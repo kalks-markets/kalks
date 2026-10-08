@@ -6,7 +6,7 @@ import { Mic, Sparkles, ArrowUp, X } from "lucide-react";
 import { cn } from "../lib/cn";
 
 /**
- * Docked "Ask Kalks AI" prompt bar with suggestion chips and an ember glow border.
+ * Docked "Ask Kalks AI" prompt bar with suggestion chips (Kalks 2: a yellow-edged card, black spark disc).
  * Answers are mocked until the Claude API integration is wired.
  */
 export function AiPromptBar({ suggestions, answer }: { suggestions: string[]; answer: (q: string) => string }) {
@@ -43,16 +43,16 @@ export function AiPromptBar({ suggestions, answer }: { suggestions: string[]; an
               </div>
               <p className="mt-2 whitespace-pre-line text-[14px] leading-relaxed text-fg">
                 {typing}
-                {typing.length < thread.a.length && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-ember align-middle" />}
+                {typing.length < thread.a.length && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-yellow align-middle" />}
               </p>
             </motion.div>
           )}
         </AnimatePresence>
-        <div className="relative rounded-[24px] p-px [background:linear-gradient(135deg,rgba(255,138,61,0.9),rgba(255,90,31,0.25)_40%,rgba(255,255,255,0.06)_70%,rgba(255,90,31,0.6))] shadow-[0_20px_60px_-20px_rgba(255,90,31,0.55)]">
+        <div className="relative rounded-[24px] bg-yellow p-px shadow-[2px_2px_0_var(--k-yellow-edge),4px_4px_0_var(--k-yellow-edge)]">
           <div className="rounded-[23px] bg-surface/95 p-1.5 backdrop-blur-xl">
             <div className={cn("flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] transition-all duration-300", open ? "max-h-12 pb-2 pt-1 opacity-100" : "max-h-0 opacity-0")}>
               {suggestions.map((s) => (
-                <button key={s} onClick={() => ask(s)} className="shrink-0 rounded-full border border-line bg-surface-2 px-3.5 py-1.5 text-[12.5px] text-fg-2 transition-colors hover:border-ember/40 hover:text-fg">
+                <button key={s} onClick={() => ask(s)} className="shrink-0 rounded-full border border-line bg-surface-2 px-3.5 py-1.5 text-[12.5px] text-fg-2 transition-colors hover:border-line-2 hover:text-fg">
                   {s}
                 </button>
               ))}
@@ -64,7 +64,7 @@ export function AiPromptBar({ suggestions, answer }: { suggestions: string[]; an
               }}
               className="flex items-center gap-2 rounded-[18px] border border-line bg-surface-2 p-1.5"
             >
-              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[radial-gradient(circle_at_30%_30%,#ff9a57,#e8431a)] text-white shadow-[0_0_24px_-4px_rgba(255,90,31,0.8)]">
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-k-black text-k-yellow">
                 <Sparkles className="size-[18px]" />
               </span>
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask Kalks AI anything about markets or your accounts…" className="h-10 min-w-0 flex-1 bg-transparent px-1 text-[14px] outline-none placeholder:text-fg-3" />

@@ -1,9 +1,8 @@
-// The Client Area's component kit: everything from @kalks/ui, with the pieces that carry the Client Area's own
-// visual language (pastel frosted cards, accent-filled segmented controls, ink money buttons, KPI accent bars)
-// replaced by the versions in this folder. Local exports take precedence over the star re-export.
+// The Client Area's component kit: everything from @kalks/ui (Kalks 2 buttons, chips, cards, segmented controls,
+// tabs, stepper …) plus the few Client Area-only pieces in this folder. Local exports take precedence over the star
+// re-export.
 export * from "@kalks/ui";
-export { Button, buttonVariants, IconButton, Chip, StatusChip, Card, CardHeader, IconTile } from "./primitives";
-export type { ButtonProps, ButtonVariant, ButtonSize, ChipTone, TileTone } from "./primitives";
-export { Segmented, Tabs, Stepper } from "./navigation";
+export { IconTile } from "./primitives";
+export type { ChipTone, TileTone } from "./primitives";
 export { PageHeader, KpiCard, ChangeChip } from "./data";
 export { Avatar, Gauge, Money } from "./visual";

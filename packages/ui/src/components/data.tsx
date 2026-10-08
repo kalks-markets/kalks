@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
 import { ArrowUpRight, Check, Copy, ChevronLeft, ChevronRight, ArrowUpDown, Search, Download } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../lib/cn";
@@ -47,12 +46,12 @@ export function KpiCard({
           {/* min-h keeps the value on the same line in a row of cards with and without an icon */}
           <div className="flex min-h-10 items-start justify-between">
             <span className="k-label">{label}</span>
-            {icon && <span className="grid size-10 place-items-center rounded-full border border-line bg-surface-2/80 text-fg-2 shadow-[inset_0_1px_0_var(--k-border-top)] [&_svg]:size-[17px]">{icon}</span>}
+            {icon && <span className="grid size-[38px] place-items-center rounded-[12px] bg-surface-3 text-fg-2 [&_svg]:size-[18px]">{icon}</span>}
           </div>
-          <div className="mt-5 text-[30px] font-semibold leading-none tracking-[-0.02em] text-fg sm:text-[32px]">{value}</div>
+          <div className="k-money mt-5 text-[30px] leading-none text-fg sm:text-[32px]">{value}</div>
         </div>
         {(chip || href || footer) && (
-          <div className="flex items-center justify-between gap-2 rounded-b-[20px] border-t border-line bg-surface-2/80 px-6 py-3.5 dark:bg-black/20">
+          <div className="flex items-center justify-between gap-2 rounded-b-[var(--radius-card)] border-t border-line bg-surface-2 px-6 py-3.5">
             {footer ?? (chip ? <Chip tone={chipTone}>{chip}</Chip> : <span />)}
             {href && (
               <Link href={href} className="text-fg-3 transition-colors hover:text-fg" aria-label={`Open ${label}`}>
@@ -203,9 +202,9 @@ export function DataTable<T>({
           {toolbar}
           <div className="ml-auto flex items-center gap-2">
             {search && (
-              <div className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface-2 px-3.5">
-                <Search className="size-3.5 text-fg-3" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={searchPlaceholder} className="w-40 bg-transparent text-[13px] outline-none placeholder:text-fg-3 sm:w-52" />
+              <div className="k-field" data-size="sm">
+                <Search className="size-3.5 shrink-0 text-fg-3" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={searchPlaceholder} aria-label={searchPlaceholder} className="w-40 sm:w-52" />
               </div>
             )}
             {exportName && (
@@ -217,24 +216,20 @@ export function DataTable<T>({
         </div>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full border-separate border-spacing-0 text-[13.5px]" style={{ minWidth: Math.min(640, columns.length * 110) }}>
+        <table className="k-table" data-dense={dense ? "" : undefined} style={{ minWidth: Math.min(640, columns.length * 110) }}>
           <thead>
             <tr>
-              {columns.map((c, i) => (
+              {columns.map((c) => (
                 <th
                   key={c.key}
                   style={{ width: c.width }}
-                  className={cn(
-                    "whitespace-nowrap bg-surface-2 px-4 py-3 text-[11.5px] font-medium uppercase tracking-[0.05em] text-fg-3 first:rounded-l-[14px] last:rounded-r-[14px] border-y border-line first:border-l last:border-r",
-                    c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : "text-left",
-                    hide(c.hideOn),
-                    i === 0 && "pl-5",
-                  )}
+                  aria-sort={sort?.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}
+                  className={cn(c.align === "right" ? "!text-right" : c.align === "center" ? "!text-center" : "", hide(c.hideOn))}
                 >
                   {c.sort ? (
-                    <button className={cn("inline-flex items-center gap-1 uppercase tracking-[0.05em] hover:text-fg", c.align === "right" && "flex-row-reverse")} onClick={() => setSort((s) => (s?.key === c.key ? { key: c.key, dir: s.dir === 1 ? -1 : 1 } : { key: c.key, dir: -1 }))}>
+                    <button type="button" className={cn("inline-flex items-center gap-1 uppercase tracking-[inherit] hover:text-fg", c.align === "right" && "flex-row-reverse")} onClick={() => setSort((s) => (s?.key === c.key ? { key: c.key, dir: s.dir === 1 ? -1 : 1 } : { key: c.key, dir: -1 }))}>
                       {c.header}
-                      <ArrowUpDown className={cn("size-3", sort?.key === c.key ? "text-ember" : "opacity-50")} />
+                      <ArrowUpDown className={cn("size-3", sort?.key === c.key ? "text-fg" : "opacity-50")} />
                     </button>
                   ) : (
                     c.header
@@ -245,30 +240,16 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {view.map((r, ri) => (
-              <motion.tr
-                key={rowKey ? rowKey(r, ri) : ri}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.25, delay: Math.min(ri * 0.02, 0.2) }}
-                onClick={onRowClick ? () => onRowClick(r) : undefined}
-                className={cn("group", onRowClick && "cursor-pointer")}
-              >
-                {columns.map((c, i) => (
+              <tr key={rowKey ? rowKey(r, ri) : ri} onClick={onRowClick ? () => onRowClick(r) : undefined} className={cn(onRowClick && "cursor-pointer")}>
+                {columns.map((c) => (
                   <td
                     key={c.key}
-                    className={cn(
-                      "border-b border-line px-4 transition-colors group-hover:bg-surface-2/60",
-                      dense ? "py-2.5" : "py-3.5",
-                      c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : "text-left",
-                      hide(c.hideOn),
-                      i === 0 && "pl-5",
-                      c.className,
-                    )}
+                    className={cn(c.align === "right" ? "k-num text-right" : c.align === "center" ? "text-center" : "text-start", hide(c.hideOn), c.className)}
                   >
                     {c.cell(r, page * pageSize + ri)}
                   </td>
                 ))}
-              </motion.tr>
+              </tr>
             ))}
           </tbody>
         </table>
@@ -322,7 +303,7 @@ function downloadCsv<T>(name: string, columns: Column<T>[], rows: T[]) {
 /* ------------------------------------------------------------------ */
 
 export function ListRow({ children, className, onClick, href, target, rel }: { children: React.ReactNode; className?: string; onClick?: () => void; href?: string; target?: string; rel?: string }) {
-  const cls = cn("k-row flex items-center gap-3 px-4 py-3 transition-colors hover:border-[var(--k-border-top)] hover:bg-surface-3/60", (onClick || href) && "cursor-pointer", className);
+  const cls = cn("k-row flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[color-mix(in_srgb,var(--k-surface-3)_60%,transparent)]", (onClick || href) && "cursor-pointer", className);
   if (href)
     return (
       <Link href={href} target={target} rel={rel} className={cls}>
@@ -332,6 +313,45 @@ export function ListRow({ children, className, onClick, href, target, rel }: { c
   return (
     <div className={cls} onClick={onClick}>
       {children}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Table primitives (KALKS2 §6): caps heads, hairlines, row hover,     */
+/* numeric columns mono + right-aligned                                */
+/* ------------------------------------------------------------------ */
+
+export function Table({ dense, className, children, ...props }: React.TableHTMLAttributes<HTMLTableElement> & { dense?: boolean }) {
+  return (
+    <div className="min-w-0 overflow-x-auto">
+      <table className={cn("k-table", className)} data-dense={dense ? "" : undefined} {...props}>
+        {children}
+      </table>
+    </div>
+  );
+}
+
+/** Header cell; `num` right-aligns it over a numeric column. */
+export function Th({ num, className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement> & { num?: boolean }) {
+  return <th scope="col" className={cn(num && "k-td-num", className)} {...props} />;
+}
+
+/** Body cell; `num` = mono, tabular, right-aligned. */
+export function Td({ num, className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement> & { num?: boolean }) {
+  return <td className={cn(num && "k-td-num", className)} {...props} />;
+}
+
+/** First-column cell: a 38 px icon tile tinted by meaning + title + one sub-line. */
+export function TitleCell({ icon, tone = "neutral", title, sub }: { icon: React.ReactNode; tone?: "neutral" | "up" | "down" | "yellow" | "red"; title: React.ReactNode; sub?: React.ReactNode }) {
+  const tint = { neutral: "bg-surface-3 text-fg-2", up: "bg-up-soft text-up", down: "bg-down-soft text-down", yellow: "bg-yellow-soft text-yellow", red: "bg-red-soft text-red" }[tone];
+  return (
+    <div className="flex items-center gap-3">
+      <span className={cn("grid size-[38px] shrink-0 place-items-center rounded-[12px] [&_svg]:size-[18px]", tint)}>{icon}</span>
+      <span className="min-w-0">
+        <b className="block truncate text-[14px] font-semibold leading-tight">{title}</b>
+        {sub && <span className="mt-[3px] block truncate text-[12.5px] leading-tight text-fg-3">{sub}</span>}
+      </span>
     </div>
   );
 }

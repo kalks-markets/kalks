@@ -4,34 +4,12 @@ import * as React from "react";
 import { cn } from "../lib/cn";
 
 /**
- * Card with a soft radial spotlight that follows the cursor
- * (React Bits "SpotlightCard" pattern, tuned to the ember palette).
+ * Before Kalks 2 a card with a pointer-following spotlight; Kalks 2 has no cursor effects (KALKS2 §7), so it is the
+ * solid card. `color` is accepted for compatibility.
  */
-export function SpotlightCard({
-  className,
-  children,
-  color = "rgba(255, 110, 50, 0.10)",
-  hot,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement> & { color?: string; hot?: boolean }) {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const [pos, setPos] = React.useState({ x: 0, y: 0, o: 0 });
+export function SpotlightCard({ className, children, color: _color, hot, ...props }: React.HTMLAttributes<HTMLDivElement> & { color?: string; hot?: boolean }) {
   return (
-    <div
-      ref={ref}
-      onMouseMove={(e) => {
-        const r = ref.current!.getBoundingClientRect();
-        setPos({ x: e.clientX - r.left, y: e.clientY - r.top, o: 1 });
-      }}
-      onMouseLeave={() => setPos((p) => ({ ...p, o: 0 }))}
-      className={cn(hot ? "k-hot-card relative rounded-[20px]" : "k-card", "overflow-hidden transition-[border-color] duration-300 hover:border-[var(--k-border-top)]", className)}
-      {...props}
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 transition-opacity duration-300"
-        style={{ opacity: pos.o, background: `radial-gradient(420px circle at ${pos.x}px ${pos.y}px, ${color}, transparent 60%)` }}
-      />
+    <div className={cn(hot ? "k-hot-card rounded-[var(--radius-card)]" : "k-card", "overflow-hidden", className)} {...props}>
       {children}
     </div>
   );

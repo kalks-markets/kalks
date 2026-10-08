@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@kalks/ui";
+import { KalksThemeProvider } from "@kalks/ui/theme";
 import type { PartialCatalog } from "@kalks/i18n";
 import { I18nProvider, useLocale } from "@kalks/i18n/react";
 import { ModulesProvider } from "@/components/modules";
@@ -29,7 +29,7 @@ function useNarrow() {
  */
 export function TerminalProviders({ children, locale, messages, modules = null }: { children: React.ReactNode; locale: string; messages: PartialCatalog; /** the broker's module switches (lib/tenant-brand.ts) */ modules?: Modules | null }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} themes={["dark", "light"]} disableTransitionOnChange>
+    <KalksThemeProvider>
       <I18nProvider locale={locale} messages={messages}>
         <ModulesProvider modules={modules}>
           <TooltipProvider>
@@ -38,7 +38,7 @@ export function TerminalProviders({ children, locale, messages, modules = null }
           </TooltipProvider>
         </ModulesProvider>
       </I18nProvider>
-    </ThemeProvider>
+    </KalksThemeProvider>
   );
 }
 

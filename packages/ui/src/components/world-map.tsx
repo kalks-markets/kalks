@@ -79,8 +79,8 @@ export function WorldMap({ pins, heat, className, onPin }: { pins: MapPin[]; hea
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full">
         <defs>
           <radialGradient id="pin-glow">
-            <stop offset="0" stopColor="#ff5a1f" stopOpacity="0.55" />
-            <stop offset="1" stopColor="#ff5a1f" stopOpacity="0" />
+            <stop offset="0" stopColor="var(--k-red)" stopOpacity="0.55" />
+            <stop offset="1" stopColor="var(--k-red)" stopOpacity="0" />
           </radialGradient>
           <radialGradient id="heat-up">
             <stop offset="0" stopColor="#22c55e" stopOpacity="0.35" />
@@ -100,7 +100,7 @@ export function WorldMap({ pins, heat, className, onPin }: { pins: MapPin[]; hea
             <circle r={26} fill="url(#pin-glow)">
               <animate attributeName="r" values="18;30;18" dur="3s" repeatCount="indefinite" />
             </circle>
-            <circle r={11} fill="var(--k-surface)" stroke="#ff5a1f" strokeWidth={1.5} />
+            <circle r={11} fill="var(--k-surface)" stroke="var(--k-red)" strokeWidth={1.5} />
             <text textAnchor="middle" dy="3.5" fontSize="10" fontWeight="700" fill="var(--k-fg)" className="k-num">
               {p.count}
             </text>
@@ -162,7 +162,7 @@ export function MarketSessions({ className }: { className?: string }) {
               <span className={`fi fis fi-${s.flag} size-4 shrink-0 rounded-full`} />
               <span className="w-20 shrink-0 text-[12.5px] text-fg-2">{tr(s.key)}</span>
               <div dir="ltr" className="relative h-2 flex-1 rounded-full bg-surface-3">
-                <span className={cn("absolute top-0 h-full rounded-full", open ? "bg-gradient-to-r from-ember/60 to-ember shadow-[0_0_12px_rgba(255,90,31,0.5)]" : "bg-fg-3/30")} style={{ left: `${(s.open / 24) * 100}%`, width: `${((s.close - s.open) / 24) * 100}%` }} />
+                <span className={cn("absolute top-0 h-full rounded-full", open ? "bg-yellow" : "bg-fg-3/30")} style={{ left: `${(s.open / 24) * 100}%`, width: `${((s.close - s.open) / 24) * 100}%` }} />
               </div>
               <span className={cn("w-28 shrink-0 text-end text-[11.5px] tabular-nums", open ? "text-up" : "text-fg-3")}>
                 {open ? `● ${tr("shell.sessions.openLeft", { h: hh, m: mm })}` : tr("shell.sessions.opensIn", { h: hh, m: mm })}

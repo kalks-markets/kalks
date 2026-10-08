@@ -64,7 +64,7 @@ export function LanguageMenu() {
               <Flag country={l.flag} className="size-[18px]" />
               <span className="flex-1">{l.name}</span>
               {"rtl" in l && l.rtl && <span className="rounded bg-surface-3 px-1.5 text-[10px] text-fg-3">RTL</span>}
-              {l.code === lang && <Check className="size-4 text-ember" />}
+              {l.code === lang && <Check className="size-4 text-fg" />}
             </button>
           ))}
         </div>
@@ -92,7 +92,7 @@ export function NotificationsPopover({ items }: { items: { id: string; title: st
     >
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <div className="text-sm font-medium">
-          {t("shell.notifications")} {unread > 0 && <span className="ms-1 rounded-full bg-ember-soft px-1.5 text-[11px] text-ember">{unread}</span>}
+          {t("shell.notifications")} {unread > 0 && <span className="ms-1 rounded-full bg-red px-1.5 text-[11px] font-semibold text-on-red">{unread}</span>}
         </div>
         <button onClick={() => setList((l) => l.map((i) => ({ ...i, unread: false })))} className="text-xs text-fg-3 hover:text-fg">
           {t("shell.markAllRead")}
@@ -106,7 +106,7 @@ export function NotificationsPopover({ items }: { items: { id: string; title: st
               <p className={cn("text-[13px] leading-snug", n.unread ? "text-fg" : "text-fg-2")}>{n.title}</p>
               <p className="mt-0.5 text-[11.5px] text-fg-3">{t("shell.timeAgo", { time: n.time })}</p>
             </div>
-            {n.unread && <span className="mt-2 size-2 shrink-0 rounded-full bg-ember" />}
+            {n.unread && <span className="mt-2 size-2 shrink-0 rounded-full bg-neon-red" />}
           </div>
         ))}
       </div>

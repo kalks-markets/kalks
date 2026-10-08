@@ -1,91 +1,218 @@
-/* Kalks design tokens — see .superdesign/design-system.md */
+/* Kalks 2 design system — docs/design/KALKS2.md, visual truth docs/design/kalks2-sample.html.
+   Colour tokens live in tokens.ts (→ tokens.css, generated); this file maps them to Tailwind, sets the type stacks
+   and holds the component classes the @kalks/ui components use. */
 @import "flag-icons/css/flag-icons.min.css" layer(base);
+@import "./tokens.css";
 
-@custom-variant dark (&:where(.dark, .dark *));
-@custom-variant light (&:where(.light, .light *));
+/* theme variants: data-theme (Kalks 2) or the class next-themes also writes; Auto resolves to one of them */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *, .light, .light *));
 
-:root,
-.dark {
-  --k-bg: #07070a;
-  --k-surface: #111114;
-  --k-surface-2: #17171c;
-  --k-surface-3: #1e1e24;
-  --k-border: rgba(255, 255, 255, 0.07);
-  --k-border-top: rgba(255, 255, 255, 0.14);
-  --k-fg: #f5f5f7;
-  --k-fg-2: #a1a1aa;
-  --k-fg-3: #63636e;
-  --k-ember: #ff5a1f;
-  --k-ember-2: #ff8a3d;
-  --k-ember-soft: rgba(255, 90, 31, 0.12);
-  --k-gold: #e9b949;
-  --k-gold-soft: rgba(233, 185, 73, 0.12);
-  --k-up: #22c55e;
-  --k-up-soft: rgba(34, 197, 94, 0.12);
-  --k-down: #f04438;
-  --k-down-soft: rgba(240, 68, 56, 0.12);
-  --k-warn: #f59e0b;
-  --k-warn-soft: rgba(245, 158, 11, 0.12);
-  --k-info: #38bdf8;
-  --k-info-soft: rgba(56, 189, 248, 0.12);
-  --k-card-grad: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.008));
-  --k-glow-strength: 1;
-  --k-shadow-card: none;
-  color-scheme: dark;
+/* ---------------- type stacks (fonts.ts loads the families with next/font; <html lang> picks the script) ----------------
+   Archivo (display, wide/heavy; narrower + tabular for money), Instrument Sans (text), JetBrains Mono (prices).
+   Archivo and Instrument Sans have no Cyrillic, Instrument Sans no Vietnamese: Russian → Golos Text + Unbounded,
+   Vietnamese → Be Vietnam Pro; other scripts → Noto (CJK: the system's CJK face). */
+:root {
+  --k-font-text: var(--font-instrument), var(--font-golos), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --k-font-display: var(--font-archivo), var(--font-unbounded), var(--font-golos), ui-sans-serif, system-ui, sans-serif;
+  --k-font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --k-track-display: -0.035em;
+  --k-track-tight: -0.02em;
+  /* the stacks under their Tailwind names, for inline styles (var(--font-display)) */
+  --font-display: var(--k-font-display);
+  /* names used before Kalks 2 (charts set them inline) */
+  --font-geist-sans: var(--k-font-text);
+  --font-geist-mono: var(--k-font-mono);
+}
+:root:lang(ru) {
+  --k-font-text: var(--font-golos), var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--font-unbounded), var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+:root:lang(vi) {
+  --k-font-text: var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--font-archivo), var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
+}
+:root:is(:lang(ar), :lang(ur), :lang(fa)) {
+  --k-font-text: var(--font-noto-arabic), var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--font-noto-kufi), var(--font-noto-arabic), ui-sans-serif, system-ui, sans-serif;
+}
+:root:lang(hi) {
+  --k-font-text: var(--font-noto-devanagari), var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--k-font-text);
+}
+:root:lang(bn) {
+  --k-font-text: var(--font-noto-bengali), var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--k-font-text);
+}
+:root:lang(ta) {
+  --k-font-text: var(--font-noto-tamil), var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--k-font-text);
+}
+:root:lang(th) {
+  --k-font-text: var(--font-noto-thai), var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--k-font-text);
+}
+:root:lang(zh) {
+  --k-font-text: var(--font-instrument), "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--k-font-text);
+}
+:root:lang(ja) {
+  --k-font-text: var(--font-instrument), "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--k-font-text);
+}
+:root:lang(ko) {
+  --k-font-text: var(--font-instrument), "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", ui-sans-serif, system-ui, sans-serif;
+  --k-font-display: var(--k-font-text);
+}
+/* connected and stacked scripts: no negative tracking (it breaks joining), no expanded width */
+:root:is(:lang(ar), :lang(ur), :lang(fa), :lang(hi), :lang(bn), :lang(ta), :lang(th), :lang(zh), :lang(ja), :lang(ko)) {
+  --k-track-display: 0;
+  --k-track-tight: 0;
 }
 
-.light {
-  --k-bg: #f6f4f1;
-  --k-surface: #ffffff;
-  --k-surface-2: #faf8f5;
-  --k-surface-3: #f1eee9;
-  --k-border: rgba(15, 15, 20, 0.08);
-  --k-border-top: rgba(15, 15, 20, 0.1);
-  --k-fg: #0e0e12;
-  --k-fg-2: #55555f;
-  --k-fg-3: #9a9aa3;
-  --k-gold: #c9971f;
-  --k-gold-soft: rgba(201, 151, 31, 0.12);
-  --k-up: #16a34a;
-  --k-down: #dc2626;
-  --k-card-grad: linear-gradient(180deg, #ffffff, #ffffff);
-  --k-glow-strength: 0.28;
-  --k-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
-  color-scheme: light;
-}
-
+/* ---------------- Tailwind theme ---------------- */
 @theme inline {
+  /* surfaces and text */
+  --color-page: var(--k-page);
   --color-bg: var(--k-bg);
+  --color-bg-2: var(--k-bg-2);
   --color-surface: var(--k-surface);
   --color-surface-2: var(--k-surface-2);
   --color-surface-3: var(--k-surface-3);
+  --color-surface-4: var(--k-surface-4);
   --color-line: var(--k-border);
-  --color-line-top: var(--k-border-top);
+  --color-line-2: var(--k-border-2);
+  --color-line-top: var(--k-border-2);
   --color-fg: var(--k-fg);
   --color-fg-2: var(--k-fg-2);
   --color-fg-3: var(--k-fg-3);
+  /* brand */
+  --color-k-red: var(--k-red);
+  --color-k-yellow: var(--k-yellow);
+  --color-k-black: var(--k-black);
+  --color-neon-red: var(--k-neon-red);
+  --color-neon-yellow: var(--k-neon-yellow);
+  --color-red: var(--k-red);
+  --color-red-edge: var(--k-red-edge);
+  --color-red-tx: var(--k-red-tx);
+  --color-red-soft: var(--k-red-soft);
+  --color-red-pastel: var(--k-red-pastel);
+  --color-on-red: var(--k-on-red);
+  --color-yellow: var(--k-yellow);
+  --color-yellow-edge: var(--k-yellow-edge);
+  --color-yellow-tx: var(--k-yellow-tx);
+  --color-yellow-soft: var(--k-yellow-soft);
+  --color-on-yellow: var(--k-on-yellow);
+  --color-ink: var(--k-ink);
+  --color-ink-edge: var(--k-ink-edge);
+  --color-ink-fg: var(--k-ink-fg);
+  --color-wine: var(--k-wine);
+  /* meaning: up = blue (buy, profit), down = red (sell, loss), ok = green (statuses only) */
+  --color-up: var(--k-up);
+  --color-up-face: var(--k-up-face);
+  --color-up-edge: var(--k-up-edge);
+  --color-up-tx: var(--k-up-tx);
+  --color-up-soft: var(--k-up-soft);
+  --color-down: var(--k-down);
+  --color-down-face: var(--k-down-face);
+  --color-down-edge: var(--k-down-edge);
+  --color-down-tx: var(--k-down-tx);
+  --color-down-soft: var(--k-down-soft);
+  --color-ok: var(--k-ok);
+  --color-ok-soft: var(--k-ok-soft);
+  --color-warn: var(--k-warn);
+  --color-warn-tx: var(--k-warn-tx);
+  --color-warn-soft: var(--k-warn-soft);
+  --color-info: var(--k-info);
+  --color-info-soft: var(--k-info-soft);
+  --color-glass: var(--k-glass);
+  --color-glass-strong: var(--k-glass-strong);
+  --color-focus: var(--k-focus);
+  --color-chart: var(--k-chart-bg);
+  /* names used before Kalks 2 */
   --color-ember: var(--k-ember);
   --color-ember-2: var(--k-ember-2);
   --color-ember-soft: var(--k-ember-soft);
   --color-gold: var(--k-gold);
   --color-gold-soft: var(--k-gold-soft);
-  --color-up: var(--k-up);
-  --color-up-soft: var(--k-up-soft);
-  --color-down: var(--k-down);
-  --color-down-soft: var(--k-down-soft);
-  --color-warn: var(--k-warn);
-  --color-warn-soft: var(--k-warn-soft);
-  --color-info: var(--k-info);
-  --color-info-soft: var(--k-info-soft);
-  --font-sans: var(--font-geist-sans), Inter, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
-  --radius-card: 20px;
+
+  /* text-<accent> reads the accent's text tone (AA on every surface); bg/border/fill keep the face colour */
+  --text-color-red: var(--k-red-tx);
+  --text-color-yellow: var(--k-yellow-tx);
+  --text-color-up: var(--k-up-tx);
+  --text-color-down: var(--k-down-tx);
+  --text-color-warn: var(--k-warn-tx);
+  --text-color-info: var(--k-info-tx);
+  --text-color-ember: var(--k-ember-tx);
+  --text-color-gold: var(--k-gold-tx);
+
+  /* type */
+  --font-sans: var(--k-font-text);
+  --font-display: var(--k-font-display);
+  --font-mono: var(--k-font-mono);
+  --text-display-xl: 80px;
+  --text-display-xl--line-height: 0.9;
+  --text-display-l: 56px;
+  --text-display-l--line-height: 0.95;
+  --text-display-m: 46px;
+  --text-display-m--line-height: 0.95;
+  --text-title: 34px;
+  --text-title--line-height: 1;
+  --text-card-title: 20px;
+  --text-card-title--line-height: 1;
+  --text-money-xl: 34px;
+  --text-money-xl--line-height: 1;
+  --text-money-l: 30px;
+  --text-money-l--line-height: 1;
+  --text-money-m: 27px;
+  --text-money-m--line-height: 1;
+  --text-body-l: 21px;
+  --text-body-l--line-height: 1.42;
+  --text-body: 15px;
+  --text-body--line-height: 1.5;
+  --text-small: 13.5px;
+  --text-small--line-height: 1.4;
+  --text-label: 12.5px;
+  --text-label--line-height: 1.2;
+  --text-th: 11px;
+  --text-th--line-height: 1;
+  --text-kicker: 12px;
+  --text-kicker--line-height: 1;
+
+  /* radius (KALKS2 §4) */
+  --radius-tag: 6px;
+  --radius-tool: 8px;
+  --radius-btn-sm: 10px;
+  --radius-btn: 12px;
+  --radius-seg: 13px;
+  --radius-btn-lg: 14px;
+  --radius-panel: 14px;
+  --radius-btn-xl: 16px;
+  --radius-strip: 20px;
+  --radius-card: 24px;
+  --radius-hero: 28px;
+  --radius-frame: 30px;
   --radius-row: 14px;
+
+  /* elevation: e1 cards, e2 sheets / menus / toasts (controls use NeoPOP edges, never these) */
+  --shadow-e1: var(--k-shadow-card);
+  --shadow-e2: var(--k-shadow-pop);
+
+  --ease-press: cubic-bezier(0.3, 0.7, 0.4, 1);
+  --ease-spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --ease-k-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
   --animate-breathe: breathe 8s ease-in-out infinite;
   --animate-shimmer: shimmer 6s ease-in-out infinite;
   --animate-pulse-dot: pulse-dot 1.8s ease-out infinite;
 }
 
+/* font width axis (Archivo 62–125, Instrument Sans 75–100): wdth-125, wdth-112, wdth-108 … */
+@utility wdth-* {
+  font-variation-settings: "wdth" --value(integer);
+}
+
+/* ---------------- keyframes ---------------- */
 @keyframes breathe {
   0%, 100% { opacity: calc(0.85 * var(--k-glow-strength)); }
   50% { opacity: var(--k-glow-strength); }
@@ -98,125 +225,621 @@
   0% { box-shadow: 0 0 0 0 currentColor; }
   100% { box-shadow: 0 0 0 6px transparent; }
 }
-/* Entrance fade-up (Reveal, PageHeader, KpiCard). A CSS animation, not a JS one: server-rendered content paints and
-   animates with the first frame, instead of staying invisible (opacity 0) until the page's scripts have loaded and
-   hydrated. Same curve, distance and timing as before; `backwards` holds the start state during the delay. */
+/* Entrance fade-up (Reveal, PageHeader, KpiCard): a CSS animation, so server-rendered content paints at once. */
 @keyframes k-reveal {
   from { opacity: 0; transform: translateY(var(--k-reveal-y, 12px)); }
 }
 .k-reveal {
   animation: k-reveal var(--k-reveal-ms, 450ms) cubic-bezier(0.16, 1, 0.3, 1) var(--k-reveal-delay, 0s) backwards;
 }
-@keyframes flash-up { from { color: var(--k-up); text-shadow: 0 0 10px var(--k-up-soft); } }
-@keyframes flash-down { from { color: var(--k-down); text-shadow: 0 0 10px var(--k-down-soft); } }
-@keyframes tick-bg-up { from { background-color: color-mix(in oklab, var(--k-up) 30%, transparent); } to { background-color: transparent; } }
-@keyframes tick-bg-down { from { background-color: color-mix(in oklab, var(--k-down) 30%, transparent); } to { background-color: transparent; } }
+/* price ticks: a 300 ms flash of up-soft / down-soft behind the price (KALKS2 §7) */
+@keyframes flash-up { from { color: var(--k-up-tx); background-color: var(--k-up-soft); } }
+@keyframes flash-down { from { color: var(--k-down-tx); background-color: var(--k-down-soft); } }
+@keyframes tick-bg-up { from { background-color: var(--k-up-soft); } to { background-color: transparent; } }
+@keyframes tick-bg-down { from { background-color: var(--k-down-soft); } to { background-color: transparent; } }
 @keyframes tick-nudge-up { from { transform: translateY(3px); opacity: 0.4; } }
 @keyframes tick-nudge-down { from { transform: translateY(-3px); opacity: 0.4; } }
+@keyframes k-fade-in { from { opacity: 0; } }
+@keyframes k-fade-out { to { opacity: 0; } }
+@keyframes k-modal-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+@keyframes k-sheet-up { from { transform: translateY(100%); } }
+@keyframes k-drawer-in { from { opacity: 0; transform: translateX(24px); } }
+@keyframes k-toast-drop { 0% { opacity: 0; transform: translateY(-110%); } 70% { transform: translateY(4%); } 100% { opacity: 1; transform: none; } }
 
+/* ---------------- base ---------------- */
 @layer base {
-  html { background: var(--k-bg); }
+  html {
+    background: var(--k-bg);
+  }
   body {
     background: var(--k-bg);
     color: var(--k-fg);
-    font-family: var(--font-sans);
+    font-family: var(--k-font-text);
     -webkit-font-smoothing: antialiased;
-    font-feature-settings: "ss01", "cv11";
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color var(--k-dur-theme) ease;
+  }
+  h1, h2, h3 {
+    font-family: var(--k-font-display);
+    letter-spacing: var(--k-track-tight);
   }
   * { border-color: var(--k-border); }
-  ::selection { background: var(--k-ember-soft); color: var(--k-fg); }
+  ::selection { background: var(--k-yellow-soft); color: var(--k-fg); }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { background: var(--k-surface-3); border-radius: 999px; border: 3px solid var(--k-bg); }
+  ::-webkit-scrollbar-thumb { background: var(--k-surface-4); border-radius: 999px; border: 3px solid var(--k-bg); }
   ::-webkit-scrollbar-track { background: transparent; }
+  /* keyboard focus: 2 px ring in the focus colour (ink in light, neon yellow in dark); never red */
+  :where(a[href], button, [role="button"], [role="tab"], [role="menuitem"], [role="switch"], [role="checkbox"], [role="radio"], [role="option"], summary, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--k-focus);
+    outline-offset: 2px;
+  }
 }
 
+/* ---------------- components ---------------- */
 @layer components {
-  /* Ambient ember glow painted behind every page */
+  /* display type (KALKS2 §3): headlines wide + heavy, money narrower + tabular, kickers mono */
+  .k-d {
+    font-family: var(--k-font-display);
+    font-variation-settings: "wdth" 125;
+    font-weight: 800;
+    letter-spacing: var(--k-track-display);
+    line-height: 0.94;
+  }
+  .k-d-wide {
+    font-family: var(--k-font-display);
+    font-variation-settings: "wdth" 112;
+    font-weight: 700;
+    letter-spacing: var(--k-track-tight);
+  }
+  .k-title {
+    font-family: var(--k-font-display);
+    font-variation-settings: "wdth" 110;
+    font-weight: 700;
+    letter-spacing: calc(var(--k-track-tight) * 0.75);
+    line-height: 1.05;
+  }
+  .k-money {
+    font-family: var(--k-font-display);
+    font-variation-settings: "wdth" 108;
+    font-weight: 700;
+    letter-spacing: var(--k-track-tight);
+    font-variant-numeric: tabular-nums;
+  }
+  .k-money .k-cents { font-size: 0.58em; font-weight: 600; color: var(--k-fg-2); }
+  .k-kicker {
+    font: 600 12px/1 var(--k-font-mono);
+    letter-spacing: 0.04em;
+  }
+  .k-th {
+    font: 600 11px/1 var(--k-font-text);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--k-fg-3);
+  }
+  .k-label { font-size: 12.5px; line-height: 1.2; font-weight: 600; color: var(--k-fg-2); }
+  .k-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  /* figures keep their left-to-right digit order inside right-to-left text (Arabic, Urdu, Persian) */
+  [dir="rtl"] .k-num { direction: ltr; unicode-bidi: isolate; }
+
+  /* ---- NeoPOP button: a flat face on a solid bottom-right edge (stacked 1 px shadows = diagonal joins); the
+     press slides the face into the edge; the edge depth is reserved as right/bottom margin, so neighbours never move.
+     No blur shadows, no glow. Sizes 28 · 32 · 40 · 48 · 56 (KALKS2 §5). */
+  .k-btn {
+    --h: 40px; --px: 16px; --r: 12px; --fs: 14px; --d: 4px; --ic: 18px;
+    --face: var(--k-ink); --edge: var(--k-ink-edge); --lbl: var(--k-ink-fg);
+    --e: 1px 1px 0 var(--edge), 2px 2px 0 var(--edge), 3px 3px 0 var(--edge), 4px 4px 0 var(--edge);
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-shrink: 0;
+    height: var(--h);
+    padding: 0 var(--px);
+    margin: 0 var(--d) var(--d) 0;
+    border-radius: var(--r);
+    background: var(--face);
+    color: var(--lbl);
+    font: 600 var(--fs)/1 var(--k-font-text);
+    letter-spacing: -0.003em;
+    white-space: nowrap;
+    box-shadow: var(--e);
+    transition: transform var(--k-dur-press) var(--k-ease-press), box-shadow var(--k-dur-press) var(--k-ease-press), filter var(--k-dur-hover) ease, background-color var(--k-dur-hover) ease;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    cursor: pointer;
+    outline: none;
+    text-decoration: none;
+  }
+  .k-btn svg { width: var(--ic); height: var(--ic); flex-shrink: 0; }
+  .k-btn:hover { filter: brightness(1.07); }
+  .k-btn:active, .k-btn[data-pressed] { transform: translate(var(--d), var(--d)); box-shadow: 0 0 0 var(--edge); }
+  .k-btn:focus-visible { outline: 2px solid var(--k-focus); outline-offset: 3px; box-shadow: var(--e), 0 0 0 7px var(--k-focus-halo); }
+  .k-btn:disabled, .k-btn[aria-disabled="true"] {
+    --face: var(--k-surface-3); --lbl: var(--k-fg-3);
+    box-shadow: none;
+    transform: translate(calc(var(--d) / 2), calc(var(--d) / 2));
+    cursor: not-allowed;
+    filter: none;
+  }
+  .k-btn-28 { --h: 28px; --px: 10px; --r: 9px; --fs: 12.5px; --d: 2px; --ic: 15px; --e: 1px 1px 0 var(--edge), 2px 2px 0 var(--edge); gap: 6px; }
+  .k-btn-32 { --h: 32px; --px: 12px; --r: 10px; --fs: 13px; --d: 3px; --ic: 16px; --e: 1px 1px 0 var(--edge), 2px 2px 0 var(--edge), 3px 3px 0 var(--edge); gap: 7px; }
+  .k-btn-48 { --h: 48px; --px: 20px; --r: 14px; --fs: 15px; --d: 5px; --e: 1px 1px 0 var(--edge), 2px 2px 0 var(--edge), 3px 3px 0 var(--edge), 4px 4px 0 var(--edge), 5px 5px 0 var(--edge); }
+  .k-btn-56 { --h: 56px; --px: 26px; --r: 16px; --fs: 16px; --d: 6px; --ic: 20px; --e: 1px 1px 0 var(--edge), 2px 2px 0 var(--edge), 3px 3px 0 var(--edge), 4px 4px 0 var(--edge), 5px 5px 0 var(--edge), 6px 6px 0 var(--edge); }
+  .k-btn-primary { --face: var(--k-red); --edge: var(--k-red-edge); --lbl: var(--k-on-red); }
+  .k-btn-highlight { --face: var(--k-yellow); --edge: var(--k-yellow-edge); --lbl: var(--k-on-yellow); }
+  .k-btn-ink { --face: var(--k-ink); --edge: var(--k-ink-edge); --lbl: var(--k-ink-fg); }
+  .k-btn-white { --face: #fff; --edge: var(--k-white-edge); --lbl: var(--k-black); }
+  .k-btn-buy { --face: var(--k-up-face); --edge: var(--k-up-edge); --lbl: #fff; }
+  .k-btn-sell { --face: var(--k-down-face); --edge: var(--k-down-edge); --lbl: #fff; }
+  .k-btn-neutral { --face: var(--k-surface-3); --edge: var(--k-seg-edge); --lbl: var(--k-fg); }
+  /* flat variants: no edge, nothing to press into */
+  .k-btn-ghost, .k-btn-soft, .k-btn-soft-up, .k-btn-soft-down {
+    --edge: transparent;
+    margin: 0;
+    box-shadow: inset 0 0 0 1.5px var(--ring, var(--k-border-2));
+  }
+  .k-btn-ghost { --face: transparent; --lbl: var(--k-fg); }
+  .k-btn-ghost:hover { filter: none; background: var(--k-surface-3); }
+  .k-btn-soft { --face: var(--k-red-soft); --lbl: var(--k-red-tx); --ring: transparent; }
+  .k-btn-soft-up { --face: var(--k-up-soft); --lbl: var(--k-up-tx); --ring: color-mix(in oklab, var(--k-up) 35%, transparent); }
+  .k-btn-soft-down { --face: var(--k-down-soft); --lbl: var(--k-down-tx); --ring: color-mix(in oklab, var(--k-down) 35%, transparent); }
+  .k-btn-ghost:active, .k-btn-soft:active, .k-btn-soft-up:active, .k-btn-soft-down:active,
+  .k-btn-ghost[data-pressed], .k-btn-soft[data-pressed] {
+    transform: translate(1px, 1px);
+    box-shadow: inset 0 0 0 1.5px var(--ring, var(--k-border-2));
+  }
+  .k-btn-ghost:focus-visible, .k-btn-soft:focus-visible, .k-btn-soft-up:focus-visible, .k-btn-soft-down:focus-visible {
+    box-shadow: inset 0 0 0 1.5px var(--ring, var(--k-border-2)), 0 0 0 7px var(--k-focus-halo);
+  }
+  .k-btn-ghost:disabled, .k-btn-soft:disabled, .k-btn-soft-up:disabled, .k-btn-soft-down:disabled { transform: none; }
+  .k-btn-round { --px: 0px; width: var(--h); border-radius: 50%; }
+  .k-btn-block { display: flex; width: calc(100% - var(--d)); }
+  .k-btn .k-btn-sub { font: 500 12px/1 var(--k-font-mono); opacity: 0.75; }
+  .k-btn[data-loading] { color: transparent; pointer-events: none; }
+  .k-btn[data-loading] > * { visibility: hidden; }
+  .k-btn[data-loading]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 24px;
+    height: 6px;
+    background: radial-gradient(circle, var(--lbl) 2.4px, transparent 2.6px) 0 50% / 8px 6px repeat-x;
+    transform: none;
+  }
+
+  /* ---- icon buttons that are not NeoPOP blocks: soft squares (top bar, toolbars) */
+  .k-icb {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: var(--s, 40px);
+    height: var(--s, 40px);
+    border-radius: var(--r, 12px);
+    color: var(--k-fg-2);
+    background: var(--k-surface);
+    box-shadow: inset 0 0 0 1px var(--k-border);
+    transition: background-color var(--k-dur-hover) ease, color var(--k-dur-hover) ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .k-icb svg { width: var(--ic, 18px); height: var(--ic, 18px); }
+  .k-icb:hover { background: var(--k-surface-3); color: var(--k-fg); }
+  .k-icb:active { transform: translate(1px, 1px); }
+  .k-icb[data-variant="ghost"] { background: transparent; box-shadow: none; }
+  .k-icb[data-variant="ghost"]:hover { background: var(--k-surface-3); }
+  .k-icb[data-variant="glass"] { background: var(--k-glass); -webkit-backdrop-filter: var(--k-glass-blur); backdrop-filter: var(--k-glass-blur); box-shadow: inset 0 0 0 1px var(--k-glass-line); }
+  .k-icb[data-variant="outline"] { background: transparent; box-shadow: inset 0 0 0 1px var(--k-border-2); color: var(--k-fg-3); }
+  .k-icb[data-active] { background: var(--k-yellow-soft); color: var(--k-fg); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--k-yellow) 55%, transparent); }
+  .k-icb:disabled { opacity: 0.45; cursor: not-allowed; }
+  .k-dot::after {
+    content: "";
+    position: absolute;
+    top: 22%;
+    right: 22%;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--k-neon-red);
+    box-shadow: 0 0 0 2px var(--k-surface);
+  }
+
+  /* ---- chips, status, tags, change */
+  .k-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 13px;
+    border-radius: 999px;
+    background: var(--k-surface-3);
+    color: var(--k-fg-2);
+    font: 600 13px/1 var(--k-font-text);
+    white-space: nowrap;
+    transition: background-color var(--k-dur-hover) ease, color var(--k-dur-hover) ease;
+  }
+  button.k-chip:hover { color: var(--k-fg); }
+  .k-chip[aria-pressed="true"], .k-chip[data-selected] { background: var(--k-fg); color: var(--k-bg); }
+  .k-chip[data-variant="outline"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--k-border-2); color: var(--k-fg); }
+  .k-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 999px;
+    font: 600 12px/1 var(--k-font-text);
+    white-space: nowrap;
+  }
+  .k-status[data-size="sm"] { height: 20px; padding: 0 7px; font-size: 10.5px; gap: 5px; }
+  .k-status-dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .k-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 6px;
+    font: 700 10.5px/1 var(--k-font-text);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: var(--k-surface-3);
+    color: var(--k-fg-2);
+  }
+  .k-tag[data-tone="live"] { background: transparent; box-shadow: inset 0 0 0 1.25px var(--k-fg); color: var(--k-fg); }
+  .k-tag[data-tone="cfd"] { background: var(--k-fg); color: var(--k-bg); }
+  .k-tag[data-tone="options"] { background: var(--k-yellow); color: var(--k-on-yellow); }
+  .k-tag[data-tone="new"] { background: var(--k-red); color: var(--k-on-red); }
+  .k-chg {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 7px;
+    font: 600 12px/1 var(--k-font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- segmented control: sunken track, the selected item raised on a 2 px NeoPOP edge */
+  .k-seg {
+    position: relative;
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 13px;
+    background: var(--k-bg-2);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08), inset 0 0 0 1px var(--k-border);
+  }
+  .k-seg-item {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 13px;
+    border-radius: 10px;
+    font: 600 13px/1 var(--k-font-text);
+    color: var(--k-fg-2);
+    white-space: nowrap;
+    transition: color var(--k-dur-hover) ease;
+  }
+  .k-seg-item:hover { color: var(--k-fg); }
+  .k-seg-item[aria-checked="true"], .k-seg-item[aria-selected="true"] { color: var(--k-fg); }
+  .k-seg-thumb {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--k-surface);
+    box-shadow: 1px 1px 0 var(--k-seg-edge), 2px 2px 0 var(--k-seg-edge);
+  }
+  .k-seg[data-size="sm"] .k-seg-item { height: 26px; padding: 0 10px; font-size: 12.5px; border-radius: 8px; }
+  .k-seg[data-size="lg"] .k-seg-item { height: 36px; padding: 0 16px; font-size: 14px; border-radius: 11px; }
+  .k-seg[data-block] { display: flex; }
+  .k-seg[data-block] .k-seg-item { flex: 1; }
+
+  /* ---- toggle: sunken track, white puck on a 2 px edge, springs over (220 ms, small overshoot) */
+  .k-tog {
+    position: relative;
+    flex-shrink: 0;
+    width: 46px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--k-surface-4);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.18);
+    transition: background-color 180ms ease;
+    cursor: pointer;
+  }
+  .k-tog::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 1px 1px 0 var(--k-puck-edge), 2px 2px 0 var(--k-puck-edge);
+    transition: transform var(--k-dur-toggle) var(--k-ease-spring);
+  }
+  .k-tog[aria-checked="true"] { background: var(--k-tog-on); }
+  .k-tog[aria-checked="true"]::after { transform: translateX(18px); }
+  [dir="rtl"] .k-tog::after { left: auto; right: 3px; }
+  [dir="rtl"] .k-tog[aria-checked="true"]::after { transform: translateX(-18px); }
+  .k-tog[data-size="sm"] { width: 40px; height: 24px; }
+  .k-tog[data-size="sm"]::after { width: 16px; height: 16px; }
+  .k-tog[data-size="sm"][aria-checked="true"]::after { transform: translateX(16px); }
+  [dir="rtl"] .k-tog[data-size="sm"][aria-checked="true"]::after { transform: translateX(-16px); }
+  .k-tog:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ---- slider: 6 px sunken track, fill, 24 px puck on a 3 px edge, value bubble; a native range input on top
+     carries keyboard, pointer and screen-reader behaviour */
+  .k-slider { position: relative; height: 28px; touch-action: none; }
+  .k-slider-track { position: absolute; left: 0; right: 0; top: 11px; height: 6px; border-radius: 99px; background: var(--k-surface-4); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18); }
+  .k-slider-fill { position: absolute; left: 0; top: 11px; height: 6px; border-radius: 99px; background: var(--k-tog-on); }
+  .k-slider-puck { position: absolute; top: 2px; width: 24px; height: 24px; margin-left: -12px; border-radius: 50%; background: #fff; box-shadow: 1px 1px 0 var(--k-puck-edge), 2px 2px 0 var(--k-puck-edge), 3px 3px 0 var(--k-puck-edge); pointer-events: none; }
+  .k-slider-bubble { position: absolute; bottom: 34px; transform: translateX(-50%); padding: 5px 8px; border-radius: 8px; background: var(--k-fg); color: var(--k-bg); font: 600 12px/1 var(--k-font-mono); white-space: nowrap; pointer-events: none; }
+  .k-slider input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .k-slider input:focus-visible ~ .k-slider-puck { outline: 2px solid var(--k-focus); outline-offset: 3px; box-shadow: 1px 1px 0 var(--k-puck-edge), 2px 2px 0 var(--k-puck-edge), 3px 3px 0 var(--k-puck-edge), 0 0 0 7px var(--k-focus-halo); }
+  .k-slider-ticks { display: flex; justify-content: space-between; margin-top: 6px; font: 500 11.5px/1 var(--k-font-mono); color: var(--k-fg-3); }
+
+  /* ---- fields: 44 px, s2 face, hairline inner ring; focus = focus ring + halo; error = red ring */
+  .k-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+    background: var(--k-surface-2);
+    box-shadow: inset 0 0 0 1px var(--k-border-2), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    font: 500 15px/1 var(--k-font-text);
+    color: var(--k-fg);
+    transition: box-shadow var(--k-dur-hover) ease;
+  }
+  .k-field:focus-within { box-shadow: inset 0 0 0 1.5px var(--k-focus), 0 0 0 4px var(--k-focus-halo); }
+  .k-field[data-invalid] { box-shadow: inset 0 0 0 1.5px var(--k-red-tx); }
+  .k-field[data-disabled] { opacity: 0.6; }
+  .k-field[data-size="sm"] { height: 36px; padding: 0 11px; border-radius: 10px; font-size: 13.5px; }
+  .k-field > input, .k-field > select, .k-field > textarea {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    border: 0;
+    outline: none;
+  }
+  .k-field > input::placeholder, .k-field > textarea::placeholder { color: var(--k-fg-3); }
+  .k-field > select { appearance: none; padding-inline-end: 22px; cursor: pointer; }
+  .k-field > select option { background: var(--k-surface-2); color: var(--k-fg); }
+  .k-field-textarea { height: auto; padding: 11px 14px; align-items: stretch; }
+  .k-field-textarea > textarea { resize: vertical; min-height: 88px; line-height: 1.45; }
+  .k-field-affix { display: flex; flex-shrink: 0; align-items: center; gap: 8px; font: 500 13px/1 var(--k-font-text); color: var(--k-fg-3); }
+  .k-field-affix svg { width: 16px; height: 16px; }
+  .k-field :focus-visible { outline: none; }
+  .k-kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 6px;
+    background: var(--k-surface-3);
+    box-shadow: inset 0 -1px 0 var(--k-border-2);
+    font: 600 11px/1 var(--k-font-mono);
+    color: var(--k-fg-2);
+  }
+
+  /* ---- cards and glass */
+  .k-card {
+    position: relative;
+    border-radius: var(--radius-card);
+    background: var(--k-surface);
+    border: 1px solid var(--k-border);
+    box-shadow: var(--k-shadow-card);
+  }
+  .k-glass {
+    background: var(--k-glass);
+    -webkit-backdrop-filter: var(--k-glass-blur);
+    backdrop-filter: var(--k-glass-blur);
+    box-shadow: inset 0 0 0 1px var(--k-glass-line);
+  }
+  .k-glass-strong {
+    background: var(--k-glass-strong);
+    -webkit-backdrop-filter: blur(28px) saturate(170%);
+    backdrop-filter: blur(28px) saturate(170%);
+    box-shadow: inset 0 0 0 1px var(--k-glass-line);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .k-glass, .k-glass-strong { background: var(--k-surface); }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .k-glass, .k-glass-strong { background: var(--k-surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+  /* the canvas with its two blooms (pastel red top-right, pastel yellow bottom-left; red glow in dark) */
+  .k-canvas {
+    background:
+      radial-gradient(60% 50% at 88% -6%, var(--k-bloom-a), transparent 70%),
+      radial-gradient(50% 40% at -6% 104%, var(--k-bloom-b), transparent 70%),
+      var(--k-bg);
+  }
+
+  /* ---- tables: 11 px caps heads, hairlines, numbers mono and right-aligned, row hover s3 at 60 % */
+  .k-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+  .k-table th {
+    padding: 10px 14px;
+    text-align: start;
+    font: 600 11px/1 var(--k-font-text);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--k-fg-3);
+    border-bottom: 1px solid var(--k-border);
+    white-space: nowrap;
+  }
+  .k-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--k-border);
+    font-size: 14px;
+    vertical-align: middle;
+  }
+  .k-table tbody tr:last-child td { border-bottom: 0; }
+  .k-table tbody tr { transition: background-color var(--k-dur-hover) ease; }
+  .k-table tbody tr:hover td { background: color-mix(in srgb, var(--k-surface-3) 60%, transparent); }
+  .k-table[data-dense] th { padding: 9px 12px; font-size: 10.5px; }
+  .k-table[data-dense] td { padding: 9px 12px; font-size: 13px; }
+  .k-table .k-td-num { text-align: end; font: 600 13.5px/1 var(--k-font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .k-table th.k-td-num { font: 600 11px/1 var(--k-font-text); }
+
+  /* ---- Client Area icon rail: black in both themes, yellow active square on a 2 px edge */
+  .k-irail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 70px;
+    padding: 16px 0;
+    border-radius: 24px;
+    background: var(--k-black);
+    color: #8a7b77;
+  }
+  .k-irail-btn {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    color: #9c8d89;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+  .k-irail-btn svg { width: 20px; height: 20px; }
+  .k-irail-btn:hover { background: #1e1719; color: #f6eee8; }
+  .k-irail-btn[aria-current="page"], .k-irail-btn[data-active] { background: var(--k-yellow); color: var(--k-on-yellow); box-shadow: 1px 1px 0 var(--k-yellow-edge-dark), 2px 2px 0 var(--k-yellow-edge-dark); }
+  .k-irail-btn:focus-visible { outline: 2px solid var(--k-neon-yellow); outline-offset: 2px; }
+  .k-irail .k-dot::after { box-shadow: 0 0 0 2px var(--k-black); }
+  /* phone tab bar (the rail on phones): ink, radius 24, active icon in a disc */
+  .k-tabbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    height: 64px;
+    border-radius: 24px;
+    background: var(--k-tabbar);
+    box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.5);
+  }
+  .k-tabbar-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; color: var(--k-tab-ic); }
+  .k-tabbar-btn svg { width: 20px; height: 20px; }
+  .k-tabbar-btn[aria-current="page"], .k-tabbar-btn[data-active] { background: var(--k-tab-on); color: var(--k-tab-on-ic); }
+  .k-tabbar-btn:focus-visible { outline: 2px solid var(--k-neon-yellow); outline-offset: 2px; }
+
+  /* ---- toasts (sonner): iOS banners, frosted s2, radius 20, a 38 px icon tile coloured by meaning */
+  .k-toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 20px;
+    background: color-mix(in oklab, var(--k-surface-2) 84%, transparent);
+    -webkit-backdrop-filter: var(--k-glass-blur);
+    backdrop-filter: var(--k-glass-blur);
+    box-shadow: inset 0 0 0 1px var(--k-border), var(--k-shadow-pop);
+    color: var(--k-fg);
+  }
+  .k-toast-ic { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px; }
+  .k-toast-ic svg { width: 18px; height: 18px; }
+
+  /* ---- overlays: 320 ms in (cubic-bezier .2 .8 .2 1), 200 ms out; reduced motion: fades only */
+  .k-overlay { background: color-mix(in oklab, var(--k-black) 52%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .k-overlay[data-state="open"] { animation: k-fade-in var(--k-dur-sheet) var(--k-ease-out); }
+  .k-overlay[data-state="closed"] { animation: k-fade-out 200ms ease-in; }
+  .k-modal[data-state="open"] { animation: k-modal-in var(--k-dur-sheet) var(--k-ease-out); }
+  .k-modal[data-state="closed"] { animation: k-fade-out 200ms ease-in; }
+  .k-sheet[data-state="open"] { animation: k-sheet-up var(--k-dur-sheet) var(--k-ease-out); }
+  .k-sheet[data-state="closed"] { animation: k-fade-out 200ms ease-in; }
+  @media (min-width: 640px) {
+    .k-sheet[data-state="open"] { animation-name: k-modal-in; }
+  }
+  .k-drawer[data-state="open"] { animation: k-drawer-in var(--k-dur-sheet) var(--k-ease-out); }
+  .k-drawer[data-state="closed"] { animation: k-fade-out 200ms ease-in; }
+  .k-grabber { width: 40px; height: 5px; border-radius: 9px; background: var(--k-border-2); margin: 0 auto; }
+
+  /* ---- pieces kept from before Kalks 2 (restyled; pages still use them) ---- */
   .k-glow {
     pointer-events: none;
     position: absolute;
     inset: 0 0 auto 0;
     height: 560px;
     background:
-      radial-gradient(900px 380px at 50% -140px, rgba(255, 92, 31, 0.55), rgba(196, 52, 20, 0.22) 45%, transparent 72%),
-      radial-gradient(520px 260px at 88% -80px, rgba(233, 150, 60, 0.25), transparent 70%);
-    animation: var(--animate-breathe);
+      radial-gradient(60% 380px at 88% -140px, var(--k-bloom-a), transparent 72%),
+      radial-gradient(40% 260px at 0% -80px, var(--k-bloom-b), transparent 70%);
+    opacity: var(--k-glow-strength);
   }
-  .k-noise {
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    opacity: 0.05;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    mix-blend-mode: overlay;
-  }
-  .k-card {
-    position: relative;
-    border-radius: var(--radius-card);
-    background: var(--k-card-grad), var(--k-surface);
-    border: 1px solid var(--k-border);
-    box-shadow: inset 0 1px 0 var(--k-border-top), var(--k-shadow-card);
-  }
+  .k-noise { display: none; }
   .k-row {
     border-radius: var(--radius-row);
     background: var(--k-surface-2);
     border: 1px solid var(--k-border);
   }
   .k-pill-group {
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--k-surface) 80%, transparent);
+    border-radius: 13px;
+    background: var(--k-glass);
     border: 1px solid var(--k-border);
-    box-shadow: inset 0 1px 0 var(--k-border-top);
-    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: var(--k-glass-blur);
+    backdrop-filter: var(--k-glass-blur);
   }
+  /* the old ember gradient button: now the red NeoPOP face (edge drawn, no reserved margin) */
   .k-ember-btn {
-    background: linear-gradient(135deg, #ff7a2f, #e8431a);
-    color: #fff;
-    box-shadow: 0 8px 24px -8px rgba(255, 90, 31, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    background: var(--k-red);
+    color: var(--k-on-red);
+    box-shadow: 1px 1px 0 var(--k-red-edge), 2px 2px 0 var(--k-red-edge), 3px 3px 0 var(--k-red-edge);
   }
+  .k-ember-btn:active { transform: translate(3px, 3px); box-shadow: none; }
   .k-hot-card {
+    position: relative;
     background:
-      radial-gradient(120% 90% at 100% 0%, rgba(255, 90, 31, 0.35), transparent 60%),
-      linear-gradient(160deg, #2a130b, #120b09 60%, var(--k-surface));
-    border: 1px solid rgba(255, 120, 60, 0.25);
-    box-shadow: inset 0 1px 0 rgba(255, 170, 120, 0.25);
-  }
-  .light .k-hot-card {
-    background:
-      radial-gradient(120% 90% at 100% 0%, rgba(255, 90, 31, 0.18), transparent 60%),
-      linear-gradient(160deg, #fff4ee, #ffffff);
+      radial-gradient(120% 90% at 100% 0%, var(--k-red-soft), transparent 60%),
+      var(--k-surface);
+    border: 1px solid color-mix(in oklab, var(--k-red) 22%, var(--k-border));
+    box-shadow: var(--k-shadow-card);
   }
   .k-dotgrid {
     background-image: radial-gradient(color-mix(in oklab, var(--k-fg) 14%, transparent) 1px, transparent 1px);
     background-size: 14px 14px;
   }
   .k-fade-bottom { mask-image: linear-gradient(to bottom, #000 70%, transparent); }
-  .k-label { font-size: 11px; line-height: 14px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; color: var(--k-fg-2); }
-  .k-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
-  /* figures keep their left-to-right digit order inside right-to-left text (Arabic, Urdu, Persian) */
-  [dir="rtl"] .k-num { direction: ltr; unicode-bidi: isolate; }
-  /* live ticks: changed digits flash + slide in; cells pulse; ~MT5 speed */
-  .flash-up { animation: flash-up 0.38s ease-out; }
-  .flash-down { animation: flash-down 0.38s ease-out; }
-  .digit-up { display: inline-block; animation: flash-up 0.38s ease-out, tick-nudge-up 0.16s ease-out; }
-  .digit-down { display: inline-block; animation: flash-down 0.38s ease-out, tick-nudge-down 0.16s ease-out; }
-  .tick-bg-up { animation: tick-bg-up 0.45s ease-out; }
-  .tick-bg-down { animation: tick-bg-down 0.45s ease-out; }
+  /* live ticks: changed digits flash + slide in; cells pulse */
+  .flash-up { animation: flash-up 0.3s ease-out; }
+  .flash-down { animation: flash-down 0.3s ease-out; }
+  .digit-up { display: inline-block; animation: flash-up 0.3s ease-out, tick-nudge-up 0.16s ease-out; }
+  .digit-down { display: inline-block; animation: flash-down 0.3s ease-out, tick-nudge-down 0.16s ease-out; }
+  .tick-bg-up { animation: tick-bg-up 0.3s ease-out; }
+  .tick-bg-down { animation: tick-bg-down 0.3s ease-out; }
   .fi.fis { border-radius: 999px; }
-}
 
-/* ---------------- Kalks icon tiles (AnimIcon) — static, crisp, no blur or motion ---------------- */
-@layer components {
+  /* icon tiles (AnimIcon): a soft tint of the tone */
   .anim-icon {
     display: inline-grid;
     place-items: center;
     flex-shrink: 0;
     color: var(--ai-c);
-    background: color-mix(in oklab, var(--ai-c) 9%, var(--k-surface-2));
-    border: 1px solid color-mix(in oklab, var(--ai-c) 22%, var(--k-border));
+    background: color-mix(in oklab, var(--ai-c) 12%, var(--k-surface));
+    border: 1px solid color-mix(in oklab, var(--ai-c) 18%, transparent);
   }
 }
 
+/* A NeoPOP button stretched by `w-full` keeps its edge inside the row (the edge is reserved as margin). Unlayered so
+   it wins over the utility; it only touches elements carrying both classes. */
+.k-btn.w-full { width: calc(100% - var(--d)); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  /* presses still change colour but never move (KALKS2 §7) */
+  .k-btn:active, .k-btn[data-pressed], .k-icb:active { transform: none !important; }
+  .k-btn:not(:disabled):active { filter: brightness(0.92); }
 }

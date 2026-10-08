@@ -99,16 +99,16 @@ function IconRail({ modules, footer, side = "right" }: { modules: NavModule[]; f
                   prefetch={m.external ? false : true}
                   target={m.external ? "_blank" : undefined}
                   data-rail-active={active || undefined}
-                  className={cn("relative grid shrink-0 place-items-center rounded-full transition-colors", dense ? "size-10" : "size-11", active ? "text-ember" : "text-fg-3 hover:bg-surface-3 hover:text-fg")}
+                  className={cn("relative grid shrink-0 place-items-center rounded-full transition-colors", dense ? "size-10" : "size-11", active ? "text-fg" : "text-fg-3 hover:bg-surface-3 hover:text-fg")}
                 >
                   {active && (
                     <>
-                      <motion.span layoutId="rail-active" className="absolute inset-0 rounded-full border border-ember/25 bg-ember-soft" transition={{ type: "spring", bounce: 0.2, duration: 0.5 }} />
-                      <motion.span layoutId="rail-bar" className="absolute -start-2 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-ember" />
+                      <motion.span layoutId="rail-active" className="absolute inset-0 rounded-[14px] bg-yellow-soft shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--k-yellow)_55%,transparent)]" transition={{ type: "tween", duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }} />
+                      <motion.span layoutId="rail-bar" className="absolute -start-2 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-yellow" />
                     </>
                   )}
                   <Icon className="relative size-[19px]" strokeWidth={1.7} />
-                  {m.badge !== undefined && <span className="absolute end-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-ember px-1 text-[9px] font-bold text-white ring-2 ring-surface">{m.badge}</span>}
+                  {m.badge !== undefined && <span className="absolute end-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-red px-1 text-[9px] font-bold text-on-red ring-2 ring-surface">{m.badge}</span>}
                 </Link>
               </Tooltip>
             </React.Fragment>
@@ -190,7 +190,7 @@ function PillNav({ items, variant, fit = false }: { items: SubNavItem[]; variant
       <>
         {Icon && <Icon className="relative size-[17px]" strokeWidth={1.8} />}
         {!iconOnly && <span className="relative whitespace-nowrap">{s.label}</span>}
-        {s.badge !== undefined && <span className="relative grid h-[18px] min-w-[18px] place-items-center rounded-full bg-ember-soft px-1 text-[10px] font-semibold text-ember">{s.badge}</span>}
+        {s.badge !== undefined && <span className="relative grid h-[18px] min-w-[18px] place-items-center rounded-full bg-red-soft px-1 text-[10px] font-semibold text-red">{s.badge}</span>}
       </>
     );
   };
@@ -245,7 +245,7 @@ function PillNav({ items, variant, fit = false }: { items: SubNavItem[]; variant
                 {t("shell.more")} <MoreHorizontal className="size-4" />
               </button>
             }
-            items={overflow.map((o) => ({ label: o.label, href: o.href, icon: o.icon ? <o.icon /> : undefined, hint: o.badge !== undefined ? <span className="k-num text-[11px] text-ember">{o.badge}</span> : undefined }))}
+            items={overflow.map((o) => ({ label: o.label, href: o.href, icon: o.icon ? <o.icon /> : undefined, hint: o.badge !== undefined ? <span className="k-num text-[11px] text-red">{o.badge}</span> : undefined }))}
           />
         )}
       </div>
@@ -267,7 +267,7 @@ function MobileBar({ modules }: { modules: NavModule[] }) {
       {primary.map((m) => {
         const active = isActive(pathname, m);
         return (
-          <Link key={m.key} href={m.href} prefetch={m.external ? false : true} className={cn("flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-[10.5px] font-medium", active ? "bg-ember-soft text-ember" : "text-fg-3")}>
+          <Link key={m.key} href={m.href} prefetch={m.external ? false : true} className={cn("flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-[10.5px] font-medium", active ? "bg-yellow-soft text-fg" : "text-fg-3")}>
             <m.icon className="size-5" strokeWidth={1.7} />
             {m.label.split(" ")[0]}
           </Link>

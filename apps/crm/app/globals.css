@@ -3,223 +3,71 @@
 @source "../../../packages/ui/src";
 
 /* ==========================================================================================================
-   Client Area theme — a soft pastel dashboard: blurred washes behind frosted white cards, a slim rail, a geometric
-   display face and large bold money figures. Every tint below is mixed from the tenant brand colour (--k-ember;
-   brokers replace it, see brandCss in @kalks/ui), so a blue brand gets a blue-tinted pastel look automatically.
-   Light is the default theme; dark keeps the same language on a deep tinted gradient.
+   Client Area. Tokens, type and components come from @kalks/ui (Kalks 2: docs/design/KALKS2.md); this file only
+   keeps the Client Area's own classes, restyled to Kalks 2, until R2 rebuilds the pages on the shared components.
    ========================================================================================================== */
 
-/* Plus Jakarta Sans (SIL Open Font License 1.1), self-hosted from /public/fonts: latin, latin-ext, vietnamese.
-   Other scripts fall through to Geist and the system fonts. */
-@font-face {
-  font-family: "Plus Jakarta Sans";
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url(/fonts/plus-jakarta-sans-vietnamese.woff2) format("woff2");
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-@font-face {
-  font-family: "Plus Jakarta Sans";
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url(/fonts/plus-jakarta-sans-latin-ext.woff2) format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: "Plus Jakarta Sans";
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url(/fonts/plus-jakarta-sans-latin.woff2) format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/* ---------------- tokens ---------------- */
-
+/* names the Client Area pages used before Kalks 2 → Kalks 2 values */
 :root {
-  --font-display: "Plus Jakarta Sans", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --k-on-ember: #ffffff;
+  --k-card-bg: var(--k-surface);
+  --k-card-border: var(--k-border);
+  --k-wash-1: var(--k-bloom-a);
+  --k-wash-2: var(--k-red-soft);
+  --k-wash-3: var(--k-bloom-b);
+  --k-rail-bg: var(--k-glass);
+  --k-rail-bg-solid: var(--k-surface);
 }
-
-.light {
-  --k-bg: color-mix(in oklab, var(--k-ember) 4%, #f9f6f5);
-  --k-surface: #ffffff;
-  --k-surface-2: color-mix(in oklab, var(--k-ember) 3%, #f6f4f8);
-  --k-surface-3: color-mix(in oklab, var(--k-ember) 5%, #eeebf1);
-  --k-border: rgba(36, 24, 52, 0.075);
-  --k-border-top: rgba(255, 255, 255, 0.9);
-  --k-fg: #17151d;
-  --k-fg-2: #5f5b6b;
-  --k-fg-3: #9893a3;
-  --k-ember-soft: color-mix(in oklab, var(--k-ember) 12%, transparent);
-  --k-up: #12a150;
-  --k-up-soft: rgba(18, 161, 80, 0.11);
-  --k-down: #e5484d;
-  --k-down-soft: rgba(229, 72, 77, 0.11);
-  --k-warn: #d98a00;
-  --k-warn-soft: rgba(245, 158, 11, 0.13);
-  --k-info: #2f7fd6;
-  --k-info-soft: rgba(47, 127, 214, 0.11);
-  --k-card-grad: linear-gradient(#ffffff, #ffffff);
-  --k-glow-strength: 0.25;
-
-  --k-card-bg: rgba(255, 255, 255, 0.86);
-  --k-card-border: rgba(255, 255, 255, 0.75);
-  --k-shadow-card: 0 1px 2px rgba(48, 28, 64, 0.035), 0 18px 46px -24px color-mix(in oklab, var(--k-ember) 24%, rgba(60, 34, 84, 0.34));
-  --k-shadow-pop: 0 2px 6px rgba(48, 28, 64, 0.06), 0 26px 60px -24px rgba(48, 28, 64, 0.32);
-  --k-ink: #17151d;
-  --k-ink-fg: #ffffff;
-  --k-wash-1: color-mix(in oklab, var(--k-ember) 30%, #fff4ee);
-  --k-wash-2: color-mix(in oklab, var(--k-ember) 18%, #ffd9ea);
-  --k-wash-3: color-mix(in oklab, var(--k-ember) 9%, #e3ddff);
-  --k-rail-bg: rgba(255, 255, 255, 0.6);
-  --k-rail-bg-solid: #ffffff;
-  color-scheme: light;
-}
-
-.dark {
-  --k-bg: color-mix(in oklab, var(--k-ember) 4%, #0b0a0f);
-  --k-surface: #17161d;
-  --k-surface-2: #1d1c24;
-  --k-surface-3: #27252f;
-  --k-border: rgba(255, 255, 255, 0.075);
-  --k-border-top: rgba(255, 255, 255, 0.08);
-  --k-fg: #f6f4f9;
-  --k-fg-2: #aca8b8;
-  --k-fg-3: #706b7d;
-  --k-ember-soft: color-mix(in oklab, var(--k-ember) 16%, transparent);
-  --k-card-grad: linear-gradient(transparent, transparent);
-  --k-card-bg: rgba(27, 25, 34, 0.74);
-  --k-card-border: rgba(255, 255, 255, 0.06);
-  --k-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 24px 60px -32px rgba(0, 0, 0, 0.75);
-  --k-shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.3), 0 30px 70px -24px rgba(0, 0, 0, 0.8);
-  --k-ink: #f6f4f9;
-  --k-ink-fg: #141218;
-  --k-wash-1: color-mix(in oklab, var(--k-ember) 34%, transparent);
-  --k-wash-2: color-mix(in oklab, var(--k-ember) 20%, rgba(150, 40, 120, 0.45));
-  --k-wash-3: color-mix(in oklab, var(--k-ember) 12%, rgba(80, 60, 190, 0.4));
-  --k-rail-bg: rgba(22, 20, 28, 0.62);
-  --k-rail-bg-solid: #17161d;
-  color-scheme: dark;
-}
-
-/* touch devices: no card blur (see .k-card), so the cards are a little more opaque */
-@media not ((hover: hover) and (pointer: fine)) {
-  .light { --k-card-bg: rgba(255, 255, 255, 0.92); }
-  .dark { --k-card-bg: rgba(27, 25, 34, 0.86); }
-}
-
-@theme inline {
-  --radius-card: 24px;
-  --radius-row: 16px;
-}
-
-@layer base {
-  body {
-    font-family: var(--font-display);
-    font-feature-settings: normal;
-    letter-spacing: -0.003em;
-  }
-  h1, h2, h3, h4 {
-    letter-spacing: -0.015em;
-  }
-}
-
-/* ---------------- surfaces ---------------- */
 
 @layer components {
-  .k-display { font-family: var(--font-display); }
+  .k-display {
+    font-family: var(--k-font-display);
+    letter-spacing: var(--k-track-tight);
+  }
 
-  /* the pastel washes behind every page */
+  /* the canvas behind every page: warm off-white / black with the two blooms */
   .k-backdrop {
     position: fixed;
     inset: 0;
     z-index: 0;
     pointer-events: none;
     background:
-      radial-gradient(55vw 48vh at 6% -6%, var(--k-wash-1), transparent 70%),
-      radial-gradient(48vw 52vh at 100% 4%, var(--k-wash-3), transparent 72%),
-      radial-gradient(60vw 56vh at 72% 104%, var(--k-wash-2), transparent 70%),
-      radial-gradient(42vw 48vh at -4% 92%, var(--k-wash-3), transparent 72%),
-      radial-gradient(36vw 36vh at 44% 46%, color-mix(in oklab, var(--k-wash-1) 45%, transparent), transparent 75%),
+      radial-gradient(60% 50% at 88% -6%, var(--k-bloom-a), transparent 70%),
+      radial-gradient(50% 40% at -6% 104%, var(--k-bloom-b), transparent 70%),
       var(--k-bg);
   }
 
-  .k-card {
-    border-radius: var(--radius-card);
-    background: var(--k-card-bg);
-    border: 1px solid var(--k-card-border);
-    box-shadow: var(--k-shadow-card);
-  }
-  /* the frosted blur only where it's cheap (desktop GPUs); touch devices get a slightly more opaque card instead */
-  @media (hover: hover) and (pointer: fine) {
-    .k-card {
-      -webkit-backdrop-filter: blur(22px) saturate(1.5);
-      backdrop-filter: blur(22px) saturate(1.5);
-    }
-  }
-  .k-card-hot,
-  .k-hot-card {
+  .k-card-hot {
     background:
-      radial-gradient(120% 90% at 100% 0%, color-mix(in oklab, var(--k-ember) 16%, transparent), transparent 60%),
-      var(--k-card-bg);
-    border: 1px solid color-mix(in oklab, var(--k-ember) 22%, var(--k-card-border));
-    box-shadow: var(--k-shadow-card);
-  }
-  .k-row {
-    border-radius: var(--radius-row);
-    background: var(--k-surface-2);
-    border: 1px solid transparent;
-  }
-  .k-pill-group {
-    border-radius: 16px;
-    background: color-mix(in oklab, var(--k-surface) 80%, transparent);
-    border: 1px solid var(--k-border);
-    box-shadow: var(--k-shadow-card);
-  }
-  .k-label {
-    font-size: 13px;
-    line-height: 18px;
-    letter-spacing: 0;
-    text-transform: none;
-    font-weight: 500;
-    color: var(--k-fg-2);
+      radial-gradient(120% 90% at 100% 0%, var(--k-red-soft), transparent 60%),
+      var(--k-surface);
+    border-color: color-mix(in oklab, var(--k-red) 22%, var(--k-border));
   }
 
-  /* buttons */
+  /* buttons written as classes (links styled as buttons): NeoPOP faces with their edge, no reserved margin */
   .k-accent-btn {
-    background: var(--k-ember);
-    color: var(--k-on-ember);
-    box-shadow: 0 10px 22px -12px color-mix(in oklab, var(--k-ember) 85%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    background: var(--k-red);
+    color: var(--k-on-red);
+    box-shadow: 1px 1px 0 var(--k-red-edge), 2px 2px 0 var(--k-red-edge), 3px 3px 0 var(--k-red-edge);
+    transition: transform var(--k-dur-press) var(--k-ease-press), box-shadow var(--k-dur-press) var(--k-ease-press), filter var(--k-dur-hover) ease;
   }
-  .k-accent-btn:hover { filter: brightness(1.06); }
   .k-ink-btn {
     background: var(--k-ink);
     color: var(--k-ink-fg);
-    box-shadow: 0 14px 28px -16px rgba(20, 14, 30, 0.7);
+    box-shadow: 1px 1px 0 var(--k-ink-edge), 2px 2px 0 var(--k-ink-edge), 3px 3px 0 var(--k-ink-edge);
+    transition: transform var(--k-dur-press) var(--k-ease-press), box-shadow var(--k-dur-press) var(--k-ease-press), filter var(--k-dur-hover) ease;
   }
-  .k-ink-btn:hover { background: color-mix(in oklab, var(--k-ink) 86%, var(--k-ember)); }
   .k-surface-btn {
-    background: var(--k-surface);
-    border: 1px solid var(--k-border);
-    box-shadow: 0 1px 2px rgba(48, 28, 64, 0.04), 0 8px 18px -14px rgba(48, 28, 64, 0.28);
+    background: var(--k-surface-3);
+    color: var(--k-fg);
+    box-shadow: 1px 1px 0 var(--k-seg-edge), 2px 2px 0 var(--k-seg-edge);
+    transition: transform var(--k-dur-press) var(--k-ease-press), box-shadow var(--k-dur-press) var(--k-ease-press), background-color var(--k-dur-hover) ease;
   }
-  .k-surface-btn:hover { background: var(--k-surface-2); }
+  .k-accent-btn:hover, .k-ink-btn:hover { filter: brightness(1.07); }
+  .k-surface-btn:hover { background: var(--k-surface-4); }
+  .k-accent-btn:active, .k-ink-btn:active { transform: translate(3px, 3px); box-shadow: none; }
+  .k-surface-btn:active { transform: translate(2px, 2px); box-shadow: none; }
 
-  /* segmented control */
-  .k-seg {
-    background: color-mix(in oklab, var(--k-surface) 82%, transparent);
-    border: 1px solid var(--k-border);
-    box-shadow: 0 1px 2px rgba(48, 28, 64, 0.04), 0 10px 24px -18px rgba(48, 28, 64, 0.3);
-  }
-  .k-seg-on {
-    background: var(--k-ember);
-    box-shadow: 0 8px 18px -10px color-mix(in oklab, var(--k-ember) 90%, transparent);
-  }
-
-  /* pastel icon tiles */
+  /* icon tiles, tinted by meaning (Kalks 2 has no pink / lavender: those fall back to red / neutral) */
   .k-tile {
     display: inline-grid;
     place-items: center;
@@ -227,35 +75,19 @@
     background: var(--tile-bg);
     color: var(--tile-fg);
   }
-  .k-tile-accent { --tile-bg: color-mix(in oklab, var(--k-ember) 14%, var(--k-surface)); --tile-fg: var(--k-ember); }
-  .k-tile-amber { --tile-bg: #fff1c9; --tile-fg: #c08600; }
-  .k-tile-coral { --tile-bg: #ffe2da; --tile-fg: #e0533d; }
-  .k-tile-pink { --tile-bg: #ffdff0; --tile-fg: #cf3f8a; }
-  .k-tile-lavender { --tile-bg: #ebe7ff; --tile-fg: #6a52dc; }
-  .k-tile-mint { --tile-bg: #d9f4e6; --tile-fg: #13935a; }
-  .k-tile-sky { --tile-bg: #dcedff; --tile-fg: #2b78d0; }
+  .k-tile-accent { --tile-bg: var(--k-red-soft); --tile-fg: var(--k-red-tx); }
+  .k-tile-amber { --tile-bg: var(--k-yellow-soft); --tile-fg: var(--k-yellow-tx); }
+  .k-tile-coral { --tile-bg: var(--k-down-soft); --tile-fg: var(--k-down-tx); }
+  .k-tile-pink { --tile-bg: var(--k-red-pastel); --tile-fg: var(--k-fg); }
+  .k-tile-lavender { --tile-bg: var(--k-surface-4); --tile-fg: var(--k-fg-2); }
+  .k-tile-mint { --tile-bg: var(--k-ok-soft); --tile-fg: var(--k-ok); }
+  .k-tile-sky { --tile-bg: var(--k-up-soft); --tile-fg: var(--k-up-tx); }
   .k-tile-neutral { --tile-bg: var(--k-surface-3); --tile-fg: var(--k-fg-2); }
-  .dark .k-tile-accent { --tile-bg: color-mix(in oklab, var(--k-ember) 20%, transparent); }
-  .dark .k-tile-amber { --tile-bg: rgba(245, 190, 60, 0.15); --tile-fg: #f4c55a; }
-  .dark .k-tile-coral { --tile-bg: rgba(255, 120, 95, 0.15); --tile-fg: #ff9a85; }
-  .dark .k-tile-pink { --tile-bg: rgba(240, 100, 170, 0.15); --tile-fg: #f58cc4; }
-  .dark .k-tile-lavender { --tile-bg: rgba(140, 120, 255, 0.17); --tile-fg: #b3a6ff; }
-  .dark .k-tile-mint { --tile-bg: rgba(40, 200, 120, 0.15); --tile-fg: #5fdc9c; }
-  .dark .k-tile-sky { --tile-bg: rgba(80, 160, 255, 0.15); --tile-fg: #8cc2ff; }
 
-  /* icon tiles of @kalks/ui (AnimIcon / Icon3D) in the same pastel style */
-  .anim-icon {
-    background: color-mix(in oklab, var(--ai-c) 13%, var(--k-surface));
-    border-color: transparent;
-  }
-  .dark .anim-icon { background: color-mix(in oklab, var(--ai-c) 17%, transparent); }
-
-  /* rail */
+  /* rail (the current shell; R2 replaces it with the black icon rail of @kalks/ui) */
   .k-rail {
-    background: var(--k-rail-bg);
+    background: var(--k-surface);
     border-inline-end: 1px solid var(--k-border);
-    -webkit-backdrop-filter: blur(26px) saturate(1.5);
-    backdrop-filter: blur(26px) saturate(1.5);
   }
   .k-rail-notch {
     position: absolute;
@@ -265,89 +97,52 @@
     width: 5px;
     border-start-end-radius: 8px;
     border-end-end-radius: 8px;
-    background: var(--k-ember);
-    box-shadow: 0 0 18px 1px color-mix(in oklab, var(--k-ember) 55%, transparent);
+    background: var(--k-yellow);
   }
   .k-rail.w-\[248px\] .k-rail-notch { inset-inline-start: -16px; }
 
   /* sticky top area: frosted once the page scrolls */
   .k-topbar { transition: background-color 0.2s, box-shadow 0.2s; }
   .k-topbar[data-scrolled] {
-    background: color-mix(in oklab, var(--k-bg) 70%, transparent);
-    -webkit-backdrop-filter: blur(18px) saturate(1.4);
-    backdrop-filter: blur(18px) saturate(1.4);
+    background: color-mix(in oklab, var(--k-bg) 72%, transparent);
+    -webkit-backdrop-filter: var(--k-glass-blur);
+    backdrop-filter: var(--k-glass-blur);
     box-shadow: 0 1px 0 var(--k-border);
   }
   .k-mobilebar {
-    background: color-mix(in oklab, var(--k-surface) 88%, transparent);
+    background: color-mix(in oklab, var(--k-surface) 94%, transparent);
     border: 1px solid var(--k-border);
     box-shadow: var(--k-shadow-pop);
-    -webkit-backdrop-filter: blur(22px) saturate(1.5);
-    backdrop-filter: blur(22px) saturate(1.5);
+    -webkit-backdrop-filter: blur(26px);
+    backdrop-filter: blur(26px);
   }
 
-  /* brand disc (logo avatar) and the dashboard's account cards */
-  .k-brand-disc {
-    background: radial-gradient(circle at 30% 25%, color-mix(in oklab, var(--k-ember) 62%, #fff), var(--k-ember) 62%);
-    box-shadow: 0 10px 22px -10px var(--k-ember), inset 0 1px 0 rgba(255, 255, 255, 0.32);
-  }
+  /* brand disc (logo avatar, Ask Kalks AI): the black disc */
+  .k-brand-disc { background: var(--k-black); color: var(--k-yellow); }
+
+  /* the dashboard's account cards: live = Kalks red block, demo = warm black block */
   .k-acct-live {
-    background:
-      radial-gradient(110% 130% at 0% 0%, color-mix(in oklab, var(--k-ember) 52%, #fff) 0%, transparent 52%),
-      radial-gradient(100% 120% at 100% 100%, color-mix(in oklab, var(--k-ember) 62%, #3c0f58) 0%, transparent 62%),
-      linear-gradient(135deg, color-mix(in oklab, var(--k-ember) 90%, #fff), color-mix(in oklab, var(--k-ember) 78%, #5a1470));
-    box-shadow: 0 30px 50px -28px color-mix(in oklab, var(--k-ember) 75%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    background: linear-gradient(150deg, color-mix(in oklab, var(--k-red) 92%, #fff), var(--k-red) 45%, var(--k-red-edge-light));
+    box-shadow: 3px 3px 0 var(--k-red-edge-dark);
   }
   .k-acct-demo {
-    background:
-      radial-gradient(110% 130% at 0% 0%, color-mix(in oklab, var(--k-ember) 30%, #45404f) 0%, transparent 55%),
-      radial-gradient(90% 110% at 100% 100%, color-mix(in oklab, var(--k-ember) 22%, #1a1720) 0%, transparent 60%),
-      linear-gradient(135deg, #2c2935, #121016);
-    box-shadow: 0 30px 50px -28px rgba(20, 14, 30, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    background: linear-gradient(150deg, #30252a, #141011 60%, #0b0809);
+    box-shadow: 3px 3px 0 #000;
   }
   .k-acct-empty {
-    border: 2px dashed color-mix(in oklab, var(--k-ember) 35%, var(--k-border));
-    background: color-mix(in oklab, var(--k-surface) 60%, transparent);
+    border: 1.5px dashed var(--k-border-2);
+    background: transparent;
   }
 
-  /* the dashboard's Ask Kalks AI card / pill: a soft brand-tinted wash over the frosted card */
+  /* the dashboard's Ask Kalks AI card: a yellow wash over the card */
   .k-ai-card {
     background:
-      radial-gradient(120% 150% at 0% 0%, color-mix(in oklab, var(--k-ember) 11%, transparent), transparent 58%),
-      radial-gradient(110% 130% at 100% 100%, color-mix(in oklab, var(--k-wash-3) 70%, transparent), transparent 62%),
-      var(--k-card-bg);
+      radial-gradient(120% 150% at 0% 0%, var(--k-yellow-soft), transparent 62%),
+      var(--k-surface);
   }
 
   /* column dividers of the dashboard's middle / right panels */
   .k-panel-divider { border-inline-start: 1px solid var(--k-border); }
-}
-
-/* ---------------- shared @kalks/ui pieces, retuned for the pastel look ---------------- */
-
-/* the primary button: flat brand fill (beats the broker gradient brandCss writes for .k-ember-btn) */
-html .k-ember-btn {
-  background: var(--k-ember);
-  color: var(--k-on-ember);
-  box-shadow: 0 10px 22px -12px color-mix(in oklab, var(--k-ember) 85%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-/* tooltips: ink chip */
-[data-radix-popper-content-wrapper] > .rounded-lg.bg-surface-3 {
-  background: var(--k-ink);
-  color: var(--k-ink-fg);
-  border-color: transparent;
-  box-shadow: var(--k-shadow-pop);
-}
-/* menus, popovers and dialogs: soft shadows, larger radius */
-[data-radix-popper-content-wrapper] > .k-card,
-[role="dialog"].k-card {
-  box-shadow: var(--k-shadow-pop);
-  background: var(--k-surface);
-}
-[role="dialog"].k-card { border-radius: 28px; }
-.light [data-state][class~="bg-black/60"] {
-  background: color-mix(in oklab, #2a1d3a 28%, transparent);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
 }
 
 /* phones and tablets: every control gets at least a 44px touch target; the visual size stays (an invisible hit area
@@ -357,7 +152,7 @@ html .k-ember-btn {
     position: relative;
   }
   .k-hit::after,
-  :where(button, [role="tab"], [role="switch"], a.inline-flex, a.flex, a.grid, a.inline-grid):not([class*="absolute"], [class*="fixed"], [class*="sticky"], [class*="sr-only"])::after {
+  :where(button, [role="tab"], [role="switch"], a.inline-flex, a.flex, a.grid, a.inline-grid):not([class*="absolute"], [class*="fixed"], [class*="sticky"], [class*="sr-only"], .k-btn, .k-tog, .k-dot)::after {
     content: "";
     position: absolute;
     left: 50%;

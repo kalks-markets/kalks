@@ -1,10 +1,9 @@
 import { preconnect } from "react-dom";
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
 // subpath imports: a server layout importing the "@kalks/ui" barrel ships every client module of it on every page
 import { BrandProvider } from "@kalks/ui/brand";
-import { brandCss, isCustomBrand } from "@kalks/ui/brand-vars";
+import { KALKS_ICONS, brandCss, isCustomBrand } from "@kalks/ui/brand-vars";
+import { fontVariables } from "@kalks/ui/fonts";
 import { Providers } from "@kalks/ui/providers";
 import { NotificationRecorder } from "@/components/notifications";
 import { tenantBrand } from "@/lib/tenant-brand";
@@ -16,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const name = isCustomBrand(b) ? b.name : "Kalks";
   return {
     title: { default: `${name} — Back Office`, template: `%s · ${name} Back Office` },
-    icons: { icon: isCustomBrand(b) && b.logo_url ? b.logo_url : "/assets/brand/kalks-mark.svg" },
+    icons: isCustomBrand(b) ? (b.logo_url ? { icon: b.logo_url } : undefined) : KALKS_ICONS,
     robots: { index: false, follow: false },
   };
 }
@@ -37,7 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const brand = await tenantBrand();
   const css = brandCss(brand);
   return (
-    <html lang="en" dir="ltr" suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="en" dir="ltr" suppressHydrationWarning className={fontVariables}>
       <body>
         {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
         <BrandProvider brand={brand}>

@@ -19,7 +19,8 @@ export function Sparkline({
   data: number[];
   width?: number;
   height?: number;
-  tone?: "up" | "down" | "gold" | "ember";
+  /** up = blue, down = red (default: by direction); yellow / accent for neutral series */
+  tone?: "up" | "down" | "gold" | "ember" | "yellow" | "accent";
   className?: string;
   fill?: boolean;
 }) {
@@ -31,23 +32,25 @@ export function Sparkline({
   const pts = data.map((v, i) => [(i / (data.length - 1)) * width, height - 2 - ((v - min) / span) * (height - 4)] as const);
   const d = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const t = tone ?? (data[data.length - 1]! >= data[0]! ? "up" : "down");
-  const color = `var(--k-${t})`;
+  const color = t === "accent" ? "var(--k-accent-line)" : t === "yellow" ? "var(--k-yellow)" : `var(--k-${t})`;
+  // the equity look (KALKS2 §6): ink line over a neon-yellow fill in light, yellow over yellow in dark
+  const fillColor = t === "accent" ? "var(--k-accent-fill)" : color;
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className={cn("overflow-visible", className)}>
+    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} preserveAspectRatio="none" aria-hidden className={cn("overflow-visible", className)}>
       <defs>
         <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity="0.28" />
-          <stop offset="1" stopColor={color} stopOpacity="0" />
+          <stop offset="0" stopColor={fillColor} stopOpacity={t === "accent" ? 0.55 : 0.22} />
+          <stop offset="1" stopColor={fillColor} stopOpacity="0" />
         </linearGradient>
       </defs>
       {fill && <path d={`${d} L${width},${height} L0,${height} Z`} fill={`url(#${id})`} />}
-      <motion.path d={d} fill="none" stroke={color} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.9, ease: "easeOut" }} />
+      <path d={d} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Gauge — glowing ember ring (margin level / sentiment / risk)        */
+/* Gauge — red → yellow ring (margin level / sentiment / risk)         */
 /* ------------------------------------------------------------------ */
 
 export function Gauge({
@@ -78,9 +81,8 @@ export function Gauge({
       <svg viewBox={`0 0 ${size} ${size}`} className="absolute inset-0 rotate-[129.6deg]">
         <defs>
           <linearGradient id={`g${id}`} x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0" stopColor="#ff8a3d" />
-            <stop offset="0.6" stopColor="#ff5a1f" />
-            <stop offset="1" stopColor="#d9261c" />
+            <stop offset="0" stopColor="var(--k-red)" />
+            <stop offset="1" stopColor="var(--k-yellow)" />
           </linearGradient>
         </defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--k-surface-3)" strokeWidth={stroke} strokeDasharray={`${c * arc} ${c}`} strokeLinecap="round" />
@@ -98,9 +100,9 @@ export function Gauge({
           transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
         />}
       </svg>
-      <div className="absolute rounded-full bg-[radial-gradient(circle_at_50%_35%,var(--k-surface-3),var(--k-surface)_70%)] shadow-[inset_0_1px_0_var(--k-border-top),0_20px_40px_-20px_rgba(0,0,0,0.6)]" style={{ inset: stroke + 18 }} />
+      <div className="absolute rounded-full bg-surface-2 shadow-[inset_0_0_0_1px_var(--k-border)]" style={{ inset: stroke + 18 }} />
       <div className="relative flex flex-col items-center text-center">
-        <div className="k-num text-[44px] font-semibold leading-none tracking-tight text-fg" style={{ fontSize: size * 0.18 }}>
+        <div className="k-money leading-none text-fg" style={{ fontSize: size * 0.18 }}>
           {display ?? Math.round(value)}
         </div>
         {label && <div className="mt-2 text-sm text-fg-2">{label}</div>}
@@ -164,14 +166,14 @@ export function CapsuleBars({
         return (
           <div key={d.label} className="relative flex h-full flex-1 flex-col items-center justify-end" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
             {on && (
-              <motion.div layoutId="capsule-tip" className="absolute z-10 -translate-y-full rounded-full border border-line bg-surface-2 px-3 py-1 font-mono text-xs text-fg shadow-lg" style={{ bottom: `${(d.value / max) * 82 + 6}%` }}>
+              <motion.div layoutId="capsule-tip" className="absolute z-10 -translate-y-full rounded-[8px] bg-fg px-2 py-1 font-mono text-xs font-semibold text-bg" style={{ bottom: `${(d.value / max) * 82 + 6}%` }}>
                 {format(d.value)}
               </motion.div>
             )}
             <motion.div
               className={cn(
-                "w-full max-w-14 rounded-full border",
-                on ? "border-ember/40 bg-gradient-to-b from-[#ff8a3d] to-[#b8330f] shadow-[0_0_40px_-6px_rgba(255,90,31,0.7)]" : "border-line bg-gradient-to-b from-surface-3 to-surface-2",
+                "w-full max-w-14 rounded-[14px]",
+                on ? "bg-yellow shadow-[1px_1px_0_var(--k-yellow-edge),2px_2px_0_var(--k-yellow-edge),3px_3px_0_var(--k-yellow-edge)]" : "bg-surface-3",
               )}
               initial={{ height: 0 }}
               animate={{ height: `${(d.value / max) * 82}%` }}
@@ -189,7 +191,8 @@ export function CapsuleBars({
 /* Donut                                                               */
 /* ------------------------------------------------------------------ */
 
-export const CHART_COLORS = ["#ff5a1f", "#e9b949", "#22c55e", "#38bdf8", "#f04438", "#a1a1aa", "#14b8a6", "#ff8a3d"];
+/** Categorical series in the Kalks 2 palette (no green: green is reserved for "Completed"). */
+export const CHART_COLORS = ["#D4112A", "#FFD21F", "#2F7BFF", "#928380", "#FF8A8A", "#B58C00", "#8DB7FF", "#7A0C18"];
 
 export function Donut({
   data,

@@ -6,45 +6,25 @@
 /* Kalks Trader: trading-room tokens layered on the Kalks design system */
 /* ------------------------------------------------------------------ */
 
-/* Design tokens: docs/TERMINAL-DESIGN.md §2.3. Text colours are tuned for WCAG AA (4.5:1) on the panels; brand
-   colours (ember, replaceable per broker) are never hard-coded: stronger variants are mixed from the brand colour. */
+/* Trading-room tokens, mapped onto the Kalks 2 tokens of @kalks/ui (docs/design/KALKS2.md §6.1): panels s1 on the
+   sunken bg-2 canvas, chart #0E0A0B / white, blue = up / buy / profit / TP, red = down / sell / loss / SL everywhere
+   (candles, Buy / Sell, P&L, change %, trade lines). Follows Auto / Light / Dark like the rest of Kalks. */
 :root,
-.dark {
-  --t-page: #050507;
-  --t-panel: #0e0e12;
-  --t-panel-2: #15151a;
-  --t-grid: rgba(255, 255, 255, 0.035);
-  --t-chart-bg: #0a0a0d;
-  /* tertiary text: 5.8:1 on the panel (the Kalks default #63636e is 3.3:1) */
-  --k-fg-3: #8b8b96;
-  /* Kalks Trader: blue = up / buy / profit / TP, red = down / sell / loss / SL (candles, Buy / Sell, P&L, change %,
-     trade lines). Scoped to the terminal: the Client Area keeps the @kalks/ui green for success states.
-     #2f7bff on the dark panel 4.9:1 */
-  --k-up: #2f7bff;
-  --k-up-soft: rgba(47, 123, 255, 0.12);
-  /* Buy / Sell button fills: white text at 5.6:1 / 4.8:1 */
-  --t-buy-fill: #1f5fe0;
-  --t-sell-fill: #dc2626;
-  /* filled primary buttons (white text) and accent-coloured text */
-  --t-accent-strong: color-mix(in oklab, var(--k-ember) 80%, black);
-  --t-accent-text: var(--k-ember);
-  --t-shadow-pop: 0 18px 48px -12px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
-}
+[data-theme],
+.dark,
 .light {
-  --t-page: #e7e5e1;
-  --t-panel: #ffffff;
-  --t-panel-2: #f5f3f0;
-  --t-grid: rgba(15, 15, 20, 0.055);
-  --t-chart-bg: #ffffff;
-  --k-fg-3: #6b6b75;
-  /* blue up on white 5.6:1 */
-  --k-up: #1f5fe0;
-  --k-up-soft: rgba(31, 95, 224, 0.12);
-  --k-warn: #b45309;
-  --k-info: #0369a1;
-  --k-gold: #a16207;
-  --t-accent-text: color-mix(in oklab, var(--k-ember) 78%, black);
-  --t-shadow-pop: 0 18px 48px -14px rgba(15, 15, 20, 0.22), 0 2px 6px rgba(15, 15, 20, 0.08);
+  --t-page: var(--k-bg-2);
+  --t-panel: var(--k-surface);
+  --t-panel-2: var(--k-surface-2);
+  --t-grid: var(--k-grid);
+  --t-chart-bg: var(--k-chart-bg);
+  /* Buy / Sell faces: white labels at 5.3–5.6 : 1 */
+  --t-buy-fill: var(--k-up-face);
+  --t-sell-fill: var(--k-down-face);
+  /* filled primary buttons (white text) and accent-coloured text */
+  --t-accent-strong: var(--k-red);
+  --t-accent-text: var(--k-red-tx);
+  --t-shadow-pop: var(--k-shadow-pop);
 }
 
 /* laptop screens of 820 px or less in height: the order panel and others tighten up */
@@ -58,14 +38,6 @@
   --color-sell-fill: var(--t-sell-fill);
   --color-accent-strong: var(--t-accent-strong);
   --color-accent-text: var(--t-accent-text);
-}
-
-/* Visible keyboard focus on every control (utilities such as focus-visible:ring-* still win: this is the base layer) */
-@layer base {
-  :where(button, a[href], [role="button"], [role="tab"], [role="menuitem"], [role="switch"], [role="checkbox"], [role="radio"], summary):focus-visible {
-    outline: 2px solid color-mix(in oklab, var(--k-ember) 65%, transparent);
-    outline-offset: 1px;
-  }
 }
 
 @keyframes t-fade { from { opacity: 0; } }
@@ -84,6 +56,8 @@
   }
   [dir="rtl"] .t-select { background-position: left 7px center; }
   .t-select option { background: var(--t-panel-2); color: var(--k-fg); }
+  /* the chevron in the text colour of the theme */
+  .dark .t-select, [data-theme="dark"] .t-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5l3 3 3-3' fill='none' stroke='%23928380' stroke-width='1.4'/%3E%3C/svg%3E"); }
   .t-scroll { scrollbar-width: thin; scrollbar-color: var(--k-surface-3) transparent; }
   .t-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
   .t-scroll::-webkit-scrollbar-thumb { background: var(--k-surface-3); border-radius: 999px; border: 2px solid var(--t-panel); }
@@ -94,7 +68,7 @@
   .t-handle::after { content: ""; position: absolute; border-radius: 99px; background: transparent; transition: background 0.15s; }
   .t-handle[data-panel-group-direction="horizontal"]::after { inset: 30% 1px; }
   .t-handle[data-panel-group-direction="vertical"]::after { inset: 1px 30%; }
-  .t-handle:hover::after, .t-handle[data-resize-handle-state="drag"]::after { background: var(--k-ember); opacity: 0.7; }
+  .t-handle:hover::after, .t-handle[data-resize-handle-state="drag"]::after { background: var(--k-yellow); opacity: 0.85; }
 }
 
 html, body { height: 100%; }
@@ -104,21 +78,16 @@ body { background: var(--t-page); }
 /* Materials (docs/TERMINAL-DESIGN.md §2.3): frosted, never see-through */
 /* ------------------------------------------------------------------ */
 :root,
-.dark {
-  --t-glass: color-mix(in oklab, var(--t-panel) 90%, transparent);
-  --t-glass-strong: color-mix(in oklab, var(--t-panel-2) 92%, transparent);
-  --t-glass-edge: rgba(255, 255, 255, 0.07);
-  --t-glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px -18px rgba(0, 0, 0, 0.7);
-  --t-depth: 24%; /* order-book depth bar strength */
-  --t-backdrop: radial-gradient(1200px 520px at 12% -12%, rgba(255, 90, 31, 0.07), transparent 62%), radial-gradient(900px 600px at 100% 0%, rgba(120, 120, 160, 0.06), transparent 60%), linear-gradient(180deg, #0a0a0e 0%, #050507 60%);
-}
+[data-theme],
+.dark,
 .light {
-  --t-glass: color-mix(in oklab, var(--t-panel) 86%, transparent);
-  --t-glass-strong: color-mix(in oklab, var(--t-panel) 92%, transparent);
-  --t-glass-edge: rgba(255, 255, 255, 0.7);
-  --t-glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 28px -18px rgba(20, 20, 30, 0.25);
-  --t-depth: 15%;
-  --t-backdrop: radial-gradient(1200px 520px at 12% -12%, rgba(255, 90, 31, 0.08), transparent 62%), radial-gradient(900px 600px at 100% 0%, rgba(90, 110, 160, 0.08), transparent 60%), linear-gradient(180deg, #ecebe7 0%, #e3e1dc 100%);
+  --t-glass: color-mix(in oklab, var(--k-surface) 94%, transparent);
+  --t-glass-strong: color-mix(in oklab, var(--k-surface-2) 94%, transparent);
+  --t-glass-edge: var(--k-border);
+  --t-glass-shadow: inset 0 0 0 1px var(--k-border);
+  --t-depth: 18%; /* order-book depth bar strength */
+  /* the panel grid sits on the sunken canvas (KALKS2 §6.1: 6 px gaps on bg-2) */
+  --t-backdrop: var(--k-bg-2);
 }
 @layer components {
   /* the terminal's app background: a subtle gradient so the frosted cards read as a material */
@@ -173,8 +142,8 @@ body { background: var(--t-page); }
 /* Options chain: the hovered half of a row (call or put side) lights up as one block; the selected half stays lit */
 .opt-chain tr:has(> td[data-r="c"]:hover) > td[data-r="c"],
 .opt-chain tr:has(> td[data-r="p"]:hover) > td[data-r="p"] { background-color: var(--k-surface-3); }
-.opt-chain tr > td[data-leg] { background-color: color-mix(in srgb, var(--k-ember) 8%, transparent); }
-.opt-chain tr > td[data-sel] { background-color: color-mix(in srgb, var(--k-ember) 17%, transparent) !important; }
+.opt-chain tr > td[data-leg] { background-color: color-mix(in srgb, var(--k-yellow) 9%, transparent); }
+.opt-chain tr > td[data-sel] { background-color: var(--k-yellow-soft) !important; }
 
 /* Options position cards: a card (identity + P&L, then the plain lines, then the actions) in narrow places, one
    row (identity · plain lines · P&L · actions) once the card is wide (the desktop toolbox). The wrapper is the

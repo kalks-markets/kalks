@@ -3,10 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "sideEffects": ["*.css"],
+  "sideEffects": [
+    "*.css"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./styles.css": "./src/styles.css",
+    "./tokens.css": "./src/tokens.css",
+    "./tokens": "./src/tokens.ts",
+    "./fonts": "./src/fonts.ts",
+    "./theme": "./src/shell/theme.tsx",
     "./brand": "./src/shell/brand.tsx",
     "./brand-vars": "./src/shell/brand-vars.ts",
     "./providers": "./src/shell/providers.tsx",
@@ -17,7 +23,8 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "tokens": "node scripts/gen-tokens.mjs"
   },
   "dependencies": {
     "@kalks/i18n": "workspace:*",
