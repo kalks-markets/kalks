@@ -61,6 +61,9 @@ class HideBalances extends Notifier<bool> {
 
 final hideBalancesProvider = NotifierProvider<HideBalances, bool>(HideBalances.new);
 
+/// The clock the greeting reads (tests pin it so their screenshots don't change with the time of day).
+final greetingClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
 /// The "Verify your identity" step from the real KYC status (web kycStep).
 ({String state, String text}) kycStep(SessionUser me, T t) {
   if (me.kycStatus == KycStatus.verified) return (state: 'done', text: t('dashboard.steps.kyc.verified'));
@@ -427,7 +430,7 @@ class DashboardScreen extends ConsumerWidget {
           // 0. targeted banner
           const DashboardBannerSlot(),
           // 1. header: the greeting as the title, the name in bold
-          _Greeting(template: t.dyn('dashboard.greeting.${_greeting(DateTime.now())}'), name: me.firstName, verified: me.kycStatus == KycStatus.verified),
+          _Greeting(template: t.dyn('dashboard.greeting.${_greeting(ref.watch(greetingClockProvider)())}'), name: me.firstName, verified: me.kycStatus == KycStatus.verified),
           // 1b. Ask Kalks AI
           if (!readOnly && aiOn) ...[const SizedBox(height: 16), AskAi(chips: aiChips, chat: config.moduleOn('support_chat'))],
           const SizedBox(height: 24),

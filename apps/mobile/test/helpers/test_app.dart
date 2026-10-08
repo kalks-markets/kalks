@@ -16,6 +16,7 @@ import 'package:kalks/core/auth/biometrics.dart';
 import 'package:kalks/core/auth/secure_store.dart';
 import 'package:kalks/core/config/app_config.dart';
 import 'package:kalks/core/prefs.dart';
+import 'package:kalks/features/dashboard/dashboard_screen.dart' show greetingClockProvider;
 import 'package:kalks/i18n/i18n.dart';
 import 'package:kalks/preview/preview_adapter.dart';
 import 'package:kalks/preview/preview_data.dart';
@@ -99,6 +100,8 @@ Future<ProviderContainer> pumpApp(
       else
         apiBaseProvider.overrideWithValue('http://127.0.0.1:9/api/mobile'),
       biometricsProvider.overrideWithValue(const NoBiometrics()),
+      // a fixed afternoon, so the dashboard greeting (and the goldens) never change with the time of day
+      greetingClockProvider.overrideWithValue(() => DateTime(2026, 10, 8, 15)),
       if (config != null) configProvider.overrideWith(() => _FixedConfig(config)),
     ],
   );
