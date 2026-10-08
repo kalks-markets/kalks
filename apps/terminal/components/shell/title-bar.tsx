@@ -17,7 +17,10 @@ import { Kbd } from "@/components/dialogs/kbd";
 import { CLIENT_AREA, LOGIN_URL, REGISTER_URL } from "@/lib/guest";
 import { GuestUserMenu } from "./guest";
 import { NotificationBell } from "./notifications";
-import { ModeSwitch } from "./mode-switch";
+import { ModeSwitch, useAccountProducts } from "./mode-switch";
+import { groupAccounts, openAccountPath, productOf } from "@/lib/options/product";
+import type { EngineTradingAccount } from "@/lib/engine/map";
+import { useModuleOn } from "@/components/modules";
 import { useMainMenuItems } from "./commands";
 
 export { CLIENT_AREA };
@@ -41,6 +44,7 @@ function AccountRow({ login, active, onPick }: { login: string; active: boolean;
   const m = useMetrics(login);
   const t = useT();
   const a = m.account;
+  const options = productOf((a as Partial<EngineTradingAccount>).engine) === "options";
   return (
     <button onClick={onPick} aria-current={active || undefined} className={cn("flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 text-start transition-colors", active ? "bg-ember-soft/70" : "hover:bg-surface-3")}>
       <Badge tone={a.type === "live" ? "ember" : "gold"} className="w-12 justify-center">
@@ -50,9 +54,14 @@ function AccountRow({ login, active, onPick }: { login: string; active: boolean;
         <span className="flex items-center gap-1.5 text-[13px] text-fg">
           <span className="k-num font-mono">{a.login}</span>
           {a.nickname && <span className="truncate text-[12px] text-fg-3">· {a.nickname}</span>}
+          {options && (
+            <Badge tone="ember" className="ms-auto">
+              {t("accounts.product.chipOptions")}
+            </Badge>
+          )}
         </span>
-        <span className="block truncate text-[12px] text-fg-3" title={`${t.dyn(`desk.g.${a.mode}`)} ${t("desk.g.leverage")}`}>
-          {a.group} · {t.dyn(`order.mode.${a.mode}`, a.mode)} · 1:{a.leverage} · {a.server}
+        <span className="block truncate text-[12px] text-fg-3" title={options ? undefined : `${t.dyn(`desk.g.${a.mode}`)} ${t("desk.g.leverage")}`}>
+          {options ? `${a.group} · ${a.server}` : `${a.group} · ${t.dyn(`order.mode.${a.mode}`, a.mode)} · 1:${a.leverage} · ${a.server}`}
         </span>
       </span>
       <span className="text-end">
@@ -70,6 +79,11 @@ function AccountSwitcher() {
   const t = useT();
   const m = useMetrics();
   const a = T.account;
+  const products = useAccountProducts();
+  const optionsOn = useModuleOn()("options");
+  const groups = groupAccounts(T.accounts.map((x, i) => ({ ...x, product: products[i]?.product })));
+  // a product the client holds no account of on this terminal: offer to open one (Options only while the module is on)
+  const missing = (["cfd", "options"] as const).filter((p) => (p === "cfd" || optionsOn) && !products.some((x) => x.product === p));
   return (
     <DropMenu
       width={420}
@@ -111,10 +125,25 @@ function AccountSwitcher() {
             </div>
           </div>
           <div className="t-scroll max-h-[50vh] space-y-0.5 overflow-y-auto p-1.5">
-            {T.accounts.map((x) => (
-              <AccountRow key={x.login} login={x.login} active={x.login === a.login} onPick={() => (T.switchAccount(x.login), close())} />
+            {/* CFD / Options account split: the accounts by product once this terminal holds both */}
+            {groups.map((g) => (
+              <React.Fragment key={g.product}>
+                {groups.length > 1 && <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-fg-3">{t(g.product === "options" ? "accounts.product.groupOptions" : "accounts.product.groupCfd")}</div>}
+                {g.accounts.map((x) => (
+                  <AccountRow key={x.login} login={x.login} active={x.login === a.login} onPick={() => (T.switchAccount(x.login), close())} />
+                ))}
+              </React.Fragment>
             ))}
           </div>
+          {T.engine && missing.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 border-t border-line px-2 pt-2">
+              {missing.map((p) => (
+                <Button key={p} variant="secondary" onClick={() => (window.open(`${CLIENT_AREA}${openAccountPath(p)}`, "_blank", "noopener"), close())} className="justify-start" data-testid={`open-${p}-account`}>
+                  <UserPlus /> {t(p === "options" ? "trader.acct.openOptions" : "trader.acct.openCfd")}
+                </Button>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-1.5 border-t border-line p-2">
             {a.type === "demo" ? (
               <Button variant="secondary" onClick={() => (T.refillDemo(), close())} className="justify-start">

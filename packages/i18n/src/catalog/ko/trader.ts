@@ -507,7 +507,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "옵션 출시 예정",
-  "opt.soon.text": "이 계좌에서는 아직 Kalks FX Options를 이용할 수 없습니다. 이용 가능해지면 CFD와 같은 계좌로 옵션 체인이 여기에 표시됩니다.",
+  "opt.soon.text": "이 계좌에는 아직 Kalks FX Options가 열리지 않았습니다. 열리는 즉시 여기에 옵션 체인이 표시됩니다.",
   "opt.soon.point1": "외환, 금, 은, 원유의 콜과 풋",
   "opt.soon.point2": "일간, 주간, 월간 만기, USD 현금결제",
   "opt.soon.point3": "매수자는 지불한 프리미엄보다 더 많이 잃지 않습니다",
@@ -1245,5 +1245,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "딜링 데스크에서 거래를 취소했습니다",
   "opt.bust.text": "{what} × {n}: 거래가 원상 복구되었으며, 부과된 수수료는 환불되었습니다.",
   "opt.tape.kind.bust": "취소",
+  // CFD / Options account split
+  "acct.openCfd": "CFD 계좌 개설",
+  "acct.openOptions": "옵션 계좌 개설",
+  "opt.err.product_mismatch": "CFD 계좌입니다. 옵션은 옵션 계좌에서 거래합니다.",
 };
 export default trader;

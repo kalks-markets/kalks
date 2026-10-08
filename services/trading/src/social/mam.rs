@@ -422,6 +422,9 @@ impl Social {
         if SYSTEM_GROUPS.contains(&b.group.as_str()) {
             return Some("Copy, PAMM and MAM accounts can't be linked".into());
         }
+        if b.options {
+            return Some("Options accounts can't be linked: MAM trades CFDs".into());
+        }
         if let Some(l) = reg.link_by_login(login) {
             let name = reg.managers.get(&l.manager_id).map(|x| x.name.clone()).unwrap_or_default();
             return Some(format!("Already managed by {name}"));

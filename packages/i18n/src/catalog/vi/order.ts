@@ -402,5 +402,7 @@ const order: NsMessages<"order"> = {
   "toast.sessionExpired": "Phiên đã hết hạn",
   "toast.sessionExpiredDesc": "Phiên của {login} đã kết thúc. Hãy đăng nhập lại để giao dịch.",
   "toast.loggedOut": "Đã đăng xuất khỏi {login}",
+  // CFD / Options account split
+  "reject.product_mismatch": "Tài khoản này không giao dịch sản phẩm này",
 };
 export default order;

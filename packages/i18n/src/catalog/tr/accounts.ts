@@ -551,5 +551,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "Opsiyon primi",
   "ledgerKind.option_settlement": "Opsiyon uzlaşması",
   "ledgerKind.option_rebate": "Maker iadesi",
+  // CFD / Options account split
+  "product.cfd": "CFD hesabı",
+  "product.options": "Opsiyon hesabı",
+  "product.cfdText": "Forex, metaller, endeksler, hisseler ve kripto CFD olarak, kaldıraçla.",
+  "product.optionsText": "Forex, altın, gümüş ve petrol üzerinde nakit uzlaşmalı call ve put opsiyonları.",
+  "product.chipOptions": "OPSİYON",
+  "product.groupCfd": "CFD hesapları",
+  "product.groupOptions": "Opsiyon hesapları",
+  "wizard.step.product": "Ürün",
+  "wizard.productTitle": "Bu hesap ne işlem görecek?",
+  "wizard.productSubtitle": "Her hesap tek bir ürün işlem görür. İkisine birden sahip olabilirsiniz.",
+  "wizard.noGroups": "Şu anda bu ürün için açık bir hesap türü yok.",
+  "wizard.introFirst": "İlk opsiyon hesabınızdan önce kısa bir adım: 1 dakikalık opsiyon tanıtımı.",
+  "wizard.agreeLiveOptions": "Opsiyonların yüksek risk taşıdığını anlıyorum: alınan bir opsiyon değersiz sona erebilir, satılan bir opsiyon ise alınan primden fazla kaybettirebilir.",
 };
 export default accounts;

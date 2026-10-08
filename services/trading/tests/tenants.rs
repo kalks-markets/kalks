@@ -121,6 +121,17 @@ async fn a_new_broker_is_provisioned_on_its_first_request() {
     assert_eq!((ctx.tenant.tenant_id, ctx.tenant.slug.as_str()), (NEW_ID, "qa-northwind"));
     assert_eq!(ctx.tenant.groups.len(), template);
     assert!(ctx.tenant.groups.contains_key("standard"));
+    // CFD / Options account split (migration 20261022120000): every existing group is a CFD group, the market
+    // maker's an Options group, Options Standard (enabled) and Options Pro (disabled) are seeded, and a new broker
+    // copies the products with its groups
+    use trading::rules::Product;
+    let platform = registry.get(1).unwrap();
+    for (code, product, enabled) in [("standard", Product::Cfd, true), ("ecn", Product::Cfd, true), ("copy", Product::Cfd, false), ("options-mm", Product::Options, false), ("options-standard", Product::Options, true), ("options-pro", Product::Options, false)] {
+        let g = &platform.groups[code];
+        assert_eq!((g.product, g.enabled), (product, enabled), "{code}");
+        assert_eq!(ctx.tenant.groups[code].product, product, "provisioned {code}");
+    }
+    assert!(platform.groups.values().filter(|g| g.product == Product::Options).all(|g| g.code.starts_with("options-")));
     // its groups price from its own spread groups, never from the platform broker's markups
     assert_eq!(ctx.tenant.groups["standard"].spread_group, "qa-northwind-standard");
     assert!(ctx.tenant.groups.values().all(|g| g.spread_group.starts_with("qa-northwind-")));

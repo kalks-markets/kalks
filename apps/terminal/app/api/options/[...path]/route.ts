@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { csrf, error, reply, soft } from "@/lib/engine/server";
 import { actingAccount, options, optionsStreamUrl, publicBook, publicChain, tenantOf } from "@/lib/options/server";
+import { moduleGate } from "@/lib/tenant-brand";
 
 // Kalks FX Options BFF (read side). Browser -> /api/options/<route> (same origin; `X-Kalks-Login` names the acting
 // account, whose engine session is in the HttpOnly cookie) -> services/options /v1/options/… with the internal
@@ -143,5 +144,6 @@ async function handle(req: NextRequest, { params }: Ctx, method: "GET" | "POST")
 }
 
 export const dynamic = "force-dynamic";
-export const GET = async (req: NextRequest, ctx: Ctx) => soft(req, await handle(req, ctx, "GET"));
-export const POST = async (req: NextRequest, ctx: Ctx) => soft(req, await handle(req, ctx, "POST"));
+// the broker switched Options off (module switches): every options call answers 403 module_disabled
+export const GET = async (req: NextRequest, ctx: Ctx) => soft(req, (await moduleGate(req.headers, "options")) ?? (await handle(req, ctx, "GET")));
+export const POST = async (req: NextRequest, ctx: Ctx) => soft(req, (await moduleGate(req.headers, "options")) ?? (await handle(req, ctx, "POST")));

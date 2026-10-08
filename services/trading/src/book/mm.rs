@@ -197,7 +197,9 @@ pub async fn account(st: &AppState, tenant_id: i64, kind: AccountKind) -> anyhow
     anyhow::ensure!(user > 0, "OPTIONS_MM_USER_ID is not set: the Kalks market maker has no user");
     let t = st.hub.shared.registry.get(tenant_id).ok_or_else(|| anyhow::anyhow!("unknown tenant {tenant_id}"))?;
     let pick = |code: &str| t.groups.get(code).filter(|g| g.allows(kind.as_str()) && !g.cent).map(|g| g.clone());
-    let g = pick(super::LP_GROUP).or_else(|| pick("standard")).ok_or_else(|| anyhow::anyhow!("no USD group for the market-maker account"))?;
+    // an Options group (CFD / Options account split): `options-mm`, else the broker's first USD Options group
+    let any_options = || t.groups.values().filter(|g| g.product == crate::rules::Product::Options && g.allows(kind.as_str()) && !g.cent).min_by(|a, b| a.code.cmp(&b.code)).cloned();
+    let g = pick(super::LP_GROUP).or_else(any_options).or_else(|| pick("standard")).ok_or_else(|| anyhow::anyhow!("no USD group for the market-maker account"))?;
     let capital = D::from(st.cfg.options_mm_capital.max(0));
     let (pw, inv) = (crate::auth::generate_password(), crate::auth::generate_password());
     let (th, ih) = tokio::task::spawn_blocking(move || -> anyhow::Result<(String, String)> { Ok((crate::auth::hash_password(&pw)?, crate::auth::hash_password(&inv)?)) }).await??;

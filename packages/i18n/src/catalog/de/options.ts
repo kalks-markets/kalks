@@ -64,10 +64,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "Die Optionsbedingungen sind derzeit nicht verfügbar. Bitte versuchen Sie es später erneut.",
 
   // Kalks Trader button
-  "trade.ready": "Alles bereit. Optionen handeln Sie in Kalks Trader, auf demselben Konto wie Ihre CFDs.",
+  "trade.ready": "Alles bereit. Optionen handeln Sie in Kalks Trader, auf Ihrem Optionskonto.",
   "trade.cta": "Optionen in Kalks Trader handeln",
   "trade.chooseAccount": "Konto auswählen",
-  "trade.noAccount": "Sie benötigen ein aktives Handelskonto, um Optionen zu handeln.",
+  "trade.noAccount": "Sie benötigen ein aktives Optionskonto, um Optionen zu handeln.",
   "trade.openAccount": "Konto eröffnen",
   "trade.cashOnly": "Prämien und Margin stammen aus dem eigenen Barguthaben Ihres Kontos. Bonus und Kredit können nicht verwendet werden.",
   "trade.live": "Live",
@@ -96,5 +96,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "Demo: Hier wird nichts gespeichert.",
+  // CFD / Options account split
+  "account.noneTitle": "Noch kein Optionskonto",
+  "account.noneText": "Optionen werden auf einem eigenen Konto gehandelt, getrennt von Ihren CFD-Konten. Eröffnen Sie eines in einer Minute, live oder demo.",
+  "account.open": "Optionskonto eröffnen",
 };
 export default options;

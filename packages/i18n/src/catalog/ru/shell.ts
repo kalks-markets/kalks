@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "Проверено {time} · при перезагрузке обновляется каждые 15 секунд",
   "system.status.expectedBack": "Ожидаемое восстановление: до {time}",
   "system.status.questions": "Вопросы? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} недоступно для вашего счёта.",
+  "module.copy_trading": "Копи-трейдинг",
+  "module.pamm": "PAMM-фонды",
+  "module.mam": "MAM",
+  "module.prop": "Проп-трейдинг",
+  "module.ib": "Партнёрская программа",
+  "module.algo": "Конструктор стратегий",
+  "module.api": "API и вебхуки",
+  "module.academy": "Академия",
+  "module.wallet": "Кошелёк",
+  "module.rewards": "Награды",
+  "module.options": "Опционы",
+  "module.news": "Новости",
+  "module.calendar": "Экономический календарь",
+  "module.markets": "Рынки",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "Чат поддержки",
 };
 export default shell;

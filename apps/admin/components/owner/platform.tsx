@@ -7,11 +7,22 @@ import { Button, Card, CardHeader, Chip, Dialog, EmptyState, Field, IconButton, 
 import { ErrorState, TableSkeleton, ago, useApi, useNow, when } from "@/components/live/kit";
 import { STATUS_TONE, act, call, cap } from "@/components/rbac/kit";
 import type { FeatureCatalogue, Probe } from "./types";
+import { MODULE_LOSES, useModuleSwitch } from "./module-switch";
 
-/** Tenant × feature grid; a click sets an override for that tenant, the reset icon returns to the default. */
+/** Tenant × feature grid (every tenant, the platform's own Kalks tenant included); a click sets an override for that
+ *  tenant, the reset icon returns to the default. A module switch asks to confirm with a reason first. */
 function Grid({ data, kind, reload }: { data: FeatureCatalogue; kind: "module" | "flag"; reload: () => void }) {
   const features = data.features.filter((f) => f.kind === kind);
-  const set = async (tenant: number, key: string, v: boolean | null) => (await act("PUT", `/api/owner/tenants/${tenant}/features`, { [key]: v }, v === null ? "Back to default" : `${key}: ${v ? "on" : "off"}`)) && reload();
+  const sw = useModuleSwitch(reload);
+  const set = async (tenant: number, key: string, v: boolean | null) => {
+    if (kind === "module") {
+      const t = data.tenants.find((x) => x.id === tenant);
+      const f = features.find((x) => x.key === key);
+      sw.ask({ tenantId: tenant, tenantName: t?.name ?? `#${tenant}`, key, name: f?.name ?? key, value: v, effective: v ?? !!f?.default });
+      return;
+    }
+    if (await act("PUT", `/api/owner/tenants/${tenant}/features`, { [key]: v }, v === null ? "Back to default" : `${key}: ${v ? "on" : "off"}`)) reload();
+  };
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[720px] border-separate border-spacing-0 text-[13px]" data-testid={`${kind}-grid`}>
@@ -30,11 +41,12 @@ function Grid({ data, kind, reload }: { data: FeatureCatalogue; kind: "module" |
         <tbody>
           {features.map((f) => (
             <tr key={f.key}>
-              <td className="sticky left-0 z-10 border-b border-line bg-surface px-3 py-3">
+              <td className="sticky left-0 z-10 max-w-[300px] border-b border-line bg-surface px-3 py-3">
                 <div className="font-medium">{f.name}</div>
                 <div className="text-[11.5px] text-fg-3">
                   {f.key} · default {f.default ? "on" : "off"}
                 </div>
+                {kind === "module" && MODULE_LOSES[f.key] && <div className="mt-1 text-[11.5px] leading-snug text-fg-2">Off: {MODULE_LOSES[f.key]}</div>}
               </td>
               {data.tenants.map((t) => {
                 const c = data.matrix[String(t.id)]?.[f.key];
@@ -55,6 +67,7 @@ function Grid({ data, kind, reload }: { data: FeatureCatalogue; kind: "module" |
           ))}
         </tbody>
       </table>
+      {sw.dialog}
     </div>
   );
 }

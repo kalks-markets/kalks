@@ -10,6 +10,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/api/api_providers.dart';
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../core/models/account.dart';
 import '../../core/notifications/notifications.dart';
 import '../../data/client_data.dart';
@@ -55,6 +56,7 @@ class PromotionsScreen extends ConsumerWidget {
     final f = GrowthFmt(t);
     final title = t('rewards.promo.title');
     final subtitle = t('rewards.promo.subtitle');
+    final walletOn = ref.watch(configProvider).moduleOn('wallet');
     final v = ref.watch(promotionsProvider);
     if (!v.hasValue) {
       return GrowthFallback(
@@ -82,12 +84,14 @@ class PromotionsScreen extends ConsumerWidget {
       },
       children: [
         KPageHeader(title: title, subtitle: Text(subtitle)),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            KButton(label: t('common.deposit'), icon: LucideIcons.wallet, variant: KButtonVariant.surface, onPressed: () => context.go('/wallet/deposit')),
-          ],
-        ),
+        if (walletOn) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              KButton(label: t('common.deposit'), icon: LucideIcons.wallet, variant: KButtonVariant.surface, onPressed: () => context.go('/wallet/deposit')),
+            ],
+          ),
+        ],
         const SizedBox(height: 20),
         const BannerSlot(placement: 'rewards'),
         SizedBox(
@@ -476,14 +480,15 @@ class _ClaimSheetState extends ConsumerState<_ClaimSheet> {
 
 /* ------------------------------------------------------------------ my bonuses */
 
-class _GrantRow extends StatelessWidget {
+class _GrantRow extends ConsumerWidget {
   const _GrantRow({required this.g});
   final Grant g;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.t;
     final k = context.k;
+    final walletOn = ref.watch(configProvider).moduleOn('wallet');
     final f = GrowthFmt(t);
     final pct = g.lotsRequired > 0 ? (g.lotsTraded / g.lotsRequired * 100).clamp(0.0, 100.0) : g.progressPct;
     final ended = const ['completed', 'forfeited', 'expired', 'cancelled', 'failed'].contains(g.status);
@@ -557,8 +562,10 @@ class _GrantRow extends StatelessWidget {
                       style: context.text.footnote.copyWith(color: k.warn),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  KTextButton(label: t('rewards.grant.deposit'), color: k.warn, onPressed: () => context.go('/wallet/deposit')),
+                  if (walletOn) ...[
+                    const SizedBox(width: 8),
+                    KTextButton(label: t('rewards.grant.deposit'), color: k.warn, onPressed: () => context.go('/wallet/deposit')),
+                  ],
                 ],
               ),
             )

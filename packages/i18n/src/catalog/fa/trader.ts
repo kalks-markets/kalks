@@ -518,7 +518,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "اختیار معامله به‌زودی راه‌اندازی می‌شود",
-  "opt.soon.text": "Kalks FX Options هنوز روی این حساب فعال نیست. به محض فعال شدن، زنجیره اختیار همین‌جا و روی همان حساب CFDهای شما نمایش داده می‌شود.",
+  "opt.soon.text": "Kalks FX Options هنوز روی این حساب فعال نشده است. به‌محض فعال شدن، زنجیره اختیار معامله اینجا نمایش داده می‌شود.",
   "opt.soon.point1": "اختیار خرید و فروش روی فارکس، طلا، نقره و نفت",
   "opt.soon.point2": "سررسیدهای روزانه، هفتگی و ماهانه با تسویه نقدی به USD",
   "opt.soon.point3": "به‌عنوان خریدار، هرگز بیش از پرمیومی که می‌پردازید زیان نمی‌کنید",
@@ -1258,5 +1258,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "معامله توسط میز دیلینگ لغو شد",
   "opt.bust.text": "{what} × {n}: معامله برگشت خورد و کارمزد آن (در صورت وجود) بازگردانده شد.",
   "opt.tape.kind.bust": "لغو شده",
+  // CFD / Options account split
+  "acct.openCfd": "افتتاح حساب CFD",
+  "acct.openOptions": "افتتاح حساب اختیار معامله",
+  "opt.err.product_mismatch": "این یک حساب CFD است: اختیار معامله در حساب اختیار معامله انجام می‌شود.",
 };
 export default trader;

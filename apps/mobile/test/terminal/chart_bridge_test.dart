@@ -13,7 +13,7 @@ void main() {
     bg: '#0a0a0d',
     grid: 'rgba(255,255,255,0.035)',
     line: 'rgba(255,255,255,0.07)',
-    up: '#22c55e',
+    up: '#2f7bff',
     down: '#f04438',
     gold: '#e9b949',
     warn: '#f59e0b',
@@ -59,7 +59,7 @@ void main() {
       expect(m['type'], 'init');
       expect(m['digits'], 5);
       expect(m['intraday'], isTrue);
-      expect((m['palette'] as Map)['up'], '#22c55e');
+      expect((m['palette'] as Map)['up'], '#2f7bff');
       expect((m['palette'] as Map)['dark'], isTrue);
     });
 
@@ -112,6 +112,60 @@ void main() {
       expect(dec(ChartCmd.chartType('bars')), {'type': 'chartType', 'chartType': 'bars'});
       // an instance survives a round trip through the workspace JSON
       expect(IndInstance.fromJson(jsonDecode(jsonEncode(rsi.toJson()))), rsi);
+    });
+
+    test('a position line carries its S / T handles (with the pip size and stops level); other lines do not', () {
+      final m = dec(
+        ChartCmd.lines(const [
+          ChartLine(id: 'pos:7', kind: 'pos', price: 1.085, label: 'BUY 0.10', side: 'buy', draggable: true, handles: 'st', pip: 0.0001, gap: 0.0001),
+          ChartLine(id: 'tp:8', kind: 'tp', price: 1.09, label: 'TP', side: 'buy'),
+        ]),
+      );
+      final pos = (m['lines'] as List).first as Map;
+      expect(pos['handles'], 'st');
+      expect(pos['pip'], 0.0001);
+      expect(pos['gap'], 0.0001);
+      expect(((m['lines'] as List).last as Map).containsKey('handles'), isFalse);
+      // a line at another price keeps everything else
+      const a = ChartLine(id: 'pos:7', kind: 'pos', price: 1.085, label: 'BUY 0.10', side: 'buy', handles: 's', pip: 0.0001);
+      expect(a.at(1.08).price, 1.08);
+      expect(a.at(1.08).handles, 's');
+      expect(a.at(1.085), a);
+      expect(a == a.at(1.085), isTrue);
+      expect(a == const ChartLine(id: 'pos:7', kind: 'pos', price: 1.085, label: 'BUY 0.10', side: 'buy', handles: 't', pip: 0.0001), isFalse);
+    });
+
+    test('an S / T handle makes the missing stop line of its position, only while the position shows that handle', () {
+      const pos = ChartLine(id: 'pos:7', kind: 'pos', price: 1.085, label: 'SELL 0.10', side: 'sell', draggable: true, handles: 't');
+      final tp = lineForHandle(const [pos], 'tp:7');
+      expect(tp, isNotNull);
+      expect(tp!.kind, 'tp');
+      expect(tp.label, 'TP');
+      expect(tp.side, 'sell');
+      expect(tp.price, 1.085);
+      expect(tp.ref, '7');
+      // the position has a stop loss already (no S), another ticket, not a stop, malformed
+      expect(lineForHandle(const [pos], 'sl:7'), isNull);
+      expect(lineForHandle(const [pos], 'tp:8'), isNull);
+      expect(lineForHandle(const [pos], 'pnd:7'), isNull);
+      expect(lineForHandle(const [pos], 'tp7'), isNull);
+    });
+
+    test('stops from a handle: the order tickets\' starting distance, held on the valid side (web trade-handles.ts)', () {
+      // the same cases as apps/terminal/tests/trade-handles.test.mjs
+      expect(defaultStop('sl', 'buy', bid: 1.085, ask: 1.0851, pip: 0.0001, gap: 0, digits: 5), 1.084);
+      expect(defaultStop('tp', 'buy', bid: 1.085, ask: 1.0851, pip: 0.0001, gap: 0, digits: 5), 1.087);
+      expect(defaultStop('sl', 'sell', bid: 1.085, ask: 1.0851, pip: 0.0001, gap: 0, digits: 5), 1.0861);
+      expect(defaultStop('tp', 'sell', bid: 1.085, ask: 1.0851, pip: 0.0001, gap: 0, digits: 5), 1.0831);
+      expect(defaultStop('sl', 'buy', bid: 2650.0, ask: 2650.8, pip: 0.1, gap: 0, digits: 2), 2648.4);
+      expect(defaultStop('tp', 'sell', bid: 2650.0, ask: 2650.8, pip: 0.1, gap: 0, digits: 2), 2647.6);
+      expect(defaultStop('sl', 'buy', bid: 100.0, ask: 100.02, pip: 0.01, gap: 0.5, digits: 2), 99.5);
+      expect(clampStop('sl', 'buy', 1.0899, bid: 1.085, ask: 1.0851, gap: 0.0001, digits: 5), 1.0849);
+      expect(clampStop('sl', 'buy', 1.08, bid: 1.085, ask: 1.0851, gap: 0.0001, digits: 5), 1.08);
+      expect(clampStop('tp', 'buy', 1.08, bid: 1.085, ask: 1.0851, gap: 0.0001, digits: 5), 1.0851);
+      expect(clampStop('sl', 'sell', 1.08, bid: 1.085, ask: 1.0851, gap: 0.0001, digits: 5), 1.0852);
+      expect(clampStop('tp', 'sell', 1.09, bid: 1.085, ask: 1.0851, gap: 0.0001, digits: 5), 1.085);
+      expect(clampStop('sl', 'buy', 1.085, bid: 1.085, ask: 1.0851, gap: 0, digits: 5), 1.08499);
     });
 
     test('a line knows its ticket and compares by value', () {

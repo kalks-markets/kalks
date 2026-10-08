@@ -7,6 +7,7 @@ import { Button, Card, Chip, DataTable, Dialog, EmptyState, Field, Input, KpiCar
 import { ErrorState, FilterSelect, Pager, TableSkeleton, ago, qs, useApi, useDebounced, useNow, when } from "@/components/live/kit";
 import { useCan, useStaff } from "@/components/staff-session";
 import { BulkDialog, BulkMenu, CloseAccountDialog, ReopenAccountDialog, type BulkKind } from "./account-ops";
+import { ProductChip } from "./groups";
 import { MiniClient, SideChip, fmtPrice } from "@/components/trading/shared";
 import { BookChip, DeskDialog, MetaTile } from "@/components/trading-desk/kit";
 import { CreateTradeDrawer } from "@/components/trading-desk/create-trade";
@@ -19,6 +20,7 @@ import {
   groupLabel,
   liveClientEmail,
   normAccount,
+  productOf,
   serverStamp,
   toUsdOf,
   upsertAccounts,
@@ -97,12 +99,13 @@ export function LiveAccountsPage() {
   const [group, setGroup] = React.useState<string>("all");
   const [kind, setKind] = React.useState<"all" | AccountKind>("all");
   const [life, setLife] = React.useState<"all" | "dormant">("all");
+  const [product, setProduct] = React.useState<"all" | "cfd" | "options">("all");
   const [bulk, setBulk] = React.useState<BulkKind | null>(null);
   const [page, setPage] = React.useState(1);
   const [open, setOpen] = React.useState<string | null>(null);
   const [act, setAct] = React.useState<Act>(null);
   const dq = useDebounced(q.trim(), 300);
-  React.useEffect(() => setPage(1), [dq, type, status, group, kind, life]);
+  React.useEffect(() => setPage(1), [dq, type, status, group, kind, life, product]);
   React.useEffect(() => {
     const l = new URLSearchParams(window.location.search).get("login");
     if (l) setOpen(l);
@@ -110,7 +113,7 @@ export function LiveAccountsPage() {
 
   // the engine has no product-kind filter: with a kind selected, the latest KIND_SCAN accounts are fetched and filtered here
   const byKind = kind !== "all";
-  const { data, error, loading, reload } = useApi<AccountsPage>(`/api/trading/admin/accounts${qs({ q: dq, type, status, group, dormant: life === "dormant" ? true : undefined, page: byKind ? 1 : page, limit: byKind ? KIND_SCAN : PER })}`, { refreshMs: byKind ? 15_000 : 5000 });
+  const { data, error, loading, reload } = useApi<AccountsPage>(`/api/trading/admin/accounts${qs({ q: dq, type, status, group, product, dormant: life === "dormant" ? true : undefined, page: byKind ? 1 : page, limit: byKind ? KIND_SCAN : PER })}`, { refreshMs: byKind ? 15_000 : 5000 });
   const sum = useApi<Summary>("/api/trading/summary", { refreshMs: 15_000 });
   const fetched = React.useMemo(() => (data?.items ?? []).map(normAccount), [data]);
   React.useEffect(() => upsertAccounts(fetched), [fetched]);
@@ -128,6 +131,7 @@ export function LiveAccountsPage() {
           <span className="font-mono text-[12.5px] font-medium">{r.login}</span>
           {r.type === "demo" && <Chip size="sm" tone="info">Demo</Chip>}
           <KindChip group={r.group} />
+          {productOf(r) === "options" && <ProductChip product="options" />}
         </span>
       ),
     },
@@ -168,8 +172,8 @@ export function LiveAccountsPage() {
     },
   ];
 
-  const filtered = !!dq || type !== "all" || status !== "all" || group !== "all" || byKind || life !== "all";
-  const filters = { q: dq, type, status, group, dormant: life === "dormant" ? true : undefined };
+  const filtered = !!dq || type !== "all" || status !== "all" || group !== "all" || byKind || life !== "all" || product !== "all";
+  const filters = { q: dq, type, status, group, product, dormant: life === "dormant" ? true : undefined };
   return (
     <div className="pb-10">
       <PageHeader
@@ -198,12 +202,13 @@ export function LiveAccountsPage() {
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Login, name or client ID" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-3" aria-label="Search accounts" />
             </div>
             <Segmented size="xs" value={type} onChange={setType} options={[{ value: "all", label: "Live + demo" }, { value: "live", label: "Live" }, { value: "demo", label: "Demo" }]} />
-            <FilterSelect label="Group" value={group} onChange={setGroup} options={[{ value: "all", label: "All groups" }, ...dir.groups.map((g) => ({ value: g.code, label: g.name }))]} />
+            <FilterSelect label="Product" value={product} onChange={(v) => setProduct(v as typeof product)} options={[{ value: "all", label: "CFD + Options" }, { value: "cfd", label: "CFD" }, { value: "options", label: "Options" }]} />
+            <FilterSelect label="Group" value={group} onChange={setGroup} options={[{ value: "all", label: "All groups" }, ...dir.groups.filter((g) => product === "all" || productOf(g) === product).map((g) => ({ value: g.code, label: g.name }))]} />
             <FilterSelect label="Status" value={status} onChange={setStatus} options={[{ value: "all", label: "Any status" }, ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]} />
             <FilterSelect label="Kind" value={kind} onChange={(v) => setKind(v as typeof kind)} options={[{ value: "all", label: "All" }, ...(["copy", "pamm", "mam", "prop", "regular"] as const).map((k) => ({ value: k, label: KIND_LABEL[k] }))]} />
             <FilterSelect label="Activity" value={life} onChange={(v) => setLife(v as typeof life)} options={[{ value: "all", label: "Any" }, { value: "dormant", label: "Dormant only" }]} />
             {filtered && (
-              <Button size="xs" variant="ghost" onClick={() => (setQ(""), setType("all"), setStatus("all"), setGroup("all"), setKind("all"), setLife("all"))}>
+              <Button size="xs" variant="ghost" onClick={() => (setQ(""), setType("all"), setStatus("all"), setGroup("all"), setKind("all"), setLife("all"), setProduct("all"))}>
                 Clear filters
               </Button>
             )}
@@ -327,6 +332,7 @@ export function AccountDrawer({ login, onClose, onAct }: { login: string | null;
           {a && <StatusChip status={a.status} />}
           {a?.type === "demo" && <Chip size="sm" tone="info">Demo</Chip>}
           {a && <KindChip group={a.group} />}
+          {a && <ProductChip product={a.product} />}
         </span>
       }
       description={a ? `${clientName(a.userId, a.login)}${liveClientEmail(a.userId) ? ` · ${liveClientEmail(a.userId)}` : ""} · client #${a.userId}` : "Loading…"}
@@ -607,7 +613,8 @@ export function AccountActions({ act, onClose, onDone }: { act: Act; onClose: ()
   const n = Number(amount.replace(/,/g, "")) || 0;
   const signedAmt = fType === "deposit" ? n : fType === "withdrawal" ? -n : dirn === "add" ? n : -n;
   const target = dir.groups.find((g) => g.code === grp);
-  const groupsFor = dir.groups.filter((g) => g.enabled && (g.accountTypes === "both" || g.accountTypes === a.type) && g.cent === a.cent);
+  // an account never changes product (the engine refuses a CFD ↔ Options move)
+  const groupsFor = dir.groups.filter((g) => g.enabled && (g.accountTypes === "both" || g.accountTypes === a.type) && g.cent === a.cent && productOf(g) === productOf(a));
   const levList = dir.groups.find((g) => g.code === a.group)?.leverages ?? a.leverages;
   const delayOn = state.tenant.execDelayEnabled;
   const after = fType === "credit" ? a.credit + signedAmt : fType === "bonus" ? a.bonus + signedAmt : a.balance + signedAmt;
@@ -722,7 +729,7 @@ export function AccountActions({ act, onClose, onDone }: { act: Act; onClose: ()
         open={act?.k === "group"}
         onOpenChange={close}
         title={`Change group · ${a.login}`}
-        description={`Now ${a.groupName}. Netting ↔ hedging only while the account is flat; cent ↔ standard never.`}
+        description={`Now ${a.groupName}. Netting ↔ hedging only while the account is flat; cent ↔ standard and CFD ↔ Options never.`}
         codes={ACC_REASONS}
         confirmLabel={target ? `Move to ${target.name}` : "Move"}
         disabled={grp === a.group ? "Choose another group" : target && target.mode !== a.mode && a.positions > 0 ? "Close the positions first (mode change)" : false}

@@ -6,6 +6,15 @@ const accounts = {
   "badge.live": "LIVE",
   "badge.demo": "DEMO",
 
+  // Product of an account (its group): CFD or Kalks FX Options; each account trades one
+  "product.cfd": "CFD account",
+  "product.options": "Options account",
+  "product.cfdText": "Forex, metals, indices, stocks and crypto as CFDs, with leverage.",
+  "product.optionsText": "Calls and puts on forex, gold, silver and oil, settled in cash.",
+  "product.chipOptions": "OPTIONS",
+  "product.groupCfd": "CFD accounts",
+  "product.groupOptions": "Options accounts",
+
   // Position modes (server enum values)
   "mode.hedging": "Hedging",
   "mode.netting": "Netting",
@@ -222,6 +231,13 @@ const accounts = {
   "wizard.step.password": "Password",
   "wizard.step.done": "Done",
 
+  // Open account wizard: the first step (CFD account | Options account)
+  "wizard.step.product": "Product",
+  "wizard.productTitle": "What will this account trade?",
+  "wizard.productSubtitle": "Each account trades one product. You can hold both.",
+  "wizard.noGroups": "No account types are open for this product right now.",
+  "wizard.introFirst": "One quick step before your first Options account: the 1-minute options intro.",
+
   // Open account wizard
   "wizard.title": "Open a trading account",
   "wizard.subtitle": "Takes under a minute. Your login and passwords are issued instantly.",
@@ -267,6 +283,7 @@ const accounts = {
   "wizard.review.minDeposit": "A first deposit of at least {amount} applies to this account type.",
   "wizard.review.fixed": "Position mode ({mode}) and currency ({currency}) can't be changed after opening.",
   "wizard.agreeLive": "I understand that CFDs are complex instruments and carry a high risk of losing money rapidly due to leverage.",
+  "wizard.agreeLiveOptions": "I understand that options carry a high risk: a bought option can expire worthless, and a sold option can lose more than the premium received.",
   "wizard.agreeDemo": "I understand that demo results use virtual funds and don't guarantee live results.",
   "wizard.opening": "Opening account…",
   "wizard.openLive": "Open live account",

@@ -518,7 +518,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "Скоро запуск опционов",
-  "opt.soon.text": "Kalks FX Options на этом счёте пока не открыт. Как только он откроется, здесь появится опционная доска — на том же счёте, что и Ваши CFD.",
+  "opt.soon.text": "Kalks FX Options на этом счёте пока не открыты. Как только откроются, здесь появится цепочка опционов.",
   "opt.soon.point1": "Коллы и путы на валюты, золото, серебро и нефть",
   "opt.soon.point2": "Дневные, недельные и месячные экспирации, денежные расчёты в USD",
   "opt.soon.point3": "Как покупатель Вы никогда не потеряете больше уплаченной премии",
@@ -1258,5 +1258,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "Сделка отменена дилинговым отделом",
   "opt.bust.text": "{what} × {n}: сделка сторнирована, комиссия (если была) возвращена.",
   "opt.tape.kind.bust": "Отменена",
+  // CFD / Options account split
+  "acct.openCfd": "Открыть счёт CFD",
+  "acct.openOptions": "Открыть опционный счёт",
+  "opt.err.product_mismatch": "Это счёт CFD: опционы торгуются на опционном счёте.",
 };
 export default trader;

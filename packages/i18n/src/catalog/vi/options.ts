@@ -64,10 +64,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "Hiện không thể hiển thị điều khoản quyền chọn. Vui lòng thử lại sau.",
 
   // Kalks Trader button
-  "trade.ready": "Mọi thứ đã sẵn sàng. Quyền chọn được giao dịch trong Kalks Trader, trên cùng tài khoản với các CFD của bạn.",
+  "trade.ready": "Mọi thứ đã sẵn sàng. Quyền chọn được giao dịch trong Kalks Trader, trên tài khoản quyền chọn của bạn.",
   "trade.cta": "Giao dịch quyền chọn trong Kalks Trader",
   "trade.chooseAccount": "Chọn tài khoản",
-  "trade.noAccount": "Bạn cần có một tài khoản giao dịch đang hoạt động để giao dịch quyền chọn.",
+  "trade.noAccount": "Bạn cần có một tài khoản quyền chọn đang hoạt động để giao dịch quyền chọn.",
   "trade.openAccount": "Mở tài khoản",
   "trade.cashOnly": "Phí quyền chọn và ký quỹ được lấy từ tiền mặt của chính tài khoản. Không thể dùng tiền thưởng và tín dụng.",
   "trade.live": "Thực",
@@ -96,5 +96,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "Demo: không có gì ở đây được lưu lại.",
+  // CFD / Options account split
+  "account.noneTitle": "Chưa có tài khoản quyền chọn",
+  "account.noneText": "Quyền chọn được giao dịch trong tài khoản riêng, tách khỏi các tài khoản CFD. Mở một tài khoản trong một phút, thật hoặc demo.",
+  "account.open": "Mở tài khoản quyền chọn",
 };
 export default options;

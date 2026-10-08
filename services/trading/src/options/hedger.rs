@@ -32,9 +32,11 @@ pub async fn hedge_account(st: &AppState, t: &TenantConfig) -> anyhow::Result<i6
         return Ok(l);
     }
     let cfg = &st.cfg;
-    let pick = |code: &str| t.groups.get(code).filter(|g| g.enabled && g.allows("live") && !g.cent).map(|g| g.code.clone());
+    // the hedge trades CFDs: always a CFD group (CFD / Options account split)
+    let cfd = |g: &&crate::rules::Group| g.product == crate::rules::Product::Cfd;
+    let pick = |code: &str| t.groups.get(code).filter(|g| g.enabled && g.allows("live") && !g.cent).filter(cfd).map(|g| g.code.clone());
     let group = pick(&cfg.options_hedge_group)
-        .or_else(|| t.groups.values().filter(|g| g.enabled && g.allows("live") && !g.cent && g.mode == crate::model::Mode::Netting && !g.code.starts_with("prop") && !matches!(g.code.as_str(), "copy" | "copy-netting" | "pamm" | "mam")).map(|g| g.code.clone()).min())
+        .or_else(|| t.groups.values().filter(cfd).filter(|g| g.enabled && g.allows("live") && !g.cent && g.mode == crate::model::Mode::Netting && !g.code.starts_with("prop") && !matches!(g.code.as_str(), "copy" | "copy-netting" | "pamm" | "mam")).map(|g| g.code.clone()).min())
         .or_else(|| pick("standard"))
         .ok_or_else(|| anyhow::anyhow!("no live USD group for the hedge account"))?;
     let (login, _, _) = st.social.open_account(t.tenant_id, cfg.options_hedge_user, &group, "Options delta hedge (house)").await.map_err(|e| anyhow::anyhow!("{e:?}"))?;

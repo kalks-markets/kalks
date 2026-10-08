@@ -404,5 +404,7 @@ const order: NsMessages<"order"> = {
   "toast.sessionExpired": "அமர்வு காலாவதியானது",
   "toast.sessionExpiredDesc": "{login} க்கான உங்கள் அமர்வு முடிந்தது. டிரேட் செய்ய மீண்டும் உள்நுழையுங்கள்.",
   "toast.loggedOut": "{login} இலிருந்து வெளியேறினீர்கள்",
+  // CFD / Options account split
+  "reject.product_mismatch": "இந்தக் கணக்கு இந்தத் தயாரிப்பை டிரேட் செய்யாது",
 };
 export default order;

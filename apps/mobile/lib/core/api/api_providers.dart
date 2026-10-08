@@ -7,6 +7,7 @@ import '../../preview/preview_adapter.dart';
 import '../app_info.dart';
 import '../auth/auth_controller.dart';
 import '../auth/secure_store.dart';
+import '../config/app_config.dart';
 import '../prefs.dart';
 import 'api_client.dart';
 
@@ -66,6 +67,8 @@ final apiProvider = Provider<ApiClient>((ref) {
     ),
     onSessionDead: (_) => ref.read(authProvider.notifier).sessionEnded(),
     onMaintenance: (_) => ref.read(maintenanceProvider.notifier).set(true),
+    // the broker switched a module off since the config was read: read it again, the router and navigation follow
+    onModuleDisabled: (_) => ref.read(configProvider.notifier).moduleRefused(),
     onDeviceMinted: store.setDeviceId,
   );
 });

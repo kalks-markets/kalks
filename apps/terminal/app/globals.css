@@ -17,8 +17,13 @@
   --t-chart-bg: #0a0a0d;
   /* tertiary text: 5.8:1 on the panel (the Kalks default #63636e is 3.3:1) */
   --k-fg-3: #8b8b96;
-  /* Buy / Sell button fills: white text at 5.0:1 / 4.8:1 */
-  --t-buy-fill: #15803d;
+  /* Kalks Trader: blue = up / buy / profit / TP, red = down / sell / loss / SL (candles, Buy / Sell, P&L, change %,
+     trade lines). Scoped to the terminal: the Client Area keeps the @kalks/ui green for success states.
+     #2f7bff on the dark panel 4.9:1 */
+  --k-up: #2f7bff;
+  --k-up-soft: rgba(47, 123, 255, 0.12);
+  /* Buy / Sell button fills: white text at 5.6:1 / 4.8:1 */
+  --t-buy-fill: #1f5fe0;
   --t-sell-fill: #dc2626;
   /* filled primary buttons (white text) and accent-coloured text */
   --t-accent-strong: color-mix(in oklab, var(--k-ember) 80%, black);
@@ -32,7 +37,9 @@
   --t-grid: rgba(15, 15, 20, 0.055);
   --t-chart-bg: #ffffff;
   --k-fg-3: #6b6b75;
-  --k-up: #15803d;
+  /* blue up on white 5.6:1 */
+  --k-up: #1f5fe0;
+  --k-up-soft: rgba(31, 95, 224, 0.12);
   --k-warn: #b45309;
   --k-info: #0369a1;
   --k-gold: #a16207;

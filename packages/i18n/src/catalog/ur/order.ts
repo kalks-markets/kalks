@@ -403,5 +403,7 @@ const order: NsMessages<"order"> = {
   "toast.sessionExpired": "سیشن ختم ہو گیا",
   "toast.sessionExpiredDesc": "{login} کا سیشن ختم ہو گیا ہے۔ ٹریڈ کرنے کے لیے دوبارہ لاگ اِن کریں۔",
   "toast.loggedOut": "{login} سے لاگ آؤٹ ہو گئے",
+  // CFD / Options account split
+  "reject.product_mismatch": "یہ اکاؤنٹ یہ پروڈکٹ ٹریڈ نہیں کرتا",
 };
 export default order;

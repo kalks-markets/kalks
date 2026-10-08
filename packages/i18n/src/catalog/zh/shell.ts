@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "检查时间 {time} · 重新加载时每 15 秒更新一次",
   "system.status.expectedBack": "预计于 {time} 前恢复",
   "system.status.questions": "有疑问？{email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "您的账户无法使用{module}。",
+  "module.copy_trading": "跟单交易",
+  "module.pamm": "PAMM 基金",
+  "module.mam": "MAM",
+  "module.prop": "自营交易",
+  "module.ib": "合作伙伴计划",
+  "module.algo": "策略构建器",
+  "module.api": "API 与 Webhook",
+  "module.academy": "学院",
+  "module.wallet": "钱包",
+  "module.rewards": "奖励",
+  "module.options": "期权",
+  "module.news": "新闻",
+  "module.calendar": "财经日历",
+  "module.markets": "市场",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "客服聊天",
 };
 export default shell;

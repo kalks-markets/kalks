@@ -256,12 +256,8 @@ pub async fn revoke_sessions(st: &AppState, login: i64) {
 pub fn limit_allows(st: &AppState, ctx: &Ctx, login: i64) -> ApiResult<()> {
     let m = st.hub.meta(login).ok_or_else(|| ApiError::NotFound("Account not found".into()))?;
     let Some(g) = ctx.tenant.groups.get(&m.group) else { return Ok(()) };
-    let used = {
-        let idx = st.hub.shared.index.read().unwrap();
-        idx.accounts.iter().filter(|(l, x)| **l != login && x.tenant_id == m.tenant_id && x.user_id == m.user_id && x.kind == m.kind && x.group == m.group && !x.status.is_retired()).count()
-    };
-    if used as u32 >= g.max_accounts_per_user {
-        return Err(ApiError::Conflict { code: "account_limit", message: format!("You can have at most {} {} account(s) in {}", g.max_accounts_per_user, m.kind.as_str(), g.name) });
+    if super::accounts::product_accounts_used(st, &ctx.tenant, m.user_id, m.kind, g.product, Some(login)) >= g.max_accounts_per_user {
+        return Err(ApiError::Conflict { code: "account_limit", message: super::accounts::limit_message(g, m.kind) });
     }
     Ok(())
 }
@@ -701,7 +697,9 @@ pub async fn group_options(State(st): State<AppState>, ctx: Ctx, headers: Header
     owned(&st, &ctx, login, user)?;
     let c = check(&st, login).await?;
     let mut out = Vec::new();
-    let mut groups: Vec<&crate::rules::Group> = ctx.tenant.groups.values().filter(|g| g.enabled && g.allows(c.kind.as_str()) && !is_special_group(&g.code)).collect();
+    // an account changes type within its product only (CFD / Options account split)
+    let product = ctx.tenant.groups.get(&c.group).map(|g| g.product).unwrap_or_default();
+    let mut groups: Vec<&crate::rules::Group> = ctx.tenant.groups.values().filter(|g| g.enabled && g.allows(c.kind.as_str()) && !is_special_group(&g.code) && g.product == product).collect();
     groups.sort_by(|a, b| a.code.cmp(&b.code));
     for g in groups {
         if g.code == c.group {
@@ -733,18 +731,18 @@ fn group_change_blocker(st: &AppState, ctx: &Ctx, c: &Check, g: &crate::rules::G
     if g.cent != (c.usd_factor != D::ONE) {
         return Some(("cent_mismatch", "An account can't move between cent and standard accounts".into()));
     }
+    let product = ctx.tenant.groups.get(&c.group).map(|x| x.product).unwrap_or_default();
+    if g.product != product {
+        return Some(("product_mismatch", "A CFD account and an Options account can't change into each other: open a new account instead".into()));
+    }
     if c.positions > 0 || c.orders > 0 {
         return Some(("positions_open", "Close all trades and orders first".into()));
     }
     if c.kind == AccountKind::Live && c.balance / c.usd_factor < g.min_deposit {
         return Some(("min_deposit", format!("{} needs at least {} USD on the account", g.name, g.min_deposit.normalize())));
     }
-    let used = {
-        let idx = st.hub.shared.index.read().unwrap();
-        idx.accounts.iter().filter(|(l, x)| **l != c.login && x.tenant_id == ctx.tenant.tenant_id && x.user_id == c.user_id && x.kind == c.kind && x.group == g.code && !x.status.is_retired()).count()
-    };
-    if used as u32 >= g.max_accounts_per_user {
-        return Some(("account_limit", format!("You already have the most {} accounts allowed ({})", g.name, g.max_accounts_per_user)));
+    if super::accounts::product_accounts_used(st, &ctx.tenant, c.user_id, c.kind, g.product, Some(c.login)) >= g.max_accounts_per_user {
+        return Some(("account_limit", format!("You already have the most {} {} accounts allowed ({})", c.kind.as_str(), funds::product_name(g.product), g.max_accounts_per_user)));
     }
     None
 }
@@ -764,11 +762,11 @@ pub async fn change_group(State(st): State<AppState>, ctx: Ctx, headers: HeaderM
         return Err(ApiError::Conflict { code, message });
     }
     let g2 = g.clone();
-    let op: Op = Box::new(move |tx, _| {
+    let op: Op = Box::new(move |tx, env| {
         if !tx.st.positions.is_empty() || !tx.st.orders.is_empty() || !tx.st.book.is_idle() {
             return Err(Reject::new("positions_open", "Close all trades and orders first"));
         }
-        funds::change_group(tx, &g2).map(|(from, to)| json!({"from": from, "to": to, "leverage": tx.st.account.leverage}))
+        funds::change_group(tx, env, &g2).map(|(from, to)| json!({"from": from, "to": to, "leverage": tx.st.account.leverage}))
     });
     let d = st.hub.exec(login, &format!("user:{user}"), None, "", "", None, op).await?;
     tracing::info!(login, user, to = %g.code, "account type changed by the client");

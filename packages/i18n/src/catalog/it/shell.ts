@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "Verificato il {time} · si aggiorna ogni 15 secondi al ricaricamento",
   "system.status.expectedBack": "Ritorno previsto entro {time}",
   "system.status.questions": "Domande? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} non è disponibile sul tuo conto.",
+  "module.copy_trading": "Copy trading",
+  "module.pamm": "Fondi PAMM",
+  "module.mam": "MAM",
+  "module.prop": "Trading prop",
+  "module.ib": "Programma partner",
+  "module.algo": "Generatore di strategie",
+  "module.api": "API e webhook",
+  "module.academy": "Accademia",
+  "module.wallet": "Portafoglio",
+  "module.rewards": "Premi",
+  "module.options": "Opzioni",
+  "module.news": "Notizie",
+  "module.calendar": "Calendario economico",
+  "module.markets": "Mercati",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "Chat di supporto",
 };
 export default shell;

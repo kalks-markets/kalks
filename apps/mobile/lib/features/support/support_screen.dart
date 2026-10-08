@@ -1,6 +1,8 @@
 // Support (port of the Live branch of apps/crm/app/(app)/support/page.tsx = components/support/live-support.tsx), in
 // the web's phone order: page header, the live chat (AI bot that hands over to our team), your conversations (history
 // with a read-only transcript), the email channel (write to support, copy client ID) and the notifications note.
+// A broker that switched the live chat off (module `support_chat`) keeps the page without the chat and the
+// conversations: the header, the email channel and the note (web live-support.tsx `chat` false).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -35,14 +37,16 @@ class SupportScreen extends ConsumerStatefulWidget {
 }
 
 class _SupportScreenState extends ConsumerState<SupportScreen> {
-  late final LiveChatController _chat = createLiveChatController(ref);
+  /// Made (and started) on the first build with the live chat on, never for the email-only page.
+  LiveChatController? _chatCtl;
+  LiveChatController get _chat => _chatCtl ??= createLiveChatController(ref);
   final GlobalKey<_HistoryCardState> _history = GlobalKey();
   final GlobalKey _head = GlobalKey();
   double? _headH;
 
   @override
   void dispose() {
-    _chat.dispose();
+    _chatCtl?.dispose();
     super.dispose();
   }
 
@@ -58,6 +62,22 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    if (!ref.watch(configProvider).moduleOn('support_chat')) {
+      // switched off while open: the chat stops once its widgets are gone
+      final old = _chatCtl;
+      _chatCtl = null;
+      if (old != null) WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+      // as the web (live-support.tsx `chat` false): the header, the email channel and the notifications note
+      return KPageScroll(
+        children: [
+          KPageHeader(title: t('support.page.title'), subtitle: Text(t('support.page.subtitle'))),
+          const SizedBox(height: 18),
+          const _EmailCard(),
+          const SizedBox(height: 16),
+          const _NoticeCard(),
+        ],
+      );
+    }
     final mq = MediaQuery.of(context);
     // the shell doesn't resize for the keyboard: keep the composer above it
     final keyboard = mq.viewInsets.bottom;

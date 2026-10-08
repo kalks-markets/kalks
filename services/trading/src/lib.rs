@@ -11,6 +11,7 @@ pub mod corporate;
 pub mod engine;
 pub mod feed;
 pub mod model;
+pub mod modules;
 pub mod money;
 pub mod notify;
 pub mod options;

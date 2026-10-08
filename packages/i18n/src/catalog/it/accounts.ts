@@ -549,5 +549,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "Premio dell'opzione",
   "ledgerKind.option_settlement": "Regolamento dell'opzione",
   "ledgerKind.option_rebate": "Rimborso maker",
+  // CFD / Options account split
+  "product.cfd": "Conto CFD",
+  "product.options": "Conto opzioni",
+  "product.cfdText": "Forex, metalli, indici, azioni e cripto come CFD, con leva.",
+  "product.optionsText": "Call e put su forex, oro, argento e petrolio, regolate in contanti.",
+  "product.chipOptions": "OPZIONI",
+  "product.groupCfd": "Conti CFD",
+  "product.groupOptions": "Conti opzioni",
+  "wizard.step.product": "Prodotto",
+  "wizard.productTitle": "Cosa negozierà questo conto?",
+  "wizard.productSubtitle": "Ogni conto negozia un solo prodotto. Puoi averli entrambi.",
+  "wizard.noGroups": "Al momento non ci sono tipi di conto disponibili per questo prodotto.",
+  "wizard.introFirst": "Un breve passo prima del tuo primo conto opzioni: l'introduzione di 1 minuto alle opzioni.",
+  "wizard.agreeLiveOptions": "Capisco che le opzioni comportano un rischio elevato: un'opzione acquistata può scadere senza valore e un'opzione venduta può perdere più del premio incassato.",
 };
 export default accounts;

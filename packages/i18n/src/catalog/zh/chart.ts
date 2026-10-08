@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "买入止损限价 {lot}",
   "line.sellStopLimit": "卖出止损限价 {lot}",
   "line.alert": "警报",
-  "line.posTitle": "拖动以设置止损/止盈 · 双击修改",
+  "line.posTitle": "拖动 S 或 T(或该线)以设置止损/止盈 · 双击修改",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "止损：拖到某个价格，或点击使用默认距离",
+  "line.tpHandleTitle": "止盈：拖到某个价格，或点击使用默认距离",
   "line.dragTitle": "拖动以移动",
   "line.remove": "删除 {label}",
 

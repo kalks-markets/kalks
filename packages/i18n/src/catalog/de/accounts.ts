@@ -556,5 +556,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "Optionsprämie",
   "ledgerKind.option_settlement": "Optionsabrechnung",
   "ledgerKind.option_rebate": "Maker-Rabatt",
+  // CFD / Options account split
+  "product.cfd": "CFD-Konto",
+  "product.options": "Optionskonto",
+  "product.cfdText": "Forex, Metalle, Indizes, Aktien und Krypto als CFDs, mit Hebel.",
+  "product.optionsText": "Calls und Puts auf Forex, Gold, Silber und Öl, bar abgerechnet.",
+  "product.chipOptions": "OPTIONEN",
+  "product.groupCfd": "CFD-Konten",
+  "product.groupOptions": "Optionskonten",
+  "wizard.step.product": "Produkt",
+  "wizard.productTitle": "Was soll dieses Konto handeln?",
+  "wizard.productSubtitle": "Jedes Konto handelt ein Produkt. Sie können beide haben.",
+  "wizard.noGroups": "Für dieses Produkt sind derzeit keine Kontotypen verfügbar.",
+  "wizard.introFirst": "Ein kurzer Schritt vor Ihrem ersten Optionskonto: die 1-minütige Einführung in Optionen.",
+  "wizard.agreeLiveOptions": "Mir ist bewusst, dass Optionen ein hohes Risiko bergen: Eine gekaufte Option kann wertlos verfallen, und eine verkaufte Option kann mehr als die erhaltene Prämie verlieren.",
 };
 export default accounts;

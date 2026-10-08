@@ -263,6 +263,10 @@ pub async fn receive(State(st): State<AppState>, peer: super::Peer, headers: Hea
     let row = sqlx::query("SELECT id, tenant_id, user_id, passphrase_hash, status FROM webhooks WHERE token_hash = $1").bind(sha256_hex(token.as_bytes())).fetch_optional(&st.pool).await;
     let Ok(Some(r)) = row else { return not_found };
     let hook = Hook { id: r.get("id"), tenant: r.get("tenant_id"), user_id: r.get("user_id"), passphrase: r.get("passphrase_hash"), status: r.get("status") };
+    // the broker switched the public API and webhooks off (module switches, gateway)
+    if let Err(e) = crate::modules::require(&st, &hook.tenant, "api").await {
+        return (e.status(), Json(json!({"error": {"code": e.code(), "message": e.message()}})));
+    }
     let (status, v) = process(&st, &hook, &body, &ip, false).await;
     (status, Json(v))
 }

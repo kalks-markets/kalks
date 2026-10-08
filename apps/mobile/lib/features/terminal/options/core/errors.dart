@@ -46,6 +46,8 @@ const Set<String> optionErrorCodes = {
   'kalks_quoted',
   'mixed_venue',
   'book_venue',
+  // an option order on a CFD account (options trade in an Options account)
+  'product_mismatch',
 };
 
 /// Rejections of a strategy request for quote that read better in that context.

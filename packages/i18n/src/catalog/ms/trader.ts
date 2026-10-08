@@ -508,7 +508,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "Opsyen akan dilancarkan tidak lama lagi",
-  "opt.soon.text": "Kalks FX Options belum dibuka pada akaun ini. Sebaik sahaja dibuka, rantaian opsyen akan dipaparkan di sini, pada akaun yang sama dengan CFD anda.",
+  "opt.soon.text": "Kalks FX Options belum dibuka pada akaun ini. Sebaik sahaja dibuka, rantaian opsyen akan dipaparkan di sini.",
   "opt.soon.point1": "Call dan put bagi forex, emas, perak dan minyak",
   "opt.soon.point2": "Tamat tempoh harian, mingguan dan bulanan, diselesaikan secara tunai dalam USD",
   "opt.soon.point3": "Sebagai pembeli, anda tidak akan rugi lebih daripada premium yang anda bayar",
@@ -1248,5 +1248,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "Dagangan dibatalkan oleh dealing desk",
   "opt.bust.text": "{what} × {n}: dagangan telah diterbalikkan dan sebarang fi telah dikembalikan.",
   "opt.tape.kind.bust": "Dibatalkan",
+  // CFD / Options account split
+  "acct.openCfd": "Buka akaun CFD",
+  "acct.openOptions": "Buka akaun opsyen",
+  "opt.err.product_mismatch": "Ini akaun CFD: opsyen didagangkan dalam akaun opsyen.",
 };
 export default trader;

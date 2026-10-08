@@ -57,6 +57,8 @@ pub const QUIZ_PASS_PCT: i64 = 60;
 pub struct AppState {
     pub pool: PgPool,
     pub cfg: Arc<Config>,
+    /// Read-only gateway database for the broker's module switches (modules.rs); None = always on.
+    pub gateway: Option<PgPool>,
 }
 
 /* ------------------------------------------------------------------ */
@@ -166,7 +168,8 @@ async fn require_internal(State(st): State<AppState>, req: Request, next: Next) 
 }
 
 pub fn router(st: AppState) -> Router {
-    let internal = Router::new()
+    // client routes: refused while the broker has the academy module off (modules.rs)
+    let client = Router::new()
         .route("/v1/catalog", get(catalog))
         .route("/v1/chapters/{slug}", get(chapter_view))
         .route("/v1/chapters/{slug}/progress", post(chapter_progress))
@@ -174,6 +177,9 @@ pub fn router(st: AppState) -> Router {
         .route("/v1/exams/{phase}", get(exam_view).post(exam_submit))
         .route("/v1/me/certificates", get(my_certificates))
         .route("/v1/glossary", get(glossary))
+        .route_layer(middleware::from_fn_with_state(st.clone(), crate::modules::gate));
+    let internal = Router::new()
+        .merge(client)
         .route("/v1/public/certificates/{code}", get(cert_verify))
         .route("/v1/public/certificates/{code}/svg", get(cert_svg))
         .route("/v1/admin/tree", get(admin_tree))

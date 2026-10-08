@@ -195,6 +195,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     if (isPropGroup(body.group)) return error(422, "validation", "Prop accounts are opened by buying a prop challenge.");
     // Back Office › Settings › Features: "Demo accounts" off stops new demo accounts (existing ones keep working)
     if (type === "demo" && (await tenantConfig())?.flags.demo_accounts === false) return error(403, "feature_disabled", "Demo accounts aren't available right now.");
+    // CFD / Options account split: no new Options account while the broker has the Options module off
+    if ((await tenantConfig())?.modules?.options === false) {
+      const gs = await groupsCache.get(user.tenant?.slug ?? "", () => engine<{ groups?: Obj[] }>("/v1/groups", { user, req }), (x) => x.status === 200);
+      if ((gs.data.groups ?? []).some((g) => g.code === body.group && g.product === "options")) return error(403, "module_disabled", "Options aren't available right now.");
+    }
     const open: Obj = { type, group: body.group };
     if (body.leverage !== undefined) {
       if (!Number.isInteger(body.leverage)) return error(422, "validation", "Invalid leverage.");

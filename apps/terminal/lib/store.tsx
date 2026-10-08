@@ -42,6 +42,9 @@ import { liveStore, useLiveEquity, useLivePosition } from "./engine/live";
 import { mapAccount, mapHistory, mapOrder, mapPosition, rejectReason, serverName, type EngineTradingAccount } from "./engine/map";
 import type { EngAccount, EngDeal, EngState, SessionInfo, StreamFrame } from "./engine/types";
 import { routeOptionFrame, splitOptionState } from "./options/book";
+import { AccountProductContext } from "./options/mode";
+import { productOf } from "./options/product";
+import { useModuleOn } from "@/components/modules";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -1385,7 +1388,10 @@ export function TerminalProvider({ initialSession, engineSessions, children, onL
 
   // Runs this account's AI strategies; orders take the same path as manual ones (placeOrder, source "ai").
   // Guest: drafts can be composed and previewed (stored under "guest"), nothing can trade.
+  // The broker switched AI off (module switches): the strategies are kept but don't run until it is back on.
+  const aiOn = useModuleOn()("ai");
   React.useEffect(() => {
+    if (!aiOn) return;
     if (guest)
       return aiTrader.attach({
         login: GUEST_LOGIN,
@@ -1442,7 +1448,7 @@ export function TerminalProvider({ initialSession, engineSessions, children, onL
       log,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.login, session.investor, !!engAccounts[session.login]]);
+  }, [session.login, session.investor, !!engAccounts[session.login], aiOn]);
 
   /* ------------------------------ workspace ------------------------------ */
 
@@ -1755,7 +1761,13 @@ export function TerminalProvider({ initialSession, engineSessions, children, onL
     openLogin,
     accountAdded,
   };
-  return <TerminalCtx.Provider value={value}>{children}</TerminalCtx.Provider>;
+  // CFD / Options account split: the active engine account's product decides the workspace (lib/options/mode.ts)
+  const accountProduct = engine && !guest && engAccounts[session.login] ? productOf(engAccounts[session.login]!.engine) : null;
+  return (
+    <TerminalCtx.Provider value={value}>
+      <AccountProductContext.Provider value={accountProduct}>{children}</AccountProductContext.Provider>
+    </TerminalCtx.Provider>
+  );
 }
 
 /** Journal timestamp "2026.09.24 14:32:11.482" in server time. */

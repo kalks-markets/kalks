@@ -548,5 +548,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "ஆப்ஷன் பிரீமியம்",
   "ledgerKind.option_settlement": "ஆப்ஷன் செட்டில்மென்ட்",
   "ledgerKind.option_rebate": "மேக்கர் ரிபேட்",
+  // CFD / Options account split
+  "product.cfd": "CFD கணக்கு",
+  "product.options": "ஆப்ஷன்ஸ் கணக்கு",
+  "product.cfdText": "ஃபாரெக்ஸ், உலோகங்கள், குறியீடுகள், பங்குகள் மற்றும் கிரிப்டோ CFD களாக, லீவரேஜுடன்.",
+  "product.optionsText": "ஃபாரெக்ஸ், தங்கம், வெள்ளி மற்றும் எண்ணெய் மீது கால் மற்றும் புட், ரொக்கமாகத் தீர்வு.",
+  "product.chipOptions": "ஆப்ஷன்ஸ்",
+  "product.groupCfd": "CFD கணக்குகள்",
+  "product.groupOptions": "ஆப்ஷன்ஸ் கணக்குகள்",
+  "wizard.step.product": "தயாரிப்பு",
+  "wizard.productTitle": "இந்தக் கணக்கு எதை டிரேட் செய்யும்?",
+  "wizard.productSubtitle": "ஒவ்வொரு கணக்கும் ஒரு தயாரிப்பை மட்டுமே டிரேட் செய்யும். இரண்டையும் வைத்திருக்கலாம்.",
+  "wizard.noGroups": "இப்போது இந்தத் தயாரிப்புக்கு எந்தக் கணக்கு வகையும் திறக்கப்படவில்லை.",
+  "wizard.introFirst": "உங்கள் முதல் ஆப்ஷன்ஸ் கணக்கிற்கு முன் ஒரு சிறிய படி: 1 நிமிட ஆப்ஷன்ஸ் அறிமுகம்.",
+  "wizard.agreeLiveOptions": "ஆப்ஷன்களில் அதிக அபாயம் உள்ளது என்பதை நான் புரிந்துகொள்கிறேன்: வாங்கிய ஆப்ஷன் மதிப்பின்றி காலாவதியாகலாம், விற்ற ஆப்ஷனில் பெற்ற பிரீமியத்தை விட அதிக இழப்பு ஏற்படலாம்.",
 };
 export default accounts;

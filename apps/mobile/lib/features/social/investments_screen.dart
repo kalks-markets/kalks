@@ -8,7 +8,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/api/api_providers.dart';
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/nav.dart';
 import '../../ui/ui.dart';
 import 'social_api.dart';
 import 'widgets/bits.dart';
@@ -65,6 +67,7 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
     final readOnly = ref.watch(meProvider)?.readOnly ?? false;
     final q = ref.watch(investmentsProvider);
     final funds = ref.watch(fundsProvider).value ?? const <FundView>[];
+    final copyOn = pageOn(ref.watch(configProvider), '/social/copy');
     final data = q.value;
     final kpiWidth = (MediaQuery.sizeOf(context).width - 2 * KSpace.page) * 0.72;
 
@@ -75,12 +78,13 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
         spacing: 8,
         runSpacing: 8,
         children: [
-          KButton(
-            label: t('social.inv.copySubscriptions'),
-            icon: LucideIcons.repeat,
-            variant: KButtonVariant.surface,
-            onPressed: () => context.go('/social/copy'),
-          ),
+          if (copyOn)
+            KButton(
+              label: t('social.inv.copySubscriptions'),
+              icon: LucideIcons.repeat,
+              variant: KButtonVariant.surface,
+              onPressed: () => context.go('/social/copy'),
+            ),
           KButton(label: t('social.funds.title'), icon: LucideIcons.landmark, onPressed: () => context.go('/social/pamm')),
         ],
       ),

@@ -134,6 +134,7 @@ bool isOlderVersion(String version, String? min) {
 
 class ConfigController extends Notifier<AppConfig> {
   Timer? _retry;
+  DateTime? _refusedAt;
 
   @override
   AppConfig build() {
@@ -141,6 +142,15 @@ class ConfigController extends Notifier<AppConfig> {
     final cached = ref.read(prefsProvider).cachedConfig;
     Future.microtask(refresh);
     return cached == null ? AppConfig.fallback : AppConfig.fromJson(cached);
+  }
+
+  /// An API call answered 403 module_disabled: a module was switched off since the config was read. Fetches it again
+  /// (at most every 30 seconds), so the navigation drops the module and the router moves off its page.
+  void moduleRefused() {
+    final now = DateTime.now();
+    if (_refusedAt != null && now.difference(_refusedAt!) < const Duration(seconds: 30)) return;
+    _refusedAt = now;
+    unawaited(refresh());
   }
 
   /// Fetches the config (public, no session); keeps the last good copy on failure and retries in a minute.

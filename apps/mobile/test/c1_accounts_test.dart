@@ -179,8 +179,9 @@ void main() {
       expect(find.textContaining('10051123'), findsWidgets);
       expect(find.textContaining('20017734'), findsNothing);
 
-      await _reveal(tester, find.byType(AccountsScreen), find.text('Demo 1'));
-      await tester.tap(find.text('Demo 1'));
+      // the sample client's demo accounts: Standard and the Options account
+      await _reveal(tester, find.byType(AccountsScreen), find.text('Demo 2'));
+      await tester.tap(find.text('Demo 2'));
       await _calm(tester);
       expect(find.textContaining('20017734'), findsWidgets);
       expect(find.textContaining('10042817'), findsNothing);
@@ -267,10 +268,11 @@ void main() {
       c.read(routerProvider).go('/accounts/new?type=demo');
       await settle(tester);
       expect(find.byType(OpenAccountScreen), findsOneWidget);
-      expect(find.text('Choose an account'), findsWidgets);
+      // the Product step first (a CFD account by default), then Live / Demo
+      expect(find.text('What will this account trade?'), findsWidgets);
 
       // walk the steps: Continue, picking the first type when asked
-      for (var i = 0; i < 4 && find.text('Review and confirm').evaluate().isEmpty; i++) {
+      for (var i = 0; i < 5 && find.text('Review and confirm').evaluate().isEmpty; i++) {
         if (find.text('Pick an account type').evaluate().isNotEmpty) {
           final cards = find.byWidgetPredicate((w) => w.runtimeType.toString() == 'EngineGroupCard');
           if (cards.evaluate().isNotEmpty) {

@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "Diperiksa {time} · diperbarui setiap 15 detik saat dimuat ulang",
   "system.status.expectedBack": "Diperkirakan kembali paling lambat {time}",
   "system.status.questions": "Ada pertanyaan? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} tidak tersedia di akun Anda.",
+  "module.copy_trading": "Copy trading",
+  "module.pamm": "Dana PAMM",
+  "module.mam": "MAM",
+  "module.prop": "Prop trading",
+  "module.ib": "Program mitra",
+  "module.algo": "Pembuat strategi",
+  "module.api": "API & webhook",
+  "module.academy": "Akademi",
+  "module.wallet": "Dompet",
+  "module.rewards": "Hadiah",
+  "module.options": "Opsi",
+  "module.news": "Berita",
+  "module.calendar": "Kalender ekonomi",
+  "module.markets": "Pasar",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "Obrolan dukungan",
 };
 export default shell;

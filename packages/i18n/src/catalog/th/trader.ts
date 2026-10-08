@@ -507,7 +507,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "ออปชันจะเปิดตัวเร็วๆ นี้",
-  "opt.soon.text": "Kalks FX Options ยังไม่เปิดให้ใช้ในบัญชีนี้ ทันทีที่เปิด ตารางออปชันจะแสดงที่นี่ บนบัญชีเดียวกับ CFD ของคุณ",
+  "opt.soon.text": "บัญชีนี้ยังไม่เปิดใช้ Kalks FX Options เมื่อเปิดแล้ว ออปชันเชนจะแสดงที่นี่",
   "opt.soon.point1": "คอลและพุทบนฟอเร็กซ์ ทองคำ เงิน และน้ำมัน",
   "opt.soon.point2": "วันหมดอายุรายวัน รายสัปดาห์ และรายเดือน ชำระราคาเป็นเงินสดสกุล USD",
   "opt.soon.point3": "ในฐานะผู้ซื้อ คุณจะไม่ขาดทุนเกินค่าพรีเมียมที่จ่าย",
@@ -1245,5 +1245,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "ฝ่ายดีลลิ่งยกเลิกการซื้อขาย",
   "opt.bust.text": "{what} × {n}: กลับรายการการซื้อขายแล้ว และคืนค่าธรรมเนียมที่เรียกเก็บไปทั้งหมด",
   "opt.tape.kind.bust": "ยกเลิกแล้ว",
+  // CFD / Options account split
+  "acct.openCfd": "เปิดบัญชี CFD",
+  "acct.openOptions": "เปิดบัญชีออปชัน",
+  "opt.err.product_mismatch": "นี่คือบัญชี CFD: ออปชันต้องเทรดในบัญชีออปชัน",
 };
 export default trader;

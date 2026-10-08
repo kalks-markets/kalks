@@ -10,7 +10,8 @@ import { Button, Card, CardHeader, Chip, CopyButton, EmptyState, Gauge, KeyValue
 import { STATUS_LABEL, curOf, fmtAmount, isArchived, fmtDate, fmtLevel, fmtPrice, levelTone, modeLabel, serverOf, serverTime, usePoll, type AccountDetail, type EngineAccount, type EnginePosition, type EngineOrder, type HistoryPage } from "./api";
 import { DealsTable, HistoryPanel, LedgerPanel } from "./activity";
 import { CredentialsPanel, SettingsPanel } from "./manage";
-import { AccountActions, FundButton, KindBadge, RefillButton, StatusBadge, TradeButton, isPropAccount } from "./ui";
+import { AccountActions, FundButton, KindBadge, ProductChip, RefillButton, StatusBadge, TradeButton, isPropAccount } from "./ui";
+import { productOf } from "@/lib/products";
 import { FlavorChip, RestoreButton, accountFlavor, copyingName } from "./archive";
 import { ClosureBanner } from "./closure";
 import { DefaultStar, HealthCard } from "./extras";
@@ -330,9 +331,15 @@ function OverviewPanel({ a, positions, onTab }: { a: EngineAccount; positions: E
               <KeyValue
                 rows={[
                   [t("common.type"), `${a.type === "live" ? t("common.live") : t("common.demo")} · ${a.groupName}`],
-                  [t("accountDetail.info.positionMode"), modeLabel(a.mode)],
+                  [t("accounts.wizard.step.product"), t(productOf(a) === "options" ? "accounts.product.options" : "accounts.product.cfd")],
+                  // position mode and leverage are CFD terms (CFD / Options account split)
+                  ...(productOf(a) === "options"
+                    ? []
+                    : ([
+                        [t("accountDetail.info.positionMode"), modeLabel(a.mode)],
+                      ] as [string, React.ReactNode][])),
                   [t("common.currency"), a.cent ? t("accountDetail.info.uscCents") : a.currency],
-                  [t("accountDetail.info.leverage"), `1:${a.leverage.toLocaleString("en-US")}`],
+                  ...(productOf(a) === "options" ? [] : ([[t("accountDetail.info.leverage"), `1:${a.leverage.toLocaleString("en-US")}`]] as [string, React.ReactNode][])),
                   [t("accountDetail.info.server"), <span key="sv" className="font-mono">{serverOf(a)}</span>],
                   [t("common.status"), <Chip key="st" size="sm" tone={st.tone}>{st.label}</Chip>],
                   [t("accountDetail.info.opened"), fmtDate(a.createdAt)],
@@ -441,8 +448,9 @@ function Detail() {
               <div className="flex flex-wrap items-center gap-2">
                 <KindBadge type={a.type} prop={isPropAccount(a)} />
                 <FlavorChip a={a} />
+                <ProductChip a={a} />
                 <h1 className="text-[20px] font-medium tracking-tight">
-                  {a.groupName} · {modeLabel(a.mode)}
+                  {productOf(a) === "options" ? a.groupName : `${a.groupName} · ${modeLabel(a.mode)}`}
                 </h1>
                 {a.name && <span className="text-[14px] text-fg-3">“{a.name}”</span>}
                 <DefaultStar a={a} />
@@ -457,7 +465,7 @@ function Detail() {
                   <Server className="size-3.5 text-fg-3" />
                   <span className="font-mono">{serverOf(a)}</span>
                 </span>
-                <Chip size="sm">1:{a.leverage.toLocaleString("en-US")}</Chip>
+                {productOf(a) !== "options" && <Chip size="sm">1:{a.leverage.toLocaleString("en-US")}</Chip>}
                 <span className="text-fg-3">{a.cent ? t("accountDetail.header.centCurrency") : a.currency}</span>
                 {accountFlavor(a) === "copy" && copyingName(a) && <span className="font-medium text-fg">{t("accounts.copy.copying", { name: copyingName(a)! })}</span>}
                 {archived && (a.archivedAt ?? a.closedAt) && <span className="text-fg-3">{t(a.status === "closed" ? "accounts.archived.closedOn" : "accounts.archived.on", { date: fmtDate(a.archivedAt ?? a.closedAt) })}</span>}

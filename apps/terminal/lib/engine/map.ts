@@ -29,6 +29,8 @@ export interface EngineAccountExtra {
   marginLevel: number | null;
   /** copy trading: the account is a follower's copy account (group `copy` / `copy-netting`, or the engine's `role`) */
   copy?: boolean;
+  /** CFD / Options account split: the account's product decides the workspace (lib/options/mode.ts). */
+  product: "cfd" | "options";
 }
 
 /** Copy accounts are named "Copy · <master>" by the engine (social/copier.rs). */
@@ -83,6 +85,7 @@ export function mapAccount(a: EngAccount): EngineTradingAccount {
       freeMargin: a.freeMargin,
       marginLevel: a.marginLevel,
       copy: isCopyGroup(a.group, (a as { role?: string | null }).role),
+      product: a.product === "options" ? "options" : "cfd",
     },
   };
 }

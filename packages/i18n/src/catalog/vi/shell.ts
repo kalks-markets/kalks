@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "Kiểm tra lúc {time} · cập nhật mỗi 15 giây khi tải lại",
   "system.status.expectedBack": "Dự kiến hoạt động trở lại trước {time}",
   "system.status.questions": "Có câu hỏi? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} không khả dụng cho tài khoản của bạn.",
+  "module.copy_trading": "Sao chép giao dịch",
+  "module.pamm": "Quỹ PAMM",
+  "module.mam": "MAM",
+  "module.prop": "Giao dịch prop",
+  "module.ib": "Chương trình đối tác",
+  "module.algo": "Trình tạo chiến lược",
+  "module.api": "API & webhook",
+  "module.academy": "Học viện",
+  "module.wallet": "Ví",
+  "module.rewards": "Phần thưởng",
+  "module.options": "Quyền chọn",
+  "module.news": "Tin tức",
+  "module.calendar": "Lịch kinh tế",
+  "module.markets": "Thị trường",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "Trò chuyện hỗ trợ",
 };
 export default shell;

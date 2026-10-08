@@ -21,9 +21,11 @@ import { ShareControls } from "@/components/share/share-dialogs";
 import { GuestNotice } from "@/components/shell/guest";
 import { AccountHealth } from "@/components/shell/account-health";
 import { useT } from "@kalks/i18n/react";
-import { useTradeMode } from "@/lib/options/mode";
+import { AccountProductContext, useTradeMode } from "@/lib/options/mode";
 import { useOptionBook } from "@/lib/options/book";
 import { useBookFlag } from "@/lib/options/book-flag";
+import { useModules } from "@/components/modules";
+import { tabOn } from "@/lib/modules";
 
 // Kalks FX Options tabs: their own chunk (loaded when the tab first shows)
 const OptionsPositionsTab = dynamic(() => import("@/components/options/positions-tab").then((m) => m.OptionsPositionsTab), { ssr: false });
@@ -53,6 +55,10 @@ export function useActivityTabs() {
   const bookFlag = useBookFlag(T.guest ? null : T.account.login);
   const optCount = book.positions.length + book.orders.length;
   const options = mode === "options";
+  // an Options account holds no CFD positions or orders (CFD / Options account split): no CFD tabs at all
+  const optionsAccount = React.useContext(AccountProductContext) === "options";
+  // tabs of modules the broker switched off (News, Calendar, AI Trader, MAM) are left out
+  const modules = useModules();
   const cfdPositions: TabDef = { value: "positions", label: options ? t("desk.act.cfdPositions") : t("desk.act.positions"), count: T.positions.length };
   const cfdOrders: TabDef = { value: "pending", label: options ? t("desk.act.cfdOrders") : t("desk.act.orders"), count: T.pendings.length };
   const history: TabDef = { value: "history", label: t("desk.act.history") };
@@ -61,7 +67,7 @@ export function useActivityTabs() {
   const primary: TabDef[] = options
     ? [optPositions, ...(bookFlag.live || bookFlag.open ? [optOrders] : []), { value: "closed", label: t("desk.act.closed") }, { value: "settlements", label: t("desk.act.settlements") }]
     : [cfdPositions, cfdOrders, history];
-  const secondary: TabDef[] = [
+  const secondaryAll: TabDef[] = [
     // CFD mode: option positions / working book orders stay in view while there are any
     ...(!options && optCount ? [optPositions] : []),
     ...(!options && bookFlag.open ? [optOrders] : []),
@@ -70,14 +76,16 @@ export function useActivityTabs() {
     { value: "news", label: t("desk.act.news"), count: T.live ? undefined : 3 },
     { value: "calendar", label: t("desk.act.calendar") },
   ];
-  const more: TabDef[] = [
-    ...(options ? [cfdPositions, cfdOrders, history] : []),
+  const moreAll: TabDef[] = [
+    ...(options && !optionsAccount ? [cfdPositions, cfdOrders, history] : []),
     { value: "exposure", label: t("desk.act.exposure") },
     { value: "journal", label: t("desk.act.journal") },
     { value: "ai", label: t("desk.act.ai"), count: ai.records.filter((r) => r.status === "active").length },
     // MAM master account or linked client account (live engine only)
     ...(mam?.role ? [{ value: "mam" as const, label: "MAM", count: mam.role === "manager" ? mam.accounts : undefined }] : []),
   ];
+  const secondary = secondaryAll.filter((x) => tabOn(modules, x.value));
+  const more = moreAll.filter((x) => tabOn(modules, x.value));
   const all = [...primary, ...secondary, ...more];
   // a tab that isn't offered here (Settlements after switching back to CFD…) shows the first primary tab
   const want = T.ws.toolboxTab === "trade" ? "positions" : T.ws.toolboxTab;

@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_providers.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/format/format.dart';
 import '../../../data/client_data.dart';
 import '../../../i18n/i18n.dart';
@@ -222,13 +223,15 @@ class _CheckoutSheetState extends ConsumerState<CheckoutSheet> {
                   KNotice(
                     tone: KChipTone.warn,
                     text: t('prop.checkout.short', {'balance': Fmt.amount(available), 'missing': Fmt.amount(size.fee - available)}),
-                    action: KButton(
-                      label: t('prop.checkout.deposit'),
-                      trailingIcon: arrowEnd(context),
-                      variant: KButtonVariant.surface,
-                      size: KButtonSize.sm,
-                      onPressed: () => _go('/wallet/deposit'),
-                    ),
+                    action: ref.watch(configProvider).moduleOn('wallet')
+                        ? KButton(
+                            label: t('prop.checkout.deposit'),
+                            trailingIcon: arrowEnd(context),
+                            variant: KButtonVariant.surface,
+                            size: KButtonSize.sm,
+                            onPressed: () => _go('/wallet/deposit'),
+                          )
+                        : null,
                   )
                 else
                   Padding(

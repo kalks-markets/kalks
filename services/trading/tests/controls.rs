@@ -38,6 +38,12 @@ const LOGIN: i64 = 10_000_301;
 struct MockGateway {
     restrictions: Arc<Mutex<Value>>,
     reports: Arc<Mutex<Vec<Value>>>,
+    /// the module map `/v1/internal/tenants/{slug}` answers (module switches)
+    modules: Arc<Mutex<Value>>,
+}
+
+async fn gw_tenant(State(g): State<MockGateway>, Path(slug): Path<String>) -> Json<Value> {
+    Json(json!({"id": 1, "slug": slug, "name": slug, "status": "active", "modules": g.modules.lock().unwrap().clone()}))
 }
 
 async fn gw_restrictions(State(g): State<MockGateway>) -> Json<Value> {
@@ -127,6 +133,7 @@ async fn restrictions_and_staff_sessions_through_the_api() {
     let app = Router::new()
         .route("/v1/internal/restrictions", get(gw_restrictions))
         .route("/v1/internal/presence/trader", post(gw_presence))
+        .route("/v1/internal/tenants/{slug}", get(gw_tenant))
         .with_state(gw.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -212,6 +219,23 @@ async fn restrictions_and_staff_sessions_through_the_api() {
     restrict(json!([]));
     let _ = refresh().await.unwrap();
     let _ = api::terminal::login(State(st.clone()), ctx(None), body(json!({"login": LOGIN, "password": "Trade2026x"}))).await.unwrap();
+
+    // module switches (gateway, Platform Owner): the broker's map comes from the gateway, a missing key is on
+    *gw.modules.lock().unwrap() = json!({"copy_trading": false, "options": true});
+    assert!(!trading::modules::on(&st, "qa-modules", "copy_trading").await, "read from the gateway");
+    assert!(trading::modules::on(&st, "qa-modules", "options").await && trading::modules::on(&st, "qa-modules", "news").await);
+    // new copy / PAMM / MAM participation is refused while its module is off (403 module_disabled)
+    let off = json!({"copy_trading": false, "pamm": false, "mam": false}).as_object().unwrap().clone();
+    trading::modules::prime("kalks", off);
+    let refused = |e: ApiError| matches!(e, ApiError::Status { status: 403, code: "module_disabled", .. });
+    assert!(refused(api::social::subscribe(State(st.clone()), ctx(None), h.clone(), body(json!({"masterId": 1, "allocation": 100}))).await.unwrap_err()));
+    assert!(refused(api::social::invest(State(st.clone()), ctx(None), h.clone(), Path(1), body(json!({"amount": 100}))).await.unwrap_err()));
+    assert!(refused(api::social::create_fund(State(st.clone()), ctx(None), h.clone(), body(json!({}))).await.unwrap_err()));
+    assert!(refused(api::mam::create_link(State(st.clone()), ctx(None), h.clone(), body(json!({}))).await.unwrap_err()));
+    assert!(refused(api::mam::create_manager(State(st.clone()), ctx(None), h.clone(), body(json!({}))).await.unwrap_err()));
+    // on again: the request gets past the switch (and fails on its own merits)
+    trading::modules::prime("kalks", serde_json::Map::new());
+    assert!(!refused(api::social::subscribe(State(st.clone()), ctx(None), h.clone(), body(json!({"masterId": 1, "allocation": 100}))).await.unwrap_err()));
 
     // a staff session from the Back Office: the account must be the client's, read-only by default, 30 minutes
     let e = api::controls::staff_sso(State(st.clone()), staff_ctx(&st).await, Path(LOGIN), body(json!({"userId": 12345}))).await.unwrap_err();

@@ -138,6 +138,8 @@ class _Chart extends ConsumerWidget {
     String? atStop(TPosition p, double price) =>
         spec == null ? null : money(profitAt(spec, side: p.side, lots: p.volume, open: p.openPrice, close: price, bidOf: bidOf) + p.swap - p.commission);
     String tone(double v) => v >= 0 ? 'up' : 'down';
+    // the stops level in price units: how close to the price a stop may go (the S / T handles hold to it)
+    final gap = spec == null ? 0.0 : spec.stopsLevelPoints * spec.point;
     final lines = <ChartLine>[
       for (final p in st.positions.where((p) => p.symbol == symbol)) ...[
         ChartLine(
@@ -150,6 +152,10 @@ class _Chart extends ConsumerWidget {
           note: money(st.profitOf(p)),
           tone: tone(st.profitOf(p)),
           closable: !ro,
+          // S / T: drag out a stop loss / take profit the position does not have yet (web trade-handles.ts)
+          handles: ro || spec == null ? '' : '${p.sl == null ? 's' : ''}${p.tp == null ? 't' : ''}',
+          pip: spec?.pipSize ?? 0,
+          gap: gap,
         ),
         if (p.sl != null)
           ChartLine(id: 'sl:${p.ticket}', kind: 'sl', price: p.sl!, side: p.side, label: 'SL', draggable: !ro, note: atStop(p, p.sl!), closable: !ro),
@@ -194,11 +200,19 @@ class _Chart extends ConsumerWidget {
   };
 
   /// A dropped line (web commitLineDrag). The future says whether the server took it (the chart keeps the line at
-  /// the drop price until then).
+  /// the drop price until then). A stop made from an S / T handle comes as an `sl:` / `tp:` line the position does
+  /// not have yet: it is always sent (even at the open price: a breakeven stop).
   Future<bool> _commitDrag(WidgetRef ref, ChartLine l, double price) async {
     final actions = ref.read(tradeActionsProvider);
     final digits = ref.read(symbolBookProvider)[symbol]?.digits ?? 5;
-    if ((price - l.price).abs() < 1 / (digits <= 0 ? 1 : _pow10(digits))) return false;
+    final tick = 1 / (digits <= 0 ? 1 : _pow10(digits));
+    final pos = ref.read(terminalProvider).positions.where((x) => x.ticket == l.ref).firstOrNull;
+    final current = switch (l.kind) {
+      'sl' => pos?.sl,
+      'tp' => pos?.tp,
+      _ => l.price,
+    };
+    if (current != null && (price - current).abs() < tick) return false;
     KHaptics.medium();
     switch (l.kind) {
       case 'sl':

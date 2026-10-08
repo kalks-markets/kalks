@@ -517,7 +517,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "ऑप्शंस जल्द आ रहे हैं",
-  "opt.soon.text": "Kalks FX Options अभी इस अकाउंट पर चालू नहीं है। जैसे ही चालू होगा, ऑप्शन चेन यहाँ दिखेगी, उसी अकाउंट पर जिस पर आपके CFD हैं।",
+  "opt.soon.text": "Kalks FX Options अभी इस अकाउंट पर चालू नहीं है। जैसे ही चालू होगा, ऑप्शन चेन यहाँ दिखेगी।",
   "opt.soon.point1": "फ़ॉरेक्स, गोल्ड, सिल्वर और ऑयल पर कॉल और पुट",
   "opt.soon.point2": "डेली, वीकली और मंथली एक्सपायरी, USD में कैश सेटलमेंट",
   "opt.soon.point3": "खरीदार के रूप में आप कभी भी चुकाए गए प्रीमियम से ज़्यादा नहीं गँवा सकते",
@@ -1257,5 +1257,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "डीलिंग डेस्क ने ट्रेड रद्द किया",
   "opt.bust.text": "{what} × {n}: ट्रेड रिवर्स कर दिया गया और जो भी कमीशन लगा था, वह वापस कर दिया गया।",
   "opt.tape.kind.bust": "रद्द",
+  // CFD / Options account split
+  "acct.openCfd": "CFD अकाउंट खोलें",
+  "acct.openOptions": "ऑप्शंस अकाउंट खोलें",
+  "opt.err.product_mismatch": "यह एक CFD अकाउंट है: ऑप्शंस, ऑप्शंस अकाउंट में ट्रेड होते हैं।",
 };
 export default trader;

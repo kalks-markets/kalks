@@ -550,5 +550,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "Prime d'option",
   "ledgerKind.option_settlement": "Règlement d'option",
   "ledgerKind.option_rebate": "Remise maker",
+  // CFD / Options account split
+  "product.cfd": "Compte CFD",
+  "product.options": "Compte options",
+  "product.cfdText": "Forex, métaux, indices, actions et cryptos en CFD, avec effet de levier.",
+  "product.optionsText": "Calls et puts sur le forex, l'or, l'argent et le pétrole, réglés en espèces.",
+  "product.chipOptions": "OPTIONS",
+  "product.groupCfd": "Comptes CFD",
+  "product.groupOptions": "Comptes options",
+  "wizard.step.product": "Produit",
+  "wizard.productTitle": "Que tradera ce compte ?",
+  "wizard.productSubtitle": "Chaque compte trade un seul produit. Vous pouvez avoir les deux.",
+  "wizard.noGroups": "Aucun type de compte n'est ouvert pour ce produit pour le moment.",
+  "wizard.introFirst": "Une petite étape avant votre premier compte options : l'introduction d'une minute aux options.",
+  "wizard.agreeLiveOptions": "Je comprends que les options comportent un risque élevé : une option achetée peut expirer sans valeur et une option vendue peut perdre plus que la prime reçue.",
 };
 export default accounts;

@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { ComingSoon, ModeGate, buttonVariants } from "@kalks/ui";
 import { IS_DEMO } from "@kalks/mock/mode";
 import { LIVE_PAGES, isLivePath, soonFor } from "@/lib/live";
-import { canOpen } from "@/lib/access";
+import { canOpen, moduleHidden } from "@/lib/access";
 import { useStaff } from "@/components/staff-session";
 
 function NoAccess() {
@@ -18,6 +18,20 @@ function NoAccess() {
       action={
         <Link href="/org" className={buttonVariants({ variant: "surface" })}>
           <ArrowLeft /> See your access
+        </Link>
+      }
+    />
+  );
+}
+
+function ModuleOff() {
+  return (
+    <ComingSoon
+      title="Switched off for your brokerage"
+      text="This module isn't part of your brokerage's plan. The platform owner can switch it on."
+      action={
+        <Link href="/" className={buttonVariants({ variant: "surface" })}>
+          <ArrowLeft /> Back to Command Center
         </Link>
       }
     />
@@ -47,6 +61,7 @@ export function LiveGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/";
   const staff = useStaff();
   if (IS_DEMO) return <>{children}</>;
+  if (moduleHidden(staff, pathname)) return <ModuleOff />;
   if (!canOpen(staff, pathname)) return <NoAccess />;
   return (
     <ModeGate allow={LIVE_PAGES} fallback={<LiveFallback />}>

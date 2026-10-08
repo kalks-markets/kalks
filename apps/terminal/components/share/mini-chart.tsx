@@ -61,7 +61,7 @@ export function TradeMiniChart({ trade, height = 128 }: { trade: ShareTrade; hei
       if (!bars || bars.length < 3) return setState("empty");
       const inst = getInstrument(trade.symbol);
       const c = {
-        up: css(el, "--k-up", "#22c55e"),
+        up: css(el, "--k-up", "#2f7bff"),
         down: css(el, "--k-down", "#f04438"),
         gold: css(el, "--k-gold", "#e9b949"),
         fg: css(el, "--k-fg-2", "#a1a1aa"),

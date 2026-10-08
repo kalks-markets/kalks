@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "تم الفحص في {time} · يتم التحديث كل 15 ثانية عند إعادة التحميل",
   "system.status.expectedBack": "من المتوقع العودة بحلول {time}",
   "system.status.questions": "لديك أسئلة؟ {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} غير متاح لحسابك.",
+  "module.copy_trading": "نسخ التداول",
+  "module.pamm": "صناديق PAMM",
+  "module.mam": "MAM",
+  "module.prop": "تداول Prop",
+  "module.ib": "برنامج الشركاء",
+  "module.algo": "منشئ الاستراتيجيات",
+  "module.api": "واجهة API وخطافات الويب",
+  "module.academy": "الأكاديمية",
+  "module.wallet": "المحفظة",
+  "module.rewards": "المكافآت",
+  "module.options": "الخيارات",
+  "module.news": "الأخبار",
+  "module.calendar": "التقويم الاقتصادي",
+  "module.markets": "الأسواق",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "دردشة الدعم",
 };
 export default shell;

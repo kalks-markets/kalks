@@ -1,11 +1,15 @@
 // Accounts › Open account. Port of the phone web page /accounts/new (apps/crm/components/trading/open-account.tsx
-// LiveOpenAccount), the five-step wizard in its phone layout (the desktop's sticky summary is hidden on phones):
-//   0 Account: Live or Demo (?type=demo; demo only while the broker allows demo accounts)
-//   1 Type: the broker's groups for that kind, with the per-type account limit
-//   2 Configure: leverage, demo starting balance, nickname, currency, own trading password (rules + generate)
-//   3 Confirm: summary tiles, what happens, the risk acknowledgement
-//   4 Done: the credentials (shown once: copy all, show / hide), Trade, Fund, View account
-// `?group=<code>` preselects a type and jumps to Configure. `GET trading/groups` and `GET trading/accounts` once;
+// LiveOpenAccount), the wizard in its phone layout (the desktop's sticky summary is hidden on phones):
+//   0 Product: a CFD account or an Options account (?product=options; only CFD while the broker has the Options
+//     module off, then the step is skipped). An Options account first shows the options intro (the three ideas,
+//     "I understand", the terms: suitability/options) while the client hasn't accepted it yet.
+//   1 Account: Live or Demo (?type=demo; demo only while the broker allows demo accounts)
+//   2 Type: the broker's groups of that product for that kind, with the per-type account limit
+//   3 Configure: leverage, demo starting balance, nickname, currency, own trading password (rules + generate)
+//   4 Confirm: summary tiles, what happens, the risk acknowledgement
+//   5 Done: the credentials (shown once: copy all, show / hide), Trade, Fund, View account
+// `?group=<code>` preselects a type (and its product) and jumps to Configure; `?product=` preselects the product and
+// goes on to the next step. `GET trading/groups` and `GET trading/accounts` once;
 // `POST trading/accounts {type, group, leverage, name?, password?, initialBalance?}` opens it.
 import 'dart:async';
 
@@ -23,25 +27,41 @@ import '../../core/models/trading.dart';
 import '../../core/notifications/notifications.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
+import '../options_intro/options_screen.dart';
 import 'account_actions.dart';
 import 'accounts_data.dart';
 import 'widgets/account_bits.dart';
 import 'widgets/group_card.dart';
 
-const List<String> kWizardSteps = [
-  'accounts.wizard.step.account',
-  'accounts.wizard.step.type',
-  'accounts.wizard.step.configure',
-  'accounts.wizard.step.confirm',
-  'accounts.wizard.step.done',
-];
+/// The wizard's steps. The options intro belongs to the Product step (the step indicator stays on it).
+enum WizardStep { product, intro, account, type, configure, confirm, done }
+
+/// The step indicator's labels (the Product step only while the broker has the Options module on).
+const Map<WizardStep, String> kWizardSteps = {
+  WizardStep.product: 'accounts.wizard.step.product',
+  WizardStep.account: 'accounts.wizard.step.account',
+  WizardStep.type: 'accounts.wizard.step.type',
+  WizardStep.configure: 'accounts.wizard.step.configure',
+  WizardStep.confirm: 'accounts.wizard.step.confirm',
+  WizardStep.done: 'accounts.wizard.step.done',
+};
 const List<int> kDemoBalances = [1000, 5000, 10000, 25000, 50000, 100000];
 
-/// Groups the wizard offers for a kind: enabled, not prop, and open to that kind (web `offers`).
-bool groupOffers(EngineGroup g, AccountKind kind) => g.enabled && !g.code.toLowerCase().startsWith('prop') && g.offers(kind);
+/// Groups the wizard offers for a kind (and a product, cfd | options): enabled, not prop, open to that kind and of
+/// that product (web `offers`).
+bool groupOffers(EngineGroup g, AccountKind kind, [String? product]) =>
+    g.enabled && clientGroup(g) && g.offers(kind) && (product == null || g.product == product);
 
-/// Accounts of this kind the client already holds in the group (web usedIn).
-int groupUsed(List<EngineAccount> accounts, EngineGroup g, AccountKind kind) => accounts.where((a) => a.group == g.code && a.type == kind).length;
+/// Groups a client opens accounts in: not prop challenges, not the options market maker's.
+bool clientGroup(EngineGroup g) {
+  final c = g.code.toLowerCase();
+  return !c.startsWith('prop') && c != 'options-mm';
+}
+
+/// Accounts of this kind (and the group's product) the client already holds in the group (web usedIn): the
+/// per-type account limit.
+int groupUsed(List<EngineAccount> accounts, EngineGroup g, AccountKind kind) =>
+    accounts.where((a) => a.group == g.code && a.type == kind && a.product == g.product).length;
 
 /// "$10,000" / "USC 1,000,000" (web money: a cent group shows the amount in cents).
 String wizardMoney(num v, bool cent) => cent ? 'USC ${Fmt.number(v * 100, 0)}' : '\$${Fmt.number(v, 0)}';
@@ -49,7 +69,8 @@ String wizardMoney(num v, bool cent) => cent ? 'USC ${Fmt.number(v * 100, 0)}' :
 class OpenAccountScreen extends ConsumerStatefulWidget {
   const OpenAccountScreen({super.key, this.query = const {}});
 
-  /// The route's query parameters (the web page's search params: `type` = live | demo, `group` = a group code).
+  /// The route's query parameters (the web page's search params: `type` = live | demo, `group` = a group code,
+  /// `product` = cfd | options).
   final Map<String, String> query;
 
   @override
@@ -58,13 +79,21 @@ class OpenAccountScreen extends ConsumerStatefulWidget {
 
 class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
   final _scroll = ScrollController();
-  int _step = 0;
+  late final bool _optionsOn = ref.read(configProvider).moduleOn('options');
+  late WizardStep _step = _optionsOn ? WizardStep.product : WizardStep.account;
+  late String _product = _optionsOn && widget.query['product'] == 'options' ? 'options' : 'cfd';
+
+  /// `?product=` / `?group=`: where to go once the groups (and, for Options, the intro state) are known.
+  late WizardStep? _jump = _optionsOn && (widget.query['product'] == 'options' || widget.query['product'] == 'cfd') ? WizardStep.account : null;
   late AccountKind _kind = widget.query['type'] == 'demo' && _demoOn ? AccountKind.demo : AccountKind.live;
   late String _group = widget.query['group'] ?? '';
   int _leverage = 0;
   final _nickname = TextEditingController();
   double _demoBalance = 10000;
   bool _ownPassword = false, _agree = false, _busy = false, _booted = false;
+
+  /// The options intro: "I understand" ticked, the acceptance being recorded, recorded here.
+  bool _understood = false, _accepting = false, _accepted = false;
   String _password = '', _confirm = '';
   OpenResult? _created;
 
@@ -77,8 +106,24 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
     super.dispose();
   }
 
-  void _go(int d) {
-    setState(() => _step = (_step + d).clamp(0, 4));
+  /// The intro comes before a first Options account (terms not accepted yet; unknown when the check failed: skipped).
+  bool _needsIntro(AsyncValue<Suitability>? suit) => _product == 'options' && !_accepted && suit?.value != null && !suit!.value!.accepted;
+
+  /// The steps in order for the chosen product.
+  List<WizardStep> _flow(AsyncValue<Suitability>? suit) => [
+    if (_optionsOn) WizardStep.product,
+    if (_step == WizardStep.intro || _needsIntro(suit)) WizardStep.intro,
+    WizardStep.account,
+    WizardStep.type,
+    WizardStep.configure,
+    WizardStep.confirm,
+    WizardStep.done,
+  ];
+
+  void _go(int d, AsyncValue<Suitability>? suit) {
+    final flow = _flow(suit);
+    final i = flow.indexOf(_step);
+    setState(() => _step = flow[(i + d).clamp(0, flow.length - 1)]);
     if (_scroll.hasClients) unawaited(_scroll.animateTo(0, duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic));
   }
 
@@ -88,17 +133,33 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
     if (_demoBalance == 0) _demoBalance = g.demoInitialBalance;
   });
 
-  /// Once groups load: honour ?group= (jump to Configure), otherwise preselect the first group (web boot effect).
+  /// Once groups load: honour ?group= (its product, then Configure), otherwise preselect the first group of the
+  /// product (web boot effect).
   void _boot(List<EngineGroup> groups) {
     if (_booted || groups.isEmpty) return;
     _booted = true;
     final want = groups.where((x) => x.code == widget.query['group']).firstOrNull;
-    final pick = want != null && groupOffers(want, _kind) ? want : groups.where((x) => groupOffers(x, _kind)).firstOrNull;
+    if (want != null && (want.product == 'cfd' || _optionsOn)) _product = want.product;
+    final pick = want != null && groupOffers(want, _kind, _product) ? want : groups.where((x) => groupOffers(x, _kind, _product)).firstOrNull;
     if (pick == null) return;
     _group = pick.code;
     _leverage = pick.defaultLeverage;
     _demoBalance = pick.demoInitialBalance;
-    if (want != null && want.code == pick.code) _step = 2;
+    if (want != null && want.code == pick.code) _jump = WizardStep.configure;
+  }
+
+  /// Records the options terms from the intro step, then goes on.
+  Future<void> _acceptIntro(Suitability data) async {
+    final d = data.disclosure;
+    if (d == null || _accepting) return;
+    setState(() => _accepting = true);
+    final ok = await acceptOptionsTerms(ref, context.t, d.version);
+    if (!mounted) return;
+    setState(() {
+      _accepting = false;
+      _accepted = ok || _accepted;
+    });
+    if (ok) _go(1, null);
   }
 
   Future<void> _create(EngineGroup g) async {
@@ -126,7 +187,7 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
         _password = '';
         _confirm = '';
       });
-      _go(1);
+      setState(() => _step = WizardStep.done);
       refreshAccountData(ProviderScope.containerOf(context, listen: false));
       accountToast(
         context,
@@ -137,7 +198,7 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       accountToast(context, NotificationKind.error, t('accounts.wizard.openFailed'), description: localizeError(e, t));
-      if (e.field == 'password' || e.field == 'investorPassword') _go(-1);
+      if (e.field == 'password' || e.field == 'investorPassword') setState(() => _step = WizardStep.configure);
     } catch (_) {
       if (mounted) accountToast(context, NotificationKind.error, t('accounts.wizard.openFailed'), description: t('common.errorRetry'));
     } finally {
@@ -151,6 +212,9 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
     final groupsQ = ref.watch(groupsProvider);
     final accounts = ref.watch(accountsOnceProvider).value ?? const <EngineAccount>[];
     final demoOn = ref.watch(configProvider).flag('demo_accounts', fallback: true);
+    // the options intro's state, loaded as soon as the Options product is chosen
+    final suit = _product == 'options' ? ref.watch(suitabilityProvider) : null;
+    final suitLoading = suit != null && !suit.hasValue && !suit.hasError;
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final header = [
       KPageHeader(title: t('accounts.wizard.title'), subtitle: Text(t('accounts.wizard.subtitle'))),
@@ -192,19 +256,27 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
 
     final groups = groupsQ.value ?? const <EngineGroup>[];
     _boot(groups);
-    final available = groups.where((g) => groupOffers(g, _kind)).toList();
-    final g = groups.where((x) => x.code == _group && groupOffers(x, _kind)).firstOrNull ?? available.firstOrNull;
+    // ?product= / ?group=: past the Product step (to the intro first while it isn't accepted) once that is known
+    if (_jump != null && groupsQ.hasValue && !suitLoading) {
+      _step = _needsIntro(suit) ? WizardStep.intro : _jump!;
+      _jump = null;
+    }
+    final available = groups.where((g) => groupOffers(g, _kind, _product)).toList();
+    final g = groups.where((x) => x.code == _group && groupOffers(x, _kind, _product)).firstOrNull ?? available.firstOrNull;
     if (_booted && g != null && g.code != _group) {
-      // keep the chosen group valid for the chosen account kind
+      // keep the chosen group valid for the chosen product and account kind
       _group = g.code;
       _leverage = g.leverages.contains(_leverage) ? _leverage : g.defaultLeverage;
     }
     final full = g != null && groupUsed(accounts, g, _kind) >= g.maxAccountsPerUser;
     final pwOk = !_ownPassword || (livePasswordOk(_password) && _password == _confirm);
+    final intro = suit?.value;
     final canNext = switch (_step) {
-      1 => g != null && !full,
-      2 => g != null && g.leverages.contains(_leverage) && pwOk,
-      3 => _agree && pwOk,
+      WizardStep.product => !suitLoading,
+      WizardStep.intro => _understood && intro?.disclosure != null && !optionsTermsReadOnly(ref) && !_accepting,
+      WizardStep.type => g != null && !full,
+      WizardStep.configure => g != null && g.leverages.contains(_leverage) && pwOk,
+      WizardStep.confirm => _agree && pwOk,
       _ => true,
     };
 
@@ -213,29 +285,37 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
       body = const KSkeleton(height: 420, radius: 24);
     } else {
       body = switch (_step) {
-        0 => _kindStep(groups, demoOn),
-        1 => _typeStep(available, accounts, g),
-        2 when g != null => _configureStep(g),
-        3 when g != null => _reviewStep(g),
-        4 when _created != null && g != null => _CreatedCard(res: _created!, ownPassword: _ownPassword, g: g),
+        WizardStep.product => _productStep(),
+        WizardStep.intro => _introStep(suit),
+        WizardStep.account => _kindStep(groups, demoOn),
+        WizardStep.type => _typeStep(available, accounts, g),
+        WizardStep.configure when g != null => _configureStep(g),
+        WizardStep.confirm when g != null => _reviewStep(g),
+        WizardStep.done when _created != null && g != null => _CreatedCard(res: _created!, ownPassword: _ownPassword, g: g),
         _ => const SizedBox.shrink(),
       };
     }
 
+    final steps = [
+      for (final s in kWizardSteps.keys)
+        if (_optionsOn || s != WizardStep.product) s,
+    ];
+    final current = steps.indexOf(_step == WizardStep.intro ? WizardStep.product : _step);
+    final first = _flow(suit).first == _step;
     return KPageScroll(
       controller: _scroll,
       children: [
         ...header,
         KCard(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-          child: KStepIndicator(steps: [for (var i = 0; i < kWizardSteps.length; i++) i == _step ? t(kWizardSteps[i]) : ''], current: _step),
+          child: KStepIndicator(steps: [for (var i = 0; i < steps.length; i++) i == current ? t(kWizardSteps[steps[i]]!) : ''], current: current),
         ),
         const SizedBox(height: 16),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
           child: KeyedSubtree(key: ValueKey(_step), child: body),
         ),
-        if (_step < 4 && groupsQ.hasValue) ...[
+        if (_step != WizardStep.done && groupsQ.hasValue) ...[
           const SizedBox(height: 16),
           Row(
             children: [
@@ -243,15 +323,16 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
                 label: t('common.back'),
                 icon: rtl ? LucideIcons.arrowRight : LucideIcons.arrowLeft,
                 variant: KButtonVariant.ghost,
-                onPressed: _step == 0 || _busy ? null : () => _go(-1),
+                onPressed: first || _busy || _accepting ? null : () => _go(-1, suit),
               ),
               const Spacer(),
-              if (_step < 3)
+              if (_step != WizardStep.confirm)
                 KButton(
                   label: t('common.continue'),
                   trailingIcon: rtl ? LucideIcons.arrowLeft : LucideIcons.arrowRight,
                   size: KButtonSize.lg,
-                  onPressed: canNext ? () => _go(1) : null,
+                  loading: (_step == WizardStep.product && suitLoading) || _accepting,
+                  onPressed: !canNext ? null : (_step == WizardStep.intro ? () => _acceptIntro(intro!) : () => _go(1, suit)),
                 )
               else
                 Flexible(
@@ -272,9 +353,56 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
 
   /* ---------------------------------------------------------------- steps */
 
+  Widget _productStep() {
+    final t = context.t;
+    return _StepCard(
+      title: t('accounts.wizard.productTitle'),
+      subtitle: t('accounts.wizard.productSubtitle'),
+      child: Column(
+        children: [
+          for (final p in ['cfd', 'options']) ...[
+            if (p == 'options') const SizedBox(height: 14),
+            _ProductCard(
+              product: p,
+              selected: _product == p,
+              onSelect: () => setState(() {
+                _product = p;
+                if (p == 'cfd') _understood = false;
+              }),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The options intro before a first Options account (the Options page's card; Continue records the acceptance).
+  Widget _introStep(AsyncValue<Suitability>? suit) {
+    final t = context.t;
+    final data = suit?.value;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        KNotice(icon: LucideIcons.sparkles, text: t('accounts.wizard.introFirst')),
+        const SizedBox(height: 14),
+        if (data == null)
+          const KSkeletonCard(height: 360, lines: 6)
+        else
+          OptionsIntroCard(
+            data: data,
+            readOnly: optionsTermsReadOnly(ref),
+            understood: _understood,
+            busy: _accepting,
+            onUnderstood: (v) => setState(() => _understood = v),
+            onTerms: () => showOptionsTerms(context, data),
+          ),
+      ],
+    );
+  }
+
   Widget _kindStep(List<EngineGroup> groups, bool demoOn) {
     final t = context.t;
-    final demoRef = groups.where((x) => groupOffers(x, AccountKind.demo)).firstOrNull;
+    final demoRef = groups.where((x) => groupOffers(x, AccountKind.demo, _product)).firstOrNull;
     return _StepCard(
       title: t('accounts.wizard.chooseTitle'),
       subtitle: t('accounts.wizard.chooseSubtitle'),
@@ -302,6 +430,7 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
       subtitle: t(_kind == AccountKind.live ? 'accounts.wizard.pickSubtitleLive' : 'accounts.wizard.pickSubtitleDemo', {'count': available.length}),
       child: Column(
         children: [
+          if (available.isEmpty) KEmptyState(compact: true, icon: LucideIcons.layers, title: t('accounts.wizard.noGroups')),
           for (final x in available) ...[
             EngineGroupCard(group: x, kind: _kind.name, used: groupUsed(accounts, x, _kind), selected: g?.code == x.code, onSelect: () => _pickGroup(x)),
             const SizedBox(height: 14),
@@ -322,12 +451,15 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(t('accounts.label.leverage'), style: context.text.label.copyWith(color: k.fg2)),
-          const SizedBox(height: 2),
-          Text(t('accounts.wizard.leverageHint'), style: context.text.footnote.copyWith(color: k.fg3)),
-          const SizedBox(height: 10),
-          LeveragePills(values: g.leverages, selected: _leverage, onSelect: (l) => setState(() => _leverage = l)),
-          if (_leverage >= 1000) ...[
+          // leverage doesn't apply to options (premiums are paid in cash): an Options type keeps its one value
+          if (!g.isOptions) ...[
+            Text(t('accounts.label.leverage'), style: context.text.label.copyWith(color: k.fg2)),
+            const SizedBox(height: 2),
+            Text(t('accounts.wizard.leverageHint'), style: context.text.footnote.copyWith(color: k.fg3)),
+            const SizedBox(height: 10),
+            LeveragePills(values: g.leverages, selected: _leverage, onSelect: (l) => setState(() => _leverage = l)),
+          ],
+          if (!g.isOptions && _leverage >= 1000) ...[
             const SizedBox(height: 8),
             Row(
               children: [
@@ -340,7 +472,7 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
             ),
           ],
           if (_kind == AccountKind.demo) ...[
-            const SizedBox(height: 22),
+            if (!g.isOptions) const SizedBox(height: 22),
             Text(t('accounts.wizard.startingBalance'), style: context.text.label.copyWith(color: k.fg2)),
             const SizedBox(height: 10),
             TileGrid(
@@ -373,7 +505,7 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
               style: context.text.footnote.copyWith(color: k.fg3),
             ),
           ],
-          const SizedBox(height: 22),
+          if (!g.isOptions || _kind == AccountKind.demo) const SizedBox(height: 22),
           KTextField(
             label: t('accounts.label.nickname'),
             hint: Text(t('accounts.wizard.nicknameHint'), style: context.text.footnote.copyWith(color: k.fg3)),
@@ -472,10 +604,13 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
             children: [
               StatTile(label: t('common.account'), child: Text(_kind == AccountKind.live ? t('common.live') : t('common.demo'))),
               StatTile(label: t('common.type'), child: Text(g.name)),
-              StatTile(
-                label: t('accounts.label.leverage'),
-                child: Text(levLabel(_leverage), textDirection: TextDirection.ltr),
-              ),
+              if (g.isOptions)
+                StatTile(label: t('accounts.wizard.step.product'), child: Text(t('accounts.product.options')))
+              else
+                StatTile(
+                  label: t('accounts.label.leverage'),
+                  child: Text(levLabel(_leverage), textDirection: TextDirection.ltr),
+                ),
               StatTile(
                 label: t('accounts.label.startBalance'),
                 child: Text(start, textDirection: TextDirection.ltr),
@@ -495,7 +630,7 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
             value: _agree,
             onChanged: (v) => setState(() => _agree = v),
             child: Text(
-              _kind == AccountKind.live ? t('accounts.wizard.agreeLive') : t('accounts.wizard.agreeDemo'),
+              _kind == AccountKind.live ? t(_product == 'options' ? 'accounts.wizard.agreeLiveOptions' : 'accounts.wizard.agreeLive') : t('accounts.wizard.agreeDemo'),
               style: context.text.callout.copyWith(color: k.fg2),
             ),
           ),
@@ -566,6 +701,67 @@ class _StepCard extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// CFD account / Options account choice card (the Product step; the Live / Demo card's look).
+class _ProductCard extends StatelessWidget {
+  const _ProductCard({required this.product, required this.selected, required this.onSelect});
+  final String product;
+  final bool selected;
+  final VoidCallback onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final k = context.k;
+    final options = product == 'options';
+    final tone = options ? k.info : k.ember;
+    final title = options ? t('accounts.product.options') : t('accounts.product.cfd');
+    return KPressable(
+      key: ValueKey('wizard-product-$product'),
+      onTap: onSelect,
+      pressedScale: 0.99,
+      semanticLabel: title,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: selected ? k.surface : k.cardBg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? tone.withValues(alpha: 0.6) : k.cardBorder),
+          boxShadow: selected ? [BoxShadow(color: tone.withValues(alpha: 0.12), spreadRadius: 4)] : k.shadowCard,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                KChip(label: options ? t('accounts.product.chipOptions') : t('trader.opt.mode.cfd'), tone: options ? KChipTone.info : KChipTone.ember),
+                const Spacer(),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? tone : null,
+                    border: Border.all(color: selected ? tone : k.line),
+                  ),
+                  child: selected ? const Icon(LucideIcons.check, size: 14, color: Colors.white) : null,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            KIconTile(icon: options ? LucideIcons.layers2 : LucideIcons.candlestickChart, tone: options ? KTone.sky : KTone.accent, size: 56),
+            const SizedBox(height: 16),
+            Text(title, style: context.text.title1.copyWith(fontSize: 21)),
+            const SizedBox(height: 4),
+            Text(options ? t('accounts.product.optionsText') : t('accounts.product.cfdText'), style: context.text.callout.copyWith(color: k.fg2)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Live / Demo choice card (web KindCard; the 3D emoji become an icon tile).

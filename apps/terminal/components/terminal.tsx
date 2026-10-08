@@ -25,6 +25,9 @@ import { ConfirmLayer } from "./dialogs/confirm";
 import { ControlsBanner } from "./shell/controls-banner";
 import { CopyBanner } from "./shell/copy-banner";
 import { applyLinkMode } from "@/lib/options/mode";
+import { openAccountPath, parseMode, pickSession, productOf } from "@/lib/options/product";
+import type { EngineTradingAccount } from "@/lib/engine/map";
+import { CLIENT_AREA } from "@/lib/guest";
 
 function useIsMobile() {
   const [m, setM] = React.useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches);
@@ -62,7 +65,8 @@ export function Splash({ text }: { text?: string }) {
 /**
  * Live builds pick the session from the trading engine: `?sso=<token>` (Client Area Trade button) is
  * redeemed by the BFF first; then every login this browser holds (HttpOnly cookie) is listed and the
- * active one is `?account=`, else the last one shown, else the newest. No login → guest chart mode.
+ * active one is `?account=`, else (with `?mode=options|cfd`) an account of that product, else the last one shown,
+ * else the newest. The active account's product decides the workspace. No login → guest chart mode.
  */
 async function liveEntry(sp: URLSearchParams): Promise<{ session: Session; sessions: SessionInfo[] }> {
   const sso = sp.get("sso");
@@ -80,7 +84,8 @@ async function liveEntry(sp: URLSearchParams): Promise<{ session: Session; sessi
   const list = await engineApi.sessions();
   const sessions = list.ok ? list.data.sessions : [];
   if (!list.ok) toast.error(tr("trader.toast.serverUnavailable"), { description: tr("trader.toast.serverUnavailableHint") });
-  const pick = sessions.find((x) => x.login === prefer) ?? sessions.find((x) => x.login === readActive()) ?? sessions[0];
+  // CFD / Options account split: `?mode=options` (or `cfd`) opens the client's account of that product
+  const pick = pickSession(sessions, { prefer, active: readActive(), want: parseMode(sp.get("mode")) });
   if (!pick) {
     if (prefer && !sso) window.location.replace(`/login?login=${encodeURIComponent(prefer)}`);
     return { session: guestSession(), sessions: [] };
@@ -172,8 +177,19 @@ function Shell({ intent }: { intent: { symbol: string | null; side: string | nul
   const mobile = useIsMobile();
   useHotkeys();
   React.useEffect(() => {
-    // CFD | Options from the link; Options opens with its toolbox tab in front
-    if (applyLinkMode(intent.mode, intent.u) && intent.mode?.toLowerCase() === "options" && ["positions", "pending", "trade", "history", "exposure"].includes(T.ws.toolboxTab)) T.setWs({ toolboxTab: "options" });
+    // CFD | Options from the link (the account was already picked by product, liveEntry); Options opens with its
+    // toolbox tab in front. A live terminal without an Options account says how to get one.
+    const want = parseMode(intent.mode);
+    if (applyLinkMode(intent.mode, intent.u) && want === "options") {
+      const onOptions = !T.engine || T.guest || productOf((T.account as Partial<EngineTradingAccount>).engine) === "options";
+      if (onOptions && ["positions", "pending", "trade", "history", "exposure"].includes(T.ws.toolboxTab)) T.setWs({ toolboxTab: "options" });
+      if (!onOptions)
+        toast.info(tr("options.account.noneTitle"), {
+          description: tr("options.account.noneText"),
+          duration: 10_000,
+          action: { label: tr("options.account.open"), onClick: () => window.open(`${CLIENT_AREA}${openAccountPath("options")}`, "_blank", "noopener") },
+        });
+    }
     const sym = intent.symbol && INSTRUMENT_MAP[intent.symbol] ? intent.symbol : null;
     if (sym) T.openSymbol(sym);
     if (intent.side === "buy" || intent.side === "sell") T.openNewOrder({ symbol: sym ?? T.activeSymbol, side: intent.side, type: "market" });

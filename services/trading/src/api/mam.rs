@@ -112,6 +112,7 @@ fn own_link(st: &AppState, ctx: &Ctx, u: i64, id: i64) -> ApiResult<Link> {
 }
 
 pub async fn create_link(State(st): State<AppState>, ctx: Ctx, h: HeaderMap, Body(b): Body<Map<String, Value>>) -> ApiResult<Json<Value>> {
+    crate::modules::require(&st, &ctx.tenant.slug, "mam").await?;
     let u = user(&h)?;
     super::controls::social_gate(&st, u)?;
     let manager = b.get("managerId").and_then(Value::as_i64).ok_or(ApiError::Validation { field: "managerId", message: "Choose a MAM programme".into() })?;
@@ -257,6 +258,7 @@ fn text_field(b: &Map<String, Value>, k: &'static str, min: usize, max: usize, l
 }
 
 pub async fn create_manager(State(st): State<AppState>, ctx: Ctx, h: HeaderMap, Body(b): Body<Map<String, Value>>) -> ApiResult<Json<Value>> {
+    crate::modules::require(&st, &ctx.tenant.slug, "mam").await?;
     let u = user(&h)?;
     super::controls::social_gate(&st, u)?;
     let tenant = ctx.tenant.tenant_id;

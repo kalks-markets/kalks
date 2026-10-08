@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "ตรวจสอบเมื่อ {time} · อัปเดตทุก 15 วินาทีเมื่อโหลดหน้าใหม่",
   "system.status.expectedBack": "คาดว่าจะกลับมาภายใน {time}",
   "system.status.questions": "มีคำถามหรือไม่ {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} ไม่พร้อมใช้งานสำหรับบัญชีของคุณ",
+  "module.copy_trading": "คัดลอกการเทรด",
+  "module.pamm": "กองทุน PAMM",
+  "module.mam": "MAM",
+  "module.prop": "เทรดแบบพร็อพ",
+  "module.ib": "โปรแกรมพาร์ทเนอร์",
+  "module.algo": "ตัวสร้างกลยุทธ์",
+  "module.api": "API และเว็บฮุค",
+  "module.academy": "อะคาเดมี",
+  "module.wallet": "กระเป๋าเงิน",
+  "module.rewards": "รางวัล",
+  "module.options": "ออปชัน",
+  "module.news": "ข่าว",
+  "module.calendar": "ปฏิทินเศรษฐกิจ",
+  "module.markets": "ตลาด",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "แชทฝ่ายสนับสนุน",
 };
 export default shell;

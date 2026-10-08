@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Memo } from "@/lib/memo";
+import { moduleGate } from "@/lib/tenant-brand";
 
 // Kalks Trader news + economic calendar BFF (read-only). Browser -> /api/news/<route> (same origin) ->
 // services/news /v1/… with the internal token (never sent to the browser). Headlines and the calendar are
@@ -45,6 +46,9 @@ async function forward(path: string) {
 
 export async function GET(req: NextRequest, { params }: Ctx) {
   const [a, b, ...rest] = (await params).path;
+  // module switches: the calendar and the news are switched separately
+  const off = await moduleGate(req.headers, a === "calendar" ? "calendar" : "news");
+  if (off) return off;
   if (rest.length) return NextResponse.json({ error: { code: "not_found", message: "Not found." } }, { status: 404 });
   if (a === "feed" && !b) return forward(`/v1/news${query(req, ["symbol", "currency", "country", "category", "q", "before", "limit", "minImportance"])}`);
   if (a === "feed" && b && ID.test(b)) return forward(`/v1/news/${b}`);

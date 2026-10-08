@@ -633,6 +633,7 @@ impl Social {
                             "positions": st.positions.len(), "orders": st.orders.len(), "version": st.version, "createdAt": st.account.created_at,
                             "group": st.account.group, "netting": st.account.mode == crate::model::Mode::Netting, "live": st.account.kind == AccountKind::Live,
                             "userId": st.account.user_id, "tenantId": st.account.tenant_id, "status": st.account.status.as_str(),
+                            "options": env.group.product == crate::rules::Product::Options,
                         })
                     }
                     None => Value::Null,
@@ -659,6 +660,7 @@ impl Social {
             user_id: v["userId"].as_i64().unwrap_or(0),
             tenant_id: v["tenantId"].as_i64().unwrap_or(0),
             status: v["status"].as_str().unwrap_or_default().to_string(),
+            options: v["options"].as_bool().unwrap_or(false),
         })
     }
 
@@ -759,6 +761,8 @@ pub struct Brief {
     pub user_id: i64,
     pub tenant_id: i64,
     pub status: String,
+    /// An Options account (CFD / Options account split): copy trading, PAMM and MAM trade CFDs only.
+    pub options: bool,
 }
 
 /* ------------------------------------------------------------------ */

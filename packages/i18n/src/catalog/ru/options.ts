@@ -64,10 +64,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "Условия торговли опционами сейчас недоступны. Пожалуйста, повторите попытку позже.",
 
   // Kalks Trader button
-  "trade.ready": "Всё готово. Опционы открываются в Kalks Trader, на том же счёте, что и Ваши CFD.",
+  "trade.ready": "Всё готово. Опционы торгуются в Kalks Trader, на Вашем опционном счёте.",
   "trade.cta": "Торговать опционами в Kalks Trader",
   "trade.chooseAccount": "Выберите счёт",
-  "trade.noAccount": "Для торговли опционами нужен активный торговый счёт.",
+  "trade.noAccount": "Для торговли опционами нужен активный опционный счёт.",
   "trade.openAccount": "Открыть счёт",
   "trade.cashOnly": "Премии и маржа оплачиваются только из собственных денежных средств счёта. Бонус и кредит использовать нельзя.",
   "trade.live": "Реальный",
@@ -96,5 +96,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "Демо: здесь ничего не сохраняется.",
+  // CFD / Options account split
+  "account.noneTitle": "Опционного счёта пока нет",
+  "account.noneText": "Опционы торгуются на отдельном счёте, не на счетах CFD. Откройте его за минуту, реальный или демо.",
+  "account.open": "Открыть опционный счёт",
 };
 export default options;

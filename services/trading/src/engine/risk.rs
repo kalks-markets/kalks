@@ -87,8 +87,10 @@ pub fn on_tick(tx: &mut Tx, env: &Env, symbol: &str) {
 fn trigger_fill(tx: &mut Tx, env: &Env, ticket: i64, q: &Quote) {
     let Some(o) = tx.st.orders.get(&ticket).cloned() else { return };
     let price = q.open_price(o.side);
-    // halted symbol, disabled / close-only account: the order stays pending until trading is allowed again
-    if gate(env, &tx.st, &o.symbol, super::trade::is_opening(&tx.st, &o.symbol, o.side, o.volume), o.volume, None).is_err() {
+    // halted symbol, disabled / close-only account, a CFD order on what is now an Options account (CFD / Options
+    // account split): the order stays pending until trading is allowed again (or staff cancel it)
+    let opening = super::trade::is_opening(&tx.st, &o.symbol, o.side, o.volume);
+    if super::trade::cfd_product_gate(env, opening).is_err() || gate(env, &tx.st, &o.symbol, opening, o.volume, None).is_err() {
         return;
     }
     let res = {

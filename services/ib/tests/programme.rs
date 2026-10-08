@@ -435,3 +435,37 @@ async fn batch_reject_releases_lines_and_clicks_are_tracked() {
     assert_eq!(e.count("SELECT count(*) FROM clicks WHERE user_id = 40").await, 3);
     e.drop().await;
 }
+
+/// Module switches (gateway): while a broker has `ib` off, the partner's own routes answer 403 module_disabled before
+/// any handler runs; tracking events stay; a broker with the module on (or a key the gateway doesn't send) is
+/// unaffected. No database needed (the switch answers first).
+#[tokio::test]
+async fn module_switch_refuses_the_partner_routes() {
+    use axum::extract::Path;
+    let gw = axum::Router::new().route(
+        "/v1/internal/tenants/{slug}",
+        axum::routing::get(|Path(slug): Path<String>| async move { Json(json!({"id": 2, "slug": slug, "modules": if slug == "qa-ib-off" { json!({"ib": false}) } else { json!({"prop": false}) }})) }),
+    );
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let gw_url = format!("http://{}", l.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(l, gw).await.unwrap() });
+    let pool = sqlx::postgres::PgPoolOptions::new().acquire_timeout(std::time::Duration::from_millis(300)).connect_lazy("postgres://postgres@127.0.0.1:1/unused").unwrap();
+    let mut cfg = Config::for_tests("postgres://postgres@127.0.0.1:1/unused");
+    cfg.gateway_url = gw_url;
+    let st = AppState::new(pool, cfg);
+    assert!(!ib::modules::on(&st, "qa-ib-off", "ib").await);
+    assert!(ib::modules::on(&st, "qa-ib-on", "ib").await, "a key the gateway doesn't send is on");
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", l.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(l, ib::api::router(st)).await.unwrap() });
+    let http = reqwest::Client::new();
+    for path in ["/v1/ib/me", "/v1/ib/me/clients", "/v1/ib/me/payouts"] {
+        let r = http.get(format!("{base}{path}")).header("x-kalks-tenant", "qa-ib-off").header("x-kalks-user-id", "7").send().await.unwrap();
+        assert_eq!(r.status().as_u16(), 403, "{path}");
+        assert_eq!(r.json::<Value>().await.unwrap()["error"]["code"], "module_disabled");
+    }
+    let r = http.get(format!("{base}/v1/ib/me")).header("x-kalks-tenant", "qa-ib-on").header("x-kalks-user-id", "7").send().await.unwrap();
+    assert_ne!(r.status().as_u16(), 403);
+    let r = http.post(format!("{base}/v1/ib/clicks")).header("x-kalks-tenant", "qa-ib-off").json(&json!({"code": "NOPE1234"})).send().await.unwrap();
+    assert_ne!(r.status().as_u16(), 403, "tracking stays");
+}

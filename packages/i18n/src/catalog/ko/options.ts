@@ -64,10 +64,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "지금은 옵션 약관을 불러올 수 없습니다. 잠시 후 다시 시도하세요.",
 
   // Kalks Trader button
-  "trade.ready": "준비가 끝났습니다. 옵션은 Kalks Trader에서 CFD와 같은 계좌로 거래됩니다.",
+  "trade.ready": "준비가 끝났습니다. 옵션은 Kalks Trader에서 옵션 계좌로 거래합니다.",
   "trade.cta": "Kalks Trader에서 옵션 거래",
   "trade.chooseAccount": "계좌 선택",
-  "trade.noAccount": "옵션을 거래하려면 활성 거래 계좌가 필요합니다.",
+  "trade.noAccount": "옵션을 거래하려면 활성 옵션 계좌가 필요합니다.",
   "trade.openAccount": "계좌 개설",
   "trade.cashOnly": "프리미엄과 증거금에는 계좌의 자체 현금만 사용됩니다. 보너스와 크레딧은 사용할 수 없습니다.",
   "trade.live": "실계좌",
@@ -96,5 +96,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "데모: 여기서는 아무것도 저장되지 않습니다.",
+  // CFD / Options account split
+  "account.noneTitle": "아직 옵션 계좌가 없습니다",
+  "account.noneText": "옵션은 CFD 계좌와 분리된 전용 계좌에서 거래합니다. 실계좌든 데모든 1분이면 개설됩니다.",
+  "account.open": "옵션 계좌 개설",
 };
 export default options;

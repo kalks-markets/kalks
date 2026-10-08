@@ -50,6 +50,9 @@ export const OPTIONS_COURSE_HREF = IS_DEMO ? "/academy" : "/academy/phase/phase-
 
 export type TradeAccount = { login: number; type: "live" | "demo"; name: string };
 
+/** The open-account wizard on its Options path (CFD / Options account split). */
+export const OPEN_OPTIONS_ACCOUNT = "/accounts/new?product=options";
+
 /** What a page variant (live / demo) provides. Write methods resolve to false after showing their own toast. */
 export type OptionsController = {
   data: Suitability | null;
@@ -57,7 +60,7 @@ export type OptionsController = {
   reload: () => void;
   /** Records the acceptance of the options terms (`version` = the current one). */
   accept: (version: number) => Promise<boolean>;
-  /** Accounts options can be traded on; null while loading. */
+  /** The client's Options accounts (the only ones options trade on); null while loading. */
   accounts: TradeAccount[] | null;
   /** Plain Kalks Trader link (options mode) when the accounts can't be listed: the terminal signs in by itself. */
   traderHref?: string | null;
@@ -125,7 +128,8 @@ const IDEAS: { kind: Idea; tone: string; icon: React.ReactNode; title: MessageKe
   { kind: "limited", tone: "border-ember/30 bg-ember-soft text-ember", icon: <ShieldCheck />, title: "options.intro.risk.title", text: "options.intro.risk.text" },
 ];
 
-function IdeaCards() {
+/** The three ideas (Buy a Call, Buy a Put, limited risk when you buy): also the Options step of the open-account wizard. */
+export function IdeaCards() {
   const t = useT();
   return (
     <>
@@ -236,18 +240,19 @@ function TraderButton({
       </Button>
     );
   }
+  // CFD / Options account split: options trade in an Options account only; without one, open one
   if (accounts.length === 0) {
     if (before) {
       return (
-        <Button variant="ember" size={size} disabled={off} onClick={() => run(async () => void ((await before()) && router.push("/accounts/new")))} className={className} data-testid={testId}>
+        <Button variant="ember" size={size} disabled={off} onClick={() => run(async () => void ((await before()) && router.push(OPEN_OPTIONS_ACCOUNT)))} className={className} data-testid={testId}>
           {ico} {text} <ArrowRight className="rtl:-scale-x-100" />
         </Button>
       );
     }
     return (
-      <Link href="/accounts/new" className={className}>
-        <Button variant="ember" size={size} className="w-full">
-          {t("options.trade.openAccount")} <ArrowRight className="rtl:-scale-x-100" />
+      <Link href={OPEN_OPTIONS_ACCOUNT} className={className}>
+        <Button variant="ember" size={size} className="w-full" data-testid="options-open-account">
+          {t("options.account.open")} <ArrowRight className="rtl:-scale-x-100" />
         </Button>
       </Link>
     );
@@ -493,7 +498,7 @@ const KEY_POINTS: { key: MessageKey; icon: React.ReactNode }[] = [
 ];
 
 /** The options terms as published (English, binding). Other languages get the key points translated on top. */
-function TermsDialog({ data, open, onOpenChange }: { data: Suitability; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function TermsDialog({ data, open, onOpenChange }: { data: Suitability; open: boolean; onOpenChange: (o: boolean) => void }) {
   const t = useT();
   const f = useFormat();
   const d = data.disclosure!;

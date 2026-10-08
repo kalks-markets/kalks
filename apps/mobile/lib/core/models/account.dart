@@ -4,6 +4,10 @@ import '../format/format.dart';
 
 enum AccountKind { live, demo }
 
+/// What an account (its group) trades: `cfd` or `options` (engine `product`). Anything but "options" reads as CFD,
+/// so an engine without the field keeps every account a CFD account.
+String productOf(Object? v) => v == 'options' ? 'options' : 'cfd';
+
 class EngineAccount {
   const EngineAccount({
     required this.login,
@@ -29,6 +33,7 @@ class EngineAccount {
     required this.createdAt,
     this.isDefault = false,
     this.demo,
+    this.product = 'cfd',
     this.raw = const {},
   });
 
@@ -55,7 +60,12 @@ class EngineAccount {
 
   /// Demo accounts: {initialBalance, refillsPerDay, refillsUsedToday, expiryDays}.
   final Map<String, dynamic>? demo;
+
+  /// cfd | options: a CFD account trades CFDs only, an Options account options only (the group's product).
+  final String product;
   final Map<String, dynamic> raw;
+
+  bool get isOptions => product == 'options';
 
   bool get live => type == AccountKind.live;
   bool get archived => status == 'archived' || status == 'closed';
@@ -101,6 +111,7 @@ class EngineAccount {
     createdAt: DateTime.tryParse('${j['createdAt']}') ?? DateTime.now(),
     isDefault: j['isDefault'] == true,
     demo: j['demo'] is Map ? (j['demo'] as Map).cast<String, dynamic>() : null,
+    product: productOf(j['product']),
     raw: j,
   );
 }

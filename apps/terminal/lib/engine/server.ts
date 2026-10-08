@@ -6,6 +6,8 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { clientIp } from "@/lib/gateway";
+import { tenantBrand } from "@/lib/tenant-brand";
+import { hostOf } from "@/lib/tenant-host";
 
 const TRADING_URL = (process.env.TRADING_URL ?? "http://127.0.0.1:8090").replace(/\/+$/, "");
 const TRADING_TOKEN = process.env.TRADING_INTERNAL_TOKEN ?? "";
@@ -22,12 +24,20 @@ export function error(status: number, code: string, message: string) {
   return reply(status, { error: { code, message } });
 }
 
+/** The broker of the visitor's host (gateway tenant_domains, as for the brand, cached 30 s); Kalks when unknown or
+ *  when the gateway is unreachable. A terminal session belongs to its broker, so every engine call names it. */
+export async function engineTenant(req?: NextRequest): Promise<string> {
+  const b = await tenantBrand(req ? hostOf(req.headers) : undefined).catch(() => null);
+  const slug = b?.slug?.toLowerCase();
+  return slug && /^[a-z0-9-]{1,64}$/.test(slug) ? slug : "kalks";
+}
+
 /** One call to the engine. `bearer` = terminal session token (terminal routes). */
 export async function engine<T = Obj>(
   path: string,
   init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown; bearer?: string; req?: NextRequest; headers?: Record<string, string> } = {},
 ): Promise<EngineResult<T>> {
-  const headers: Record<string, string> = { "x-kalks-internal": TRADING_TOKEN, "x-kalks-tenant": "kalks", ...init.headers };
+  const headers: Record<string, string> = { "x-kalks-internal": TRADING_TOKEN, "x-kalks-tenant": await engineTenant(init.req), ...init.headers };
   if (init.bearer) headers.authorization = `Bearer ${init.bearer}`;
   if (init.req) {
     headers["x-forwarded-for"] = clientIp(init.req.headers);

@@ -48,9 +48,14 @@ export async function tenantBrand(host?: string): Promise<TenantBrand | null> {
 
 /**
  * Which module a Client Area page or BFF path belongs to (longest prefix wins). A path shared by two modules
- * ("algo|api") stays open while either of them is on.
+ * ("algo|api") stays open while either of them is on; a path that needs both ("options+ai") closes when either is off.
+ * The mobile app's native trade routes are judged on their own path (lib/mobile.ts), its rewrites on the cookie route.
  */
 const MODULE_PATHS: [string, string][] = [
+  // MAM was part of copy trading's /social until it got its own switch
+  ["/social/mam", "mam"],
+  ["/social/managed", "mam"],
+  ["/api/social/mam", "mam"],
   ["/social/pamm", "pamm"],
   ["/social/investments", "pamm"],
   ["/api/social/funds", "pamm"],
@@ -88,6 +93,24 @@ const MODULE_PATHS: [string, string][] = [
   ["/rewards", "rewards"],
   // growth BFF: rewards features follow the module; banners and share cards stay on
   ...["rewards", "points", "redeem", "redemptions", "vouchers", "cashback", "promotions", "bonuses", "promo", "contests"].map((p): [string, string] => [`/api/growth/${p}`, "rewards"]),
+  // Kalks FX Options: the Options page and its terms (suitability is options-only)
+  ["/options", "options"],
+  ["/api/suitability", "options"],
+  // market pages; the news BFF serves news and the economic calendar
+  ["/markets", "markets"],
+  ["/news", "news"],
+  ["/calendar", "calendar"],
+  ...["feed", "map", "sources", "brief"].map((p): [string, string] => [`/api/news/${p}`, "news"]),
+  ["/api/news/calendar", "calendar"],
+  ["/api/news/me/calendar", "calendar"],
+  // the support chat (Ask Kalks AI asks through it too); the stream ticket also serves the bell and stays open, and so
+  // does the Support page (email)
+  ...["me", "conversations", "messages", "handover", "read", "typing", "attachments"].map((p): [string, string] => [`/api/support/${p}`, "support_chat|ai"]),
+  // the mobile app's native trade routes (Kalks Trader in the app)
+  ["/api/mobile/trade/options", "options"],
+  ["/api/mobile/trade/options/explain", "options+ai"],
+  ["/api/mobile/trade/ai-trader", "ai"],
+  ["/api/mobile/trade/mam", "mam"],
 ];
 
 export function moduleFor(pathname: string): string | null {
@@ -95,8 +118,17 @@ export function moduleFor(pathname: string): string | null {
   return hit ? hit[1] : null;
 }
 
-/** True when the broker switched off the module(s) a page or BFF path belongs to (every one of them, when shared). */
+/** True when the broker switched off the module(s) a page or BFF path belongs to (every one of them when shared with
+ *  "|", any of them when "+" needs all). A module the gateway doesn't list counts as on. */
 export function moduleOff(modules: Record<string, boolean>, pathname: string): boolean {
   const mod = moduleFor(pathname);
-  return !!mod && mod.split("|").every((m) => modules[m] === false);
+  if (!mod) return false;
+  if (mod.includes("+")) return mod.split("+").some((m) => modules[m] === false);
+  return mod.split("|").every((m) => modules[m] === false);
+}
+
+/** The first switched-off module of a path (for the "not available" page), or null. */
+export function offModule(modules: Record<string, boolean>, pathname: string): string | null {
+  if (!moduleOff(modules, pathname)) return null;
+  return moduleFor(pathname)!.split(/[|+]/).find((m) => modules[m] === false) ?? null;
 }

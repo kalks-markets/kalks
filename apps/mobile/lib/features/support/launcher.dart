@@ -1,7 +1,8 @@
 // The floating support chat button (port of apps/crm/components/support/launcher.tsx): on every Client Area page
 // except /support, above the bottom bar at the end side (web: bottom 92px, end 16px); opens the live chat in a tall
 // sheet; a badge with the agent replies that arrived while it was closed (`conversation` frames' clientUnread).
-// View-only and read-only sessions have no chat (the web hides the launcher for viewers).
+// View-only and read-only sessions have no chat (the web hides the launcher for viewers), nor does a broker that
+// switched the live chat off (module `support_chat`).
 // CONTRACT used by the shell — keep these names and parameters:
 //   SupportLauncher(path:)        the floating button (hidden on /support). Put it in the shell's Stack as a plain
 //                                 (non-Positioned) child, outside the page's MediaQuery override: it aligns itself to
@@ -12,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
 import 'live_chat.dart';
@@ -21,7 +23,7 @@ import 'support_data.dart';
 Future<void> openSupportChat(BuildContext context) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final me = container.read(meProvider);
-  if (me == null || me.readOnly) return;
+  if (me == null || me.readOnly || !container.read(configProvider).moduleOn('support_chat')) return;
   final launcher = container.read(supportLauncherProvider.notifier)..opened();
   try {
     await showKSheet<void>(
@@ -47,7 +49,7 @@ class SupportLauncher extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (path == '/support' || path.startsWith('/support/')) return const SizedBox.shrink();
     final me = ref.watch(meProvider);
-    if (me == null || me.readOnly) return const SizedBox.shrink();
+    if (me == null || me.readOnly || !ref.watch(configProvider).moduleOn('support_chat')) return const SizedBox.shrink();
     final t = context.t;
     final k = context.k;
     final s = ref.watch(supportLauncherProvider);

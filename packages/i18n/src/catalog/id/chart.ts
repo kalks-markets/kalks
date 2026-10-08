@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "BUY STOP LMT {lot}",
   "line.sellStopLimit": "SELL STOP LMT {lot}",
   "line.alert": "PERINGATAN",
-  "line.posTitle": "Seret untuk mengatur SL/TP · klik dua kali untuk mengubah",
+  "line.posTitle": "Seret S atau T (atau garisnya) untuk mengatur SL/TP · klik dua kali untuk mengubah",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "Stop loss: seret ke suatu harga, atau klik untuk jarak bawaan",
+  "line.tpHandleTitle": "Take profit: seret ke suatu harga, atau klik untuk jarak bawaan",
   "line.dragTitle": "Seret untuk memindahkan",
   "line.remove": "Hapus {label}",
 

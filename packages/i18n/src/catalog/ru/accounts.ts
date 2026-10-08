@@ -588,5 +588,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "Премия по опциону",
   "ledgerKind.option_settlement": "Расчёт по опциону",
   "ledgerKind.option_rebate": "Ребейт мейкера",
+  // CFD / Options account split
+  "product.cfd": "Счёт CFD",
+  "product.options": "Опционный счёт",
+  "product.cfdText": "Форекс, металлы, индексы, акции и криптовалюты в виде CFD, с кредитным плечом.",
+  "product.optionsText": "Коллы и путы на форекс, золото, серебро и нефть с расчётом деньгами.",
+  "product.chipOptions": "ОПЦИОНЫ",
+  "product.groupCfd": "Счета CFD",
+  "product.groupOptions": "Опционные счета",
+  "wizard.step.product": "Продукт",
+  "wizard.productTitle": "Чем будет торговать этот счёт?",
+  "wizard.productSubtitle": "Каждый счёт торгует одним продуктом. Можно открыть оба.",
+  "wizard.noGroups": "Сейчас для этого продукта нет доступных типов счетов.",
+  "wizard.introFirst": "Один короткий шаг перед первым опционным счётом: минутное введение в опционы.",
+  "wizard.agreeLiveOptions": "Я понимаю, что опционы связаны с высоким риском: купленный опцион может истечь без стоимости, а проданный — принести убыток больше полученной премии.",
 };
 export default accounts;

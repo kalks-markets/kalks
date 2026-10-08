@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "بررسی‌شده در {time} · با بارگذاری مجدد هر ۱۵ ثانیه به‌روز می‌شود",
   "system.status.expectedBack": "بازگشت پیش‌بینی‌شده تا {time}",
   "system.status.questions": "سؤالی دارید؟ {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} برای حساب شما در دسترس نیست.",
+  "module.copy_trading": "کپی‌تریدینگ",
+  "module.pamm": "صندوق‌های PAMM",
+  "module.mam": "MAM",
+  "module.prop": "معاملات پراپ",
+  "module.ib": "برنامه همکاری",
+  "module.algo": "سازنده استراتژی",
+  "module.api": "API و وب‌هوک‌ها",
+  "module.academy": "آکادمی",
+  "module.wallet": "کیف پول",
+  "module.rewards": "پاداش‌ها",
+  "module.options": "آپشن‌ها",
+  "module.news": "اخبار",
+  "module.calendar": "تقویم اقتصادی",
+  "module.markets": "بازارها",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "چت پشتیبانی",
 };
 export default shell;

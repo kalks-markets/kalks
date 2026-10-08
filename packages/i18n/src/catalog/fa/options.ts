@@ -65,10 +65,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "شرایط اختیار معامله در حال حاضر در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.",
 
   // Kalks Trader button
-  "trade.ready": "همه‌چیز آماده است. اختیار معامله در Kalks Trader و روی همان حسابی باز می‌شود که CFDهای شما روی آن است.",
+  "trade.ready": "همه‌چیز آماده است. اختیار معامله در Kalks Trader و در حساب اختیار معامله شما انجام می‌شود.",
   "trade.cta": "معامله اختیار در Kalks Trader",
   "trade.chooseAccount": "یک حساب انتخاب کنید",
-  "trade.noAccount": "برای معامله اختیار به یک حساب معاملاتی فعال نیاز دارید.",
+  "trade.noAccount": "برای معامله اختیار به یک حساب اختیار معامله فعال نیاز دارید.",
   "trade.openAccount": "افتتاح حساب",
   "trade.cashOnly": "پرمیوم‌ها و مارجین از موجودی نقدی خود حساب شما تأمین می‌شوند. بونوس و اعتبار قابل استفاده نیستند.",
   "trade.live": "واقعی",
@@ -97,5 +97,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "دمو: هیچ چیزی در اینجا ذخیره نمی‌شود.",
+  // CFD / Options account split
+  "account.noneTitle": "هنوز حساب اختیار معامله ندارید",
+  "account.noneText": "اختیار معامله در حساب جداگانه‌ای جدا از حساب‌های CFD شما معامله می‌شود. در یک دقیقه یکی باز کنید، واقعی یا دمو.",
+  "account.open": "افتتاح حساب اختیار معامله",
 };
 export default options;

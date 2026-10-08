@@ -605,5 +605,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "علاوة خيار",
   "ledgerKind.option_settlement": "تسوية خيار",
   "ledgerKind.option_rebate": "خصم صانع السوق",
+  // CFD / Options account split
+  "product.cfd": "حساب عقود فروقات",
+  "product.options": "حساب خيارات",
+  "product.cfdText": "الفوركس والمعادن والمؤشرات والأسهم والعملات المشفرة كعقود فروقات، مع رافعة مالية.",
+  "product.optionsText": "خيارات شراء وبيع على الفوركس والذهب والفضة والنفط، تُسوّى نقدًا.",
+  "product.chipOptions": "خيارات",
+  "product.groupCfd": "حسابات عقود الفروقات",
+  "product.groupOptions": "حسابات الخيارات",
+  "wizard.step.product": "المنتج",
+  "wizard.productTitle": "ماذا سيتداول هذا الحساب؟",
+  "wizard.productSubtitle": "كل حساب يتداول منتجًا واحدًا. يمكنك امتلاك النوعين معًا.",
+  "wizard.noGroups": "لا تتوفر أنواع حسابات لهذا المنتج حاليًا.",
+  "wizard.introFirst": "خطوة سريعة قبل أول حساب خيارات لك: مقدمة الخيارات في دقيقة واحدة.",
+  "wizard.agreeLiveOptions": "أفهم أن الخيارات تنطوي على مخاطر عالية: قد ينتهي الخيار المشترى بلا قيمة، وقد يخسر الخيار المبيع أكثر من العلاوة المستلمة.",
 };
 export default accounts;

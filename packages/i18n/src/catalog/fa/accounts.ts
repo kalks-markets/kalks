@@ -555,5 +555,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "پرمیوم اختیار",
   "ledgerKind.option_settlement": "تسویه اختیار",
   "ledgerKind.option_rebate": "بازپرداخت میکر",
+  // CFD / Options account split
+  "product.cfd": "حساب CFD",
+  "product.options": "حساب اختیار معامله",
+  "product.cfdText": "فارکس، فلزات، شاخص‌ها، سهام و رمزارز به‌صورت CFD، با اهرم.",
+  "product.optionsText": "اختیار خرید و فروش روی فارکس، طلا، نقره و نفت، با تسویه نقدی.",
+  "product.chipOptions": "اختیار",
+  "product.groupCfd": "حساب‌های CFD",
+  "product.groupOptions": "حساب‌های اختیار معامله",
+  "wizard.step.product": "محصول",
+  "wizard.productTitle": "این حساب چه چیزی معامله می‌کند؟",
+  "wizard.productSubtitle": "هر حساب یک محصول را معامله می‌کند. می‌توانید هر دو را داشته باشید.",
+  "wizard.noGroups": "در حال حاضر هیچ نوع حسابی برای این محصول باز نیست.",
+  "wizard.introFirst": "یک گام کوتاه پیش از نخستین حساب اختیار معامله: معرفی یک‌دقیقه‌ای اختیار معامله.",
+  "wizard.agreeLiveOptions": "می‌دانم که اختیار معامله ریسک بالایی دارد: اختیار خریداری‌شده ممکن است بی‌ارزش منقضی شود و اختیار فروخته‌شده ممکن است بیش از پریمیوم دریافتی زیان بدهد.",
 };
 export default accounts;

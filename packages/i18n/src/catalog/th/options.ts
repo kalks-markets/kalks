@@ -64,10 +64,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "ขณะนี้ไม่สามารถแสดงข้อกำหนดการเทรดออปชันได้ โปรดลองอีกครั้งในภายหลัง",
 
   // Kalks Trader button
-  "trade.ready": "พร้อมแล้ว เทรดออปชันได้ใน Kalks Trader บนบัญชีเดียวกับ CFD ของคุณ",
+  "trade.ready": "พร้อมแล้ว เทรดออปชันได้ใน Kalks Trader บนบัญชีออปชันของคุณ",
   "trade.cta": "เทรดออปชันใน Kalks Trader",
   "trade.chooseAccount": "เลือกบัญชี",
-  "trade.noAccount": "คุณต้องมีบัญชีเทรดที่ใช้งานอยู่จึงจะเทรดออปชันได้",
+  "trade.noAccount": "คุณต้องมีบัญชีออปชันที่ใช้งานอยู่จึงจะเทรดออปชันได้",
   "trade.openAccount": "เปิดบัญชี",
   "trade.cashOnly": "ค่าพรีเมียมและมาร์จิ้นมาจากเงินสดของบัญชีเท่านั้น ไม่สามารถใช้โบนัสและเครดิตได้",
   "trade.live": "จริง",
@@ -96,5 +96,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "โหมดสาธิต: ไม่มีการบันทึกข้อมูลใดๆ ในหน้านี้",
+  // CFD / Options account split
+  "account.noneTitle": "ยังไม่มีบัญชีออปชัน",
+  "account.noneText": "ออปชันเทรดในบัญชีของตัวเอง แยกจากบัญชี CFD ของคุณ เปิดได้ในหนึ่งนาที ทั้งบัญชีจริงและเดโม",
+  "account.open": "เปิดบัญชีออปชัน",
 };
 export default options;

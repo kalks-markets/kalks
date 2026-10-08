@@ -38,6 +38,7 @@ use crate::model::{
 use crate::money::{D, HUNDRED, ONE, ZERO, num, r2, rdp};
 use crate::options::snapshot::{OptSnapshot, Underlying};
 use crate::options::{OptPrice, PriceError, ScenLeg, TradeState, dec, f, weekend_margin};
+use crate::rules::Product;
 use crate::state::{AccountState, Event};
 
 /// Most legs in one order (iron condor = 4; the builder allows custom strategies).
@@ -253,7 +254,9 @@ pub fn margin(env: &Env, st: &AccountState, cfd: &BTreeMap<String, (D, D)>, extr
         if !legs.iter().any(|l| l.contracts < ZERO) {
             continue; // long options are paid in full: no margin
         }
-        let cfd_units = cfd.get(&u).and_then(|(l, s)| env.specs.get(&u).map(|sp| f((*l - *s) * sp.contract_size))).unwrap_or(0.0);
+        // CFD / Options account split: an Options account's option margin never takes CFD offsets (and a CFD account
+        // carries no option positions, so no option margin)
+        let cfd_units = if env.group.product == Product::Options { 0.0 } else { cfd.get(&u).and_then(|(l, s)| env.specs.get(&u).map(|sp| f((*l - *s) * sp.contract_size))).unwrap_or(0.0) };
         let m = match env.options.scenario(&env.tenant.slug, &u, &legs, cfd_units, env.now) {
             Some(sc) if sc.incremental.is_finite() => dec(sc.incremental) * dec(sc.usd_per_quote) * acc.usd_factor(),
             _ => fallback_margin(env, acc, &legs),
@@ -374,11 +377,28 @@ pub fn system_group(code: &str) -> bool {
         || g.starts_with("mam-")
 }
 
-/// Module switch (system groups, tenant, live / demo, underlying allow-list, group setting, underlying enabled).
+/// Refusal of options on a CFD account (CFD / Options account split).
+pub const CFD_ACCOUNT: &str = "This is a CFD account: options trade in an Options account";
+
+/// Module switch (system groups, the account's product, tenant, live / demo, underlying allow-list, group setting,
+/// underlying enabled).
 pub fn module_gate(env: &Env, st: &AccountState, snap: &OptSnapshot, underlying: &str) -> Result<(), Reject> {
+    module_gate_for(env, st, snap, underlying, false)
+}
+
+/// `module_gate`; `lp` = a liquidity-provider account (the Kalks market maker, `book::Books::is_lp`): the house's own
+/// quoting account trades options whatever group it was opened in (its group is `options-mm`, an Options group).
+pub fn module_gate_for(env: &Env, st: &AccountState, snap: &OptSnapshot, underlying: &str, lp: bool) -> Result<(), Reject> {
     if system_group(&st.account.group) || system_group(&env.group.code) {
         return Err(rej("options_disabled", "Kalks FX Options are not available on copy-trading, PAMM, MAM or prop accounts"));
     }
+    // CFD / Options account split: options (house prices and the order book) trade on Options accounts only
+    if env.group.product != Product::Options && !lp {
+        return Err(rej("product_mismatch", CFD_ACCOUNT));
+    }
+    // The gateway's `options` module switch is enforced before an order reaches the engine (api/options.rs,
+    // api/options_book.rs → modules::require, 403 module_disabled), so replay never depends on it; the options
+    // service's tenant switch below stays the Kalks risk switch.
     let live = st.account.kind == AccountKind::Live;
     let tenant = env.tenant.slug.as_str();
     if !snap.enabled(tenant, live) {

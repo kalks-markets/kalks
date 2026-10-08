@@ -67,14 +67,19 @@ const options = {
   "terms.unavailable": "The options terms aren't available right now. Please try again later.",
 
   // Kalks Trader button
-  "trade.ready": "You're all set. Options open in Kalks Trader, on the same account as your CFDs.",
+  "trade.ready": "You're all set. Options trade in Kalks Trader, in your Options account.",
   "trade.cta": "Trade options in Kalks Trader",
   "trade.chooseAccount": "Choose an account",
-  "trade.noAccount": "You need an active trading account to trade options.",
+  "trade.noAccount": "You need an active Options account to trade options.",
   "trade.openAccount": "Open an account",
   "trade.cashOnly": "Premiums and margin come from your account's own cash. Bonus and credit can't be used.",
   "trade.live": "Live",
   "trade.demo": "Demo",
+
+  // Options page without an Options account
+  "account.noneTitle": "No Options account yet",
+  "account.noneText": "Options trade in their own account, apart from your CFD accounts. Open one in a minute, live or demo.",
+  "account.open": "Open an Options account",
 
   // Key facts card
   "facts.title": "How Kalks FX Options work",

@@ -117,7 +117,7 @@ function TeamNote({ text, onView }: { text: string; onView: () => void }) {
 /* Panel (card body and sheet body)                                    */
 /* ------------------------------------------------------------------ */
 
-function Panel({ e, chips, variant, onOpenChat, onClose, inputRef }: { e: AiEngine; chips: AiChip[]; variant: "card" | "sheet"; onOpenChat: () => void; onClose?: () => void; inputRef: React.RefObject<HTMLInputElement | null> }) {
+function Panel({ e, chips, variant, onOpenChat, chat, onClose, inputRef }: { e: AiEngine; chips: AiChip[]; variant: "card" | "sheet"; onOpenChat: () => void; chat: boolean; onClose?: () => void; inputRef: React.RefObject<HTMLInputElement | null> }) {
   const t = useT();
   const [q, setQ] = React.useState("");
   const scroller = React.useRef<HTMLDivElement>(null);
@@ -153,10 +153,12 @@ function Panel({ e, chips, variant, onOpenChat, onClose, inputRef }: { e: AiEngi
           <h3 className="k-display text-[17px] font-semibold tracking-[-0.015em] sm:text-[18px]">{t("dashboard.ai.title", { name: e.botName })}</h3>
           <p className="mt-0.5 text-[12.5px] leading-snug text-fg-3">{t("dashboard.ai.subtitle")}</p>
         </div>
-        <button type="button" onClick={onOpenChat} className="k-surface-btn flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold text-fg-2 hover:text-fg">
-          <MessageCircle className="size-4" />
-          <span className="hidden sm:inline">{t("dashboard.ai.openChat")}</span>
-        </button>
+        {chat && (
+          <button type="button" onClick={onOpenChat} className="k-surface-btn flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold text-fg-2 hover:text-fg">
+            <MessageCircle className="size-4" />
+            <span className="hidden sm:inline">{t("dashboard.ai.openChat")}</span>
+          </button>
+        )}
         {onClose && (
           <button type="button" onClick={onClose} aria-label={t("common.close")} className="grid size-9 shrink-0 place-items-center rounded-full text-fg-3 hover:bg-surface-3 hover:text-fg">
             <X className="size-[18px]" />
@@ -216,10 +218,12 @@ function Panel({ e, chips, variant, onOpenChat, onClose, inputRef }: { e: AiEngi
       {/* follow-up actions once an answer is in */}
       {answered && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="ink" onClick={onOpenChat}>
-            <MessageCircle /> {t("dashboard.ai.continueChat")}
-          </Button>
-          {!human && (
+          {chat && (
+            <Button size="sm" variant="ink" onClick={onOpenChat}>
+              <MessageCircle /> {t("dashboard.ai.continueChat")}
+            </Button>
+          )}
+          {chat && !human && (
             <Button size="sm" variant="surface" onClick={e.handover}>
               <UserRound /> {t("support.menu.talkToPerson")}
             </Button>
@@ -321,7 +325,7 @@ function Sheet({ open, onClose, label, tall, children }: { open: boolean; onClos
 /* Entry                                                               */
 /* ------------------------------------------------------------------ */
 
-function View({ e, chips }: { e: AiEngine; chips: AiChip[] }) {
+function View({ e, chips, chat }: { e: AiEngine; chips: AiChip[]; chat: boolean }) {
   const t = useT();
   const [sheet, setSheet] = React.useState(false);
   const cardInput = React.useRef<HTMLInputElement>(null);
@@ -338,7 +342,7 @@ function View({ e, chips }: { e: AiEngine; chips: AiChip[] }) {
     <section aria-label={label}>
       {/* tablets and desktops: the card */}
       <div className="k-card k-ai-card hidden p-5 md:block sm:p-6">
-        <Panel e={e} chips={chips} variant="card" onOpenChat={openChat} inputRef={cardInput} />
+        <Panel e={e} chips={chips} variant="card" onOpenChat={openChat} chat={chat} inputRef={cardInput} />
       </div>
       {/* phones: a compact pill in the page flow that opens a bottom sheet */}
       <button type="button" onClick={() => setSheet(true)} aria-haspopup="dialog" className="k-card k-ai-card flex h-14 w-full items-center gap-3 rounded-full py-2 pe-2 ps-2 text-start md:hidden">
@@ -352,28 +356,29 @@ function View({ e, chips }: { e: AiEngine; chips: AiChip[] }) {
         </span>
       </button>
       <Sheet open={sheet} onClose={() => setSheet(false)} label={label} tall={e.turns.length > 0 || e.streaming !== null}>
-        <Panel e={e} chips={chips} variant="sheet" onOpenChat={openChat} onClose={() => setSheet(false)} inputRef={sheetInput} />
+        <Panel e={e} chips={chips} variant="sheet" onOpenChat={openChat} chat={chat} onClose={() => setSheet(false)} inputRef={sheetInput} />
       </Sheet>
     </section>
   );
 }
 
-function LiveAskAi({ chips }: { chips: AiChip[] }) {
+function LiveAskAi({ chips, chat }: { chips: AiChip[]; chat: boolean }) {
   const t = useT();
   const e = useLiveAi("Kalks AI", t("support.unavailable"));
-  return <View e={e} chips={chips} />;
+  return <View e={e} chips={chips} chat={chat} />;
 }
 
 function DemoAskAi({ chips, answer }: { chips: AiChip[]; answer: (q: string, chip?: string) => string }) {
   const t = useT();
   const me = useSession();
   const e = useDemoAi("Kalks AI", answer, { name: SUPPORT_AGENT.name, reply: (q) => `Hi ${me.first_name}, ${SUPPORT_AGENT.name.split(" ")[0]} here from Client Support. ${agentAnswer(q)}` }, t("dashboard.ai.connecting"));
-  return <View e={e} chips={chips} />;
+  return <View e={e} chips={chips} chat />;
 }
 
-/** The Overview's AI entry: the real support bot in live builds, canned answers (`demoAnswer`) in demo builds. */
-export function AskAi({ chips, demoAnswer }: { chips: AiChip[]; demoAnswer?: (q: string, chip?: string) => string }) {
-  return IS_DEMO ? <DemoAskAi chips={chips} answer={demoAnswer ?? ((q) => botAnswer(q).text)} /> : <LiveAskAi chips={chips} />;
+/** The Overview's AI entry: the real support bot in live builds, canned answers (`demoAnswer`) in demo builds.
+ *  `chat` false (the broker switched the support chat off): no way into the chat or to a person from here. */
+export function AskAi({ chips, demoAnswer, chat = true }: { chips: AiChip[]; demoAnswer?: (q: string, chip?: string) => string; chat?: boolean }) {
+  return IS_DEMO ? <DemoAskAi chips={chips} answer={demoAnswer ?? ((q) => botAnswer(q).text)} /> : <LiveAskAi chips={chips} chat={chat} />;
 }
 
 /** Link used in answers' extras (e.g. "Open account"). */

@@ -507,7 +507,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "期权即将上线",
-  "opt.soon.text": "此账户尚未开通 Kalks FX Options。一旦开通，期权链将显示在此处，与您的 CFD 使用同一个账户。",
+  "opt.soon.text": "此账户尚未开通 Kalks FX Options。一旦开通，期权链将显示在此处。",
   "opt.soon.point1": "外汇、黄金、白银和原油的看涨与看跌期权",
   "opt.soon.point2": "每日、每周和每月到期，以美元现金结算",
   "opt.soon.point3": "作为买方，您的亏损绝不会超过所支付的权利金",
@@ -1245,5 +1245,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "交易部门已取消该交易",
   "opt.bust.text": "{what} × {n}：该交易已还原，已收取的手续费已退还。",
   "opt.tape.kind.bust": "已取消",
+  // CFD / Options account split
+  "acct.openCfd": "开立 CFD 账户",
+  "acct.openOptions": "开立期权账户",
+  "opt.err.product_mismatch": "这是 CFD 账户：期权需在期权账户中交易。",
 };
 export default trader;

@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/format/format.dart';
 import '../../../i18n/i18n.dart';
+import '../../../shell/nav.dart';
 import '../../../ui/ui.dart';
 import '../social_api.dart';
 import 'bits.dart';
@@ -44,6 +46,8 @@ class _FundSheet extends ConsumerWidget {
     final t = context.t;
     final k = context.k;
     final q = ref.watch(fundDetailProvider(fundId));
+    // the master's profile is a copy trading page (/social/masters/:id)
+    final profileOn = pageOn(ref.watch(configProvider), '/social/masters');
     final d = q.value;
     final f = d?.fund;
     final lf = LocaleFormat(t.locale);
@@ -64,17 +68,18 @@ class _FundSheet extends ConsumerWidget {
             children: [
               FundStatusChip(status: f.status),
               const Spacer(),
-              KButton(
-                label: t('social.masterProfile'),
-                trailingIcon: Directionality.of(context) == TextDirection.rtl ? LucideIcons.arrowUpLeft : LucideIcons.arrowUpRight,
-                variant: KButtonVariant.surface,
-                size: KButtonSize.sm,
-                onPressed: () {
-                  final router = GoRouter.of(context);
-                  Navigator.of(context).pop();
-                  router.push('/social/masters/${f.masterId}');
-                },
-              ),
+              if (profileOn)
+                KButton(
+                  label: t('social.masterProfile'),
+                  trailingIcon: Directionality.of(context) == TextDirection.rtl ? LucideIcons.arrowUpLeft : LucideIcons.arrowUpRight,
+                  variant: KButtonVariant.surface,
+                  size: KButtonSize.sm,
+                  onPressed: () {
+                    final router = GoRouter.of(context);
+                    Navigator.of(context).pop();
+                    router.push('/social/masters/${f.masterId}');
+                  },
+                ),
               if (onInvest != null && f.status == 'active') ...[
                 const SizedBox(width: 8),
                 KButton(

@@ -22,6 +22,8 @@ pub struct Acct {
     pub kind: String,
     pub group: String,
     pub group_name: String,
+    /// `cfd` | `options` (CFD / Options account split)
+    pub product: String,
     pub cent: bool,
     pub currency: String,
     pub equity: f64,
@@ -36,7 +38,7 @@ impl Acct {
 }
 
 pub async fn user_accounts(app: &App, tenant: &str, user_id: i64) -> ApiResult<Vec<Acct>> {
-    let rows = sqlx::query("SELECT login, kind, group_code, group_name, cent, currency, equity, balance, created_at FROM accounts WHERE tenant = $1 AND user_id = $2 ORDER BY kind, login")
+    let rows = sqlx::query("SELECT login, kind, group_code, group_name, product, cent, currency, equity, balance, created_at FROM accounts WHERE tenant = $1 AND user_id = $2 ORDER BY kind, login")
         .bind(tenant)
         .bind(user_id)
         .fetch_all(&app.pool)
@@ -48,6 +50,7 @@ pub async fn user_accounts(app: &App, tenant: &str, user_id: i64) -> ApiResult<V
             kind: r.get("kind"),
             group: r.get("group_code"),
             group_name: r.get("group_name"),
+            product: r.get("product"),
             cent: r.get("cent"),
             currency: r.get("currency"),
             equity: r.get::<Decimal, _>("equity").to_f64().unwrap_or(0.0),
@@ -245,7 +248,7 @@ pub async fn analytics(app: &App, tenant: &str, user_id: i64, login: Option<i64>
     Ok(json!({
         "scope": if login.is_some() { "account" } else { "live" },
         "from": from, "to": to, "currency": "USD",
-        "accounts": accts.iter().map(|a| json!({"login": a.login, "type": a.kind, "group": a.group, "groupName": a.group_name, "currency": a.currency, "cent": a.cent, "equity": a.equity, "balance": a.balance})).collect::<Vec<_>>(),
+        "accounts": accts.iter().map(|a| json!({"login": a.login, "type": a.kind, "group": a.group, "groupName": a.group_name, "product": a.product, "currency": a.currency, "cent": a.cent, "equity": a.equity, "balance": a.balance})).collect::<Vec<_>>(),
         "curve": {
             "points": points.iter().map(|p| json!({"day": p.day, "balance": p.balance, "equity": p.equity, "flow": p.flow, "index": (p.index * 1e6).round() / 1e6, "drawdown": round2(p.drawdown)})).collect::<Vec<_>>(),
             "maxDrawdown": round2(cstats.max_drawdown), "currentDrawdown": round2(cstats.current_drawdown), "returnPct": round2(cstats.return_pct),

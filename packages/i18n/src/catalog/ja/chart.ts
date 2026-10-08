@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "買いSTP LMT {lot}",
   "line.sellStopLimit": "売りSTP LMT {lot}",
   "line.alert": "アラート",
-  "line.posTitle": "ドラッグでSL/TPを設定 · ダブルクリックで変更",
+  "line.posTitle": "S / T(またはライン)をドラッグでSL/TPを設定 · ダブルクリックで変更",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "ストップロス：価格までドラッグ、またはクリックで既定の幅",
+  "line.tpHandleTitle": "テイクプロフィット：価格までドラッグ、またはクリックで既定の幅",
   "line.dragTitle": "ドラッグで移動",
   "line.remove": "{label}を削除",
 

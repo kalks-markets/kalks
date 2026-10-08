@@ -11,6 +11,7 @@ pub mod dsl;
 pub mod error;
 pub mod house;
 pub mod indicators;
+pub mod modules;
 pub mod runtime;
 pub mod security;
 pub mod spec;

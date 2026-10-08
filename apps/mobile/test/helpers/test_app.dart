@@ -132,6 +132,9 @@ Future<void> unmount(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1));
 }
 
+/// Replaces the fixed config of an app pumped with `config:` (a broker switching a module while the app is open).
+void setConfig(ProviderContainer container, AppConfig config) => (container.read(configProvider.notifier) as _FixedConfig).set(config);
+
 /// A config that stays as given (no fetch).
 class _FixedConfig extends ConfigController {
   _FixedConfig(this.config);
@@ -142,4 +145,6 @@ class _FixedConfig extends ConfigController {
 
   @override
   Future<void> refresh() async {}
+
+  void set(AppConfig c) => state = c;
 }

@@ -555,5 +555,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "ऑप्शन प्रीमियम",
   "ledgerKind.option_settlement": "ऑप्शन सेटलमेंट",
   "ledgerKind.option_rebate": "मेकर रिबेट",
+  // CFD / Options account split
+  "product.cfd": "CFD अकाउंट",
+  "product.options": "ऑप्शंस अकाउंट",
+  "product.cfdText": "फ़ॉरेक्स, मेटल्स, इंडेक्स, स्टॉक्स और क्रिप्टो CFD के रूप में, लीवरेज के साथ।",
+  "product.optionsText": "फ़ॉरेक्स, सोना, चाँदी और तेल पर कॉल और पुट, नकद में सेटल।",
+  "product.chipOptions": "ऑप्शंस",
+  "product.groupCfd": "CFD अकाउंट",
+  "product.groupOptions": "ऑप्शंस अकाउंट",
+  "wizard.step.product": "प्रोडक्ट",
+  "wizard.productTitle": "यह अकाउंट क्या ट्रेड करेगा?",
+  "wizard.productSubtitle": "हर अकाउंट एक ही प्रोडक्ट ट्रेड करता है। आप दोनों रख सकते हैं।",
+  "wizard.noGroups": "अभी इस प्रोडक्ट के लिए कोई अकाउंट प्रकार उपलब्ध नहीं है।",
+  "wizard.introFirst": "आपके पहले ऑप्शंस अकाउंट से पहले एक छोटा कदम: 1 मिनट का ऑप्शंस परिचय।",
+  "wizard.agreeLiveOptions": "मैं समझता/समझती हूँ कि ऑप्शंस में जोखिम अधिक है: खरीदा गया ऑप्शन बेकार होकर एक्सपायर हो सकता है, और बेचे गए ऑप्शन में मिले प्रीमियम से ज़्यादा नुकसान हो सकता है।",
 };
 export default accounts;

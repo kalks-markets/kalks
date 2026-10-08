@@ -329,7 +329,9 @@ class AccountCardVisual extends StatelessWidget {
               stops: const [0, 0.6],
             ),
           ];
-    final badge = a.prop ? t('accounts.badge.prop') : (a.live ? t('accounts.badge.live') : t('accounts.badge.demo'));
+    final kind = a.prop ? t('accounts.badge.prop') : (a.live ? t('accounts.badge.live') : t('accounts.badge.demo'));
+    // an Options account says so on its card
+    final badge = a.isOptions ? '$kind · ${t('accounts.product.chipOptions')}' : kind;
     final title = '${a.groupName} · ${t.dyn('accounts.mode.${a.mode}', fallback: a.mode)}';
     final caption = context.text.micro.copyWith(color: white.withValues(alpha: 0.75), letterSpacing: 1.0);
     return Container(

@@ -64,10 +64,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "現在、オプション取引規約を表示できません。しばらくしてから再度お試しください。",
 
   // Kalks Trader button
-  "trade.ready": "準備が整いました。オプションはKalks Traderで、CFDと同じ口座で取引できます。",
+  "trade.ready": "準備が整いました。オプションはKalks Traderで、オプション口座から取引できます。",
   "trade.cta": "Kalks Traderでオプションを取引",
   "trade.chooseAccount": "口座を選択",
-  "trade.noAccount": "オプションを取引するには、有効な取引口座が必要です。",
+  "trade.noAccount": "オプションを取引するには、有効なオプション口座が必要です。",
   "trade.openAccount": "口座を開設",
   "trade.cashOnly": "プレミアムと証拠金には口座の自己資金が使われます。ボーナスとクレジットは使用できません。",
   "trade.live": "リアル",
@@ -96,5 +96,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "デモ：ここでの操作は保存されません。",
+  // CFD / Options account split
+  "account.noneTitle": "オプション口座はまだありません",
+  "account.noneText": "オプションはCFD口座とは別の専用口座で取引します。リアルでもデモでも1分で開設できます。",
+  "account.open": "オプション口座を開設",
 };
 export default options;

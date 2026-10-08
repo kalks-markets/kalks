@@ -405,5 +405,7 @@ const order: NsMessages<"order"> = {
   "toast.sessionExpired": "Kipindi kimeisha",
   "toast.sessionExpiredDesc": "Kipindi chako cha {login} kimeisha. Ingia tena ili ufanye biashara.",
   "toast.loggedOut": "Umetoka kwenye {login}",
+  // CFD / Options account split
+  "reject.product_mismatch": "Akaunti hii haifanyi biashara ya bidhaa hii",
 };
 export default order;

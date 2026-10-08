@@ -1,5 +1,6 @@
 // The terminal screen as the router opens it: `/trader?login=&symbol=&side=` (Markets and the Client Area's Trade
-// buttons) opens the account, the market's chart and the order sheet with that side; `mode=options` opens Options.
+// buttons) opens the account, the market's chart and the order sheet with that side; an Options account (with
+// `mode=options`, the Options page's Trade button) opens Options.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -67,8 +68,8 @@ void main() {
     await close(tester);
   });
 
-  testWidgets('mode=options opens the Options mode', (tester) async {
-    await open(tester, '/trader?login=10042817&mode=options');
+  testWidgets('mode=options on an Options account opens the Options mode', (tester) async {
+    await open(tester, '/trader?login=20019001&mode=options');
     expect(h.container.read(tradeModeProvider), 'options');
     await close(tester);
   });

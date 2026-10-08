@@ -126,6 +126,10 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
   (String, double)? _held;
   Timer? _holdTimer;
 
+  /// A stop made from a position line's S / T handle (lineForHandle): not among the given lines until the position
+  /// carries it, so it is added to what the chart shows while it is held.
+  ChartLine? _fresh;
+
   ChartSource get _source {
     final s = widget.source;
     if (s != null) return s;
@@ -170,32 +174,24 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
 
   List<Map<String, Object?>> get _indicatorsJson => [for (final i in widget.indicators) i.toJson()];
 
-  /// The lines to draw: the given ones, with a just-dropped line kept at its drop price.
+  /// The lines to draw: the given ones, with a just-dropped line kept at its drop price (and a stop just made from
+  /// an S / T handle added until the position carries it).
   void _sendLines() {
     var h = _held;
     // the confirmed line is at the drop price: nothing to hold any more
     if (h != null && widget.lines.any((l) => l.id == h!.$1 && (l.price - h.$2).abs() < 1e-9)) {
       _held = h = null;
+      _fresh = null;
       _holdTimer?.cancel();
       _holdTimer = null;
     }
+    final f = _fresh;
+    final add = f != null && h != null && h.$1 == f.id && !widget.lines.any((l) => l.id == f.id);
     final lines = h == null
         ? widget.lines
         : [
-            for (final l in widget.lines)
-              l.id == h.$1
-                  ? ChartLine(
-                      id: l.id,
-                      kind: l.kind,
-                      price: h.$2,
-                      label: l.label,
-                      side: l.side,
-                      draggable: l.draggable,
-                      note: l.note,
-                      tone: l.tone,
-                      closable: l.closable,
-                    )
-                  : l,
+            for (final l in widget.lines) l.id == h.$1 ? l.at(h.$2) : l,
+            if (add) f.at(h.$2),
           ];
     _c.send(ChartCmd.lines(lines));
   }
@@ -203,6 +199,7 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
   void _release() {
     _holdTimer?.cancel();
     _holdTimer = null;
+    _fresh = null;
     if (_held == null) return;
     _held = null;
     if (mounted) _sendLines();
@@ -246,6 +243,11 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
         texts: {
           'more': t('chart.legend.more', {'count': '{count}'}),
           'less': t('chart.legend.showLess'),
+          // a position line's S / T handles
+          'sl': t('chart.line.slHandle'),
+          'tp': t('chart.line.tpHandle'),
+          'slTitle': t('chart.line.slHandleTitle'),
+          'tpTitle': t('chart.line.tpHandleTitle'),
         },
       ),
     );
@@ -290,12 +292,15 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
         _c.holdLines = true;
       case ChartLineDragged(:final id, :final price):
         _c.holdLines = false;
-        final l = widget.lines.where((x) => x.id == id).firstOrNull;
+        // an S / T handle dragged out (or tapped) of a position line: the stop line it makes is not given yet
+        final made = widget.lines.any((x) => x.id == id) ? null : lineForHandle(widget.lines, id);
+        final l = widget.lines.where((x) => x.id == id).firstOrNull ?? made;
         if (l == null) {
           _sendLines();
           break;
         }
         _holdTimer?.cancel();
+        _fresh = made;
         // a position line does not move (its drag sets the SL or TP): only stops, orders and alerts stay put
         _held = l.kind == 'pos' ? null : (id, price);
         _sendLines();

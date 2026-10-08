@@ -65,10 +65,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "آپشنز کی شرائط اس وقت دستیاب نہیں ہیں۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
 
   // Kalks Trader button
-  "trade.ready": "آپ بالکل تیار ہیں۔ آپشنز Kalks Trader میں کھلتے ہیں، اسی اکاؤنٹ پر جس پر آپ کے CFDs ہیں۔",
+  "trade.ready": "آپ بالکل تیار ہیں۔ آپشنز Kalks Trader میں، آپ کے آپشنز اکاؤنٹ میں ٹریڈ ہوتے ہیں۔",
   "trade.cta": "Kalks Trader میں آپشنز ٹریڈ کریں",
   "trade.chooseAccount": "اکاؤنٹ منتخب کریں",
-  "trade.noAccount": "آپشنز ٹریڈ کرنے کے لیے آپ کے پاس ایک فعال ٹریڈنگ اکاؤنٹ ہونا ضروری ہے۔",
+  "trade.noAccount": "آپشنز ٹریڈ کرنے کے لیے آپ کے پاس ایک فعال آپشنز اکاؤنٹ ہونا ضروری ہے۔",
   "trade.openAccount": "اکاؤنٹ کھولیں",
   "trade.cashOnly": "پریمیم اور مارجن آپ کے اکاؤنٹ کی اپنی نقد رقم سے آتے ہیں۔ بونس اور کریڈٹ استعمال نہیں کیے جا سکتے۔",
   "trade.live": "لائیو",
@@ -97,5 +97,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "ڈیمو: یہاں کچھ بھی محفوظ نہیں ہوتا۔",
+  // CFD / Options account split
+  "account.noneTitle": "ابھی کوئی آپشنز اکاؤنٹ نہیں",
+  "account.noneText": "آپشنز اپنے الگ اکاؤنٹ میں ٹریڈ ہوتے ہیں، آپ کے CFD اکاؤنٹس سے الگ۔ ایک منٹ میں لائیو یا ڈیمو اکاؤنٹ کھولیں۔",
+  "account.open": "آپشنز اکاؤنٹ کھولیں",
 };
 export default options;

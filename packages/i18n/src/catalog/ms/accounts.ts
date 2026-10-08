@@ -550,5 +550,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "Premium opsyen",
   "ledgerKind.option_settlement": "Penyelesaian opsyen",
   "ledgerKind.option_rebate": "Rebat maker",
+  // CFD / Options account split
+  "product.cfd": "Akaun CFD",
+  "product.options": "Akaun opsyen",
+  "product.cfdText": "Forex, logam, indeks, saham dan kripto sebagai CFD, dengan leveraj.",
+  "product.optionsText": "Call dan put atas forex, emas, perak dan minyak, diselesaikan secara tunai.",
+  "product.chipOptions": "OPSYEN",
+  "product.groupCfd": "Akaun CFD",
+  "product.groupOptions": "Akaun opsyen",
+  "wizard.step.product": "Produk",
+  "wizard.productTitle": "Apakah yang akan didagangkan oleh akaun ini?",
+  "wizard.productSubtitle": "Setiap akaun mendagangkan satu produk. Anda boleh memiliki kedua-duanya.",
+  "wizard.noGroups": "Tiada jenis akaun dibuka untuk produk ini buat masa ini.",
+  "wizard.introFirst": "Satu langkah ringkas sebelum akaun opsyen pertama anda: pengenalan opsyen 1 minit.",
+  "wizard.agreeLiveOptions": "Saya faham bahawa opsyen berisiko tinggi: opsyen yang dibeli boleh tamat tanpa nilai, dan opsyen yang dijual boleh rugi lebih daripada premium yang diterima.",
 };
 export default accounts;

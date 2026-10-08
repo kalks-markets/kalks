@@ -9,10 +9,11 @@ import { Button, CHART_COLORS, Card, CardHeader, Chip, Donut, EmptyState, Field,
 import { accountTitle, curOf, fmtAmount, fmtPrice, isArchived, isoDay, toUsd, tradingApi, useAccounts, type AccountDetail, type EngineAccount, type EnginePosition } from "./api";
 import { AccountsError, liveTotals } from "./accounts-page";
 import { HistoryPanel, LedgerPanel } from "./activity";
-import { KindBadge, TradeButton, isPropAccount } from "./ui";
+import { ProductChip, KindBadge, TradeButton, isPropAccount } from "./ui";
 import { tr, useFormat, useT } from "@kalks/i18n/react";
 import { OptionTag, TradeSymbolAvatar, fmtContracts, symbolLabel } from "./instrument";
 import { isOptionTrade, positionPremiumsUsd, usdFactorOf } from "./option-deal";
+import { productOrder } from "@/lib/products";
 
 /* ------------------------------------------------------------------ */
 /* Account picker (history / ledger / statements)                      */
@@ -22,7 +23,7 @@ function AccountPicker({ accounts, value, onChange }: { accounts: EngineAccount[
   return (
     <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <div className="flex min-w-max gap-2">
-        {accounts.map((a) => {
+        {productOrder(accounts).map((a) => {
           const on = a.login === value;
           return (
             <button
@@ -33,6 +34,7 @@ function AccountPicker({ accounts, value, onChange }: { accounts: EngineAccount[
               className={cn("k-row flex items-center gap-2.5 px-3.5 py-2.5 text-start transition-colors", on ? "border-ember/50 bg-ember-soft" : "hover:border-[var(--k-border-top)]")}
             >
               <KindBadge type={a.type} prop={isPropAccount(a)} />
+              <ProductChip a={a} />
               <span>
                 <span className="block font-mono text-[13px] font-medium">#{a.login}</span>
                 <span className="block text-[11px] text-fg-3">{accountTitle(a)}</span>
@@ -579,13 +581,14 @@ export function LivePortfolio() {
                           </tr>
                         </thead>
                         <tbody>
-                          {accounts.map((a) => {
+                          {productOrder(accounts).map((a) => {
                             const cur = curOf(a);
                             return (
                               <tr key={a.login} className="bg-surface-2">
                                 <td className="rounded-s-[12px] border-y border-s border-line px-3 py-2.5">
                                   <Link href={`/accounts/${a.login}`} className="flex items-center gap-2 hover:text-ember">
                                     <KindBadge type={a.type} prop={isPropAccount(a)} />
+                                    <ProductChip a={a} />
                                     <span className="font-mono">#{a.login}</span>
                                     <span className="hidden text-[12px] text-fg-3 sm:inline">{a.groupName}</span>
                                   </Link>

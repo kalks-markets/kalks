@@ -6,7 +6,7 @@ import { getI18n } from "@kalks/i18n/server";
 // subpath imports: a server layout importing the "@kalks/ui" barrel ships every client module of it on every page
 import { BrandProvider } from "@kalks/ui/brand";
 import { brandCss, isCustomBrand } from "@kalks/ui/brand-vars";
-import { tenantBrand } from "@/lib/tenant-brand";
+import { tenantBrand, tenantModules } from "@/lib/tenant-brand";
 import { TerminalProviders } from "./providers";
 import "./globals.css";
 
@@ -37,14 +37,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // page loads instead of after hydration (the browser fetches it without credentials, hence "anonymous")
   if (MARKET_DATA_ORIGIN) preconnect(MARKET_DATA_ORIGIN, { crossOrigin: "anonymous" });
   // same language cookie as the Client Area (kalks_locale), else the browser's Accept-Language
-  const [{ locale, dir, messages }, brand] = await Promise.all([getI18n(), tenantBrand()]);
+  const [{ locale, dir, messages }, brand, modules] = await Promise.all([getI18n(), tenantBrand(), tenantModules()]);
   const css = brandCss(brand);
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="overflow-hidden">
         {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
         <BrandProvider brand={brand}>
-          <TerminalProviders locale={locale} messages={messages}>{children}</TerminalProviders>
+          <TerminalProviders locale={locale} messages={messages} modules={modules}>
+            {children}
+          </TerminalProviders>
         </BrandProvider>
       </body>
     </html>

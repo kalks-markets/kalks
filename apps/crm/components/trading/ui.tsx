@@ -8,6 +8,7 @@ import { Button, Chip, CopyButton, Dialog, IconButton, Menu, Money, cn, type But
 import { useT } from "@kalks/i18n/react";
 import { useReadOnly } from "@/components/session";
 import { STATUS_LABEL, curOf, errorToast, fmtLevel, levelTone, openTerminal, serverOf, tradingApi, type EngineAccount } from "./api";
+import { productOf } from "@/lib/products";
 import { DeleteAccountDialog, FlavorChip, RenameDialog, accountFlavor, copyingName } from "./archive";
 import { CloseAccountDialog } from "./closure";
 import { ChangeTypeDialog, DefaultStar, DemoBalanceDialog, TransferBetweenDialog, setDefaultAccount } from "./extras";
@@ -247,6 +248,17 @@ function CopyActions({ a }: { a: EngineAccount }) {
   );
 }
 
+/** OPTIONS chip on an Options account (CFD / Options account split); nothing on a CFD account. */
+export function ProductChip({ a, size = "sm" }: { a: { product?: string | null }; size?: "sm" | "md" }) {
+  const t = useT();
+  if (productOf(a) !== "options") return null;
+  return (
+    <Chip size={size} tone="ember" className="font-semibold tracking-wider" data-testid="product-chip-options">
+      {t("accounts.product.chipOptions")}
+    </Chip>
+  );
+}
+
 export function LiveAccountRow({ a, onChanged, compact }: { a: EngineAccount; onChanged?: () => void; compact?: boolean }) {
   const t = useT();
   const cur = curOf(a);
@@ -259,8 +271,9 @@ export function LiveAccountRow({ a, onChanged, compact }: { a: EngineAccount; on
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <KindBadge type={a.type} prop={isPropAccount(a)} />
         <FlavorChip a={a} />
+        <ProductChip a={a} />
         <Link href={`/accounts/${a.login}`} className="text-[15px] font-medium text-fg hover:text-ember">
-          {a.groupName} · {t.dyn(`accounts.mode.${a.mode}`, a.mode)}
+          {productOf(a) === "options" ? a.groupName : `${a.groupName} · ${t.dyn(`accounts.mode.${a.mode}`, a.mode)}`}
         </Link>
         <span className="inline-flex items-center gap-1 font-mono text-[13px] text-fg-2">
           #{a.login}
@@ -286,7 +299,7 @@ export function LiveAccountRow({ a, onChanged, compact }: { a: EngineAccount; on
         )}
         <div className="ms-auto flex items-center gap-2 text-xs text-fg-3">
           <span className="hidden font-mono sm:inline">{serverOf(a)}</span>
-          <Chip size="sm">1:{a.leverage.toLocaleString("en-US")}</Chip>
+          {productOf(a) !== "options" && <Chip size="sm">1:{a.leverage.toLocaleString("en-US")}</Chip>}
         </div>
       </div>
       <div className={cn("mt-4 grid items-end gap-4", compact ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_auto]" : "grid-cols-2 sm:grid-cols-4 xl:grid-cols-[1fr_1fr_1fr_1fr_auto]")}>

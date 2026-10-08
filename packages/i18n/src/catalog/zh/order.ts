@@ -402,5 +402,7 @@ const order: NsMessages<"order"> = {
   "toast.sessionExpired": "会话已过期",
   "toast.sessionExpiredDesc": "{login} 的会话已结束。请重新登录以进行交易。",
   "toast.loggedOut": "已退出 {login}",
+  // CFD / Options account split
+  "reject.product_mismatch": "此账户不交易该产品",
 };
 export default order;

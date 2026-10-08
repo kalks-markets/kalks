@@ -548,5 +548,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "オプションプレミアム",
   "ledgerKind.option_settlement": "オプション決済",
   "ledgerKind.option_rebate": "メイカーリベート",
+  // CFD / Options account split
+  "product.cfd": "CFD口座",
+  "product.options": "オプション口座",
+  "product.cfdText": "FX、貴金属、指数、株式、暗号資産をCFDで、レバレッジ付きで取引。",
+  "product.optionsText": "FX、金、銀、原油のコールとプット。差金決済です。",
+  "product.chipOptions": "オプション",
+  "product.groupCfd": "CFD口座",
+  "product.groupOptions": "オプション口座",
+  "wizard.step.product": "商品",
+  "wizard.productTitle": "この口座で何を取引しますか？",
+  "wizard.productSubtitle": "1つの口座で取引できる商品は1種類です。両方を持つこともできます。",
+  "wizard.noGroups": "現在、この商品で開設できる口座タイプはありません。",
+  "wizard.introFirst": "初めてのオプション口座の前に、1分でわかるオプション入門をご覧ください。",
+  "wizard.agreeLiveOptions": "オプションには高いリスクがあることを理解しています。買ったオプションは無価値で満期を迎えることがあり、売ったオプションは受け取ったプレミアムを超える損失が出ることがあります。",
 };
 export default accounts;

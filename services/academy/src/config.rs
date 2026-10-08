@@ -14,6 +14,9 @@ pub struct Config {
     pub verify_base_url: String,
     pub dev_mode: bool,
     pub json_logs: bool,
+    /// Read-only gateway database for module switches (`ACADEMY_GATEWAY_DATABASE_URL`, else `GATEWAY_DATABASE_URL`);
+    /// empty = the Academy is always on.
+    pub gateway_database_url: String,
 }
 
 fn redact_url(url: &str) -> String {
@@ -34,6 +37,7 @@ impl fmt::Debug for Config {
         f.debug_struct("Config")
             .field("bind", &self.bind)
             .field("database_url", &redact_url(&self.database_url))
+            .field("gateway_database_url", &redact_url(&self.gateway_database_url))
             .field("internal_token", &if self.internal_token.is_empty() { "<empty>" } else { "<redacted>" })
             .field("content_dir", &self.content_dir)
             .field("verify_base_url", &self.verify_base_url)
@@ -76,6 +80,7 @@ impl Config {
             verify_base_url: var("ACADEMY_VERIFY_URL", "http://localhost:3000").trim_end_matches('/').to_string(),
             dev_mode,
             json_logs: var("ACADEMY_LOG_FORMAT", if dev_mode { "text" } else { "json" }) == "json",
+            gateway_database_url: var("ACADEMY_GATEWAY_DATABASE_URL", &var("GATEWAY_DATABASE_URL", "")),
         })
     }
 }

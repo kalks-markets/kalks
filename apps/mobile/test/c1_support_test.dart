@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kalks/app.dart';
 import 'package:kalks/core/api/api_providers.dart';
+import 'package:kalks/core/config/app_config.dart';
 import 'package:kalks/core/notifications/notifications.dart';
 import 'package:kalks/features/support/ask_ai.dart';
 import 'package:kalks/features/support/ask_ai_engine.dart';
@@ -607,6 +608,55 @@ void main() {
       await tester.tap(find.text('Continue in chat'));
       await settle(tester);
       expect(find.byKey(const ValueKey('support-chat')), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('live chat switched off (support_chat): email-only page, no launcher, Ask Kalks AI without the chat', (tester) async {
+      PreviewSupport.reset('none');
+      final c = await pumpApp(
+        tester,
+        signedIn: true,
+        config: AppConfig.fromJson(const {
+          'modules': {'support_chat': false},
+        }),
+      );
+      // the floating chat is gone from every page, and comes back when the broker switches the chat on again
+      expect(find.byKey(const ValueKey('support-launcher')), findsNothing);
+      setConfig(c, AppConfig.fromJson(const {'modules': <String, bool>{}}));
+      await settle(tester, frames: 4);
+      expect(find.byKey(const ValueKey('support-launcher')), findsOneWidget);
+      setConfig(
+        c,
+        AppConfig.fromJson(const {
+          'modules': {'support_chat': false},
+        }),
+      );
+      await settle(tester, frames: 4);
+      expect(find.byKey(const ValueKey('support-launcher')), findsNothing);
+
+      // the Support page keeps the email channel and the note (web live-support.tsx)
+      c.read(routerProvider).go('/support');
+      await settle(tester);
+      expect(find.byKey(const ValueKey('support-chat')), findsNothing);
+      expect(find.byKey(const ValueKey('support-history')), findsNothing);
+      expect(find.byKey(const ValueKey('support-email')), findsOneWidget);
+      expect(find.text('Prefer email?'), findsOneWidget);
+      expect(find.text('Write to support'), findsOneWidget);
+      expect(find.textContaining('Replies from our team also appear'), findsOneWidget);
+
+      // Ask Kalks AI still answers, with no way into the chat or to a person (web AskAi chat={false})
+      await _page(tester, const AskAi(chips: _chips, chat: false));
+      await tester.tap(find.byKey(const ValueKey('ask-ai-pill')));
+      await settle(tester);
+      final panel = find.byKey(const ValueKey('ask-ai-panel'));
+      expect(find.descendant(of: panel, matching: find.byIcon(LucideIcons.messageCircle)), findsNothing);
+      await tester.tap(find.text("What's my free margin?"));
+      await settle(tester);
+      await _poll(tester);
+      expect(find.descendant(of: find.byKey(const ValueKey('ai-thread')), matching: find.textContaining('Margin level', findRichText: true)), findsOneWidget);
+      expect(find.text('New question'), findsOneWidget);
+      expect(find.text('Continue in chat'), findsNothing);
+      expect(find.text('Talk to a person'), findsNothing);
       await unmount(tester);
     });
 

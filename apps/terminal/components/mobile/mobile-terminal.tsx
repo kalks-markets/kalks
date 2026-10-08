@@ -21,7 +21,9 @@ import { SegmentChips, inSegment } from "@/components/market/segments";
 import { NotificationBell } from "@/components/shell/notifications";
 import { REGISTER_URL } from "@/lib/guest";
 import { DomLadder } from "@/components/order/dom-ladder";
-import { ModeSwitch } from "@/components/shell/mode-switch";
+import { ModeSwitch, useAccountProducts } from "@/components/shell/mode-switch";
+import { groupAccounts, productOf } from "@/lib/options/product";
+import type { EngineTradingAccount } from "@/lib/engine/map";
 import { useTradeMode } from "@/lib/options/mode";
 
 // Options mode: its own chunk, downloaded the first time a trader switches to Options
@@ -352,14 +354,21 @@ function MAccount() {
   const T = useTerminal();
   const t = useT();
   const { resolvedTheme, setTheme } = useTheme();
+  const products = useAccountProducts();
+  const groups = groupAccounts(T.accounts.map((x, i) => ({ ...x, product: products[i]?.product })));
   return (
     <div className="t-scroll h-full space-y-3 overflow-y-auto p-3">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-3">{t("common.accounts")}</div>
-      <div className="overflow-hidden rounded-[8px] border border-line bg-panel">
-        {T.accounts.map((x) => (
-          <MAccountRow key={x.login} login={x.login} />
-        ))}
-      </div>
+      {/* CFD / Options account split: the accounts by product once this terminal holds both */}
+      {groups.map((g) => (
+        <React.Fragment key={g.product}>
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-3">{groups.length > 1 ? t(g.product === "options" ? "accounts.product.groupOptions" : "accounts.product.groupCfd") : t("common.accounts")}</div>
+          <div className="overflow-hidden rounded-[8px] border border-line bg-panel">
+            {g.accounts.map((x) => (
+              <MAccountRow key={x.login} login={x.login} />
+            ))}
+          </div>
+        </React.Fragment>
+      ))}
       <div className="overflow-hidden rounded-[8px] border border-line bg-panel">
         <Row label={t("trader.oneClick.name")} icon={<Zap />}>
           <MiniSwitch checked={T.ws.oneClick} onChange={(v) => T.setWs({ oneClick: v })} label={t("trader.oneClick.name")} />
@@ -430,9 +439,7 @@ function MAccountRow({ login }: { login: string }) {
       </Badge>
       <div className="min-w-0 flex-1">
         <div className="font-mono text-[12.5px]">{a.login}</div>
-        <div className="text-[10.5px] text-fg-3">
-          {a.group} · {a.mode} · 1:{a.leverage}
-        </div>
+        <div className="text-[10.5px] text-fg-3">{productOf((a as Partial<EngineTradingAccount>).engine) === "options" ? `${t("accounts.product.chipOptions")} · ${a.group}` : `${a.group} · ${a.mode} · 1:${a.leverage}`}</div>
       </div>
       <div className="text-right font-mono text-[12px]">
         {accMoney(a, m.equity)} <span className="text-[10px] text-fg-3">{accCcy(a)}</span>

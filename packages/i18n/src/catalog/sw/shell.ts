@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "Imekaguliwa {time} · inasasishwa kila sekunde 15 unapopakia upya",
   "system.status.expectedBack": "Inatarajiwa kurudi kufikia {time}",
   "system.status.questions": "Maswali? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} haipatikani kwenye akaunti yako.",
+  "module.copy_trading": "Biashara ya kunakili",
+  "module.pamm": "Mifuko ya PAMM",
+  "module.mam": "MAM",
+  "module.prop": "Biashara ya prop",
+  "module.ib": "Mpango wa washirika",
+  "module.algo": "Kijenzi cha mikakati",
+  "module.api": "API na webhooks",
+  "module.academy": "Akademia",
+  "module.wallet": "Pochi",
+  "module.rewards": "Zawadi",
+  "module.options": "Chaguo (Options)",
+  "module.news": "Habari",
+  "module.calendar": "Kalenda ya kiuchumi",
+  "module.markets": "Masoko",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "Gumzo la usaidizi",
 };
 export default shell;

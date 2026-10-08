@@ -509,7 +509,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "Opsi segera hadir",
-  "opt.soon.text": "Kalks FX Options belum dibuka di akun ini. Begitu dibuka, rantai opsi akan muncul di sini, di akun yang sama dengan CFD Anda.",
+  "opt.soon.text": "Kalks FX Options belum dibuka di akun ini. Begitu dibuka, rantai opsi akan muncul di sini.",
   "opt.soon.point1": "Call dan put untuk forex, emas, perak, dan minyak",
   "opt.soon.point2": "Jatuh tempo harian, mingguan, dan bulanan, diselesaikan tunai dalam USD",
   "opt.soon.point3": "Sebagai pembeli, kerugian Anda tidak pernah melebihi premi yang Anda bayar",
@@ -1249,5 +1249,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "Transaksi dibatalkan oleh dealing desk",
   "opt.bust.text": "{what} × {n}: transaksi telah dibalik dan biaya yang sempat dikenakan sudah dikembalikan.",
   "opt.tape.kind.bust": "Dibatalkan",
+  // CFD / Options account split
+  "acct.openCfd": "Buka akun CFD",
+  "acct.openOptions": "Buka akun opsi",
+  "opt.err.product_mismatch": "Ini akun CFD: opsi diperdagangkan di akun opsi.",
 };
 export default trader;

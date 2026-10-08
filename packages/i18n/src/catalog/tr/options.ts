@@ -64,10 +64,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "Opsiyon koşulları şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
 
   // Kalks Trader button
-  "trade.ready": "Her şey hazır. Opsiyonlar, CFD'lerinizle aynı hesapta Kalks Trader'da açılır.",
+  "trade.ready": "Her şey hazır. Opsiyonlar Kalks Trader'da, opsiyon hesabınızda işlem görür.",
   "trade.cta": "Kalks Trader'da opsiyon işlemi yap",
   "trade.chooseAccount": "Bir hesap seçin",
-  "trade.noAccount": "Opsiyon işlemi yapmak için aktif bir işlem hesabınız olmalı.",
+  "trade.noAccount": "Opsiyon işlemi yapmak için aktif bir opsiyon hesabınız olmalı.",
   "trade.openAccount": "Hesap aç",
   "trade.cashOnly": "Primler ve teminat, hesabınızın kendi nakit bakiyesinden karşılanır. Bonus ve kredi kullanılamaz.",
   "trade.live": "Gerçek",
@@ -96,5 +96,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "Demo: burada hiçbir şey kaydedilmez.",
+  // CFD / Options account split
+  "account.noneTitle": "Henüz opsiyon hesabınız yok",
+  "account.noneText": "Opsiyonlar CFD hesaplarınızdan ayrı, kendi hesabında işlem görür. Bir dakikada gerçek ya da demo bir hesap açın.",
+  "account.open": "Opsiyon hesabı aç",
 };
 export default options;

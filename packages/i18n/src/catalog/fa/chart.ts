@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "خرید استاپ‌لیمیت {lot}",
   "line.sellStopLimit": "فروش استاپ‌لیمیت {lot}",
   "line.alert": "هشدار",
-  "line.posTitle": "برای تنظیم SL/TP بکشید · برای ویرایش دوبار کلیک کنید",
+  "line.posTitle": "برای تنظیم SL/TP، S یا T (یا خط) را بکشید · برای ویرایش دوبار کلیک کنید",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "حد ضرر: تا یک قیمت بکشید، یا برای فاصله پیش‌فرض کلیک کنید",
+  "line.tpHandleTitle": "حد سود: تا یک قیمت بکشید، یا برای فاصله پیش‌فرض کلیک کنید",
   "line.dragTitle": "برای جابه‌جایی بکشید",
   "line.remove": "حذف {label}",
 

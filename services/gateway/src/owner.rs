@@ -377,7 +377,7 @@ pub async fn create_tenant(State(st): State<AppState>, ctx: Ctx, req: Result<Jso
     crate::domains::replace_all(&st.pool, id, &domains, Some(me.id)).await?;
     rbac::seed_tenant_roles(&st.pool, id).await?;
     for (k, v) in &modules {
-        tenancy::write_feature(&st, &ctx, &me, id, k, Some(*v)).await?;
+        tenancy::write_feature(&st, &ctx, &me, id, k, Some(*v), Some("Set when the tenant was created")).await?;
     }
     save_billing(&st, id, &billing).await?;
     let mut invite = Value::Null;
@@ -654,9 +654,15 @@ pub async fn activate_tenant(State(st): State<AppState>, ctx: Ctx, Path(id): Pat
 }
 
 pub async fn set_tenant_features(State(st): State<AppState>, ctx: Ctx, Path(id): Path<i64>, req: Result<Json<Map<String, Value>>, JsonRejection>) -> ApiResult<Json<Value>> {
-    let r = body(req)?;
+    let mut r = body(req)?;
     let me = require_key(&st, &ctx, "owner.tenants").await?;
     let _: i64 = sqlx::query_scalar("SELECT id FROM tenants WHERE id = $1").bind(id).fetch_optional(&st.pool).await?.ok_or(ApiError::NotFound)?;
+    // `reason` rides along with the switches (audited with each of them)
+    let reason = match r.remove("reason") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s)) => tenancy::clean_reason(Some(&s)),
+        Some(_) => return Err(ApiError::Validation { field: "reason", message: "The reason must be text." }),
+    };
     let known: Vec<String> = sqlx::query_scalar("SELECT key FROM feature_flags").fetch_all(&st.pool).await?;
     let mut changes = Vec::new();
     for (k, v) in &r {
@@ -672,7 +678,7 @@ pub async fn set_tenant_features(State(st): State<AppState>, ctx: Ctx, Path(id):
     }
     let mut out = Vec::new();
     for (k, v) in changes {
-        out.push(tenancy::write_feature(&st, &ctx, &me, id, &k, v).await?);
+        out.push(tenancy::write_feature(&st, &ctx, &me, id, &k, v, reason.as_deref()).await?);
     }
     Ok(Json(json!({ "items": out })))
 }

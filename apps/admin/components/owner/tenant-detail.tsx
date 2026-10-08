@@ -11,6 +11,7 @@ import { TenantMark } from "./tenants";
 import { BillingForm, InvoiceTable } from "./billing";
 import { TenantDomains } from "./domains";
 import type { TenantDetail } from "./types";
+import { MODULE_LOSES, useModuleSwitch } from "./module-switch";
 
 export function LiveTenantDetail({ id }: { id: string }) {
   const now = useNow();
@@ -20,6 +21,8 @@ export function LiveTenantDetail({ id }: { id: string }) {
   const [reason, setReason] = React.useState("");
   const [invite, setInvite] = React.useState({ email: "", name: "" });
   const [link, setLink] = React.useState<string | undefined>();
+  // a module switch asks to confirm with a reason (audited) and says what the clients lose
+  const sw = useModuleSwitch(reload);
   React.useEffect(() => {
     if (data) {
       const t = data.tenant;
@@ -29,8 +32,10 @@ export function LiveTenantDetail({ id }: { id: string }) {
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <TableSkeleton rows={6} />;
   const t = data.tenant;
-
-  const toggleModule = async (key: string, v: boolean) => (await act("PUT", `/api/owner/tenants/${t.id}/features`, { [key]: v }, `${key}: ${v ? "on" : "off"}`)) && reload();
+  const toggleModule = (key: string, v: boolean) => {
+    const m = data.modules.find((x) => x.key === key);
+    sw.ask({ tenantId: t.id, tenantName: t.name, key, name: m?.name ?? key, value: v, effective: v });
+  };
 
   return (
     <div className="pb-10">
@@ -134,7 +139,7 @@ export function LiveTenantDetail({ id }: { id: string }) {
               <div key={m.key} className="flex items-center justify-between gap-3 border-b border-line py-2.5 last:border-0">
                 <div className="min-w-0">
                   <div className="text-[13.5px] font-medium">{m.name}</div>
-                  <div className="truncate text-[12px] text-fg-3">{m.description}</div>
+                  <div className="text-[12px] leading-snug text-fg-3">{m.enabled ? m.description : `Off: ${MODULE_LOSES[m.key] ?? m.description}`}</div>
                 </div>
                 <span data-testid={`module-${m.key}`}>
                   <Toggle checked={m.enabled} onChange={(v) => void toggleModule(m.key, v)} />
@@ -192,6 +197,7 @@ export function LiveTenantDetail({ id }: { id: string }) {
           </div>
         </Card>
       </div>
+      {sw.dialog}
       <Dialog open={suspend} onOpenChange={setSuspend} title={`Suspend ${t.name}?`} description="Every session at this broker ends now. Clients see an unavailable page and nobody can sign in until you re-activate it.">
         <Field label="Reason (audit log)">
           <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. unpaid invoices" name="suspend-reason" />

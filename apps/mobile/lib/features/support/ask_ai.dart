@@ -4,8 +4,10 @@
 // (ask_ai_engine.dart), with the open-request-for-a-person handling (hold the question; close that request and ask
 // Kalks AI, or send it to the team; View opens the chat). View-only and read-only sessions get nothing (the web's
 // dashboard leaves it out for them).
+// `chat` false (the broker switched the live chat off, module `support_chat`; web AskAi chat={false}): no way into
+// the chat or to a person from here (no chat button, no Continue in chat, no Talk to a person).
 // CONTRACT used by the Dashboard — keep these names and parameters:
-//   AskAi(chips:)                     the pill at the top of the dashboard (opens the phone sheet)
+//   AskAi(chips:, chat:)              the pill at the top of the dashboard (opens the phone sheet)
 //   AiChip(key:, label:, question:, extra:)   a suggestion; `extra` shows under the question it asked
 //   AiFacts(title:, rows:)            the client's own figures under an answer
 //   AiLink(href:, label:)             a link to a Client Area page under an answer
@@ -153,8 +155,11 @@ class AiLink extends StatelessWidget {
 
 /// The Dashboard's AI entry on phones: a compact pill that opens the Ask Kalks AI sheet.
 class AskAi extends ConsumerStatefulWidget {
-  const AskAi({super.key, required this.chips});
+  const AskAi({super.key, required this.chips, this.chat = true});
   final List<AiChip> chips;
+
+  /// The live chat is on: the sheet offers the way into it and to a person.
+  final bool chat;
 
   @override
   ConsumerState<AskAi> createState() => _AskAiState();
@@ -207,7 +212,7 @@ class _AskAiState extends ConsumerState<AskAi> {
     if (e == null) return;
     await showKSheet<void>(
       context,
-      builder: (ctx) => _AskAiSheet(e: e, chips: _chips, onOpenChat: () => _openChat(ctx), onClose: () => Navigator.of(ctx).pop()),
+      builder: (ctx) => _AskAiSheet(e: e, chips: _chips, chat: widget.chat, onOpenChat: () => _openChat(ctx), onClose: () => Navigator.of(ctx).pop()),
     );
   }
 
@@ -293,9 +298,10 @@ class _AskAiState extends ConsumerState<AskAi> {
 
 /// The phone bottom sheet: short with the suggestions, tall once there's a thread (web Sheet `tall`).
 class _AskAiSheet extends StatelessWidget {
-  const _AskAiSheet({required this.e, required this.chips, required this.onOpenChat, required this.onClose});
+  const _AskAiSheet({required this.e, required this.chips, required this.chat, required this.onOpenChat, required this.onClose});
   final AskAiEngine e;
   final ValueListenable<List<AiChip>> chips;
+  final bool chat;
   final VoidCallback onOpenChat;
   final VoidCallback onClose;
 
@@ -307,7 +313,7 @@ class _AskAiSheet extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([e, chips]),
       builder: (context, _) {
-        final panel = AskAiPanel(e: e, chips: chips.value, onOpenChat: onOpenChat, onClose: onClose);
+        final panel = AskAiPanel(e: e, chips: chips.value, chat: chat, onOpenChat: onOpenChat, onClose: onClose);
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 2, 16, 16),
           child: AnimatedSize(
@@ -324,9 +330,12 @@ class _AskAiSheet extends StatelessWidget {
 
 /// The sheet's body (web Panel, variant "sheet").
 class AskAiPanel extends StatefulWidget {
-  const AskAiPanel({super.key, required this.e, required this.chips, required this.onOpenChat, this.onClose});
+  const AskAiPanel({super.key, required this.e, required this.chips, required this.onOpenChat, this.onClose, this.chat = true});
   final AskAiEngine e;
   final List<AiChip> chips;
+
+  /// The live chat is on (module `support_chat`): the chat button, Continue in chat and Talk to a person show.
+  final bool chat;
   final VoidCallback onOpenChat;
   final VoidCallback? onClose;
 
@@ -407,7 +416,8 @@ class _AskAiPanelState extends State<AskAiPanel> {
           ),
         ),
         const SizedBox(width: 8),
-        KIconButton(icon: LucideIcons.messageCircle, size: 36, filled: true, semanticLabel: t('dashboard.ai.openChat'), onPressed: widget.onOpenChat),
+        if (widget.chat)
+          KIconButton(icon: LucideIcons.messageCircle, size: 36, filled: true, semanticLabel: t('dashboard.ai.openChat'), onPressed: widget.onOpenChat),
         if (widget.onClose != null) KIconButton(icon: LucideIcons.x, size: 36, semanticLabel: t('common.close'), color: k.fg3, onPressed: widget.onClose),
       ],
     );
@@ -581,14 +591,15 @@ class _AskAiPanelState extends State<AskAiPanel> {
               runSpacing: 4,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                KButton(
-                  label: t('dashboard.ai.continueChat'),
-                  icon: LucideIcons.messageCircle,
-                  variant: KButtonVariant.ink,
-                  size: KButtonSize.sm,
-                  onPressed: widget.onOpenChat,
-                ),
-                if (!e.human)
+                if (widget.chat)
+                  KButton(
+                    label: t('dashboard.ai.continueChat'),
+                    icon: LucideIcons.messageCircle,
+                    variant: KButtonVariant.ink,
+                    size: KButtonSize.sm,
+                    onPressed: widget.onOpenChat,
+                  ),
+                if (widget.chat && !e.human)
                   KButton(
                     label: t('support.menu.talkToPerson'),
                     icon: LucideIcons.userRound,

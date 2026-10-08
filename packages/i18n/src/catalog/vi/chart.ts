@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "BUY STOP LMT {lot}",
   "line.sellStopLimit": "SELL STOP LMT {lot}",
   "line.alert": "CẢNH BÁO",
-  "line.posTitle": "Kéo để đặt SL/TP · nhấp đúp để sửa",
+  "line.posTitle": "Kéo S hoặc T (hoặc đường) để đặt SL/TP · nhấp đúp để sửa",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "Cắt lỗ: kéo đến một mức giá, hoặc nhấp để dùng khoảng cách mặc định",
+  "line.tpHandleTitle": "Chốt lời: kéo đến một mức giá, hoặc nhấp để dùng khoảng cách mặc định",
   "line.dragTitle": "Kéo để di chuyển",
   "line.remove": "Xóa {label}",
 

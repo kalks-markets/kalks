@@ -502,7 +502,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "Options zinakuja hivi karibuni",
-  "opt.soon.text": "Kalks FX Options bado haijafunguliwa kwenye akaunti hii. Itakapofunguliwa, jedwali la options litaonekana hapa, kwenye akaunti ile ile ya CFD zako.",
+  "opt.soon.text": "Kalks FX Options bado haijafunguliwa kwenye akaunti hii. Ikifunguliwa tu, mnyororo wa options utaonekana hapa.",
   "opt.soon.point1": "Call na put kwenye forex, dhahabu, fedha na mafuta",
   "opt.soon.point2": "Tarehe za kuisha za kila siku, kila wiki na kila mwezi, hulipwa kwa pesa taslimu kwa USD",
   "opt.soon.point3": "Ukiwa mnunuzi, kamwe huwezi kupoteza zaidi ya premium unayolipa",
@@ -1242,5 +1242,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "Biashara imeghairiwa na dawati la biashara",
   "opt.bust.text": "{what} × {n}: biashara imebatilishwa na ada yoyote imerudishwa.",
   "opt.tape.kind.bust": "Imeghairiwa",
+  // CFD / Options account split
+  "acct.openCfd": "Fungua akaunti ya CFD",
+  "acct.openOptions": "Fungua akaunti ya Options",
+  "opt.err.product_mismatch": "Hii ni akaunti ya CFD: options hufanyiwa biashara kwenye akaunti ya Options.",
 };
 export default trader;

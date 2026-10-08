@@ -19,12 +19,8 @@ use serde_json::json;
 use subtle::ConstantTimeEq;
 
 pub fn router(st: AppState) -> Router {
-    let v1 = Router::new()
-        // public tracking + events from other services
-        .route("/v1/ib/clicks", post(public::click))
-        .route("/v1/ib/events/deposit", post(public::deposit_event))
-        .route("/v1/ib/events/lots", post(public::lots_event))
-        // Client Area
+    // Client Area: refused while the broker has the ib module off (modules.rs)
+    let me = Router::new()
         .route("/v1/ib/me", get(client::dashboard))
         .route("/v1/ib/me/programme", get(client::programme))
         .route("/v1/ib/me/campaigns", get(client::campaigns).post(client::create_campaign))
@@ -35,6 +31,13 @@ pub fn router(st: AppState) -> Router {
         .route("/v1/ib/me/commissions", get(client::commissions))
         .route("/v1/ib/me/payouts", get(client::payouts))
         .route("/v1/ib/me/settings", axum::routing::put(client::update_settings))
+        .route_layer(middleware::from_fn_with_state(st.clone(), crate::modules::gate));
+    let v1 = Router::new()
+        // public tracking + events from other services
+        .route("/v1/ib/clicks", post(public::click))
+        .route("/v1/ib/events/deposit", post(public::deposit_event))
+        .route("/v1/ib/events/lots", post(public::lots_event))
+        .merge(me)
         // Back Office
         .route("/v1/ib/admin/overview", get(admin::overview))
         .route("/v1/ib/admin/settings", get(admin::get_settings).put(admin::put_settings))

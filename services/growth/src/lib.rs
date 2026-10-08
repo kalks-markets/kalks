@@ -17,6 +17,7 @@ pub mod error;
 pub mod journeys;
 pub mod loyalty;
 pub mod model;
+pub mod modules;
 pub mod money;
 pub mod payouts;
 pub mod profiles;

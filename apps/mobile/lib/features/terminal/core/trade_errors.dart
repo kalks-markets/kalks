@@ -25,6 +25,7 @@ const Map<String, String> rejectReasons = {
   'symbol_halted': 'Trading is halted on this symbol',
   'symbol_close_only': 'Only position closing is allowed on this symbol',
   'not_hedging': 'Close By needs a hedging account',
+  'product_mismatch': "This account doesn't trade this product",
   'invalid_close_by': 'Invalid Close By',
   'requote': 'Requote',
   'read_only': 'Trading is disabled (investor password)',

@@ -149,6 +149,9 @@ String localizeError(ApiException e, T t) {
       return t.dyn('auth.apiError.rateLimited', fallback: e.message, vars: {'seconds': secs});
     case 'unavailable':
       return t('common.unavailable');
+    case 'module_disabled':
+      // the server's own sentence (the module it refused), else the "not available" page's text
+      return e.message.trim().isNotEmpty ? e.message : t('shell.system.unavailable.text');
   }
   final codeKey = _codeKeys[e.code];
   if (codeKey != null && t.has(codeKey)) return t(codeKey);

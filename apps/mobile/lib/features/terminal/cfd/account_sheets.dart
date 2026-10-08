@@ -1,5 +1,6 @@
 // Accounts of Kalks Trader: the list used by the Account tab and the header's switcher (web MAccountRow: Live / Demo,
-// login, group · mode · leverage, equity; one tap switches, opening the client's own account if needed), and the
+// login, group · mode · leverage, equity; one tap switches, opening the client's own account if needed), grouped by
+// product (CFD accounts, Options accounts with an OPTIONS tag; Options hidden while the module is off), and the
 // MT5-style "Login to trade account" sheet (web EngineLoginForm: login, password, server; the investor password opens
 // a read-only session).
 import 'dart:async';
@@ -8,9 +9,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/api/api_error.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/models/account.dart';
 import '../../../core/notifications/notifications.dart';
 import '../../../i18n/i18n.dart';
@@ -32,6 +35,7 @@ class AccountEntry {
     required this.equity,
     required this.cent,
     this.readOnly = false,
+    this.product = 'cfd',
   });
   final String login;
   final bool live;
@@ -42,6 +46,11 @@ class AccountEntry {
   final double equity;
   final bool cent;
   final bool readOnly;
+
+  /// cfd | options.
+  final String product;
+
+  bool get isOptions => product == 'options';
 }
 
 /// The client's own accounts (not archived) plus the logins added with a password, in that order.
@@ -65,6 +74,7 @@ final accountEntriesProvider = Provider.autoDispose<List<AccountEntry>>((ref) {
         equity: sa?.equity ?? (a.cent ? a.equity / 100 : a.equity),
         cent: a.cent,
         readOnly: s?.readOnly ?? false,
+        product: sa?.product ?? a.product,
       ),
     );
   }
@@ -81,13 +91,33 @@ final accountEntriesProvider = Provider.autoDispose<List<AccountEntry>>((ref) {
         equity: a?.equity ?? 0,
         cent: a?.cent ?? false,
         readOnly: s.readOnly,
+        product: a?.product ?? 'cfd',
       ),
     );
   }
   return out;
 });
 
-/// The account rows (web MAccountRow); tap switches.
+/// Shows `login` in the terminal (opening the client's own account if needed), with the web's "Switched to …" toast
+/// or the reason it couldn't.
+Future<bool> switchTradeAccount(BuildContext context, String login, {bool? live}) async {
+  final t = context.t;
+  final c = ProviderScope.containerOf(context, listen: false);
+  final ok = await c.read(tradeSessionsProvider.notifier).activate(login);
+  final notes = c.read(notificationsProvider.notifier);
+  if (ok) {
+    final isLive = live ?? c.read(tradeSessionsProvider).sessions[login]?.account?.live ?? true;
+    notes.toast(NotificationKind.info, t(isLive ? 'order.toast.switchedLive' : 'order.toast.switchedDemo', {'login': login}), keep: false);
+  } else {
+    final err = c.read(tradeSessionsProvider).error;
+    if (err != null) notes.toast(NotificationKind.error, localizeTradeLogin(err, t), keep: false);
+  }
+  return ok;
+}
+
+/// The account rows (web MAccountRow), by product: CFD accounts, then Options accounts (OPTIONS tag) with "Open an
+/// Options account" when there is none; the Options section is hidden while the broker has the module off. Tap
+/// switches.
 class AccountList extends ConsumerWidget {
   const AccountList({super.key, this.onSwitched});
   final VoidCallback? onSwitched;
@@ -99,78 +129,111 @@ class AccountList extends ConsumerWidget {
     final entries = ref.watch(accountEntriesProvider);
     final sessions = ref.watch(tradeSessionsProvider);
     final activeEquity = ref.watch(terminalProvider.select((s) => s.metrics.equity));
+    final optionsOn = ref.watch(configProvider.select((c) => c.moduleOn('options')));
     if (entries.isEmpty) return Padding(padding: const EdgeInsets.all(14), child: KSkeleton.lines(2));
-    return Column(
-      children: [
-        for (final e in entries)
-          KPressable(
-            pressedScale: 1,
-            pressedOpacity: 0.7,
-            onTap: () async {
-              if (e.login == sessions.active) return;
-              KHaptics.selection();
-              final ok = await ref.read(tradeSessionsProvider.notifier).activate(e.login);
-              if (ok) {
-                ref
-                    .read(notificationsProvider.notifier)
-                    .toast(NotificationKind.info, t(e.live ? 'order.toast.switchedLive' : 'order.toast.switchedDemo', {'login': e.login}), keep: false);
-                onSwitched?.call();
-              } else {
-                final err = ref.read(tradeSessionsProvider).error;
-                if (err != null) ref.read(notificationsProvider.notifier).toast(NotificationKind.error, localizeTradeLogin(err, t), keep: false);
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: e.login == sessions.active ? k.ember.withValues(alpha: 0.07) : Colors.transparent,
-                border: Border(bottom: BorderSide(color: k.line, width: 0.6)),
-              ),
-              child: Row(
+
+    Widget row(AccountEntry e) => KPressable(
+      key: ValueKey('trader-account-${e.login}'),
+      pressedScale: 1,
+      pressedOpacity: 0.7,
+      onTap: () async {
+        if (e.login == sessions.active) return;
+        KHaptics.selection();
+        if (await switchTradeAccount(context, e.login, live: e.live)) onSwitched?.call();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: e.login == sessions.active ? k.ember.withValues(alpha: 0.07) : Colors.transparent,
+          border: Border(bottom: BorderSide(color: k.line, width: 0.6)),
+        ),
+        child: Row(
+          children: [
+            TBadge(
+              t.dyn('trader.accountType.${e.live ? 'live' : 'demo'}', fallback: e.live ? 'live' : 'demo'),
+              tone: e.live ? TBadgeTone.ember : TBadgeTone.gold,
+              minWidth: 44,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TBadge(
-                    t.dyn('trader.accountType.${e.live ? 'live' : 'demo'}', fallback: e.live ? 'live' : 'demo'),
-                    tone: e.live ? TBadgeTone.ember : TBadgeTone.gold,
-                    minWidth: 44,
+                  Row(
+                    children: [
+                      Text(e.login, style: context.text.mono(12.5, weight: FontWeight.w600)),
+                      if (e.isOptions) ...[const SizedBox(width: 5), TBadge(t('accounts.product.chipOptions'), tone: TBadgeTone.info)],
+                      if (e.readOnly) ...[const SizedBox(width: 5), TBadge(t('trader.badge.readOnly'), tone: TBadgeTone.warn)],
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(e.login, style: context.text.mono(12.5, weight: FontWeight.w600)),
-                            if (e.readOnly) ...[const SizedBox(width: 5), TBadge(t('trader.badge.readOnly'), tone: TBadgeTone.warn)],
-                          ],
-                        ),
-                        Text(
-                          '${e.group} · ${e.mode}${e.leverage > 0 ? ' · 1:${e.leverage}' : ''}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.text.footnote.copyWith(color: k.fg3, fontSize: 10.5),
-                        ),
-                      ],
-                    ),
+                  Text(
+                    '${e.group} · ${e.mode}${e.leverage > 0 ? ' · 1:${e.leverage}' : ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.footnote.copyWith(color: k.fg3, fontSize: 10.5),
                   ),
-                  if (sessions.busyLogin == e.login)
-                    CupertinoActivityIndicator(radius: 7, color: k.fg3)
-                  else
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: accMoney(e.cent, e.login == sessions.active ? activeEquity : e.equity), style: context.text.mono(12)),
-                          TextSpan(
-                            text: ' ${accCcy(e.cent)}',
-                            style: context.text.mono(10, color: k.fg3),
-                          ),
-                        ],
-                      ),
-                    ),
                 ],
               ),
             ),
-          ),
+            if (sessions.busyLogin == e.login)
+              CupertinoActivityIndicator(radius: 7, color: k.fg3)
+            else
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: accMoney(e.cent, e.login == sessions.active ? activeEquity : e.equity), style: context.text.mono(12)),
+                    TextSpan(
+                      text: ' ${accCcy(e.cent)}',
+                      style: context.text.mono(10, color: k.fg3),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    // "Open a CFD account" / "Open an Options account" under an empty section
+    Widget open(String product) => KPressable(
+      key: ValueKey('trader-open-$product'),
+      pressedScale: 1,
+      pressedOpacity: 0.7,
+      onTap: () => GoRouter.of(context).go('/accounts/new?product=$product'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: k.line, width: 0.6)),
+        ),
+        child: Row(
+          children: [
+            Icon(LucideIcons.plus, size: 15, color: k.ember),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                t(product == 'options' ? 'trader.acct.openOptions' : 'trader.acct.openCfd'),
+                style: context.text.callout.copyWith(fontSize: 13, color: k.ember, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!optionsOn) {
+      return Column(children: [for (final e in entries.where((e) => !e.isOptions)) row(e)]);
+    }
+    final cfd = entries.where((e) => !e.isOptions).toList();
+    final opt = entries.where((e) => e.isOptions).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TSectionLabel(t('accounts.product.groupCfd'), padding: const EdgeInsets.fromLTRB(12, 10, 12, 4)),
+        if (cfd.isEmpty) open('cfd'),
+        for (final e in cfd) row(e),
+        TSectionLabel(t('accounts.product.groupOptions'), padding: const EdgeInsets.fromLTRB(12, 12, 12, 4)),
+        if (opt.isEmpty) open('options'),
+        for (final e in opt) row(e),
       ],
     );
   }

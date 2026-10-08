@@ -910,6 +910,7 @@ mod tests {
             kind: "live".into(),
             group: "standard".into(),
             group_name: "Standard".into(),
+            product: "cfd".into(),
             currency: "USD".into(),
             cent: false,
             leverage: 500,

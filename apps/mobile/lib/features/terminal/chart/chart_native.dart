@@ -2,7 +2,7 @@
 // preview (webview_flutter has no web implementation) and widget tests. Candles / bars / line / area + volume, the
 // OHLC legend with a row per indicator (tap: the indicator menu; only moving averages are drawn here), the bid / ask
 // lines, trade lines with their chips at the price scale (tap, ×,
-// vertical drag, the P&L on them), the Kalks K in the corner, horizontal pan, long press. The product chart on Android
+// vertical drag, the P&L on them, a position's S / T handles), the Kalks K in the corner, horizontal pan, long press. The product chart on Android
 // is the lightweight-charts page (chart_webview.dart).
 import 'dart:convert';
 import 'dart:math' as math;
@@ -22,11 +22,17 @@ class NativeChartSurface extends StatefulWidget {
 }
 
 class _Line {
-  _Line(this.id, this.kind, this.price, this.label, this.side, this.drag, this.note, this.tone, this.close);
+  _Line(this.id, this.kind, this.price, this.label, this.side, this.drag, this.note, this.tone, this.close, {this.handles = '', this.pip = 0, this.gap = 0});
   final String id, kind, label;
   final double price;
   final String? side, note, tone;
   final bool drag, close;
+
+  /// A position line's S / T handles (chart_bridge ChartLine.handles), with the pip size and stops level they use.
+  final String handles;
+  final double pip, gap;
+
+  String get ref => id.substring(id.indexOf(':') + 1);
 }
 
 class _NativeChartSurfaceState extends State<NativeChartSurface> {
@@ -43,6 +49,15 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
   String? _dragId;
   double? _dragPrice;
   _Geo? _geo;
+  Map<String, dynamic> _texts = const {};
+
+  /// An S / T handle being dragged out: its position line, the stop line under the finger (drawn with the given
+  /// lines; the handle stays mounted until the finger lifts) and the finger's unclamped y.
+  _Line? _hPos, _hLine;
+  double _hY = 0;
+
+  /// The lines drawn: the given ones and a stop being dragged out of a handle.
+  List<_Line> get _shown => _hLine == null ? _lines : [..._lines, _hLine!];
 
   @override
   void initState() {
@@ -83,6 +98,7 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
         _tf = '${m['tf'] ?? ''}';
         _inds = _instances(m['indicators']);
         _type = '${m['chartType'] ?? 'candles'}';
+        _texts = (m['texts'] as Map?)?.cast<String, dynamic>() ?? const {};
         _bars = [];
         _lines = [];
         _scroll = 0;
@@ -121,6 +137,9 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
                 l['note'] as String?,
                 l['tone'] as String?,
                 l['close'] == true,
+                handles: '${l['handles'] ?? ''}',
+                pip: (l['pip'] as num?)?.toDouble() ?? 0,
+                gap: (l['gap'] as num?)?.toDouble() ?? 0,
               ),
         ];
       case 'palette':
@@ -308,7 +327,7 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
   /// The chips at the price scale; chips of nearby prices line up side by side to the left (like the chart page).
   List<Widget> _chips(_Geo geo, KTokens k) {
     final placed = <(_Line, double)>[];
-    for (final l in _lines) {
+    for (final l in _shown) {
       final y = geo.y(_dragId == l.id ? (_dragPrice ?? l.price) : l.price);
       if (y != null && y >= 8 && y <= geo.plotH - 4) placed.add((l, y));
     }
@@ -338,8 +357,66 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
       chars = l.note!.length;
       w += chars * 6.4 + 11;
     }
+    final hs = _handlesOf(l);
+    if (hs.isNotEmpty) w += 1 + 3 + hs.length * 17;
     if (l.close) w += 21;
     return w;
+  }
+
+  /// The S / T handles a position chip shows now: "sl" / "tp" while that stop is missing (a stop being made counts).
+  List<String> _handlesOf(_Line l) => l.kind != 'pos' || l.handles.isEmpty
+      ? const []
+      : [
+          for (final k in const ['sl', 'tp'])
+            if (l.handles.contains(k[0]) && !_lines.any((x) => x.id == '$k:${l.ref}')) k,
+        ];
+
+  _Line _stopLine(_Line pos, String kind, double price) => _Line('$kind:${pos.ref}', kind, price, kind.toUpperCase(), pos.side, false, null, null, false);
+
+  /// A handle tapped: the stop at the order tickets' starting distance (chart_bridge defaultStop), shown at once.
+  void _tapHandle(_Line pos, String kind) {
+    if (_bid <= 0 || _ask <= 0) return;
+    final p = defaultStop(kind, pos.side ?? 'buy', bid: _bid, ask: _ask, pip: pos.pip, gap: pos.gap, digits: _digits);
+    setState(() => _lines = [..._lines, _stopLine(pos, kind, p)]);
+    widget.controller.emit(ChartLineDragged('$kind:${pos.ref}', p));
+  }
+
+  void _startHandle(_Line pos, String kind) {
+    final g = _geo;
+    if (g == null) return;
+    final id = '$kind:${pos.ref}';
+    _hPos = pos;
+    _hY = g.y(pos.price) ?? 0;
+    setState(() {
+      _hLine = _stopLine(pos, kind, pos.price);
+      _dragId = id;
+      _dragPrice = pos.price;
+    });
+    widget.controller.emit(ChartDragStarted(id));
+  }
+
+  void _moveHandle(double dy) {
+    final g = _geo, pos = _hPos, id = _dragId;
+    if (g == null || pos == null || id == null) return;
+    _hY += dy;
+    final p = g.priceAt(_hY);
+    if (p == null) return;
+    final kind = id.substring(0, 2);
+    setState(() => _dragPrice = clampStop(kind, pos.side ?? 'buy', p, bid: _bid, ask: _ask, gap: pos.gap, digits: _digits));
+  }
+
+  void _endHandle() {
+    final id = _dragId, p = _dragPrice, pos = _hPos;
+    _hPos = null;
+    if (id == null || p == null || pos == null) return;
+    setState(() {
+      _hLine = null;
+      _dragId = null;
+      _dragPrice = null;
+      // the new stop stays at the drop price until the app sends its lines
+      _lines = [..._lines, _stopLine(pos, id.substring(0, 2), p)];
+    });
+    widget.controller.emit(ChartLineDragged(id, p));
   }
 
   Widget _chip(_Line l, double y, double left, KTokens k) {
@@ -351,7 +428,39 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
     final noteColor = filled ? fg : (l.tone == 'up' ? _c('up', k.up) : (l.tone == 'down' ? _c('down', k.down) : _c('fg2', k.fg2)));
     final sep = Container(width: 1, height: 20, color: fg.withValues(alpha: 0.3));
     TextStyle st(Color c) => TextStyle(fontFamily: KFonts.mono, fontSize: 10.5, fontWeight: FontWeight.w500, color: c, height: 1);
+    final hs = _handlesOf(l);
+    Widget handle(String kind) {
+      final c = kind == 'sl' ? _c('down', k.down) : _c('up', k.up);
+      final pulled = _hLine?.id == '$kind:${l.ref}';
+      return GestureDetector(
+        key: ValueKey('chart-handle-$kind:${l.ref}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _tapHandle(l, kind),
+        onVerticalDragStart: (_) => _startHandle(l, kind),
+        onVerticalDragUpdate: (d) => _moveHandle(d.delta.dy),
+        onVerticalDragEnd: (_) => _endHandle(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 1.5, vertical: 3),
+          child: Opacity(
+            opacity: pulled ? 0.35 : 1,
+            child: Container(
+              width: 14,
+              height: 14,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                border: Border.all(color: c),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text('${_texts[kind] ?? kind[0].toUpperCase()}', style: st(c).copyWith(fontSize: 9, fontWeight: FontWeight.w700, fontFamily: KFonts.sans)),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Positioned(
+      // keyed: chips reorder as lines move past each other (or a stop is pulled out of a handle) mid-gesture
+      key: ValueKey('chart-chip-${l.id}'),
       left: left,
       top: y - 10,
       child: GestureDetector(
@@ -405,6 +514,13 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   child: Text(l.note!, style: st(noteColor)),
+                ),
+              ],
+              if (hs.isNotEmpty) ...[
+                sep,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [for (final h in hs) handle(h)]),
                 ),
               ],
               if (l.close) ...[
@@ -614,7 +730,7 @@ class _Painter extends CustomPainter {
       )..layout();
       tp.paint(canvas, Offset(g.plotW + 4, y - tp.height / 2));
     }
-    for (final l in s._lines) {
+    for (final l in s._shown) {
       final price = s._dragId == l.id ? (s._dragPrice ?? l.price) : l.price;
       final c = s._lineColor(l, k);
       final warm = l.kind == 'pending' || l.kind == 'alert' || l.kind == 'barrier';
@@ -622,7 +738,8 @@ class _Painter extends CustomPainter {
     }
     if (s._bid > 0) {
       hline(s._bid, fg2, text: k.dark ? const Color(0xFF0A0A0D) : Colors.white);
-      hline(s._ask, down);
+      // the ask is the buy price: the buy colour
+      hline(s._ask, up);
     }
   }
 

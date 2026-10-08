@@ -544,7 +544,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "الخيارات قادمة قريبًا",
-  "opt.soon.text": "Kalks FX Options غير مفعّلة على هذا الحساب بعد. بمجرد تفعيلها، تظهر سلسلة الخيارات هنا، على الحساب نفسه الذي تتداول عليه عقود الفروقات.",
+  "opt.soon.text": "Kalks FX Options غير مفعّلة على هذا الحساب بعد. بمجرد تفعيلها، تظهر سلسلة الخيارات هنا.",
   "opt.soon.point1": "خيارات شراء وبيع على الفوركس والذهب والفضة والنفط",
   "opt.soon.point2": "تواريخ انتهاء يومية وأسبوعية وشهرية، بتسوية نقدية بـ USD",
   "opt.soon.point3": "كمشترٍ، لا يمكن أن تخسر أبدًا أكثر من العلاوة التي تدفعها",
@@ -1382,5 +1382,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "ألغى مكتب التداول الصفقة",
   "opt.bust.text": "{what} × {n}: عُكست الصفقة واستُردّت أي رسوم.",
   "opt.tape.kind.bust": "ملغاة",
+  // CFD / Options account split
+  "acct.openCfd": "فتح حساب عقود فروقات",
+  "acct.openOptions": "فتح حساب خيارات",
+  "opt.err.product_mismatch": "هذا حساب عقود فروقات: تُتداول الخيارات في حساب خيارات.",
 };
 export default trader;

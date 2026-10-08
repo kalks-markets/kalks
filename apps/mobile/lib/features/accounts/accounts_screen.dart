@@ -2,8 +2,9 @@
 // LiveAccountsPage), in its phone order:
 //   1 header (Trading accounts) + Open account
 //   2 KPI cards: live equity, free margin, accounts, demo accounts (stacked on phones)
-//   3 My accounts: Live / Demo / Archived (?tab=), the account rows, "Open a new … account"
-//   4 Account types (the broker's groups -> /accounts/new?group=)
+//   3 My accounts: Live / Demo / Archived (?tab=), the account rows (by product, CFD accounts then Options accounts,
+//     once the client holds an Options account), "Open a new … account"
+//   4 Account types (the broker's groups -> /accounts/new?group=; Options types only while the module is on)
 // `GET trading/accounts` every 5 s (web useAccounts), `GET trading/groups` once.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,12 +13,14 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/api/api_providers.dart';
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../core/format/format.dart';
 import '../../core/models/account.dart';
 import '../../data/client_data.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
 import 'accounts_data.dart';
+import 'widgets/account_bits.dart';
 import 'widgets/account_rows.dart';
 import 'widgets/group_card.dart';
 
@@ -71,7 +74,8 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
     final k = context.k;
     final readOnly = ref.watch(meProvider)?.readOnly ?? false;
     final acc = ref.watch(accountsPageProvider);
-    final groups = ref.watch(groupsProvider).value;
+    final optionsOn = ref.watch(configProvider.select((c) => c.moduleOn('options')));
+    final groups = ref.watch(groupsProvider).value?.where((g) => (optionsOn || !g.isOptions) && g.code != 'options-mm').toList();
     final all = acc.value ?? const <EngineAccount>[];
     final loading = !acc.hasValue && !acc.hasError;
     final totals = AccountTotals(all);
@@ -124,12 +128,16 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                       title: tab == 'live' ? t('accounts.empty.noLive') : t('accounts.empty.noDemo'),
                       text: tab == 'live' ? t('accounts.empty.liveText') : t('accounts.empty.demoText'),
                     ),
-            for (final a in list) ...[
-              if (tab == 'archived')
-                ArchivedAccountRow(key: ValueKey('arch-${a.login}'), account: a, onChanged: _reload)
-              else
-                LiveAccountRow(key: ValueKey('row-${a.login}'), account: a, onChanged: _reload),
-              const SizedBox(height: 12),
+            // by product once the client holds an Options account: CFD accounts, then Options accounts
+            for (final (product, accounts) in byProduct(list)) ...[
+              if (list.any((a) => a.isOptions)) ProductSection(key: ValueKey('section-$product'), product: product),
+              for (final a in accounts) ...[
+                if (tab == 'archived')
+                  ArchivedAccountRow(key: ValueKey('arch-${a.login}'), account: a, onChanged: _reload)
+                else
+                  LiveAccountRow(key: ValueKey('row-${a.login}'), account: a, onChanged: _reload),
+                const SizedBox(height: 12),
+              ],
             ],
             if (!readOnly && tab != 'archived') _OpenNewLink(demo: tab == 'demo'),
           ],

@@ -10,6 +10,7 @@ import { SUPPORT_EMAIL } from "@/lib/live";
 import type { MessageKey } from "@kalks/i18n";
 import { Trans, tr, useFormat, useT } from "@kalks/i18n/react";
 import { LiveChat, MessageRow, errMsg, type Conversation, type Message } from "@/components/support/live-chat";
+import { useModules } from "@/components/tenant-config";
 
 function copy(text: string, what: string) {
   navigator.clipboard?.writeText(text).then(
@@ -103,6 +104,8 @@ function HistoryCard() {
 export function LiveSupport() {
   const t = useT();
   const me = useSession();
+  // the broker switched the support chat off: the page keeps the email channel only
+  const chat = useModules()("support_chat");
   const id = `KL-${String(me.id).padStart(6, "0")}`;
   const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Support request · ${id}`)}`;
   return (
@@ -110,14 +113,18 @@ export function LiveSupport() {
       <PageHeader title={t("support.page.title")} subtitle={t("support.page.subtitle")} />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <Reveal className="xl:col-span-7">
-          <LiveChat />
-        </Reveal>
-
-        <div className="space-y-4 xl:col-span-5">
-          <Reveal delay={0.05}>
-            <HistoryCard />
+        {chat && (
+          <Reveal className="xl:col-span-7">
+            <LiveChat />
           </Reveal>
+        )}
+
+        <div className={chat ? "space-y-4 xl:col-span-5" : "space-y-4 xl:col-span-7"}>
+          {chat && (
+            <Reveal delay={0.05}>
+              <HistoryCard />
+            </Reveal>
+          )}
           <Reveal delay={0.1}>
             <Card className="p-6">
               <div className="flex items-start gap-4">

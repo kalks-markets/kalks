@@ -1,5 +1,6 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { clientAccount, csrf, engine, error, readSessions, reply, sessionFor, soft, streamUrl, writeSessions, type EngineSession, type Obj } from "@/lib/engine/server";
+import { moduleGate } from "@/lib/tenant-brand";
 
 // Kalks Trader trading BFF. Browser -> /api/engine/<route> (same origin, `X-Kalks-Login: <login>` picks which
 // of this browser's sessions acts) -> engine /v1/terminal/<route> with that session's bearer token + the
@@ -287,6 +288,8 @@ async function handle(req: NextRequest, { params }: Ctx, method: "GET" | "POST" 
     return done(await forward(req, s, `/v1/terminal/state?historyLimit=${limit}`), async (d) => ({ ...(scrub(d) as Obj), account: await clientAccount(d.account) }));
   }
   if (method === "GET" && a === "mam" && path.length === 1) {
+    const off = await moduleGate(req.headers, "mam");
+    if (off) return off;
     const sp = req.nextUrl.searchParams;
     const symbol = sp.get("symbol");
     const volume = sp.get("volume") ?? "1";

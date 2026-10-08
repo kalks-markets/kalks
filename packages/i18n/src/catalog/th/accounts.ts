@@ -548,5 +548,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "พรีเมียมออปชัน",
   "ledgerKind.option_settlement": "การชำระราคาออปชัน",
   "ledgerKind.option_rebate": "เงินคืนเมกเกอร์",
+  // CFD / Options account split
+  "product.cfd": "บัญชี CFD",
+  "product.options": "บัญชีออปชัน",
+  "product.cfdText": "ฟอเร็กซ์ โลหะ ดัชนี หุ้น และคริปโตในรูปแบบ CFD พร้อมเลเวอเรจ",
+  "product.optionsText": "คอลและพุตบนฟอเร็กซ์ ทองคำ เงิน และน้ำมัน ชำระราคาเป็นเงินสด",
+  "product.chipOptions": "ออปชัน",
+  "product.groupCfd": "บัญชี CFD",
+  "product.groupOptions": "บัญชีออปชัน",
+  "wizard.step.product": "ผลิตภัณฑ์",
+  "wizard.productTitle": "บัญชีนี้จะเทรดอะไร?",
+  "wizard.productSubtitle": "แต่ละบัญชีเทรดผลิตภัณฑ์เดียว คุณมีได้ทั้งสองแบบ",
+  "wizard.noGroups": "ขณะนี้ยังไม่มีประเภทบัญชีที่เปิดให้สำหรับผลิตภัณฑ์นี้",
+  "wizard.introFirst": "อีกหนึ่งขั้นตอนสั้นๆ ก่อนเปิดบัญชีออปชันแรกของคุณ: บทแนะนำออปชัน 1 นาที",
+  "wizard.agreeLiveOptions": "ฉันเข้าใจว่าออปชันมีความเสี่ยงสูง: ออปชันที่ซื้ออาจหมดอายุโดยไม่มีมูลค่า และออปชันที่ขายอาจขาดทุนมากกว่าพรีเมียมที่ได้รับ",
 };
 export default accounts;

@@ -8,7 +8,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_providers.dart';
+import '../../../core/config/app_config.dart';
 import '../../../i18n/i18n.dart';
+import '../../../shell/nav.dart';
 import '../../../ui/ui.dart';
 import '../dashboard_data.dart';
 
@@ -26,7 +28,14 @@ class _DashboardBannerSlotState extends ConsumerState<DashboardBannerSlot> {
 
   @override
   Widget build(BuildContext context) {
-    final items = (ref.watch(dashBannersProvider).value ?? const <DashBanner>[]).where((b) => !_hidden.contains(b.id)).take(widget.max).toList();
+    final cfg = ref.watch(configProvider);
+    // a banner whose button leads into a module the broker switched off stays out
+    bool leadsOn(DashBanner b) {
+      final url = b.ctaUrl;
+      return url == null || !url.startsWith('/') || pageOn(cfg, Uri.tryParse(url)?.path ?? url);
+    }
+
+    final items = (ref.watch(dashBannersProvider).value ?? const <DashBanner>[]).where((b) => !_hidden.contains(b.id) && leadsOn(b)).take(widget.max).toList();
     if (items.isEmpty) return const SizedBox.shrink();
     final api = ref.read(apiProvider);
     for (final b in items) {

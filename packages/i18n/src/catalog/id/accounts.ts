@@ -551,5 +551,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "Premi opsi",
   "ledgerKind.option_settlement": "Penyelesaian opsi",
   "ledgerKind.option_rebate": "Rabat maker",
+  // CFD / Options account split
+  "product.cfd": "Akun CFD",
+  "product.options": "Akun opsi",
+  "product.cfdText": "Forex, logam, indeks, saham, dan kripto sebagai CFD, dengan leverage.",
+  "product.optionsText": "Call dan put atas forex, emas, perak, dan minyak, diselesaikan tunai.",
+  "product.chipOptions": "OPSI",
+  "product.groupCfd": "Akun CFD",
+  "product.groupOptions": "Akun opsi",
+  "wizard.step.product": "Produk",
+  "wizard.productTitle": "Apa yang akan diperdagangkan akun ini?",
+  "wizard.productSubtitle": "Setiap akun memperdagangkan satu produk. Anda bisa memiliki keduanya.",
+  "wizard.noGroups": "Saat ini belum ada jenis akun yang dibuka untuk produk ini.",
+  "wizard.introFirst": "Satu langkah singkat sebelum akun opsi pertama Anda: pengenalan opsi 1 menit.",
+  "wizard.agreeLiveOptions": "Saya memahami bahwa opsi berisiko tinggi: opsi yang dibeli bisa kedaluwarsa tanpa nilai, dan opsi yang dijual bisa merugi lebih dari premi yang diterima.",
 };
 export default accounts;

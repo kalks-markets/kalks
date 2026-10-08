@@ -101,7 +101,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "إيقاف حد شراء {lot}",
   "line.sellStopLimit": "إيقاف حد بيع {lot}",
   "line.alert": "تنبيه",
-  "line.posTitle": "اسحب لضبط SL/TP · انقر نقرًا مزدوجًا للتعديل",
+  "line.posTitle": "اسحب S أو T (أو الخط) لضبط SL/TP · انقر نقرًا مزدوجًا للتعديل",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "إيقاف الخسارة: اسحب إلى سعر، أو انقر للمسافة الافتراضية",
+  "line.tpHandleTitle": "جني الربح: اسحب إلى سعر، أو انقر للمسافة الافتراضية",
   "line.dragTitle": "اسحب للنقل",
   "line.remove": "إزالة {label}",
 

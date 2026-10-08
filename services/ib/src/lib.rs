@@ -14,6 +14,7 @@ pub mod db;
 pub mod deals;
 pub mod error;
 pub mod model;
+pub mod modules;
 pub mod money;
 pub mod notifier;
 pub mod payouts;

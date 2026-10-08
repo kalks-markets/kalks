@@ -7,8 +7,10 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../core/format/format.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/nav.dart';
 import '../../ui/ui.dart';
 import 'social_api.dart';
 import 'widgets/bits.dart';
@@ -46,6 +48,8 @@ class _PammScreenState extends ConsumerState<PammScreen> {
     final q = ref.watch(fundsProvider);
     final all = q.value ?? const <FundView>[];
     final loading = q.value == null && !q.hasError;
+    // the master application lives under copy trading (/social/master)
+    final masterOn = pageOn(ref.watch(configProvider), '/social/master');
     final funds = all.where((f) => _roll == 'all' || f.period == _roll).toList()..sort((a, b) => b.aum.compareTo(a.aum));
     final aum = all.fold<double>(0, (s, f) => s + f.aum);
     final investors = all.fold<int>(0, (s, f) => s + f.investorCount);
@@ -199,7 +203,7 @@ class _PammScreenState extends ConsumerState<PammScreen> {
                 icon: LucideIcons.landmark,
                 title: all.isNotEmpty ? t('social.funds.empty.filteredTitle') : t('social.funds.empty.title'),
                 text: all.isNotEmpty ? t('social.funds.empty.filteredText') : t('social.funds.empty.text'),
-                action: all.isEmpty
+                action: all.isEmpty && masterOn
                     ? KButton(label: t('social.becomeMaster'), icon: LucideIcons.crown, size: KButtonSize.sm, onPressed: () => context.go('/social/master'))
                     : null,
               ),

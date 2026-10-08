@@ -43,7 +43,57 @@ export const PAGE_PERMS: Record<string, readonly string[]> = {
   "/brokers/symbols": ["owner.system"],
 };
 
-type Who = { permissions?: string[] };
+/**
+ * Back Office pages that run a client module the Platform Owner can switch off per broker (gateway tenancy.rs, longest
+ * prefix wins). "a|b": hidden only when every listed module is off; "" exempts a sub-page from its parent's module.
+ * The Platform Owner always sees every page (the options desk, MM and the owner panel serve every broker).
+ */
+export const PAGE_MODULES: Record<string, string> = {
+  "/options": "options",
+  "/partners": "ib",
+  // masters, applications, fee payouts and caps serve copy trading and PAMM
+  "/social": "copy_trading|pamm",
+  "/social/followers": "copy_trading",
+  "/social/house": "copy_trading",
+  "/social/pamm": "pamm",
+  "/social/mam": "mam",
+  "/social/audit": "copy_trading|pamm|mam",
+  "/social/marketplace": "algo",
+  "/social/api-keys": "api",
+  "/algo": "algo|api",
+  "/algo/deployments": "algo",
+  "/algo/marketplace": "algo",
+  "/algo/keys": "api",
+  "/algo/webhooks": "api",
+  "/prop": "prop",
+  // marketing: bonuses, contests, loyalty rewards, promo codes and cashback are the Rewards module
+  "/marketing": "rewards",
+  "/marketing/banners": "",
+  "/marketing/automation": "",
+  "/marketing/campaigns": "",
+  "/marketing/reports": "",
+  "/content/news": "news",
+  "/content/calendar": "calendar",
+  "/content/academy": "academy",
+};
+
+type Who = { permissions?: string[]; is_owner?: boolean; tenant?: { modules?: Record<string, boolean> } };
+
+/** The module(s) a Back Office page belongs to, or null. */
+export function pageModule(pathname: string): string | null {
+  const key = Object.keys(PAGE_MODULES)
+    .filter((p) => pathname === p || pathname.startsWith(p + "/"))
+    .sort((a, b) => b.length - a.length)[0];
+  return key ? PAGE_MODULES[key]! || null : null;
+}
+
+/** True when the staff member's broker has the page's module(s) switched off (never for the Platform Owner). */
+export function moduleHidden(staff: Who, pathname: string): boolean {
+  const mods = staff.tenant?.modules;
+  const mod = pageModule(pathname);
+  if (staff.is_owner || !mods || !mod) return false;
+  return mod.split("|").every((m) => mods[m] === false);
+}
 
 /** Required permissions for a path (longest prefix), or null when the page is open to every staff member. */
 export function pagePerms(pathname: string): readonly string[] | null {
@@ -55,10 +105,11 @@ export function pagePerms(pathname: string): readonly string[] | null {
 
 export function canOpen(staff: Who, pathname: string): boolean {
   const need = pagePerms(pathname);
-  return !need || need.some((p) => staff.permissions?.includes(p));
+  return (!need || need.some((p) => staff.permissions?.includes(p))) && !moduleHidden(staff, pathname);
 }
 
-/** Navigation without the pages the staff member can't open (a module disappears when none of its pages is left). */
+/** Navigation without the pages the staff member can't open, by role or because the broker's module is off (a
+ *  module disappears when none of its pages is left). */
 export function navFor(nav: NavModule[], staff: Who): NavModule[] {
   return nav.flatMap((m) => {
     if (!m.sub?.length) return canOpen(staff, m.href) ? [m] : [];

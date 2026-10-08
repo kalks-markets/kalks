@@ -29,6 +29,8 @@ export interface EngAccount {
   withdrawable?: number;
   demo?: { initialBalance: number; refillsPerDay: number; refillsUsedToday: number; expiryDays: number } | null;
   createdAt: string;
+  /** What the account trades: its group's product (CFD / Options account split; absent on older engines = CFD). */
+  product?: "cfd" | "options";
 }
 
 export interface EngPosition {

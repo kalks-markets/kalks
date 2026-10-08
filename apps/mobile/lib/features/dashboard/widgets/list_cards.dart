@@ -258,14 +258,17 @@ class _ActivityTabsState extends State<ActivityTabs> {
   @override
   Widget build(BuildContext context) {
     final k = context.k;
-    final cur = widget.tabs[_i.clamp(0, widget.tabs.length - 1)];
+    if (widget.tabs.isEmpty) return const SizedBox.shrink();
+    // the tabs can shrink under the open one (a module switched off)
+    final at = _i.clamp(0, widget.tabs.length - 1);
+    final cur = widget.tabs[at];
     final rows = cur.rows;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Transform.translate(
           offset: const Offset(-8, 0),
-          child: KSubNav(labels: [for (final x in widget.tabs) x.label], current: _i, onSelect: (i) => setState(() => _i = i)),
+          child: KSubNav(labels: [for (final x in widget.tabs) x.label], current: at, onSelect: (i) => setState(() => _i = i)),
         ),
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 200),

@@ -16,8 +16,16 @@ export function useFeatures(): ClientFeatures | null {
   return React.useContext(Ctx);
 }
 
+/** `on(key)`: whether a module is on for this broker (unknown config or a key the gateway doesn't send = on). */
+export function useModules(): (key: string) => boolean {
+  const f = React.useContext(Ctx);
+  return React.useCallback((key: string) => f?.modules[key] !== false, [f]);
+}
+
 /** Nav path → module key (mirrors lib/tenant-config.ts MODULE_PATHS for pages). */
 const PAGE_MODULES: [string, string][] = [
+  ["/social/mam", "mam"],
+  ["/social/managed", "mam"],
   ["/social/pamm", "pamm"],
   ["/social/investments", "pamm"],
   ["/social", "copy_trading"],
@@ -31,6 +39,10 @@ const PAGE_MODULES: [string, string][] = [
   ["/academy", "academy"],
   ["/wallet", "wallet"],
   ["/rewards", "rewards"],
+  ["/options", "options"],
+  ["/markets", "markets"],
+  ["/news", "news"],
+  ["/calendar", "calendar"],
 ];
 
 export function pageModule(href: string): string | null {

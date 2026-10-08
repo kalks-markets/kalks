@@ -11,7 +11,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 // Kalks tokens (OG images can't read CSS variables)
-const C = { bg: "#07070a", surface: "#111114", surface2: "#17171c", line: "#26262d", fg: "#f5f5f7", fg2: "#a1a1aa", fg3: "#63636e", ember: "#ff5a1f", gold: "#e9b949", up: "#22c55e", down: "#f04438" };
+const C = { bg: "#07070a", surface: "#111114", surface2: "#17171c", line: "#26262d", fg: "#f5f5f7", fg2: "#a1a1aa", fg3: "#63636e", ember: "#ff5a1f", gold: "#e9b949", up: "#2f7bff", down: "#f04438" };
 
 async function logo() {
   try {

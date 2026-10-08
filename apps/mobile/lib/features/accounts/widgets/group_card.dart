@@ -17,6 +17,8 @@ const Map<String, String> _photo = {
   'cent': 'money',
   'vip': 'skyscrapers',
   'prop': 'trader',
+  'options-standard': 'charts',
+  'options-pro': 'analytics',
 };
 
 /// The group's photo (web groupPhoto).
@@ -120,6 +122,8 @@ class EngineGroupCard extends StatelessWidget {
                                 text: ' · ${t('accounts.groupCard.uscCentAlt')}',
                                 style: TextStyle(color: k.gold),
                               ),
+                            // an Options account type
+                            if (g.isOptions) TextSpan(text: ' · ${t('accounts.product.chipOptions')}'),
                           ],
                         ),
                         style: context.text.micro.copyWith(color: white.withValues(alpha: 0.8), letterSpacing: 0.8),

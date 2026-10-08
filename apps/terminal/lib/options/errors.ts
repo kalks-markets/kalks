@@ -7,6 +7,8 @@ import type { Reason } from "./types";
 
 export const OPTION_ERROR_CODES = [
   "options_disabled",
+  // CFD / Options account split: options on a CFD account
+  "product_mismatch",
   "not_eligible",
   "market_closed",
   "cutoff",

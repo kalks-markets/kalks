@@ -509,7 +509,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "Les options arrivent bientôt",
-  "opt.soon.text": "Kalks FX Options n'est pas encore ouvert sur ce compte. Dès qu'il le sera, la chaîne d'options apparaîtra ici, sur le même compte que vos CFD.",
+  "opt.soon.text": "Kalks FX Options n'est pas encore ouvert sur ce compte. Dès qu'il le sera, la chaîne d'options apparaîtra ici.",
   "opt.soon.point1": "Calls et puts sur le forex, l'or, l'argent et le pétrole",
   "opt.soon.point2": "Échéances quotidiennes, hebdomadaires et mensuelles, réglées en espèces en USD",
   "opt.soon.point3": "En tant qu'acheteur, vous ne pouvez jamais perdre plus que la prime payée",
@@ -1247,5 +1247,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "Transaction annulée par le desk de trading",
   "opt.bust.text": "{what} × {n} : la transaction a été annulée et les frais éventuels remboursés.",
   "opt.tape.kind.bust": "Annulée",
+  // CFD / Options account split
+  "acct.openCfd": "Ouvrir un compte CFD",
+  "acct.openOptions": "Ouvrir un compte options",
+  "opt.err.product_mismatch": "Ceci est un compte CFD : les options se tradent sur un compte options.",
 };
 export default trader;

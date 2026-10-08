@@ -273,6 +273,9 @@ pub async fn place(State(st): State<AppState>, ctx: Ctx, Body(b): Body<OrderBody
     let s = terminal::session(&st, &ctx).await?;
     s.writable()?;
     terminal::copy_guard(&st, &s, !b.reduce_only.unwrap_or(false))?;
+    if !b.reduce_only.unwrap_or(false) {
+        crate::modules::require(&st, &ctx.tenant.slug, "options").await?;
+    }
     venue(&st, &s)?;
     st.limiter.hit(&format!("book:{}", s.login), RATE_PER_SEC, Duration::from_secs(1)).map_err(ApiError::RateLimited)?;
     settling_gate(&st, s.login)?;
@@ -804,6 +807,9 @@ pub async fn rfq_open(State(st): State<AppState>, ctx: Ctx, Body(b): Body<RfqBod
     s.writable()?;
     let reduce = b.reduce_only.unwrap_or(false);
     terminal::copy_guard(&st, &s, !reduce)?;
+    if !reduce {
+        crate::modules::require(&st, &ctx.tenant.slug, "options").await?;
+    }
     let kind = venue(&st, &s)?;
     st.limiter.hit(&format!("book:{}", s.login), RATE_PER_SEC, Duration::from_secs(1)).map_err(ApiError::RateLimited)?;
     if b.qty <= ZERO {

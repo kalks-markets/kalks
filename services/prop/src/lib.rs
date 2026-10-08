@@ -7,6 +7,7 @@ pub mod engine;
 pub mod error;
 pub mod evaluator;
 pub mod heuristics;
+pub mod modules;
 pub mod money;
 pub mod notifier;
 pub mod ops;

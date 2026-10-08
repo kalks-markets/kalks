@@ -59,6 +59,8 @@ export interface EngineAccount {
   withdrawable: number;
   demo?: { initialBalance: number; refillsPerDay: number; refillsUsedToday: number; expiryDays: number } | null;
   createdAt: string;
+  /** What the account trades: its group's product (CFD / Options account split; absent on older engines = CFD). */
+  product?: "cfd" | "options";
 }
 
 export interface EngineGroup {
@@ -81,6 +83,8 @@ export interface EngineGroup {
   demoRefillsPerDay: number;
   demoExpiryDays: number;
   enabled: boolean;
+  /** CFD group or Options group (absent on older engines = CFD). */
+  product?: "cfd" | "options";
 }
 
 export interface EnginePosition {

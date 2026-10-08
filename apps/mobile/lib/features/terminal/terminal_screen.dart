@@ -1,8 +1,12 @@
 // Kalks Trader, full screen (its own route above the Client Area; back returns to it). The web's PHONE layout
 // (apps/terminal/components/mobile/mobile-terminal.tsx) in the app's iOS look:
-//   header      back · CFD | Options · account pill (login, Live / Demo / read-only, equity, floating P&L) · bell
+//   header      back · CFD | Options (the account switch by product) · account pill (login, Live / Demo / read-only,
+//               equity, floating P&L) · bell
 //   CFD         Watchlist · Chart · Trade · History · Account (bottom bar; the chart opens first)
 //   Options     its own body and bottom bar (options/options_terminal.dart)
+// An account is a CFD account or an Options account (its group's product): the workspace follows the account on
+// screen, and CFD | Options switches to the client's last / default account of that product (or offers to open one).
+// The Options side is hidden while the broker has the Options module off.
 // Like the web's mobile terminal (dir="ltr") the terminal keeps its left-to-right layout in Arabic, Urdu and Persian:
 // bid / ask, Sell / Buy and the chart keep their places, only the words are translated.
 import 'dart:async';
@@ -16,6 +20,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/api/api_error.dart';
 import '../../core/auth/auth_controller.dart';
 import '../../core/config/app_config.dart';
+import '../../core/models/trading.dart' show isOptionSymbol;
 import '../../core/notifications/notifications.dart';
 import '../../core/realtime/socket.dart';
 import '../../core/theme_controller.dart';
@@ -38,14 +43,49 @@ import 'core/workspace.dart';
 import 'options/options_terminal.dart';
 import 'widgets/kit.dart';
 
-/// The terminal's mode (web useTradeMode): cfd | options.
-class TradeModeController extends Notifier<String> {
-  @override
-  String build() => 'cfd';
-  void set(String m) => state = m;
+/// What the account on screen trades: cfd | options (its session's account, else the client's own record; CFD while
+/// none is open).
+final activeProductProvider = Provider.autoDispose<String>((ref) {
+  final active = ref.watch(tradeSessionsProvider.select((s) => s.active));
+  final product = ref.watch(tradeSessionsProvider.select((s) => s.current?.account?.product));
+  if (product != null) return product;
+  if (active == null) return 'cfd';
+  final own = ref.watch(ownAccountsProvider).value;
+  return own?.where((a) => '${a.login}' == active).firstOrNull?.product ?? 'cfd';
+});
+
+/// The terminal's workspace (web useTradeMode): cfd | options. Not a choice of its own: an Options account opens the
+/// options workspace, a CFD account the CFD one (always CFD while the broker has the Options module off).
+final tradeModeProvider = Provider.autoDispose<String>((ref) {
+  final optionsOn = ref.watch(configProvider.select((c) => c.moduleOn('options')));
+  return optionsOn && ref.watch(activeProductProvider) == 'options' ? 'options' : 'cfd';
+});
+
+/// The header's CFD | Options: shows the client's last / default account of that product; none -> offers to open
+/// one (the open-account wizard with the product chosen).
+Future<void> switchToProduct(BuildContext context, WidgetRef ref, String product) async {
+  final sessions = ref.read(tradeSessionsProvider.notifier);
+  final login = await sessions.loginForProduct(product);
+  if (!context.mounted) return;
+  if (login == null) return showOpenProductSheet(context, product);
+  if (login == ref.read(tradeSessionsProvider).active) return;
+  KHaptics.selection();
+  await switchTradeAccount(context, login);
 }
 
-final tradeModeProvider = NotifierProvider<TradeModeController, String>(TradeModeController.new);
+/// "Open a CFD account" / "Open an Options account" when the client holds none of that product.
+Future<void> showOpenProductSheet(BuildContext context, String product) async {
+  final t = context.t;
+  final router = GoRouter.of(context);
+  final options = product == 'options';
+  final go = await showKActionSheet<bool>(
+    context,
+    title: options ? t('options.account.noneTitle') : null,
+    message: options ? t('options.account.noneText') : null,
+    actions: [KAction(label: t(options ? 'trader.acct.openOptions' : 'trader.acct.openCfd'), value: true, icon: LucideIcons.plus, primary: true)],
+  );
+  if (go == true) router.go('/accounts/new?product=$product');
+}
 
 /// The CFD bottom-bar tab: watch | chart | trade | history | account.
 class CfdTabController extends Notifier<String> {
@@ -87,25 +127,61 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> with WidgetsBin
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    Future.microtask(() {
+    Future.microtask(() async {
       if (!mounted) return;
       final readOnly = ref.read(authProvider.select((s) => s is AuthSignedIn && s.me.viewer != null));
-      if (!readOnly) unawaited(ref.read(tradeSessionsProvider.notifier).start(preferred: widget.login));
       _applyRoute();
+      if (readOnly) return;
+      await ref.read(tradeSessionsProvider.notifier).start(preferred: widget.login, mode: _startMode());
+      if (mounted) await _cfdForSymbol();
     });
   }
 
-  /// symbol / side / mode of the route.
+  /// A CFD market's chart (`?symbol=`, not an option series).
+  bool get _cfdLink {
+    final s = widget.symbol;
+    return s != null && s.isNotEmpty && !isOptionSymbol(s);
+  }
+
+  /// The product to open (`?mode=cfd|options`; options only while the module is on). Without a mode, a CFD market's
+  /// link without a login opens a CFD account.
+  String? _startMode() {
+    final m = widget.mode;
+    if (m == 'cfd' || (m == 'options' && ref.read(configProvider).moduleOn('options'))) return m;
+    return widget.login == null && _cfdLink ? 'cfd' : null;
+  }
+
+  /// symbol / side of the route (the workspace itself follows the account: [tradeModeProvider]).
   void _applyRoute() {
-    if (widget.mode == 'options' || widget.mode == 'cfd') ref.read(tradeModeProvider.notifier).set(widget.mode!);
     final symbol = widget.symbol;
     if (symbol != null && symbol.isNotEmpty) {
       ref.read(workspaceProvider.notifier).update((w) => w.copyWith(symbol: symbol));
-      ref.read(tradeModeProvider.notifier).set('cfd');
       ref.read(cfdTabProvider.notifier).set('chart');
       final side = widget.side;
       if (side == 'buy' || side == 'sell') _orderWhenReady(symbol, side!);
     }
+  }
+
+  /// A CFD market's link while an Options account is on screen: the client's CFD account instead (if any).
+  Future<void> _cfdForSymbol() async {
+    if (!_cfdLink) return;
+    final sessions = ref.read(tradeSessionsProvider.notifier);
+    final active = ref.read(tradeSessionsProvider).active;
+    if (active == null || await sessions.productOfLogin(active) != 'options') return;
+    final login = await sessions.loginForProduct('cfd');
+    if (login != null && mounted) await sessions.activate(login);
+  }
+
+  /// A new route on the open terminal: its account (or product), then its market.
+  Future<void> _follow(TerminalScreen old) async {
+    final sessions = ref.read(tradeSessionsProvider.notifier);
+    if (widget.login != null && widget.login != old.login) {
+      await sessions.activate(widget.login!);
+    } else if (widget.mode != old.mode && _startMode() != null) {
+      await sessions.start(mode: _startMode());
+    }
+    if (!mounted) return;
+    if (widget.symbol != old.symbol) await _cfdForSymbol();
   }
 
   /// Opens the order sheet once the account is open and the market is known (and tradable on it).
@@ -136,8 +212,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> with WidgetsBin
   @override
   void didUpdateWidget(TerminalScreen old) {
     super.didUpdateWidget(old);
-    if (widget.login != null && widget.login != old.login) unawaited(ref.read(tradeSessionsProvider.notifier).activate(widget.login!));
-    if (widget.symbol != old.symbol || widget.side != old.side || widget.mode != old.mode) _applyRoute();
+    final readOnly = ref.read(authProvider.select((s) => s is AuthSignedIn && s.me.viewer != null));
+    if (!readOnly) unawaited(_follow(old));
+    if (widget.symbol != old.symbol || widget.side != old.side) _applyRoute();
   }
 
   @override
@@ -212,6 +289,7 @@ class _Header extends ConsumerWidget {
     final k = context.k;
     final unread = ref.watch(notificationsProvider.select((s) => s.unread));
     final mode = ref.watch(tradeModeProvider);
+    final optionsOn = ref.watch(configProvider.select((c) => c.moduleOn('options')));
     final rtl = Directionality.of(context) == TextDirection.rtl;
     return KFrosted(
       color: k.bar,
@@ -230,17 +308,21 @@ class _Header extends ConsumerWidget {
                   semanticLabel: t('common.back'),
                   onPressed: () => context.canPop() ? context.pop() : context.go('/'),
                 ),
-                SizedBox(
-                  width: 118,
-                  child: KSegmented<String>(
-                    height: 30,
-                    values: const ['cfd', 'options'],
-                    labels: [t('trader.opt.mode.cfd'), t('trader.opt.mode.options')],
-                    selected: mode,
-                    onChanged: (v) => ref.read(tradeModeProvider.notifier).set(v),
+                // the account switch by product: CFD | Options shows the client's account of that product
+                if (optionsOn) ...[
+                  SizedBox(
+                    width: 118,
+                    child: KSegmented<String>(
+                      key: const ValueKey('trader-product'),
+                      height: 30,
+                      values: const ['cfd', 'options'],
+                      labels: [t('trader.opt.mode.cfd'), t('trader.opt.mode.options')],
+                      selected: mode,
+                      onChanged: (v) => unawaited(switchToProduct(context, ref, v)),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 6),
+                  const SizedBox(width: 6),
+                ],
                 const Expanded(child: _AccountPill()),
                 KIconButton(
                   icon: LucideIcons.bell,

@@ -49,7 +49,15 @@ export interface LiveAccount {
   withdrawable: number;
   createdAt: string;
   demo?: { initialBalance: number; refillsPerDay: number; refillsUsedToday: number; expiryDays: number };
+  /** What the account trades: its group's product (CFD / Options account split). Absent on older engines = CFD. */
+  product?: Product;
 }
+
+/** CFD / Options account split: a group's accounts trade CFDs or Kalks FX Options, never both. */
+export type Product = "cfd" | "options";
+
+/** The product of a group or account (anything but "options" is a CFD one, as older engines send none). */
+export const productOf = (x: { product?: string | null } | null | undefined): Product => (x?.product === "options" ? "options" : "cfd");
 
 /** Engine group (GET /v1/admin/groups). */
 export interface LiveGroup {
@@ -73,6 +81,8 @@ export interface LiveGroup {
   demoRefillsPerDay: number;
   demoExpiryDays: number;
   enabled: boolean;
+  /** Fixed once the group has accounts (the engine refuses the change). */
+  product?: Product;
   accounts?: number;
 }
 

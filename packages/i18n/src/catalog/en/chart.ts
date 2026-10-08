@@ -98,7 +98,12 @@ const chart = {
   "line.buyStopLimit": "BUY STOP LMT {lot}",
   "line.sellStopLimit": "SELL STOP LMT {lot}",
   "line.alert": "ALERT",
-  "line.posTitle": "Drag to set SL/TP · double-click to modify",
+  "line.posTitle": "Drag S or T (or the line) to set SL/TP · double-click to modify",
+  // S / T: the small handles on a position line without a stop loss / take profit (drag one out to place that stop)
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "Stop loss: drag to a price, or click for the default distance",
+  "line.tpHandleTitle": "Take profit: drag to a price, or click for the default distance",
   "line.dragTitle": "Drag to move",
   "line.remove": "Remove {label}",
 

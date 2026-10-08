@@ -61,7 +61,7 @@ fn account(login: i64, user: i64, cent: bool) -> Account {
         login,
         user_id: user,
         kind: AccountKind::Demo,
-        group: if cent { "cent".into() } else { "standard".into() },
+        group: if cent { "options-cent".into() } else { "options-standard".into() },
         mode: Mode::Hedging,
         cent,
         leverage: 100,
@@ -199,6 +199,8 @@ async fn book_settlement_goes_through_clearing_nets_across_usd_and_cent_and_swee
     }
     let url = server.clone().database(&db).to_url_lossy().to_string();
     let pool = trading::persist::connect(&url).await.expect("connect + migrate");
+    // an Options cent group for the cent accounts (CFD / Options account split; only `options-standard` is seeded)
+    sqlx::query("INSERT INTO groups (tenant_id, code, name, mode, cent, leverages, default_leverage, margin_call_pct, stop_out_pct, spread_group, product) VALUES (1, 'options-cent', 'Options Cent', 'hedging', true, '{100}', 100, 60, 20, 'cent', 'options') ON CONFLICT DO NOTHING").execute(&pool).await.unwrap();
     let hub = boot(&pool, Default::default()).await;
     let a = (50_000_911i64, 911i64);
     let cents = [(50_000_912i64, 912i64), (50_000_913, 913), (50_000_914, 914)];

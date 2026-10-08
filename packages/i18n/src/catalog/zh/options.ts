@@ -64,10 +64,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "期权条款暂时无法显示。请稍后再试。",
 
   // Kalks Trader button
-  "trade.ready": "一切就绪。期权在 Kalks Trader 中交易，与您的差价合约（CFD）使用同一个账户。",
+  "trade.ready": "一切就绪。期权在 Kalks Trader 中、在您的期权账户里交易。",
   "trade.cta": "在 Kalks Trader 中交易期权",
   "trade.chooseAccount": "选择账户",
-  "trade.noAccount": "您需要一个有效的交易账户才能交易期权。",
+  "trade.noAccount": "您需要一个有效的期权账户才能交易期权。",
   "trade.openAccount": "开立账户",
   "trade.cashOnly": "权利金和保证金仅使用账户中的自有资金。赠金和信用额度不能使用。",
   "trade.live": "真实",
@@ -96,5 +96,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "演示版：此处的任何内容都不会被保存。",
+  // CFD / Options account split
+  "account.noneTitle": "还没有期权账户",
+  "account.noneText": "期权在独立账户中交易，与您的 CFD 账户分开。一分钟即可开立，真实或模拟均可。",
+  "account.open": "开立期权账户",
 };
 export default options;

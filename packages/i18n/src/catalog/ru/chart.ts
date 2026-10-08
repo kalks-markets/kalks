@@ -99,7 +99,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "BUY STOP LMT {lot}",
   "line.sellStopLimit": "SELL STOP LMT {lot}",
   "line.alert": "ОПОВЕЩЕНИЕ",
-  "line.posTitle": "Потяните, чтобы задать SL/TP · двойной щелчок — изменить",
+  "line.posTitle": "Потяните S или T (или линию), чтобы задать SL/TP · двойной щелчок — изменить",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "Стоп Лосс: потяните к цене или щёлкните для расстояния по умолчанию",
+  "line.tpHandleTitle": "Тейк Профит: потяните к цене или щёлкните для расстояния по умолчанию",
   "line.dragTitle": "Потяните, чтобы переместить",
   "line.remove": "Удалить {label}",
 

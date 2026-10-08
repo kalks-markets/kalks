@@ -164,9 +164,9 @@ pub async fn upsert_account(app: &App, tenant: &str, a: &Value) -> anyhow::Resul
     let version = a["version"].as_i64().unwrap_or(0);
     let row = sqlx::query(
         "INSERT INTO accounts (tenant, login, user_id, kind, group_code, group_name, mode, cent, currency, leverage, status, name, created_at,
-                               balance, credit, bonus, equity, margin, profit, positions, version, seen_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21, now())
-         ON CONFLICT (tenant, login) DO UPDATE SET user_id = EXCLUDED.user_id, kind = EXCLUDED.kind, group_code = EXCLUDED.group_code,
+                               balance, credit, bonus, equity, margin, profit, positions, version, product, seen_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22, now())
+         ON CONFLICT (tenant, login) DO UPDATE SET user_id = EXCLUDED.user_id, kind = EXCLUDED.kind, group_code = EXCLUDED.group_code, product = EXCLUDED.product,
            group_name = EXCLUDED.group_name, mode = EXCLUDED.mode, cent = EXCLUDED.cent, currency = EXCLUDED.currency, leverage = EXCLUDED.leverage,
            status = EXCLUDED.status, name = EXCLUDED.name, balance = EXCLUDED.balance, credit = EXCLUDED.credit, bonus = EXCLUDED.bonus,
            equity = EXCLUDED.equity, margin = EXCLUDED.margin, profit = EXCLUDED.profit, positions = EXCLUDED.positions, version = EXCLUDED.version, seen_at = now()
@@ -193,6 +193,8 @@ pub async fn upsert_account(app: &App, tenant: &str, a: &Value) -> anyhow::Resul
     .bind(dec(&a["profit"]))
     .bind(a["positions"].as_i64().unwrap_or(0) as i32)
     .bind(version)
+    // CFD / Options account split (an engine without it: every account is a CFD account)
+    .bind(if a["product"].as_str() == Some("options") { "options" } else { "cfd" })
     .fetch_one(&app.pool)
     .await?;
     let synced: i64 = row.get(0);

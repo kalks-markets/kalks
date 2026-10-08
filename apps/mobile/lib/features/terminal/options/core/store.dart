@@ -678,8 +678,10 @@ class OptionsController extends Notifier<OptState> {
   }
 
   void _teardown() {
-    _stream?.stop();
+    // detached first: stopping reports `closed`, which must not write state while the provider is being disposed
+    final stream = _stream;
     _stream = null;
+    stream?.stop();
     for (final t in [_poll, _expiryTimer, _rollTimer, _retry]) {
       t?.cancel();
     }
@@ -886,7 +888,7 @@ class OptionsController extends Notifier<OptState> {
             SocketStatus.reconnecting => _poll != null ? 'polling' : 'reconnecting',
             _ => 'connecting',
           };
-          if (ref.mounted && name != state.stream) _set(state.copyWith(stream: name));
+          if (ref.mounted && _stream != null && name != state.stream) _set(state.copyWith(stream: name));
         },
       );
       _stream = s;

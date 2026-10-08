@@ -22,13 +22,8 @@ use serde_json::json;
 use subtle::ConstantTimeEq;
 
 pub fn router(st: AppState) -> Router {
-    let v1 = Router::new()
-        // public (Client Area server) + other services
-        .route("/v1/growth/public/shares/{code}", get(public::share))
-        .route("/v1/growth/internal/vouchers", get(public::vouchers))
-        .route("/v1/growth/internal/vouchers/redeem", post(public::redeem_voucher))
-        .route("/v1/growth/internal/accounts/{login}/retired", post(public::account_retired))
-        // Client Area
+    // Client Area rewards: refused while the broker has the rewards module off (modules.rs)
+    let rewards = Router::new()
         .route("/v1/growth/me/rewards", get(client::rewards))
         .route("/v1/growth/me/points", get(client::points))
         .route("/v1/growth/me/redeem", post(client::redeem))
@@ -42,6 +37,15 @@ pub fn router(st: AppState) -> Router {
         .route("/v1/growth/me/contests", get(client::contests))
         .route("/v1/growth/me/contests/{id}", get(client::contest))
         .route("/v1/growth/me/contests/{id}/join", post(client::join))
+        .route_layer(middleware::from_fn_with_state(st.clone(), crate::modules::gate));
+    let v1 = Router::new()
+        // public (Client Area server) + other services
+        .route("/v1/growth/public/shares/{code}", get(public::share))
+        .route("/v1/growth/internal/vouchers", get(public::vouchers))
+        .route("/v1/growth/internal/vouchers/redeem", post(public::redeem_voucher))
+        .route("/v1/growth/internal/accounts/{login}/retired", post(public::account_retired))
+        .merge(rewards)
+        // Client Area: banners and share cards
         .route("/v1/growth/me/banners", get(client::banners))
         .route("/v1/growth/me/banners/{id}/events", post(client::banner_event))
         .route("/v1/growth/me/shares", get(client::shares).post(client::create_share))

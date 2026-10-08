@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_providers.dart';
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/auth/secure_store.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/models/account.dart';
 import '../../../data/client_data.dart';
 import 'models.dart';
@@ -50,6 +51,19 @@ class TradeSession {
 }
 
 enum TradeSessionsPhase { starting, ready, failed }
+
+/// The account to show for a product (cfd | options) among the client's own: `recent` when it trades that product,
+/// else the default-starred one, else a live one, else any. Archived and blocked accounts don't count; null when the
+/// client holds no usable account of that product.
+String? pickProductLogin(List<EngineAccount> accounts, String product, {String? recent}) {
+  final list = accounts.where((a) => !a.archived && !a.tradeBlocked && a.product == product).toList();
+  if (list.isEmpty) return null;
+  if (recent != null && list.any((a) => '${a.login}' == recent)) return recent;
+  final def = list.where((a) => a.isDefault);
+  if (def.isNotEmpty) return '${def.first.login}';
+  final live = list.where((a) => a.type == AccountKind.live);
+  return '${(live.isNotEmpty ? live.first : list.first).login}';
+}
 
 @immutable
 class TradeSessionsState {
@@ -93,6 +107,7 @@ class TradeSessionsController extends Notifier<TradeSessionsState> {
     // a new client (sign-out, another sign-in) starts from nothing: trade tokens belong to the client they were issued to
     ref.watch(authProvider.select((s) => s is AuthSignedIn ? s.me.id : null));
     _started = false;
+    _recent.clear();
     return const TradeSessionsState();
   }
 
@@ -100,10 +115,20 @@ class TradeSessionsController extends Notifier<TradeSessionsState> {
   SessionStore get _store => ref.read(sessionStoreProvider);
   bool _started = false;
 
-  /// Opens the terminal: the stored sessions still alive, then `preferred` (the Trade button's account), else the
-  /// last one used, else the default own account.
-  Future<void> start({String? preferred}) async {
-    if (_started && preferred == null && state.current != null) return;
+  /// The last account shown per product (cfd | options), for the header's CFD | Options switch.
+  final Map<String, String> _recent = {};
+
+  /// Opens the terminal: the stored sessions still alive, then `preferred` (the Trade button's account), else for a
+  /// `mode` (cfd | options, `/trader?mode=`) an account of that product, else the last one used, else the default
+  /// own account. Already open: only a `mode` the account on screen doesn't trade switches accounts.
+  Future<void> start({String? preferred, String? mode}) async {
+    final product = mode == 'cfd' || mode == 'options' ? mode : null;
+    if (_started && preferred == null && state.current != null) {
+      if (product == null || await productOfLogin(state.active!) == product) return;
+      final pick = await loginForProduct(product);
+      if (pick != null) await activate(pick);
+      return;
+    }
     _started = true;
     state = state.copyWith(phase: TradeSessionsPhase.starting, clearError: true);
     final alive = <String, TradeSession>{...state.sessions};
@@ -129,7 +154,7 @@ class TradeSessionsController extends Notifier<TradeSessionsState> {
     }
     state = state.copyWith(sessions: alive);
     final ws = ref.read(workspaceProvider);
-    String? login = preferred ?? ws.lastLogin;
+    String? login = preferred ?? (product == null ? ws.lastLogin : await _defaultOwnLogin(product: product));
     if (login == null || (!alive.containsKey(login) && !(await _isOwn(login)))) {
       login = await _defaultOwnLogin() ?? (alive.keys.isEmpty ? null : alive.keys.first);
     }
@@ -162,9 +187,15 @@ class TradeSessionsController extends Notifier<TradeSessionsState> {
     }
   }
 
-  Future<String?> _defaultOwnLogin() async {
+  /// The default own account: of `product` when given (the last one used of it, else default-starred, live, any);
+  /// otherwise the default-starred one, else a live one, else the first (CFD accounts only while the broker has the
+  /// Options module off).
+  Future<String?> _defaultOwnLogin({String? product}) async {
     try {
-      final list = (await _ownAccounts()).where((a) => !a.archived && !a.tradeBlocked).toList();
+      final own = await _ownAccounts();
+      if (product != null) return pickProductLogin(own, product, recent: _recent[product] ?? ref.read(workspaceProvider).lastLogin);
+      var list = own.where((a) => !a.archived && !a.tradeBlocked).toList();
+      if (!ref.read(configProvider).moduleOn('options') && list.any((a) => !a.isOptions)) list = list.where((a) => !a.isOptions).toList();
       if (list.isEmpty) return null;
       final def = list.where((a) => a.isDefault);
       if (def.isNotEmpty) return '${def.first.login}';
@@ -173,6 +204,31 @@ class TradeSessionsController extends Notifier<TradeSessionsState> {
     } catch (_) {
       return null;
     }
+  }
+
+  /// What `login` trades (cfd | options): its session's account, else the client's own record, else CFD.
+  Future<String> productOfLogin(String login) async {
+    final p = state.sessions[login]?.account?.product;
+    if (p != null) return p;
+    try {
+      return (await _ownAccounts()).where((a) => '${a.login}' == login).firstOrNull?.product ?? 'cfd';
+    } catch (_) {
+      return 'cfd';
+    }
+  }
+
+  /// The account to switch to for a product (the header's CFD | Options): the last one shown of it, else the
+  /// client's default / live / any own account of it, else a login added with a password that trades it. Null: the
+  /// client has none (the terminal offers to open one).
+  Future<String?> loginForProduct(String product) async {
+    final recent = _recent[product];
+    if (recent != null && state.sessions[recent]?.account?.product == product) return recent;
+    final own = await _defaultOwnLogin(product: product);
+    if (own != null) return own;
+    for (final s in state.sessions.values) {
+      if (s.account?.product == product) return s.login;
+    }
+    return null;
   }
 
   /// Shows `login`: its alive session, else opens the client's own account (one tap in the switcher).
@@ -194,6 +250,8 @@ class TradeSessionsController extends Notifier<TradeSessionsState> {
   }
 
   void _setActive(String login) {
+    final product = state.sessions[login]?.account?.product;
+    if (product != null) _recent[product] = login;
     state = state.copyWith(active: login, phase: TradeSessionsPhase.ready, clearError: true);
     ref.read(workspaceProvider.notifier).update((w) => w.copyWith(lastLogin: login));
   }

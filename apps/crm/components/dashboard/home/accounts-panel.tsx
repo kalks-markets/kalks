@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Plus } from "lucide-react";
 import { Button, CopyButton, LogoMark, Skeleton, cn, formatMoney } from "@/components/kit";
 import { useT } from "@kalks/i18n/react";
+import { productOrder } from "@/lib/products";
 
 export type CardAccount = {
   login: string;
@@ -27,6 +28,8 @@ export type CardAccount = {
   leverage: number;
   server: string;
   positions?: number;
+  /** CFD / Options account split: an Options account shows an OPTIONS badge (absent = CFD). */
+  product?: "cfd" | "options";
 };
 
 function money(v: number, cur: string) {
@@ -69,7 +72,10 @@ export function AccountVisual({ a, hidden }: { a: CardAccount; hidden?: boolean 
       <div className="relative flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">
           <LogoMark size={26} className="text-white" />
-          <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10.5px] font-bold tracking-[0.08em] backdrop-blur-sm">{a.prop ? t("accounts.badge.prop") : a.type === "live" ? t("accounts.badge.live") : t("accounts.badge.demo")}</span>
+          <span className="flex items-center gap-1.5">
+            {a.product === "options" && <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10.5px] font-bold tracking-[0.08em] backdrop-blur-sm">{t("accounts.product.chipOptions")}</span>}
+            <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10.5px] font-bold tracking-[0.08em] backdrop-blur-sm">{a.prop ? t("accounts.badge.prop") : a.type === "live" ? t("accounts.badge.live") : t("accounts.badge.demo")}</span>
+          </span>
         </div>
         <div dir="ltr" className="k-num mt-auto text-start font-mono text-[19px] font-semibold tracking-[0.14em] [text-shadow:0_1px_8px_rgba(0,0,0,0.18)] sm:text-[22px]">
           {spacedLogin(a.login)}
@@ -111,7 +117,8 @@ export function AccountsPanel({
   const [i, setI] = React.useState(0);
   const [dir, setDir] = React.useState(1);
   const [hidden, setHidden] = React.useState(false);
-  const list = accounts ?? [];
+  // CFD accounts first, then Options accounts (CFD / Options account split)
+  const list = React.useMemo(() => productOrder(accounts ?? []), [accounts]);
   const idx = Math.min(i, Math.max(0, list.length - 1));
   const a = list[idx];
   const go = (d: number) => {
@@ -131,7 +138,7 @@ export function AccountsPanel({
           </span>,
         ],
         [t("common.equity"), <span key="e" dir="ltr" className="k-num">{hidden ? "••••" : money(a.equity, a.currency)}</span>],
-        [t("dashboard.home.leverage"), <span key="lv" dir="ltr" className="k-num">1:{a.leverage.toLocaleString("en-US")}</span>],
+        ...(a.product === "options" ? [] : ([[t("dashboard.home.leverage"), <span key="lv" dir="ltr" className="k-num">1:{a.leverage.toLocaleString("en-US")}</span>]] as [string, React.ReactNode][])),
         [t("accounts.label.freeMargin"), <span key="f" dir="ltr" className="k-num">{hidden ? "••••" : money(a.freeMargin, a.currency)}</span>],
         [t("accounts.label.marginLevel"), <span key="m" dir="ltr" className="k-num">{a.marginLevel === null || !Number.isFinite(a.marginLevel) ? "—" : `${Math.round(a.marginLevel).toLocaleString("en-US")}%`}</span>],
       ]

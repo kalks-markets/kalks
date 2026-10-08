@@ -8,11 +8,12 @@ import { ArrowDownRight, ArrowUpRight, Bell, Camera, CandlestickChart, ChevronUp
 import { getInstrument, isMarketOpen, priceFeed } from "@kalks/mock";
 import { PriceText, cn, useQuote } from "@kalks/ui";
 import { usePositionProfit, useTerminal, type Anchor, type ChartTab, type Drawing } from "@/lib/store";
-import { CHART_TYPES, TIMEFRAMES, accMoney, fmtPrice, fmtVol, profitAt, roundPrice, type TPosition } from "@/lib/trading";
+import { CHART_TYPES, TIMEFRAMES, accMoney, contractSpec, fmtPrice, fmtVol, pipSize, profitAt, roundPrice, type TPosition } from "@/lib/trading";
 import { useContextMenu, type MenuItem } from "@/components/ui/menu";
 import { INDICATOR_CATEGORIES, INDICATOR_LIST } from "@/lib/indicators";
 import { chartRegistry, useChartEngine, type LegendData } from "./engine";
 import { IndicatorLegendRow } from "./indicators/legend";
+import { clampStop, defaultStop, lineHandles, type StopKind } from "./trade-handles";
 import { addIndicator, openIndicatorList, openIndicatorSettings, removeIndicator, toggleIndicator } from "./indicators/state";
 import { useMarketOpen } from "@/lib/market-hours";
 import { openRegister } from "@/lib/guest";
@@ -33,6 +34,20 @@ export interface TLine {
   label: string;
   draggable: boolean;
   closable?: boolean;
+  /** a position line's S / T handles: "s" without a stop loss, "t" without a take profit (trade-handles.ts) */
+  handles?: string;
+}
+
+/** An S / T handle pulled out of a position line: the stop it makes and where that stop may go. */
+interface HandleDrag {
+  kind: StopKind;
+  ref: string;
+  side: "buy" | "sell";
+  /** pointer y at the press: a handle is a tap until the pointer moves a few pixels */
+  y0: number;
+  pip: number;
+  /** the stops level in price units */
+  gap: number;
 }
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -48,7 +63,7 @@ export function useTradeLines(symbol: string): TLine[] {
   return React.useMemo(() => {
     const out: TLine[] = [];
     for (const p of positions) {
-      out.push({ id: `pos:${p.ticket}`, kind: "pos", price: p.openPrice, ref: p.ticket, side: p.side, label: t(p.side === "buy" ? "chart.line.buy" : "chart.line.sell", { lot: fmtVol(p.volume) }), draggable: !ro, closable: !ro });
+      out.push({ id: `pos:${p.ticket}`, kind: "pos", price: p.openPrice, ref: p.ticket, side: p.side, label: t(p.side === "buy" ? "chart.line.buy" : "chart.line.sell", { lot: fmtVol(p.volume) }), draggable: !ro, closable: !ro, handles: lineHandles(p, ro) });
       if (p.sl !== undefined) out.push({ id: `sl:${p.ticket}`, kind: "sl", price: p.sl, ref: p.ticket, side: p.side, label: "SL", draggable: !ro, closable: !ro });
       if (p.tp !== undefined) out.push({ id: `tp:${p.ticket}`, kind: "tp", price: p.tp, ref: p.ticket, side: p.side, label: "TP", draggable: !ro, closable: !ro });
     }
@@ -179,11 +194,17 @@ export function ChartView({ tab, active, onActivate, compact, hideOneClick, high
   /* ---------------- lines from store ---------------- */
   const ro = T.readOnly;
   const tradeLines = useTradeLines(tab.symbol);
-  // a position line dropped to create an SL / TP: the new line shows at once, not when the trade server answers
-  const [fresh, setFresh] = React.useState<TLine | null>(null);
-  const lines = React.useMemo(() => (fresh && !tradeLines.some((l) => l.id === fresh.id) ? [...tradeLines, fresh] : tradeLines), [tradeLines, fresh]);
+  // a new SL / TP (a position line dropped past the price, an S / T handle dragged or tapped) shows at once, not when
+  // the trade server answers; it goes once the position carries it or the server says no
+  const [fresh, setFresh] = React.useState<TLine[]>([]);
+  const lines = React.useMemo(() => {
+    const add = fresh.filter((f) => !tradeLines.some((l) => l.id === f.id));
+    return add.length ? [...tradeLines, ...add] : tradeLines;
+  }, [tradeLines, fresh]);
+  const addFresh = (l: TLine) => setFresh((f) => [...f.filter((x) => x.id !== l.id), l]);
+  const dropFresh = (id: string) => setFresh((f) => (f.some((x) => x.id === id) ? f.filter((x) => x.id !== id) : f));
 
-  const [drag, setDrag] = React.useState<{ id: string; price: number } | null>(null);
+  const [drag, setDrag] = React.useState<{ id: string; price: number; handle?: HandleDrag } | null>(null);
   const dragRef = React.useRef(drag);
   dragRef.current = drag;
   // a dropped SL / TP / pending line stays where it was dropped until the trade server has answered
@@ -361,27 +382,69 @@ export function ChartView({ tab, active, onActivate, compact, hideOneClick, high
     if (hl) T.selectDrawing(hl.id);
   };
 
+  /** Pulls an S / T handle out of a position line: the new stop follows the pointer once it moves (startHandle). */
+  const handleOf = (l: TLine, kind: StopKind, y0: number): HandleDrag => ({ kind, ref: l.ref, side: l.side ?? "buy", y0, pip: pipSize(inst), gap: contractSpec(tab.symbol).stopsLevel / 10 ** inst.digits });
+  const startHandle = (l: TLine, kind: StopKind, clientY: number) => {
+    if (!engine) return;
+    engine.chart.applyOptions({ handleScroll: false, handleScale: false });
+    setDrag({ id: `${kind}:${l.ref}`, price: l.price, handle: handleOf(l, kind, clientY) });
+  };
+
   React.useEffect(() => {
     if (!drag || !engine) return;
+    const id = drag.id;
+    const h = drag.handle;
+    // a handle stays a tap until the pointer has moved a few pixels; then its new line appears and follows it
+    let moved = !h;
+    let shown = false;
+    let last = drag.price;
+    let done = false;
     const move = (e: PointerEvent) => {
+      if (!moved) {
+        if (Math.abs(e.clientY - h!.y0) <= 4) return;
+        moved = true;
+      }
       const p = engine.main.coordinateToPrice(localY(e.clientY));
-      if (p !== null) setDrag((d) => (d ? { ...d, price: roundPrice(tab.symbol, p) } : d));
+      if (p === null) return;
+      let price = roundPrice(tab.symbol, p);
+      if (h) {
+        // held on the side of the price the trade server accepts
+        price = clampStop(h.kind, h.side, price, quoteNow(), h.gap, inst.digits);
+        if (!shown) {
+          shown = true;
+          addFresh(stopLine(id, h, price));
+        }
+      }
+      last = price;
+      setDrag((d) => (d ? { ...d, price } : d));
     };
     const up = () => {
-      const d = dragRef.current;
+      if (done) return;
+      done = true;
       engine.chart.applyOptions({ handleScroll: true, handleScale: true });
       setDrag(null);
-      if (!d) return;
-      commitDrag(d.id, d.price);
+      if (!dragRef.current) return;
+      if (h) commitHandle(id, h, moved ? last : null);
+      else commitDrag(id, last);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up, { once: true });
+    window.addEventListener("pointercancel", up, { once: true });
     return () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drag?.id, engine]);
+
+  const stopLine = (id: string, h: HandleDrag, price: number): TLine => ({ id, kind: h.kind, price, ref: h.ref, side: h.side, label: h.kind === "sl" ? "SL" : "TP", draggable: false, closable: false });
+  /** A handle let go: the stop where it was dropped, or (a tap) at the order tickets' starting distance. */
+  const commitHandle = (id: string, h: HandleDrag, dropped: number | null) => {
+    const price = dropped ?? defaultStop(h.kind, h.side, quoteNow(), h.pip, h.gap, inst.digits);
+    addFresh(stopLine(id, h, price));
+    settle(id, price, T.modifyPosition(h.ref, h.kind === "sl" ? { sl: price } : { tp: price }).finally(() => dropFresh(id)));
+  };
 
   const commitDrag = (id: string, price: number) => {
     const [kind, ref] = id.split(":") as [string, string];
@@ -403,8 +466,8 @@ export function ChartView({ tab, active, onActivate, compact, hideOneClick, high
       const cur = p.side === "buy" ? q.bid : q.ask;
       const isSl = p.side === "buy" ? price < cur : price > cur;
       const id = `${isSl ? "sl" : "tp"}:${ref}`;
-      setFresh({ id, kind: isSl ? "sl" : "tp", price, ref, side: p.side, label: isSl ? "SL" : "TP", draggable: false, closable: false });
-      settle(id, price, T.modifyPosition(ref, isSl ? { sl: price } : { tp: price }).finally(() => setFresh((f) => (f?.id === id ? null : f))));
+      addFresh({ id, kind: isSl ? "sl" : "tp", price, ref, side: p.side, label: isSl ? "SL" : "TP", draggable: false, closable: false });
+      settle(id, price, T.modifyPosition(ref, isSl ? { sl: price } : { tp: price }).finally(() => dropFresh(id)));
     }
   };
 
@@ -550,6 +613,8 @@ export function ChartView({ tab, active, onActivate, compact, hideOneClick, high
       className={cn("relative h-full min-h-0 w-full select-none overflow-hidden rounded-[8px] border bg-[var(--t-chart-bg)]", highlight ? "border-ember/70 shadow-[0_0_0_1px_rgba(255,90,31,0.25)]" : "border-line", (hover || drag) && "cursor-ns-resize")}
       onPointerDownCapture={(e) => {
         if (drawing || e.button !== 0) return;
+        // the S / T handles and the × on a chip take their own presses
+        if ((e.target as Element).closest("[data-chip-action]")) return;
         const id = hitLine(e.clientY);
         if (!id) {
           if (T.selectedDrawing && !(e.target as Element).closest("[data-drawing]")) T.selectDrawing(null);
@@ -644,6 +709,8 @@ export function ChartView({ tab, active, onActivate, compact, hideOneClick, high
           let pnlText = "";
           let pnl = 0;
           const livePos = l.kind === "pos" ? T.positions.find((x) => x.ticket === l.ref) : undefined;
+          // S / T: only while the position has no such stop (a new one being placed counts)
+          const handles = l.kind === "pos" && l.handles ? (["sl", "tp"] as const).filter((k) => l.handles!.includes(k[0]!) && !lines.some((x) => x.id === `${k}:${l.ref}`)) : [];
           if (l.kind === "sl" || l.kind === "tp") {
             const p = T.positions.find((x) => x.ticket === l.ref);
             if (p) {
@@ -674,9 +741,43 @@ export function ChartView({ tab, active, onActivate, compact, hideOneClick, high
                 {isDrag && l.kind !== "pos" && <span className="ml-1 opacity-80">{fmtPrice(tab.symbol, price)}</span>}
               </span>
               {livePos && <PositionChipPnl p={livePos} />}
+              {handles.length > 0 && (
+                <span className="flex h-full items-center gap-[3px] border-l border-line px-[3px]">
+                  {handles.map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      data-chip-action
+                      data-handle={k}
+                      aria-label={t(k === "sl" ? "chart.line.slHandleTitle" : "chart.line.tpHandleTitle")}
+                      title={t(k === "sl" ? "chart.line.slHandleTitle" : "chart.line.tpHandleTitle")}
+                      onPointerDown={(e) => {
+                        if (e.button !== 0) return;
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onActivate();
+                        startHandle(l, k, e.clientY);
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // keyboard (Enter / Space): the starting distance, as a tap
+                        if (e.detail === 0) commitHandle(`${k}:${l.ref}`, handleOf(l, k, 0), null);
+                      }}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                      className={cn(
+                        "grid size-[14px] shrink-0 cursor-ns-resize place-items-center rounded-[3px] border font-sans text-[9px] font-bold leading-none transition-colors",
+                        k === "sl" ? "border-down text-down hover:bg-down/15" : "border-up text-up hover:bg-up/15",
+                      )}
+                    >
+                      {t(k === "sl" ? "chart.line.slHandle" : "chart.line.tpHandle")}
+                    </button>
+                  ))}
+                </span>
+              )}
               {pnlText && <span className="k-num border-l border-white/25 px-1.5">{pnlText}</span>}
               {l.closable && (
                 <button
+                  data-chip-action
                   aria-label={t("chart.line.remove", { label: l.label })}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {

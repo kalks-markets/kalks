@@ -10,6 +10,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/api/api_providers.dart';
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../core/format/format.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
@@ -82,7 +83,8 @@ class MasterProfileScreen extends ConsumerWidget {
     final s = m.stats;
     final accepting = m.acceptingNew != false;
     final canCopy = m.program != 'pamm' && m.status == 'approved' && !m.frozen && !(m.house && m.hidden) && accepting;
-    final canInvest = m.fund != null && m.program != 'copy' && m.fund!.status == 'active';
+    // investing in the master's fund is PAMM's
+    final canInvest = m.fund != null && m.program != 'copy' && m.fund!.status == 'active' && ref.watch(configProvider).moduleOn('pamm');
     void copy() => showFollowSheet(
       context,
       // terms carry the effective minimum (the broker's floor or the master's, whichever is higher)

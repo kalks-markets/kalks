@@ -140,5 +140,23 @@ const shell = {
   "system.status.checked": "Checked {time} · refreshes every 15 seconds on reload",
   "system.status.expectedBack": "Expected back by {time}",
   "system.status.questions": "Questions? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} isn't available on your account.",
+  "module.copy_trading": "Copy trading",
+  "module.pamm": "PAMM funds",
+  "module.mam": "MAM",
+  "module.prop": "Prop trading",
+  "module.ib": "Partner programme",
+  "module.algo": "Strategy builder",
+  "module.api": "API & webhooks",
+  "module.academy": "Academy",
+  "module.wallet": "Wallet",
+  "module.rewards": "Rewards",
+  "module.options": "Options",
+  "module.news": "News",
+  "module.calendar": "Economic calendar",
+  "module.markets": "Markets",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "Support chat",
 };
 export default shell;

@@ -1,5 +1,6 @@
 // Small pieces of the Accounts pages, ported from the web's trading components:
 //   KindBadge, StatusBadge, FlavorChip, DefaultStar            (ui.tsx, archive.tsx, extras.tsx)
+//   ProductChip, ProductSection, byProduct                     the OPTIONS tag, CFD / Options account sections
 //   LoginCopy                                                  "#10042817" + CopyButton
 //   SecretField, PasswordInput, PasswordRules                  (ui.tsx SecretField / PasswordRules, accounts/security.tsx)
 //   TradeSymbolAvatar, OptionTag, symbolLabel, optionLabel     (instrument.tsx)
@@ -90,6 +91,53 @@ class FlavorChip extends StatelessWidget {
     final f = accountFlavor(account);
     if (f == null) return const SizedBox.shrink();
     return KChip(label: context.t('accounts.badge.$f'), tone: f == 'copy' ? KChipTone.info : KChipTone.neutral, small: true);
+  }
+}
+
+/// OPTIONS on an Options account (a CFD account carries no tag).
+class ProductChip extends StatelessWidget {
+  const ProductChip({super.key, required this.account});
+  final EngineAccount account;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!account.isOptions) return const SizedBox.shrink();
+    return KChip(label: context.t('accounts.product.chipOptions'), tone: KChipTone.info, small: true);
+  }
+}
+
+/// Accounts by product, CFD first: `[(cfd, [...]), (options, [...])]` without empty groups (order kept).
+List<(String, List<EngineAccount>)> byProduct(List<EngineAccount> accounts) => [
+  for (final p in const ['cfd', 'options'])
+    if (accounts.any((a) => a.product == p)) (p, accounts.where((a) => a.product == p).toList()),
+];
+
+/// A product section's title ("CFD accounts" / "Options accounts") over its account rows.
+class ProductSection extends StatelessWidget {
+  const ProductSection({super.key, required this.product, this.padding = const EdgeInsets.only(bottom: 10)});
+  final String product;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final k = context.k;
+    final options = product == 'options';
+    return Padding(
+      padding: padding,
+      child: Row(
+        children: [
+          Icon(options ? LucideIcons.layers2 : LucideIcons.candlestickChart, size: 15, color: k.fg3),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              options ? t('accounts.product.groupOptions') : t('accounts.product.groupCfd'),
+              style: context.text.label.copyWith(color: k.fg2, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

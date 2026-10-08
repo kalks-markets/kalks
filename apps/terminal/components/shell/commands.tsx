@@ -51,6 +51,8 @@ import type { MenuItem } from "@/components/ui/menu";
 import { askConfirm } from "@/components/dialogs/confirm";
 import { useSwitchMode } from "./mode-switch";
 import { useTradeMode } from "@/lib/options/mode";
+import { useModules } from "@/components/modules";
+import { tabOn } from "@/lib/modules";
 
 export function toggleFullscreen() {
   try {
@@ -242,6 +244,7 @@ export interface Command {
 export function useCommands(): Command[] {
   const T = useTerminal();
   const t = useT();
+  const modules = useModules();
   const lang = useLocale();
   const { resolvedTheme, setTheme } = useTheme();
   const switchMode = useSwitchMode();
@@ -302,7 +305,8 @@ export function useCommands(): Command[] {
     ["journal", t("toolbox.tab.journal")],
     ["ai", t("toolbox.tab.ai")],
   ] as const)
-    add({ id: `tab-${k}`, group: "view", label, keywords: `${k} tab toolbox`, run: () => openActivity(T, k) });
+    // tabs of modules the broker switched off are not offered (module switches)
+    if (tabOn(modules, k)) add({ id: `tab-${k}`, group: "view", label, keywords: `${k} tab toolbox`, run: () => openActivity(T, k) });
   add({ id: "dark", group: "view", label: `${t("desk.set.theme")}: ${t("desk.set.dark")}`, icon: <Moon />, keywords: "dark theme night", checked: resolvedTheme !== "light", run: () => setTheme("dark") });
   add({ id: "light", group: "view", label: `${t("desk.set.theme")}: ${t("desk.set.light")}`, icon: <Sun />, keywords: "light theme day", checked: resolvedTheme === "light", run: () => setTheme("light") });
   for (const l of LOCALES) add({ id: `lang-${l.code}`, group: "view", label: `${t("desk.set.language")}: ${l.name}`, icon: <Flag country={l.flag} className="size-3.5" />, keywords: `language ${l.english} ${l.code}`, checked: lang.locale === l.code, run: () => void lang.setLocale(l.code) });

@@ -140,6 +140,28 @@ async fn archive_restore_rename_and_replay() {
         mine.push(open_demo(&st, &g.code).await.unwrap_or_else(|e| panic!("open: {e:?}")));
     }
     assert!(open_demo(&st, &g.code).await.is_err(), "limit reached");
+    // CFD / Options account split: the limit counts per (kind, product). Every other CFD group is full now too, an
+    // Options account still opens (and the Options limit counts only Options accounts)
+    assert_eq!(c.tenant.groups[&g.code].product, trading::rules::Product::Cfd);
+    let other_cfd = c.tenant.groups.values().filter(|x| x.enabled && x.allows("demo") && x.product == trading::rules::Product::Cfd && x.code != g.code && !x.code.starts_with("prop")).min_by_key(|x| x.code.clone()).expect("another CFD group").clone();
+    let e = open_demo(&st, &other_cfd.code).await.unwrap_err();
+    assert!(matches!(&e, trading::api::ApiError::Conflict { code: "account_limit", message } if message.contains("CFD")), "{e:?}");
+    let opt = open_demo(&st, "options-standard").await.expect("an Options account opens beside full CFD groups");
+    let listed = accounts::list(State(st.clone()), ctx(&st).await, headers(), q()).await.unwrap().0;
+    let product_of = |l: i64| listed["accounts"].as_array().unwrap().iter().find(|x| x["login"] == json!(l)).map(|x| x["product"].clone());
+    assert_eq!((product_of(opt), product_of(mine[0])), (Some(json!("options")), Some(json!("cfd"))));
+    mine.push(opt);
+    // the product of a group with accounts is locked; an older Back Office that omits it never flips the group
+    let mut gj = serde_json::to_value(&c.tenant.groups["options-standard"]).unwrap();
+    gj["reasonCode"] = json!("GRP-01");
+    gj["note"] = json!("it");
+    gj["product"] = json!("cfd");
+    let e = trading::api::admin::update_group(State(st.clone()), staff(&st, ctx(&st).await, "8", "admin"), Path("options-standard".into()), body(gj.clone())).await.unwrap_err();
+    assert_eq!(err_code(e), "field:product");
+    gj.as_object_mut().unwrap().remove("product");
+    gj["name"] = json!("Options Standard ·");
+    let r = trading::api::admin::update_group(State(st.clone()), staff(&st, ctx(&st).await, "8", "admin"), Path("options-standard".into()), body(gj)).await.unwrap().0;
+    assert_eq!((r["data"]["product"].as_str(), r["data"]["name"].as_str()), (Some("options"), Some("Options Standard ·")), "{r}");
     let a = mine[0];
 
     // a position: archive without `empty` is refused, the check says why
@@ -394,6 +416,10 @@ async fn closure_queue_four_eyes_reopen_and_jobs() {
     assert!(listed["accounts"].as_array().unwrap().iter().any(|x| x["login"] == json!(a) && x["isDefault"] == json!(true)));
     let opts = lifecycle::group_options(State(st.clone()), ctx(&st).await, headers(), Path(a), q()).await.unwrap().0;
     assert!(opts["groups"].as_array().unwrap().iter().all(|g| !g["code"].as_str().unwrap().starts_with("prop")), "{opts}");
+    // a CFD account changes type within CFD groups only (CFD / Options account split)
+    assert!(!opts["groups"].as_array().unwrap().is_empty() && opts["groups"].as_array().unwrap().iter().all(|g| !g["code"].as_str().unwrap().starts_with("options-")), "{opts}");
+    let e = lifecycle::change_group(State(st.clone()), ctx(&st).await, headers(), Path(a), q(), body(json!({"group": "options-standard"}))).await.unwrap_err();
+    assert_eq!(err_code(e), "product_mismatch");
     let r = lifecycle::demo_balance(State(st.clone()), ctx(&st).await, headers(), Path(d1), q(), body(json!({"amount": 2500}))).await.unwrap().0;
     assert_eq!(r["balance"], json!(2500.0), "{r}");
     assert!(lifecycle::demo_balance(State(st.clone()), ctx(&st).await, headers(), Path(d1), q(), body(json!({"amount": 5}))).await.is_err());

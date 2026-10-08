@@ -8,8 +8,13 @@
   draws it and posts gestures back on the `KalksChart` channel (lib/features/terminal/chart/chart_bridge.dart):
     in:  init {digits, intraday, palette, symbol, tf, step, chartType, indicators, texts} · bars {bars}
          · older {bars, exhausted} · bar {bar} · quote {bid, ask} · lines {lines: [{id, kind, price, label, side, drag,
-         note, tone, close}]} · palette {palette} · indicators {indicators} · chartType {chartType}
+         note, tone, close, handles?, pip?, gap?}]} · palette {palette} · indicators {indicators} · chartType {chartType}
     out: ready · dragstart {id} · drag {id, price} · tap {id} · close {id} · older {before} · long {price} · ind {uid}
+  A position line with `handles` ("st" / "s" / "t": no stop loss / no take profit yet) shows small S (red outline) and
+  T (blue outline) squares after its P&L, like the web (components/chart/trade-handles.ts): pulling one out makes a
+  temporary `sl:TICKET` / `tp:TICKET` line that follows the finger, held on the side of the price the trade server
+  accepts (`gap` = the stops level in price units), and posts drag {id: "sl:TICKET", price} when the finger lifts; a
+  tap posts it at the order tickets' starting distance (max(10 pips, 2 x spread), twice that for TP; `pip` = pip size).
   Bars are [time (server-time seconds), open, high, low, close, volume]. Like the web chart (components/chart/
   engine.ts + chart-view.tsx): candles / bars / line / area, the OHLC legend with one row per indicator (tap: show /
   hide, settings, remove), oscillators in their own sub-windows, the account's bid / ask lines, trade-line chips at the
@@ -131,6 +136,34 @@
         border-left: 1px solid rgba(127, 127, 127, 0.35);
         padding: 0 6px;
         font-size: 12px;
+      }
+      /* a position's S / T handles: small outlined squares, each in a finger-sized hit area */
+      .chip .hs {
+        border-left: 1px solid rgba(127, 127, 127, 0.35);
+        padding: 0 2px;
+      }
+      .chip .hb {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        padding: 0 3px;
+        touch-action: none;
+      }
+      .chip .hb.on {
+        opacity: 0.35;
+      }
+      .chip .h {
+        width: 14px;
+        height: 14px;
+        box-sizing: border-box;
+        border: 1px solid;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font: 700 9px system-ui, -apple-system, Roboto, sans-serif;
+        line-height: 1;
+        letter-spacing: 0;
       }
       .chip.dragging {
         z-index: 2;
@@ -254,6 +287,9 @@
         const priceLines = new Map();
         const chips = new Map();
         let drag = null;
+        // a stop just made from an S / T handle: kept on the chart until the app's lines carry it (or briefly, if the
+        // app's next lines were already on their way)
+        let sticky = null;
 
         const fmt = (p) => Number(p).toFixed(digits);
         const pow = () => Math.pow(10, digits);
@@ -424,6 +460,7 @@
           chips.clear();
           chipsEl.innerHTML = "";
           drag = null;
+          sticky = null;
           pendingLines = null;
           legendSig = "";
           digits = msg.digits;
@@ -488,7 +525,8 @@
           wm.setDark(pal.dark);
           chart.panes()[0].attachPrimitive(wm);
           bidLine = main.createPriceLine({ price: 0, color: pal.fg2, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "", axisLabelColor: pal.fg2, axisLabelTextColor: pal.dark ? "#0a0a0d" : "#fff" });
-          askLine = main.createPriceLine({ price: 0, color: pal.down, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "", axisLabelColor: pal.down, axisLabelTextColor: "#fff" });
+          // the ask is the buy price: the buy colour (Kalks Trader: blue = up / buy / profit / TP)
+          askLine = main.createPriceLine({ price: 0, color: pal.up, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "", axisLabelColor: pal.up, axisLabelTextColor: "#fff" });
           bid = 0;
           ask = 0;
           data = [];
@@ -621,11 +659,61 @@
           if (el.textContent !== s) el.textContent = s;
         };
 
+        /* ---------------- S / T handles ---------------- */
+
+        const refOf = (id) => id.slice(id.indexOf(":") + 1);
+        const pulled = (k, ref) => !!drag && drag.id === k + ":" + ref;
+        /** The handles a position chip shows now: "sl" / "tp" while the position has no such stop (a stop being made
+         *  counts; the handle under the finger stays, dimmed, until it lifts). */
+        function handlesOf(l) {
+          if (l.kind !== "pos" || !l.handles) return [];
+          const ref = refOf(l.id);
+          const out = [];
+          for (const k of ["sl", "tp"]) {
+            if (l.handles.indexOf(k[0]) < 0) continue;
+            if (!pulled(k, ref) && lines.some((x) => x.id === k + ":" + ref)) continue;
+            out.push(k);
+          }
+          return out;
+        }
+        /** Holds a stop on the side of the close price the trade server accepts (services/trading check_sltp): a buy
+         *  closes at the bid, so its SL stays the stops level (at least one point) below it and its TP as far above;
+         *  a sell closes at the ask, mirrored. */
+        function clampStop(kind, side, price, gap) {
+          const lim = Math.max(gap || 0, 1 / pow());
+          const buy = side === "buy";
+          const ref = buy ? bid : ask;
+          const p = buy === (kind === "sl") ? Math.min(price, ref - lim) : Math.max(price, ref + lim);
+          return Math.round(p * pow()) / pow();
+        }
+        /** A tapped handle: the order tickets' starting distance, max(10 pips, 2 x spread) for SL and twice that for
+         *  TP, from the price the position closes at now. */
+        function defaultStop(kind, side, pip, gap) {
+          if (!(bid > 0 && ask > 0 && pip > 0)) return null;
+          const base = Math.max(10, Math.round(Math.max(1, (ask - bid) / pip) * 2));
+          const dist = (kind === "sl" ? base : base * 2) * pip;
+          const buy = side === "buy";
+          return clampStop(kind, side, (buy ? bid : ask) + (buy === (kind === "tp") ? dist : -dist), gap);
+        }
+        const stopLine = (pos, kind, price) => ({ id: kind + ":" + refOf(pos.id), kind, price, label: kind.toUpperCase(), side: pos.side, drag: false, close: false });
+        /** The app's lines, with a just-made stop kept until they carry it. */
+        function withSticky(list) {
+          if (!sticky) return list;
+          if (list.some((x) => x.id === sticky.line.id) || Date.now() > sticky.until) {
+            sticky = null;
+            return list;
+          }
+          return list.concat([sticky.line]);
+        }
+
         function fillChip(c, l) {
           const [bg, fg, border] = chipColors(l);
           const filled = l.kind !== "pos" && l.kind !== "breakeven";
           const noteColor = filled ? fg : l.tone === "up" ? pal.up : l.tone === "down" ? pal.down : pal.fg2;
-          const sig = [bg, fg, border, l.drag, l.note || "", noteColor, l.close].join("|");
+          const hs = handlesOf(l);
+          const ref = l.kind === "pos" ? refOf(l.id) : "";
+          const hsig = hs.map((k) => k + (pulled(k, ref) ? "*" : "")).join(",");
+          const sig = [bg, fg, border, l.drag, l.note || "", noteColor, l.close, hsig].join("|");
           if (c.sig !== sig) {
             c.sig = sig;
             const el = c.el;
@@ -636,6 +724,18 @@
             c.note.style.display = l.note ? "flex" : "none";
             c.note.textContent = l.note || "";
             c.note.style.color = noteColor;
+            c.hs.style.display = hs.length ? "flex" : "none";
+            for (const k of ["sl", "tp"]) {
+              const b = c.h[k];
+              const col = k === "sl" ? pal.down : pal.up;
+              b.style.display = hs.indexOf(k) >= 0 ? "flex" : "none";
+              b.classList.toggle("on", pulled(k, ref));
+              b.firstChild.style.color = col;
+              b.firstChild.style.borderColor = col;
+              b.firstChild.textContent = texts[k] || k[0].toUpperCase();
+              b.title = texts[k + "Title"] || "";
+              b.setAttribute("aria-label", b.title || k.toUpperCase());
+            }
             c.x.style.display = l.close ? "flex" : "none";
             c.w = -1;
           }
@@ -692,13 +792,29 @@
               lbl.className = "lbl";
               const note = document.createElement("span");
               note.className = "note";
+              const hs = document.createElement("span");
+              hs.className = "hs";
+              hs.style.display = "none";
+              const h = {};
+              for (const k of ["sl", "tp"]) {
+                const b = document.createElement("span");
+                b.className = "hb";
+                b.dataset.handle = k;
+                b.setAttribute("role", "button");
+                const sq = document.createElement("span");
+                sq.className = "h";
+                b.appendChild(sq);
+                hs.appendChild(b);
+                h[k] = b;
+              }
               const x = document.createElement("span");
               x.className = "x";
               x.textContent = "×";
-              el.append(grip, lbl, note, x);
-              c = { el, grip, lbl, note, x, l, sig: "", w: -1, tx: NaN, ty: NaN, shown: true };
+              el.append(grip, lbl, note, hs, x);
+              c = { el, grip, lbl, note, hs, h, x, l, sig: "", w: -1, tx: NaN, ty: NaN, shown: true };
               chips.set(l.id, c);
               const cc = c;
+              for (const k of ["sl", "tp"]) h[k].addEventListener("pointerdown", (e) => startDrag(e, cc, k));
               x.addEventListener("pointerdown", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -771,21 +887,28 @@
           if (dragged) moveTo(dragged.c, Math.round(Math.max(4, plotW - 6 - dragged.c.w)), Math.round(clampY(dragged.y)));
         }
 
-        function startDrag(e, c) {
+        /** Drags a chip (`kind` undefined), or pulls an S / T handle out of a position chip (`kind` "sl" | "tp"): the
+         *  handle's stop line appears once the finger moves and follows it, held on the valid side of the price; a tap
+         *  places it at the order tickets' starting distance. */
+        function startDrag(e, c, kind) {
           e.preventDefault();
           e.stopPropagation();
-          const l = c.l;
-          const el = c.el;
+          const src = e.currentTarget;
+          const pos = kind ? c.l : null;
+          let l = c.l;
+          const id = kind ? kind + ":" + refOf(pos.id) : l.id;
+          const movable = kind ? true : l.drag;
           const startY = e.clientY;
           const top = host.getBoundingClientRect().top;
           const plotW = chart.timeScale().width();
           const maxY = pane0H() - 2;
-          drag = { id: l.id, price: l.price, moved: false, y: startY - top, raf: 0 };
+          drag = { id, price: l.price, moved: false, y: startY - top, raf: 0 };
           const d0 = drag;
-          if (l.drag) chart.applyOptions({ handleScroll: false, handleScale: false });
-          el.classList.add("dragging");
+          if (movable) chart.applyOptions({ handleScroll: false, handleScale: false });
+          if (kind) fillChip(c, pos); // the pulled handle dims
+          else c.el.classList.add("dragging");
           try {
-            el.setPointerCapture(e.pointerId);
+            src.setPointerCapture(e.pointerId);
           } catch (x) {}
           // one frame: the chip, its label and the ghost line follow the latest finger position
           const paint = () => {
@@ -800,21 +923,30 @@
             placeChips();
           };
           const move = (ev) => {
-            if (!l.drag || drag !== d0) return;
+            if (!movable || drag !== d0) return;
             if (!d0.moved) {
               if (Math.abs(ev.clientY - startY) <= 4) return;
               d0.moved = true;
-              post({ type: "dragstart", id: l.id });
+              if (kind) {
+                // the new stop line appears under the finger and becomes the chip that moves
+                lines = lines.filter((x) => x.id !== id).concat([stopLine(pos, kind, pos.price)]);
+                renderLines();
+                c = chips.get(id);
+                l = c.l;
+                c.el.classList.add("dragging");
+              }
+              post({ type: "dragstart", id });
             }
             const y = Math.max(2, Math.min(maxY, ev.clientY - top));
             const p = main.coordinateToPrice(y);
             if (p === null) return;
-            const price = Math.round(p * pow()) / pow();
+            let price = Math.round(p * pow()) / pow();
+            if (kind && bid > 0 && ask > 0) price = clampStop(kind, pos.side, price, pos.gap);
             d0.y = y;
             if (price === d0.price && d0.raf) return;
             d0.price = price;
             // the price line moves with the chart's own frame; the chip with ours
-            const pl = priceLines.get(l.id);
+            const pl = priceLines.get(id);
             if (pl && l.kind !== "pos") {
               pl.line.applyOptions({ price });
               pl.key = "";
@@ -822,17 +954,35 @@
             if (!d0.raf) d0.raf = requestAnimationFrame(paint);
           };
           const up = () => {
-            el.removeEventListener("pointermove", move);
-            el.removeEventListener("pointerup", up);
-            el.removeEventListener("pointercancel", up);
-            el.removeEventListener("lostpointercapture", up);
+            src.removeEventListener("pointermove", move);
+            src.removeEventListener("pointerup", up);
+            src.removeEventListener("pointercancel", up);
+            src.removeEventListener("lostpointercapture", up);
             if (d0.raf) cancelAnimationFrame(d0.raf);
-            el.classList.remove("dragging");
+            c.el.classList.remove("dragging");
             ghost.style.display = "none";
             chart.applyOptions({ handleScroll: { horzTouchDrag: true, vertTouchDrag: false, pressedMouseMove: true }, handleScale: { axisPressedMouseMove: true, pinch: true, mouseWheel: true } });
             if (drag !== d0) return;
             drag = null;
-            if (d0.moved && l.drag) {
+            if (kind) {
+              // dropped where the finger lifted, or (a tap) at the starting distance; it stays until the app answers
+              const price = d0.moved ? d0.price : defaultStop(kind, pos.side, pos.pip, pos.gap);
+              lines = lines.filter((x) => x.id !== id);
+              if (price !== null) {
+                const made = stopLine(pos, kind, price);
+                lines = lines.concat([made]);
+                const st = (sticky = { line: made, until: Date.now() + 700 });
+                setTimeout(() => {
+                  if (sticky !== st || (drag && drag.id === id)) return;
+                  sticky = null;
+                  if (lines.indexOf(made) >= 0) {
+                    lines = lines.filter((x) => x !== made);
+                    renderLines();
+                  }
+                }, 750);
+                post({ type: "drag", id, price });
+              }
+            } else if (d0.moved && l.drag) {
               // a stop, order or alert stays at the drop price until the app answers with its lines (a position
               // line stays where it is: its drag sets the SL or TP)
               if (l.kind !== "pos") {
@@ -842,16 +992,16 @@
               post({ type: "drag", id: l.id, price: d0.price });
             } else if (!d0.moved) post({ type: "tap", id: l.id });
             if (pendingLines) {
-              lines = pendingLines;
+              lines = withSticky(pendingLines);
               pendingLines = null;
             }
             renderLines();
           };
-          el.addEventListener("pointermove", move);
-          el.addEventListener("pointerup", up);
-          el.addEventListener("pointercancel", up);
+          src.addEventListener("pointermove", move);
+          src.addEventListener("pointerup", up);
+          src.addEventListener("pointercancel", up);
           // a lost capture (the system took the touch) ends the drag too: never a stuck chip
-          el.addEventListener("lostpointercapture", up);
+          src.addEventListener("lostpointercapture", up);
         }
 
         /* ---------------- long press on the plot ---------------- */
@@ -902,7 +1052,7 @@
           vol.setData(data.map(volPoint));
           if (layer) layer.setPalette(pal);
           bidLine.applyOptions({ color: pal.fg2, axisLabelColor: pal.fg2, axisLabelTextColor: pal.dark ? "#0a0a0d" : "#fff" });
-          askLine.applyOptions({ color: pal.down, axisLabelColor: pal.down });
+          askLine.applyOptions({ color: pal.up, axisLabelColor: pal.up });
           wm.setDark(pal.dark);
           for (const c of chips.values()) c.sig = "";
           renderLines();
@@ -928,7 +1078,7 @@
                 pendingLines = m.lines || [];
                 return;
               }
-              lines = m.lines || [];
+              lines = withSticky(m.lines || []);
               return renderLines();
             case "palette":
               return setPalette(m.palette);

@@ -45,11 +45,38 @@ pub struct Group {
     pub demo_refills_per_day: u32,
     pub demo_expiry_days: u32,
     pub enabled: bool,
+    /// What the group's accounts trade: CFDs or Kalks FX Options, never both (fixed once the group has accounts).
+    /// Read fresh from the group on every operation, so it never rides on an event.
+    #[serde(default)]
+    pub product: Product,
 }
 
 impl Group {
     pub fn allows(&self, kind: &str) -> bool {
         self.account_types == "both" || self.account_types == kind
+    }
+}
+
+/// The product an account trades, a property of its group: a CFD account opens CFD positions only, an Options
+/// account option positions only (house and order book). Closing is never refused for the product.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Product {
+    #[default]
+    Cfd,
+    Options,
+}
+
+impl Product {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Product::Cfd => "cfd",
+            Product::Options => "options",
+        }
+    }
+    /// Anything but `options` is a CFD group (the database default).
+    pub fn parse(s: &str) -> Self {
+        if s.trim().eq_ignore_ascii_case("options") { Product::Options } else { Product::Cfd }
     }
 }
 

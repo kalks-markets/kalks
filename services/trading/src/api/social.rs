@@ -256,6 +256,8 @@ async fn candidates(st: &AppState, tenant: i64, user: i64, kyc_ok: bool) -> Vec<
             json!({"key": "track", "ok": age >= settings.min_track_days, "label": format!("Track record of at least {} days", settings.min_track_days), "detail": format!("Account age {age} days")}),
             json!({"key": "equity", "ok": b.equity >= settings.min_master_equity, "label": format!("Equity of at least {} USD", settings.min_master_equity.normalize()), "detail": format!("Equity {} USD", r2(b.equity).normalize())}),
             json!({"key": "free", "ok": !taken.contains(&login) && b.status == "active", "label": "Account not already a master", "detail": if taken.contains(&login) { "Already applied or approved".to_string() } else { format!("Status {}", b.status) }}),
+            // CFD / Options account split: followers copy CFD trades only (options are never mirrored)
+            json!({"key": "cfd", "ok": !b.options, "label": "CFD account", "detail": if b.options { "Options accounts can't be copied: choose a CFD account".to_string() } else { "CFD".to_string() }}),
         ];
         let eligible = checks.iter().all(|c| c["ok"].as_bool() == Some(true));
         out.push(json!({"login": login, "group": b.group, "equity": num(r2(b.equity)), "ageDays": age, "eligible": eligible, "checks": checks}));
@@ -318,6 +320,13 @@ pub async fn master_apply(State(st): State<AppState>, ctx: Ctx, h: HeaderMap, Bo
     let nickname = check_nickname(&r.nickname)?;
     if !matches!(r.program.as_str(), "copy" | "pamm" | "both") {
         return Err(ApiError::Validation { field: "program", message: "program must be copy, pamm or both".into() });
+    }
+    // the master programme follows its module(s)
+    if r.program != "pamm" {
+        crate::modules::require(&st, &ctx.tenant.slug, "copy_trading").await?;
+    }
+    if r.program != "copy" {
+        crate::modules::require(&st, &ctx.tenant.slug, "pamm").await?;
     }
     if !valid_period(&r.fee_period) {
         return Err(ApiError::Validation { field: "feePeriod", message: "feePeriod must be daily, weekly or monthly".into() });
@@ -596,6 +605,7 @@ async fn sub_view(st: &AppState, s: &crate::social::Sub) -> Value {
 }
 
 pub async fn subscribe(State(st): State<AppState>, ctx: Ctx, h: HeaderMap, Body(b): Body<Map<String, Value>>) -> ApiResult<Json<Value>> {
+    crate::modules::require(&st, &ctx.tenant.slug, "copy_trading").await?;
     let u = user(&h)?;
     super::controls::social_gate(&st, u)?;
     let so = social(&st);
@@ -722,6 +732,7 @@ pub async fn sub_funds(State(st): State<AppState>, ctx: Ctx, h: HeaderMap, Path(
     };
     if add {
         super::controls::social_gate(&st, u)?;
+        crate::modules::require(&st, &ctx.tenant.slug, "copy_trading").await?;
     }
     let amount = dec(b.get("amount"), "amount")?.ok_or(ApiError::Validation { field: "amount", message: "Enter the amount".into() })?;
     let (moved, balance) = st.social.sub_funds(s.id, add, amount).await.map_err(|e| ApiError::Status { status: e.status, code: e.code, message: e.message })?;
@@ -887,6 +898,7 @@ pub async fn fund(State(st): State<AppState>, ctx: Ctx, h: HeaderMap, Path(id): 
 }
 
 pub async fn create_fund(State(st): State<AppState>, ctx: Ctx, h: HeaderMap, Body(b): Body<Map<String, Value>>) -> ApiResult<Json<Value>> {
+    crate::modules::require(&st, &ctx.tenant.slug, "pamm").await?;
     let u = user(&h)?;
     super::controls::social_gate(&st, u)?;
     let m = master_of_user(&st, ctx.tenant.tenant_id, u).filter(|m| m.status == "approved").ok_or_else(|| bad("not_master", "Only approved masters can open a PAMM fund"))?;
@@ -961,6 +973,7 @@ pub async fn update_fund(State(st): State<AppState>, ctx: Ctx, h: HeaderMap, Pat
 }
 
 pub async fn invest(State(st): State<AppState>, ctx: Ctx, h: HeaderMap, Path(id): Path<i64>, Body(b): Body<Map<String, Value>>) -> ApiResult<Json<Value>> {
+    crate::modules::require(&st, &ctx.tenant.slug, "pamm").await?;
     let u = user(&h)?;
     super::controls::social_gate(&st, u)?;
     st.social.fund(id).filter(|f| f.tenant_id == ctx.tenant.tenant_id).ok_or_else(|| ApiError::NotFound("Fund not found".into()))?;

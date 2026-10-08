@@ -145,7 +145,7 @@ fn account(login: i64, user: i64, kind: AccountKind) -> Account {
         login,
         user_id: user,
         kind,
-        group: "standard".into(),
+        group: "options-standard".into(),
         mode: Mode::Hedging,
         cent: false,
         leverage: 100,

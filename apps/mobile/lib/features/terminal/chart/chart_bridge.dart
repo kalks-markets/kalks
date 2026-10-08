@@ -19,6 +19,9 @@ class ChartLine {
     this.note,
     this.tone,
     this.closable = false,
+    this.handles = '',
+    this.pip = 0,
+    this.gap = 0,
   });
 
   /// `pos:TICKET`, `sl:TICKET`, `tp:TICKET`, `pnd:TICKET` or `alr:ID`.
@@ -42,8 +45,31 @@ class ChartLine {
   /// The chip has × (close the position, remove the stop, cancel the order, delete the alert).
   final bool closable;
 
+  /// A position line's S / T handles (web chart-view, trade-handles.ts): `s` while it has no stop loss, `t` while it
+  /// has no take profit; empty when read-only. Dragging a handle out makes the `sl:` / `tp:` line ([lineForHandle]).
+  final String handles;
+
+  /// With handles: the market's pip size (the tap's starting distance) and its stops level in price units (how close
+  /// to the price a stop may go), both in price units.
+  final double pip, gap;
+
   /// The ticket / alert id after the prefix.
   String get ref => id.contains(':') ? id.substring(id.indexOf(':') + 1) : id;
+
+  ChartLine at(double p) => ChartLine(
+    id: id,
+    kind: kind,
+    price: p,
+    label: label,
+    side: side,
+    draggable: draggable,
+    note: note,
+    tone: tone,
+    closable: closable,
+    handles: handles,
+    pip: pip,
+    gap: gap,
+  );
 
   Map<String, Object?> toJson() => {
     'id': id,
@@ -55,6 +81,7 @@ class ChartLine {
     'note': note,
     'tone': tone,
     'close': closable,
+    if (handles.isNotEmpty) ...{'handles': handles, 'pip': pip, 'gap': gap},
   };
 
   @override
@@ -68,10 +95,57 @@ class ChartLine {
       other.draggable == draggable &&
       other.note == note &&
       other.tone == tone &&
-      other.closable == closable;
+      other.closable == closable &&
+      other.handles == handles &&
+      other.pip == pip &&
+      other.gap == gap;
 
   @override
-  int get hashCode => Object.hash(id, kind, price, label, side, draggable, note, tone, closable);
+  int get hashCode => Object.hash(id, kind, price, label, side, draggable, note, tone, closable, handles, pip, gap);
+}
+
+/// The stop line an S / T handle makes: `sl:T` / `tp:T` for the position line `pos:T` when that line still shows the
+/// handle (it has no such stop); null for any other id. It starts at the position's price, like the chart page's
+/// temporary line.
+ChartLine? lineForHandle(List<ChartLine> lines, String id) {
+  final i = id.indexOf(':');
+  if (i <= 0) return null;
+  final kind = id.substring(0, i);
+  if (kind != 'sl' && kind != 'tp') return null;
+  final pos = lines.where((l) => l.kind == 'pos' && l.id == 'pos:${id.substring(i + 1)}').firstOrNull;
+  if (pos == null || !pos.handles.contains(kind[0])) return null;
+  return ChartLine(id: id, kind: kind, price: pos.price, label: kind.toUpperCase(), side: pos.side, draggable: pos.draggable);
+}
+
+double _round(double v, int digits) => double.parse(v.toStringAsFixed(digits < 0 ? 0 : digits));
+
+/// Holds a stop on the side of the close price that the trade server accepts (services/trading check_sltp; web
+/// trade-handles.ts clampStop): a buy closes at the bid, so its stop loss stays at least the stops level (and one
+/// point) below it and its take profit as far above; a sell closes at the ask, mirrored.
+double clampStop(String kind, String side, double price, {required double bid, required double ask, required double gap, required int digits}) {
+  var point = 1.0;
+  for (var i = 0; i < digits; i++) {
+    point /= 10;
+  }
+  final lim = gap > point ? gap : point;
+  final buy = side == 'buy';
+  final ref = buy ? bid : ask;
+  final below = buy == (kind == 'sl');
+  final p = below ? (price < ref - lim ? price : ref - lim) : (price > ref + lim ? price : ref + lim);
+  return _round(p, digits);
+}
+
+/// Where a tapped handle puts the stop (web trade-handles.ts defaultStop): the order tickets' starting distance —
+/// twice the spread, at least 10 pips, for the stop loss and twice that for the take profit — from the price the
+/// position closes at now, held on the valid side.
+double defaultStop(String kind, String side, {required double bid, required double ask, required double pip, required double gap, required int digits}) {
+  final spreadPips = pip > 0 ? ((ask - bid) / pip).clamp(1, 1e9) : 1;
+  final base = (spreadPips * 2).round() < 10 ? 10 : (spreadPips * 2).round();
+  final dist = (kind == 'sl' ? base : base * 2) * pip;
+  final buy = side == 'buy';
+  final ref = buy ? bid : ask;
+  final up = buy == (kind == 'tp');
+  return clampStop(kind, side, ref + (up ? dist : -dist), bid: bid, ask: ask, gap: gap, digits: digits);
 }
 
 /// The chart's colours (web readPalette): CSS colour strings.

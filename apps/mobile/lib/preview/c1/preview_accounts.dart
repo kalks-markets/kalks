@@ -3,9 +3,11 @@
 // engine's account views); values are made up. Return null for paths this file doesn't answer.
 //
 // `trading/accounts` is a superset of the shared sample (lib/preview/preview_data.dart): the same three accounts and
-// figures, plus the default star, demo terms, one pending order and an archived account. Changes made in the preview
+// figures, plus the default star, demo terms, one pending order, an archived account and a demo Options account
+// (the Options Standard group: options trade in their own account; the groups carry their product). Changes made in the preview
 // (rename, default, leverage, archive / restore, closure requests, new accounts) are kept until the app restarts
 // (`resetPreviewAccounts()` in tests). Step-up protected writes answer 403 stepup_required without `stepup_token`.
+import '../../features/terminal/preview/preview_server.dart';
 import '../preview_data.dart' as shared;
 
 Map<String, dynamic> _error(String code, String message) => {
@@ -40,6 +42,32 @@ void resetPreviewAccounts() {
 }
 
 String _ago(Duration d) => DateTime.now().toUtc().subtract(d).toIso8601String();
+
+/// The sample Options account (demo, Options Standard): the options workspace of Kalks Trader opens on it.
+const int previewOptionsLogin = 20019001;
+
+Map<String, dynamic> get _optionsAccount => {
+  ...(shared.previewAccounts['accounts'] as List).first as Map<String, dynamic>,
+  'login': previewOptionsLogin,
+  'type': 'demo',
+  'group': 'options-standard',
+  'groupName': 'Options Standard',
+  'product': 'options',
+  'name': '',
+  'leverage': 100,
+  'leverages': [100],
+  'positions': 0,
+  'orders': 0,
+  'balance': 10000,
+  'profit': 0,
+  'equity': 10000,
+  'margin': 0,
+  'freeMargin': 10000,
+  'marginLevel': null,
+  'withdrawable': 10000,
+  'demo': {'initialBalance': 10000, 'refillsPerDay': 3, 'refillsUsedToday': 0, 'expiryDays': 30},
+  'createdAt': '2026-09-21T08:00:00Z',
+};
 
 /// The archived sample account (Archived tab).
 Map<String, dynamic> get _archivedAccount => {
@@ -90,6 +118,7 @@ List<Map<String, dynamic>> _accounts() {
         },
         if (a['type'] == 'demo') 'demo': {'initialBalance': 25000, 'refillsPerDay': 3, 'refillsUsedToday': 1, 'expiryDays': 30},
       },
+    _optionsAccount,
     _archivedAccount,
     ..._opened,
   ];
@@ -323,9 +352,11 @@ Map<String, dynamic> _group(
   double commission = 0,
   int max = 5,
   bool swapFree = false,
+  String product = 'cfd',
 }) => {
   'code': code,
   'name': name,
+  'product': product,
   'mode': mode,
   'cent': cent,
   'accountTypes': types,
@@ -362,6 +393,8 @@ final List<Map<String, dynamic>> _groups = [
     commission: 3,
     max: 2,
   ),
+  // the Options Standard group (leverage doesn't apply to options: one fixed value)
+  _group('options-standard', 'Options Standard', leverages: [100], defaultLeverage: 100, marginCall: 100, stopOut: 50, product: 'options'),
 ];
 
 /* ------------------------------------------------------------------ answers */
@@ -551,7 +584,9 @@ List<Map<String, dynamic>> _groupOptions(Map<String, dynamic> a) {
   final cent = a['cent'] == true;
   return [
     for (final g in _groups)
-      if (g['code'] != a['group'] && (g['accountTypes'] == 'both' || g['accountTypes'] == a['type']))
+      if (g['code'] != a['group'] &&
+          (g['accountTypes'] == 'both' || g['accountTypes'] == a['type']) &&
+          g['product'] == (a['product'] == 'options' ? 'options' : 'cfd'))
         () {
           Map<String, String>? blocker;
           if (g['cent'] != cent) {
@@ -601,6 +636,7 @@ List<Map<String, dynamic>> _groupOptions(Map<String, dynamic> a) {
     'type': type,
     'group': g['code'],
     'groupName': g['name'],
+    'product': g['product'],
     'mode': g['mode'],
     'cent': g['cent'],
     'currency': g['cent'] == true ? 'USC' : 'USD',
@@ -622,6 +658,17 @@ List<Map<String, dynamic>> _groupOptions(Map<String, dynamic> a) {
     if (demo) 'demo': {'initialBalance': balance, 'refillsPerDay': 3, 'refillsUsedToday': 0, 'expiryDays': 30},
   };
   _opened.add(account);
+  // the preview trade server opens it in Kalks Trader too
+  PreviewServer.instance.addAccount(
+    login: login,
+    type: '$type',
+    group: '${g['code']}',
+    groupName: '${g['name']}',
+    balance: balance,
+    cent: g['cent'] == true,
+    leverage: (body['leverage'] as num?)?.toInt() ?? (g['defaultLeverage'] as int),
+    product: '${g['product'] ?? 'cfd'}',
+  );
   return (
     200,
     {

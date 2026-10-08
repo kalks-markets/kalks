@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "BUY STOP LMT {lot}",
   "line.sellStopLimit": "SELL STOP LMT {lot}",
   "line.alert": "ALARM",
-  "line.posTitle": "Ziehen, um SL/TP zu setzen · Doppelklick zum Ändern",
+  "line.posTitle": "S oder T (oder die Linie) ziehen, um SL/TP zu setzen · Doppelklick zum Ändern",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "Stop Loss: auf einen Kurs ziehen oder für den Standardabstand klicken",
+  "line.tpHandleTitle": "Take Profit: auf einen Kurs ziehen oder für den Standardabstand klicken",
   "line.dragTitle": "Ziehen zum Verschieben",
   "line.remove": "{label} entfernen",
 

@@ -29,6 +29,25 @@ pub fn user_of(h: &HeaderMap, q: Option<i64>) -> ApiResult<i64> {
     super::user_id(h.get("x-kalks-user-id").and_then(|v| v.to_str().ok()).map(str::to_string), q)
 }
 
+/// Accounts of `user` of `kind` that count against the account limit of a `product` group (CFD / Options account
+/// split: a client may hold up to the group's `maxAccountsPerUser` CFD accounts AND as many Options accounts, per
+/// live / demo): not retired, not `except`, and not in a system-managed group (copy, PAMM, MAM, prop and the market
+/// maker's: the platform opens those, never the client).
+pub fn product_accounts_used(st: &AppState, tenant: &crate::rules::TenantConfig, user: i64, kind: AccountKind, product: crate::rules::Product, except: Option<i64>) -> u32 {
+    let idx = st.hub.shared.index.read().unwrap();
+    idx.accounts
+        .iter()
+        .filter(|(l, m)| Some(**l) != except && m.tenant_id == tenant.tenant_id && m.user_id == user && m.kind == kind && !m.status.is_retired())
+        .filter(|(_, m)| !crate::engine::options::system_group(&m.group) && m.group != crate::book::LP_GROUP)
+        .filter(|(_, m)| tenant.groups.get(&m.group).map(|g| g.product).unwrap_or_default() == product)
+        .count() as u32
+}
+
+/// The `account_limit` refusal of a group.
+pub fn limit_message(g: &crate::rules::Group, kind: AccountKind) -> String {
+    format!("You can have at most {} {} {} account(s)", g.max_accounts_per_user, kind.as_str(), funds::product_name(g.product))
+}
+
 /// The account must belong to the tenant and to the calling user.
 pub fn owned(st: &AppState, ctx: &Ctx, login: i64, user: i64) -> ApiResult<crate::shard::AccountMeta> {
     let m = st.hub.meta(login).ok_or_else(|| ApiError::NotFound("Account not found".into()))?;
@@ -106,12 +125,8 @@ pub async fn open(State(st): State<AppState>, ctx: Ctx, headers: HeaderMap, Body
     let (th, ih) = tokio::task::spawn_blocking(move || -> anyhow::Result<(String, String)> { Ok((auth::hash_password(&password)?, auth::hash_password(&investor)?)) }).await??;
 
     let _guard = st.open_lock.lock().await;
-    let used = {
-        let idx = st.hub.shared.index.read().unwrap();
-        idx.accounts.values().filter(|m| m.tenant_id == ctx.tenant.tenant_id && m.user_id == user && m.kind == kind && m.group == g.code && !m.status.is_retired()).count()
-    };
-    if used as u32 >= g.max_accounts_per_user {
-        return Err(ApiError::Conflict { code: "account_limit", message: format!("You can have at most {} {} account(s) in {}", g.max_accounts_per_user, kind.as_str(), g.name) });
+    if product_accounts_used(&st, &ctx.tenant, user, kind, g.product, None) >= g.max_accounts_per_user {
+        return Err(ApiError::Conflict { code: "account_limit", message: limit_message(&g, kind) });
     }
     let login = match kind {
         AccountKind::Live => st.logins.live.fetch_add(1, Ordering::SeqCst) + 1,

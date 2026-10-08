@@ -6,8 +6,10 @@
 //                                                 · More), each with its own stack; module pages under More
 //   /trader?login=                                Kalks Trader, full screen above the shell (any Trade button)
 //   /maintenance /update                          system states
+//   /unavailable?m=<module>                       a page of a module the broker switched off (web /unavailable)
 // Sub-pages of a module are siblings that share one page, the module pager (a finger slides between them, the URL
 // follows); detail pages are children (iOS push).
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -68,6 +70,9 @@ final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 const Set<String> _authPaths = {'/login', '/register', '/forgot'};
 const Set<String> _systemPaths = {'/boot', '/unlock', '/maintenance', '/update'};
+
+/// The "not available" page: a page of a module the broker switched off lands here (`?m=` names the module).
+const String kUnavailablePath = '/unavailable';
 
 /// The tab (shell branch) each module's pages live in.
 int branchOf(String moduleKey) => switch (moduleKey) {
@@ -145,8 +150,15 @@ final ModuleScreens _c1Screens = {
 /// Path and query of a location (deep links arrive with a scheme and host).
 String _loc(Uri uri) => '${uri.path.isEmpty ? '/' : uri.path}${uri.hasQuery ? '?${uri.query}' : ''}';
 
-/// Decides where a location may go, from the sign-in state, maintenance and the minimum app version.
-String? redirectFor({required AuthState auth, required bool maintenance, required bool updateRequired, required Uri uri}) {
+/// Decides where a location may go, from the sign-in state, maintenance, the minimum app version and the broker's
+/// module switches (`modules`, AppConfig.modules: a page of a module set to false goes to /unavailable).
+String? redirectFor({
+  required AuthState auth,
+  required bool maintenance,
+  required bool updateRequired,
+  required Uri uri,
+  Map<String, bool> modules = const {},
+}) {
   // https://trade.kalkstrade.com/… (Kalks Trader links) -> the terminal
   if (uri.host.startsWith('trade.')) return '/trader';
   final path = uri.path.isEmpty ? '/' : uri.path;
@@ -159,21 +171,28 @@ String? redirectFor({required AuthState auth, required bool maintenance, require
     case AuthLocked():
       // back to the same page after the unlock
       if (path == '/unlock') return null;
-      return _systemPaths.contains(path) || _authPaths.contains(path) || path == '/' ? '/unlock' : '/unlock?next=${Uri.encodeComponent(_loc(uri))}';
+      return _systemPaths.contains(path) || _authPaths.contains(path) || path == '/' || path == kUnavailablePath
+          ? '/unlock'
+          : '/unlock?next=${Uri.encodeComponent(_loc(uri))}';
     case AuthSignedOut():
       if (_authPaths.contains(path)) return null;
-      final next = _systemPaths.contains(path) || path == '/' ? null : _loc(uri);
+      final next = _systemPaths.contains(path) || path == '/' || path == kUnavailablePath ? null : _loc(uri);
       return next == null ? '/login' : '/login?next=${Uri.encodeComponent(next)}';
     case AuthSignedIn(:final me):
       if (_authPaths.contains(path) || _systemPaths.contains(path)) {
         final next = uri.queryParameters['next'];
         return next != null && next.startsWith('/') && !next.startsWith('//') ? next : '/';
       }
+      // the "not available" page itself never moves (no loop), whatever the switches and the login's sections
+      if (path == kUnavailablePath) return null;
+      final off = offModuleOf(modules, path);
+      if (off != null) return '$kUnavailablePath?m=$off';
       final v = me.viewer;
       if (v != null && path != '/more' && !viewerPageAllowed(v, path)) {
         return const ['dashboard', 'accounts', 'history', 'wallet', 'partner']
                 .where(v.sections.contains)
                 .map((s) => const {'dashboard': '/', 'accounts': '/accounts', 'history': '/portfolio/history', 'wallet': '/wallet', 'partner': '/partner'}[s]!)
+                .where((p) => offModuleOf(modules, p) == null)
                 .firstOrNull ??
             '/more';
       }
@@ -190,7 +209,8 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(authProvider, (_, _) => refresh.ping());
   ref.listen(maintenanceProvider, (_, _) => refresh.ping());
   ref.listen(configProvider, (a, b) {
-    if (a?.maintenance != b.maintenance || a?.minAppVersion != b.minAppVersion) refresh.ping();
+    // a module switched off (or on) while the app is open: the page in front leaves it, the navigation follows
+    if (a?.maintenance != b.maintenance || a?.minAppVersion != b.minAppVersion || !mapEquals(a?.modules, b.modules)) refresh.ping();
   });
   ref.onDispose(refresh.dispose);
 
@@ -205,6 +225,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         maintenance: cfg.maintenance || ref.read(maintenanceProvider),
         updateRequired: isOlderVersion(ref.read(appInfoProvider).version, cfg.minAppVersion),
         uri: state.uri,
+        modules: cfg.modules,
       );
       return to;
     },
@@ -220,6 +241,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/unlock', pageBuilder: (c, s) => _tab(const UnlockScreen(), s)),
       GoRoute(path: '/maintenance', pageBuilder: (c, s) => _tab(const MaintenanceScreen(), s)),
       GoRoute(path: '/update', pageBuilder: (c, s) => _tab(const UpdateScreen(), s)),
+      GoRoute(
+        path: kUnavailablePath,
+        pageBuilder: (c, s) => _tab(UnavailableScreen(module: s.uri.queryParameters['m']), s),
+      ),
       GoRoute(
         path: '/trader',
         parentNavigatorKey: rootNavigatorKey,

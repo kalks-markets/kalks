@@ -165,7 +165,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         </div>
       </TooltipProvider>
       {!IS_DEMO && <SessionGuard />}
-      {!viewer && <SupportLauncher />}
+      {!viewer && features?.modules.support_chat !== false && <SupportLauncher />}
     </NotificationsProvider>
   );
 }

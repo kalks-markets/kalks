@@ -38,6 +38,7 @@ class EngineGroup {
     required this.enabled,
     this.hedgedMarginPct = 0,
     this.spreadGroup = '',
+    this.product = 'cfd',
     this.raw = const {},
   });
 
@@ -55,7 +56,12 @@ class EngineGroup {
   final bool swapFree, enabled;
   final String spreadGroup;
   final int maxAccountsPerUser, demoRefillsPerDay, demoExpiryDays;
+
+  /// cfd | options: what accounts of this group trade.
+  final String product;
   final Map<String, dynamic> raw;
+
+  bool get isOptions => product == 'options';
 
   bool offers(AccountKind kind) => accountTypes == 'both' || accountTypes == kind.name;
 
@@ -79,6 +85,7 @@ class EngineGroup {
     demoRefillsPerDay: _i(j['demoRefillsPerDay']),
     demoExpiryDays: _i(j['demoExpiryDays']),
     enabled: j['enabled'] != false,
+    product: productOf(j['product']),
     raw: j,
   );
 }

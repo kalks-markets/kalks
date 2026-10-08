@@ -10,6 +10,8 @@ import { isArchived, toUsd, useAccounts, useGroups, type EngineAccount } from ".
 import { ArchivedAccountRow } from "./archive";
 import { EngineGroupCard } from "./group-card";
 import { LiveAccountRow, isPropAccount, refillsLeft } from "./ui";
+import { byProduct, optionsModuleOn, productOf, productOrder } from "@/lib/products";
+import { useFeatures } from "@/components/tenant-config";
 import { useReadOnly } from "@/components/session";
 
 export function AccountsError({ onRetry, message }: { onRetry: () => void; message?: string }) {
@@ -80,6 +82,7 @@ function Inner() {
   const list = active === "live" ? t.live : active === "demo" ? t.demo : t.archived;
   const refills = t.demo.reduce((s, a) => s + refillsLeft(a), 0);
   const readOnly = useReadOnly();
+  const optionsOn = optionsModuleOn(useFeatures()?.modules);
 
   return (
     <div className="pb-16">
@@ -176,9 +179,19 @@ function Inner() {
                     }
                   />
                 )}
-                {list.map((a) =>
-                  active === "archived" ? <ArchivedAccountRow key={a.login} a={a} onChanged={reload} /> : <LiveAccountRow key={a.login} a={a} onChanged={reload} />,
-                )}
+                {/* CFD / Options account split: the two products in their own sections once the client holds both */}
+                {(() => {
+                  const split = byProduct(list);
+                  const both = split.cfd.length > 0 && split.options.length > 0;
+                  return (["cfd", "options"] as const).map((p) =>
+                    split[p].length === 0 ? null : (
+                      <React.Fragment key={p}>
+                        {both && <div className="k-label pt-1" data-testid={`accounts-section-${p}`}>{tt(p === "options" ? "accounts.product.groupOptions" : "accounts.product.groupCfd")}</div>}
+                        {split[p].map((a) => (active === "archived" ? <ArchivedAccountRow key={a.login} a={a} onChanged={reload} /> : <LiveAccountRow key={a.login} a={a} onChanged={reload} />))}
+                      </React.Fragment>
+                    ),
+                  );
+                })()}
                 {!readOnly && active !== "archived" && <Link
                   href={`/accounts/new?type=${active}`}
                   className="flex items-center justify-center gap-2 rounded-[14px] border border-dashed border-line py-4 text-[13.5px] text-fg-3 transition-colors hover:border-ember/40 hover:bg-ember-soft hover:text-ember"
@@ -206,7 +219,7 @@ function Inner() {
               }
             />
             <div className="grid grid-cols-1 gap-4 px-4 pb-6 pt-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
-              {groups.data.groups.map((g) => (
+              {productOrder(groups.data.groups.filter((g) => optionsOn || productOf(g) !== "options")).map((g) => (
                 <Link key={g.code} href={`/accounts/new?group=${encodeURIComponent(g.code)}`} className="block">
                   <EngineGroupCard g={g} compact />
                 </Link>

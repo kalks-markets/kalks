@@ -298,6 +298,7 @@ const order = {
   "reject.symbol_halted": "Trading is halted on this symbol",
   "reject.symbol_close_only": "Only position closing is allowed on this symbol",
   "reject.not_hedging": "Close By needs a hedging account",
+  "reject.product_mismatch": "This account doesn't trade this product",
   "reject.invalid_close_by": "Invalid Close By",
   "reject.requote": "Requote",
   "reject.read_only": "Trading is disabled (investor password)",

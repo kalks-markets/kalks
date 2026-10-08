@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/api/api_error.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/notifications/notifications.dart';
 import '../../../../i18n/i18n.dart';
 import '../../../../ui/ui.dart';
@@ -976,7 +977,8 @@ class _ExplainIdeaState extends ConsumerState<_ExplainIdea> {
         'probProfit': double.parse(x.pop.toStringAsFixed(3)),
       },
     };
-    final api = ref.read(optionsApiProvider);
+    // the broker switched Kalks AI off (module `ai`): the built-in explanation, no call
+    final api = ref.read(configProvider).moduleOn('ai') ? ref.read(optionsApiProvider) : null;
     try {
       final r = api == null ? const <String, dynamic>{'configured': false} : await api.explain(body);
       if (!mounted) return;
@@ -990,6 +992,10 @@ class _ExplainIdeaState extends ConsumerState<_ExplainIdea> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
+      if (e.isModuleDisabled) {
+        setState(() => _x = (busy: false, text: '$plain ${t('trader.opt.simple.basicMore')}', ai: false, error: null));
+        return;
+      }
       final denied = switch (e.code) {
         'signin' => t('desk.ai.signin'),
         'rate_minute' => t('desk.ai.rateMinute', {'n': 10}),

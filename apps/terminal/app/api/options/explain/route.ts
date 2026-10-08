@@ -12,6 +12,8 @@ import type { NextRequest } from "next/server";
 import { LOCALES } from "@kalks/i18n/locales";
 import { sameOrigin } from "@/lib/engine/server";
 import { aiGate } from "@/lib/ai-guard";
+import { moduleOn } from "@/lib/tenant-brand";
+import { hostOf } from "@/lib/tenant-host";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,9 +30,10 @@ Rules:
 - Cover: what the idea bets on, what it costs now, when and how it makes money (breakeven), the most it can lose, how time passing affects it (time decay), and one plain sentence on the main risk.
 - 110 to 170 words, short paragraphs, no headings, no markdown, no emoji. Write it in the requested language; keep symbols, numbers and the currency code as given.`;
 
-/** GET: whether Claude is configured (never exposes the key). */
-export function GET() {
-  return Response.json({ configured: !!process.env.ANTHROPIC_API_KEY, model: MODEL });
+/** GET: whether Claude is configured (never exposes the key); not while the broker has Options or AI switched off. */
+export async function GET(req: NextRequest) {
+  const on = await moduleOn("options+ai", hostOf(req.headers));
+  return Response.json({ configured: on && !!process.env.ANTHROPIC_API_KEY, model: MODEL, ...(on ? {} : { code: "module_disabled" }) });
 }
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -41,6 +44,8 @@ function bad(status: number, error: string) {
 }
 
 export async function POST(req: NextRequest) {
+  // module switches: the broker switched Options or AI off
+  if (!(await moduleOn("options+ai", hostOf(req.headers)))) return Response.json({ configured: false, error: "AI isn't available on your account.", code: "module_disabled" }, { status: 403 });
   if (!sameOrigin(req)) return bad(403, "Cross-site request blocked.");
   const raw = await req.text();
   if (raw.length > 8000) return bad(413, "Request too large.");

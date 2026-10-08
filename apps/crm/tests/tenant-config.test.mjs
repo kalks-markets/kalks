@@ -15,6 +15,9 @@ const MODULES = {
   "api-off.broker.test": { api: false },
   "both-off.broker.test": { algo: false, api: false },
   "all-on.broker.test": {},
+  "new-off.broker.test": { options: false, news: false, calendar: false, markets: false, mam: false, support_chat: false },
+  "ai-off.broker.test": { ai: false },
+  "chat-ai-off.broker.test": { support_chat: false, ai: false },
 };
 let gateway;
 
@@ -83,4 +86,86 @@ test("the strategy catalogue and account picker stay open while Algo or API is o
   assert.equal(await gate(m, "algo-off.broker.test", "/api/algo/strategies"), "off");
   assert.equal(await gate(m, "algo-off.broker.test", "/api/algo/ai/strategy"), "off");
   assert.equal(await gate(m, "algo-off.broker.test", "/api/algo/keys"), "open");
+});
+
+test("the new module keys own their pages and BFF paths", async () => {
+  const { cfg } = await load();
+  const want = {
+    "/options": "options",
+    "/api/suitability/options": "options",
+    "/markets": "markets",
+    "/news": "news",
+    "/api/news/feed": "news",
+    "/api/news/map": "news",
+    "/api/news/brief": "news",
+    "/calendar": "calendar",
+    "/api/news/calendar/next": "calendar",
+    "/api/news/me/calendar/reminders": "calendar",
+    "/social/mam": "mam",
+    "/social/managed": "mam",
+    "/api/social/mam/links": "mam",
+    "/social/copy": "copy_trading",
+    "/social/pamm": "pamm",
+    "/api/support/messages": "support_chat|ai",
+    "/api/support/conversations/4/resolve": "support_chat|ai",
+    "/api/mobile/trade/options/orders": "options",
+    "/api/mobile/trade/options/explain": "options+ai",
+    "/api/mobile/trade/ai-trader": "ai",
+    "/api/mobile/trade/mam": "mam",
+  };
+  for (const [path, mod] of Object.entries(want)) assert.equal(cfg.moduleFor(path), mod, path);
+  // the bell's stream ticket and the Support page itself (email) stay open with the chat off
+  assert.equal(cfg.moduleFor("/api/support/stream-ticket"), null);
+  assert.equal(cfg.moduleFor("/support"), null);
+  assert.equal(cfg.moduleFor("/api/mobile/trade/orders"), null, "CFD trading is not a module");
+  // "+" needs every module, "|" any one of them
+  assert.equal(cfg.moduleOff({ ai: false }, "/api/mobile/trade/options/explain"), true);
+  assert.equal(cfg.moduleOff({ options: false }, "/api/mobile/trade/options/explain"), true);
+  assert.equal(cfg.moduleOff({}, "/api/mobile/trade/options/explain"), false);
+  assert.equal(cfg.offModule({ ai: false }, "/api/mobile/trade/options/explain"), "ai");
+  assert.equal(cfg.offModule({ options: false }, "/options"), "options");
+  assert.equal(cfg.offModule({}, "/options"), null);
+});
+
+test("pages of a switched-off module show the not-available page named after it; their APIs refuse", async () => {
+  const m = await load();
+  for (const [path, mod] of [["/options", "options"], ["/news", "news"], ["/calendar", "calendar"], ["/markets", "markets"], ["/social/mam", "mam"], ["/social/managed", "mam"]]) {
+    const res = await m.proxy(new m.NextRequest(`https://new-off.broker.test${path}`, { headers: { host: "new-off.broker.test" } }));
+    const to = new URL(res.headers.get("x-middleware-rewrite"));
+    assert.equal(to.pathname, "/unavailable", path);
+    assert.equal(to.searchParams.get("m"), mod, path);
+  }
+  for (const path of ["/api/news/feed", "/api/news/calendar", "/api/social/mam/links", "/api/suitability/options", "/api/support/messages"]) {
+    assert.equal(await gate(m, "new-off.broker.test", path), path === "/api/support/messages" ? "open" : "off", path);
+  }
+  // the rest of social, the Support page and the bell stay
+  assert.equal(await gate(m, "new-off.broker.test", "/api/social/funds"), "open");
+  assert.equal(await gate(m, "new-off.broker.test", "/api/support/stream-ticket"), "open");
+  // the chat API serves the chat and Ask Kalks AI: closed only when both are off
+  assert.equal(await gate(m, "ai-off.broker.test", "/api/support/messages"), "open");
+  assert.equal(await gate(m, "chat-ai-off.broker.test", "/api/support/messages"), "off");
+  assert.equal(await gate(m, "chat-ai-off.broker.test", "/api/support/stream-ticket"), "open");
+  // the app's native trade routes
+  assert.equal(await gate(m, "new-off.broker.test", "/api/mobile/trade/options/orders"), "off");
+  assert.equal(await gate(m, "ai-off.broker.test", "/api/mobile/trade/ai-trader"), "off");
+  assert.equal(await gate(m, "ai-off.broker.test", "/api/mobile/trade/options/explain"), "off");
+  assert.equal(await gate(m, "new-off.broker.test", "/api/mobile/trade/mam"), "off");
+  assert.equal(await gate(m, "all-on.broker.test", "/api/mobile/trade/options/orders"), "open");
+});
+
+test("navigation and commands drop the new modules' pages", async () => {
+  const { navForFeatures, pageModule } = await import("../components/tenant-config.tsx");
+  const nav = [
+    { key: "dashboard", label: "Dashboard", href: "/", sub: [{ href: "/", label: "Overview" }, { href: "/markets", label: "Markets" }, { href: "/news", label: "News" }, { href: "/calendar", label: "Calendar" }] },
+    { key: "options", label: "Options", href: "/options" },
+    { key: "social", label: "Social", href: "/social", sub: [{ href: "/social", label: "Discover" }, { href: "/social/mam", label: "MAM manager" }, { href: "/social/managed", label: "Managed" }] },
+  ];
+  const out = navForFeatures(nav, { modules: { markets: false, news: false, calendar: false, options: false, mam: false }, flags: {} });
+  assert.deepEqual(out.map((m) => m.key), ["dashboard", "social"]);
+  assert.deepEqual(out[0].sub.map((s) => s.href), ["/"]);
+  assert.deepEqual(out[1].sub.map((s) => s.href), ["/social"]);
+  assert.equal(pageModule("/social/managed"), "mam");
+  assert.equal(pageModule("/options"), "options");
+  // unknown config: everything stays
+  assert.equal(navForFeatures(nav, null).length, 3);
 });

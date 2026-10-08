@@ -508,7 +508,7 @@ const trader: NsMessages<"trader"> = {
 
   // Module not open yet / price server down
   "opt.soon.title": "オプション取引はまもなく開始",
-  "opt.soon.text": "この口座ではKalks FX Optionsをまだご利用いただけません。利用可能になり次第、CFDと同じ口座でオプションチェーンがここに表示されます。",
+  "opt.soon.text": "この口座ではKalks FX Optionsをまだご利用いただけません。利用可能になり次第、ここにオプションチェーンが表示されます。",
   "opt.soon.point1": "FX、金、銀、原油のコールとプット",
   "opt.soon.point2": "日次・週次・月次の満期、米ドルで現金決済",
   "opt.soon.point3": "買い手の損失は支払ったプレミアムを超えることはありません",
@@ -1246,5 +1246,9 @@ const trader: NsMessages<"trader"> = {
   "opt.bust.title": "ディーリングデスクが取引を取り消しました",
   "opt.bust.text": "{what} × {n}：取引は元に戻され、発生した手数料は返金されました。",
   "opt.tape.kind.bust": "取消",
+  // CFD / Options account split
+  "acct.openCfd": "CFD口座を開設",
+  "acct.openOptions": "オプション口座を開設",
+  "opt.err.product_mismatch": "これはCFD口座です。オプションはオプション口座で取引します。",
 };
 export default trader;

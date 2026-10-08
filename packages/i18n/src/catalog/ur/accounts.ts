@@ -548,5 +548,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "آپشن پریمیم",
   "ledgerKind.option_settlement": "آپشن سیٹلمنٹ",
   "ledgerKind.option_rebate": "میکر ریبیٹ",
+  // CFD / Options account split
+  "product.cfd": "CFD اکاؤنٹ",
+  "product.options": "آپشنز اکاؤنٹ",
+  "product.cfdText": "فاریکس، دھاتیں، انڈیکسز، اسٹاکس اور کرپٹو بطور CFD، لیوریج کے ساتھ۔",
+  "product.optionsText": "فاریکس، سونا، چاندی اور تیل پر کالز اور پٹس، نقد تصفیہ۔",
+  "product.chipOptions": "آپشنز",
+  "product.groupCfd": "CFD اکاؤنٹس",
+  "product.groupOptions": "آپشنز اکاؤنٹس",
+  "wizard.step.product": "پروڈکٹ",
+  "wizard.productTitle": "یہ اکاؤنٹ کیا ٹریڈ کرے گا؟",
+  "wizard.productSubtitle": "ہر اکاؤنٹ ایک ہی پروڈکٹ ٹریڈ کرتا ہے۔ آپ دونوں رکھ سکتے ہیں۔",
+  "wizard.noGroups": "اس وقت اس پروڈکٹ کے لیے کوئی اکاؤنٹ قسم دستیاب نہیں۔",
+  "wizard.introFirst": "آپ کے پہلے آپشنز اکاؤنٹ سے پہلے ایک مختصر قدم: 1 منٹ کا آپشنز تعارف۔",
+  "wizard.agreeLiveOptions": "میں سمجھتا/سمجھتی ہوں کہ آپشنز میں خطرہ زیادہ ہے: خریدا گیا آپشن بے قدر ہو کر ختم ہو سکتا ہے، اور بیچے گئے آپشن میں ملنے والے پریمیم سے زیادہ نقصان ہو سکتا ہے۔",
 };
 export default accounts;

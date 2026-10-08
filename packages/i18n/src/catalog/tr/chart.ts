@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "AL STOP LMT {lot}",
   "line.sellStopLimit": "SAT STOP LMT {lot}",
   "line.alert": "UYARI",
-  "line.posTitle": "SL/TP ayarlamak için sürükleyin · değiştirmek için çift tıklayın",
+  "line.posTitle": "SL/TP ayarlamak için S veya T'yi (ya da çizgiyi) sürükleyin · değiştirmek için çift tıklayın",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "Zarar durdur: bir fiyata sürükleyin veya varsayılan mesafe için tıklayın",
+  "line.tpHandleTitle": "Kâr al: bir fiyata sürükleyin veya varsayılan mesafe için tıklayın",
   "line.dragTitle": "Taşımak için sürükleyin",
   "line.remove": "{label} kaldır",
 

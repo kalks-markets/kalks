@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "خرید اسٹاپ لمٹ {lot}",
   "line.sellStopLimit": "فروخت اسٹاپ لمٹ {lot}",
   "line.alert": "الرٹ",
-  "line.posTitle": "SL/TP سیٹ کرنے کے لیے ڈریگ کریں · ترمیم کے لیے ڈبل کلک کریں",
+  "line.posTitle": "SL/TP سیٹ کرنے کے لیے S یا T (یا لائن) ڈریگ کریں · ترمیم کے لیے ڈبل کلک کریں",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "اسٹاپ لاس: کسی قیمت تک ڈریگ کریں، یا ڈیفالٹ فاصلے کے لیے کلک کریں",
+  "line.tpHandleTitle": "ٹیک پرافٹ: کسی قیمت تک ڈریگ کریں، یا ڈیفالٹ فاصلے کے لیے کلک کریں",
   "line.dragTitle": "منتقل کرنے کے لیے ڈریگ کریں",
   "line.remove": "{label} ہٹائیں",
 

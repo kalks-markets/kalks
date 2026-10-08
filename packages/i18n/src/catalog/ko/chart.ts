@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "매수 스톱 리밋 {lot}",
   "line.sellStopLimit": "매도 스톱 리밋 {lot}",
   "line.alert": "알림",
-  "line.posTitle": "드래그하여 SL/TP 설정 · 더블 클릭하여 수정",
+  "line.posTitle": "S 또는 T(또는 라인)를 드래그하여 SL/TP 설정 · 더블 클릭하여 수정",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "손절매: 가격까지 드래그하거나 클릭하여 기본 거리로 설정",
+  "line.tpHandleTitle": "이익 실현: 가격까지 드래그하거나 클릭하여 기본 거리로 설정",
   "line.dragTitle": "드래그하여 이동",
   "line.remove": "{label} 제거",
 

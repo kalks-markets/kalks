@@ -17,6 +17,7 @@ import '../../core/models/account.dart';
 import '../../core/models/trading.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
+import '../accounts/widgets/account_bits.dart' show ProductChip, ProductSection, byProduct;
 import 'portfolio_data.dart';
 import 'portfolio_logic.dart';
 import 'widgets/portfolio_bits.dart';
@@ -260,54 +261,59 @@ class _AccountsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          for (final a in accounts) ...[
-            KPressable(
-              pressedScale: 0.99,
-              semanticLabel: '#${a.login}',
-              onTap: () => context.go('/accounts/${a.login}'),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
-                decoration: BoxDecoration(
-                  color: k.surface2.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: k.line),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        KindBadge(account: a),
-                        const SizedBox(width: 8),
-                        Text(
-                          '#${a.login}',
-                          textDirection: TextDirection.ltr,
-                          style: context.text.mono(13, color: k.fg),
-                        ),
-                        const Spacer(),
-                        Icon(Directionality.of(context) == TextDirection.rtl ? LucideIcons.chevronLeft : LucideIcons.chevronRight, size: 16, color: k.fg3),
-                      ],
-                    ),
-                    const SizedBox(height: 9),
-                    Row(
-                      children: [
-                        Expanded(flex: 5, child: cell(t('common.balance'), fmtAmount(a.balance, a.currencyPrefix))),
-                        Expanded(flex: 5, child: cell(t('common.equity'), fmtAmount(a.equity, a.currencyPrefix), bold: true)),
-                        Expanded(
-                          flex: 5,
-                          child: cell(t('portfolio.col.floating'), fmtAmount(a.profit, a.currencyPrefix, signed: true), color: signColor(k, a.profit)),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: cell(t('portfolio.col.positions'), '${a.positions}', color: k.fg2, align: CrossAxisAlignment.end),
-                        ),
-                      ],
-                    ),
-                  ],
+          // by product once the client holds an Options account: CFD accounts, then Options accounts
+          for (final (product, group) in byProduct(accounts)) ...[
+            if (accounts.any((a) => a.isOptions)) ProductSection(product: product, padding: const EdgeInsets.fromLTRB(2, 4, 2, 8)),
+            for (final a in group) ...[
+              KPressable(
+                pressedScale: 0.99,
+                semanticLabel: '#${a.login}',
+                onTap: () => context.go('/accounts/${a.login}'),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
+                  decoration: BoxDecoration(
+                    color: k.surface2.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: k.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          KindBadge(account: a),
+                          if (a.isOptions) ...[const SizedBox(width: 6), ProductChip(account: a)],
+                          const SizedBox(width: 8),
+                          Text(
+                            '#${a.login}',
+                            textDirection: TextDirection.ltr,
+                            style: context.text.mono(13, color: k.fg),
+                          ),
+                          const Spacer(),
+                          Icon(Directionality.of(context) == TextDirection.rtl ? LucideIcons.chevronLeft : LucideIcons.chevronRight, size: 16, color: k.fg3),
+                        ],
+                      ),
+                      const SizedBox(height: 9),
+                      Row(
+                        children: [
+                          Expanded(flex: 5, child: cell(t('common.balance'), fmtAmount(a.balance, a.currencyPrefix))),
+                          Expanded(flex: 5, child: cell(t('common.equity'), fmtAmount(a.equity, a.currencyPrefix), bold: true)),
+                          Expanded(
+                            flex: 5,
+                            child: cell(t('portfolio.col.floating'), fmtAmount(a.profit, a.currencyPrefix, signed: true), color: signColor(k, a.profit)),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: cell(t('portfolio.col.positions'), '${a.positions}', color: k.fg2, align: CrossAxisAlignment.end),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
+            ],
           ],
         ],
       ),

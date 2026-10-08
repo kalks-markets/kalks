@@ -403,5 +403,7 @@ const order: NsMessages<"order"> = {
   "toast.sessionExpired": "Sesi tamat tempoh",
   "toast.sessionExpiredDesc": "Sesi anda untuk {login} telah tamat. Log masuk semula untuk berdagang.",
   "toast.loggedOut": "Log keluar daripada {login}",
+  // CFD / Options account split
+  "reject.product_mismatch": "Akaun ini tidak mendagangkan produk ini",
 };
 export default order;

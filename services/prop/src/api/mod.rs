@@ -24,11 +24,8 @@ use crate::ops::App;
 use crate::store::Actor;
 
 pub fn router(app: App) -> Router {
-    let api = Router::new()
-        // public (through the BFF)
-        .route("/v1/public/certificates/{code}", get(public::certificate))
-        .route("/v1/public/certificates/{code}/image.svg", get(public::certificate_svg))
-        // client
+    // client routes: refused while the broker has the prop module off (modules.rs)
+    let client = Router::new()
         .route("/v1/plans", get(client::plans))
         .route("/v1/challenges", get(client::challenges).post(client::purchase))
         .route("/v1/challenges/{id}", get(client::challenge))
@@ -40,6 +37,12 @@ pub fn router(app: App) -> Router {
         .route("/v1/certificates", get(client::certificates))
         .route("/v1/notifications", get(client::notifications))
         .route("/v1/notifications/read", post(client::notifications_read))
+        .route_layer(middleware::from_fn_with_state(app.clone(), crate::modules::gate));
+    let api = Router::new()
+        // public (through the BFF): certificates stay verifiable
+        .route("/v1/public/certificates/{code}", get(public::certificate))
+        .route("/v1/public/certificates/{code}/image.svg", get(public::certificate_svg))
+        .merge(client)
         // staff
         .route("/v1/admin/overview", get(admin::overview))
         .route("/v1/admin/plans", get(admin::plans).post(admin::create_plan))

@@ -341,15 +341,25 @@ pub fn change_leverage(tx: &mut Tx, env: &Env, leverage: u32, staff: bool) -> Re
     Ok((from, leverage))
 }
 
-/// Moves the account to another group. Mode (netting/hedging) can only change while flat, and the cent flag
-/// never changes (the ledger currency is fixed at opening).
-pub fn change_group(tx: &mut Tx, new: &crate::rules::Group) -> Result<(String, String), Reject> {
+/// Moves the account to another group (`env.group` = its current one). Mode (netting/hedging) can only change while
+/// flat, the cent flag never changes (the ledger currency is fixed at opening), and neither does the product: a CFD
+/// account never becomes an Options account or the reverse (CFD / Options account split).
+pub fn change_group(tx: &mut Tx, env: &Env, new: &crate::rules::Group) -> Result<(String, String), Reject> {
     let a0 = tx.st.account.clone();
     if new.code == a0.group {
         return Err(Reject::new("no_change", "Nothing changed"));
     }
     if new.cent != a0.cent {
         return Err(Reject::new("invalid_group", "An account cannot move between cent and standard currency groups"));
+    }
+    if new.product != env.group.product {
+        return Err(Reject::new(
+            "product_mismatch",
+            match env.group.product {
+                crate::rules::Product::Cfd => format!("A CFD account can't move to {}, an Options group: open an Options account instead", new.name),
+                crate::rules::Product::Options => format!("An Options account can't move to {}, a CFD group: open a CFD account instead", new.name),
+            },
+        ));
     }
     if !new.allows(a0.kind.as_str()) {
         return Err(Reject::new("invalid_group", format!("Group {} does not accept {} accounts", new.name, a0.kind.as_str())));
@@ -370,6 +380,14 @@ pub fn change_group(tx: &mut Tx, new: &crate::rules::Group) -> Result<(String, S
     }
     tx.emit(Event::AccountUpdated { account: a, change: format!("group {} → {}", a0.group, new.code) });
     Ok((a0.group, new.code.clone()))
+}
+
+/// "CFD" / "Options" in refusal messages.
+pub fn product_name(p: crate::rules::Product) -> &'static str {
+    match p {
+        crate::rules::Product::Cfd => "CFD",
+        crate::rules::Product::Options => "Options",
+    }
 }
 
 pub fn set_status(tx: &mut Tx, status: crate::model::Status) -> Result<(), Reject> {

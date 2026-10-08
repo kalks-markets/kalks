@@ -12,6 +12,10 @@
 //   9 getting started checklist
 //   then Markets (movers, heatmap, calendar, news, world) and More for you (Kalks Trader, your account, market clock,
 //   support).
+// The broker's module switches (AppConfig.modules) take out everything that leads into a switched-off module: the
+// wallet's money actions, KPI, prompt, step and activity, rewards, copy trading, partner, Ask Kalks AI (`ai`; without
+// `support_chat` it has no way into the chat), the Markets section's cards (markets, calendar, news) and the hero's
+// options pill (web live-dashboard.tsx `on(...)`).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -99,8 +103,8 @@ DashStep walletStep(WalletOverview? o, T t) {
   return (key: 'wallet', icon: LucideIcons.wallet, title: title, text: t('wallet.onboarding.todo'), state: 'todo', href: '/wallet/deposit');
 }
 
-/// Every step driven by the real client record (web steps()).
-List<DashStep> dashboardSteps(SessionUser me, List<EngineAccount>? accounts, WalletOverview? wallet, T t, LocaleFormat f) {
+/// Every step driven by the real client record (web steps()); "Fund your wallet" only with the wallet module on.
+List<DashStep> dashboardSteps(SessionUser me, List<EngineAccount>? accounts, WalletOverview? wallet, T t, LocaleFormat f, {bool walletOn = true}) {
   final live = accounts?.where((a) => a.live).length ?? 0;
   final demo = accounts?.where((a) => !a.live).length ?? 0;
   final opened = live + demo > 0;
@@ -131,7 +135,7 @@ List<DashStep> dashboardSteps(SessionUser me, List<EngineAccount>? accounts, Wal
       state: opened ? 'done' : 'todo',
       href: opened ? '/accounts' : '/accounts/new',
     ),
-    walletStep(wallet, t),
+    if (walletOn) walletStep(wallet, t),
   ];
 }
 
@@ -218,16 +222,25 @@ class DashboardScreen extends ConsumerWidget {
     final readOnly = me.readOnly;
     final hidden = ref.watch(hideBalancesProvider);
     final f = LocaleFormat(t.locale);
+    // the broker's module switches: nothing below leads into a switched-off module (nor loads its data)
+    final config = ref.watch(configProvider);
+    final walletOn = config.moduleOn('wallet');
+    final rewardsOn = config.moduleOn('rewards');
+    final copyOn = pageOn(config, '/social');
+    final partnerOn = pageOn(config, '/partner');
+    final marketsOn = pageOn(config, '/markets');
+    final calendarOn = pageOn(config, '/calendar');
+    final newsOn = pageOn(config, '/news');
+    final aiOn = config.moduleOn('ai');
 
     final acc = ref.watch(accountsProvider);
     final all = acc.value;
     // archived / closed accounts live on the Accounts page's Archived tab only
     final accounts = all?.where((a) => !a.archived).toList();
     final totals = AccountTotals(accounts ?? const []);
-    final walletAsync = ref.watch(walletOverviewProvider);
-    final wallet = walletAsync.value;
+    final wallet = walletOn ? ref.watch(walletOverviewProvider).value : null;
     final walletTotal = wallet?.usdt.total;
-    final rewards = ref.watch(rewardsProvider).value;
+    final rewards = rewardsOn ? ref.watch(rewardsProvider).value : null;
 
     // today's P&L: today's equity move net of deposits / withdrawals (reports), else the live accounts' floating P&L
     final week = ref.watch(equityCurveProvider(14)).value;
@@ -239,8 +252,9 @@ class DashboardScreen extends ConsumerWidget {
     }
     final hasLive = totals.live.isNotEmpty;
 
-    // carousel: live first, then demo, then prop
-    final ordered = [...totals.live, ...totals.demo, ...?accounts?.where((a) => a.prop)];
+    // carousel: CFD accounts, then Options accounts; each live first, then demo, then prop
+    final byKind = [...totals.live, ...totals.demo, ...?accounts?.where((a) => a.prop)];
+    final ordered = [...byKind.where((a) => !a.isOptions), ...byKind.where((a) => a.isOptions)];
 
     // prompts: verification, then funding
     final kyc = kycStep(me, t);
@@ -268,7 +282,7 @@ class DashboardScreen extends ConsumerWidget {
     ];
 
     // Getting started
-    final steps = dashboardSteps(me, accounts, wallet, t, f);
+    final steps = dashboardSteps(me, accounts, wallet, t, f, walletOn: walletOn);
     final done = steps.where((s) => s.state == 'done').length;
     final checklist = [
       for (final s in steps)
@@ -287,9 +301,9 @@ class DashboardScreen extends ConsumerWidget {
         ),
     ];
 
-    // activity tabs
-    final activity = ref.watch(walletActivityProvider);
-    final cfg = ref.watch(walletConfigProvider);
+    // activity tabs (History and Funding are the wallet's)
+    final activity = walletOn ? ref.watch(walletActivityProvider) : const AsyncValue<List<WalletActivity>>.data([]);
+    final cfg = walletOn ? ref.watch(walletConfigProvider) : const AsyncValue<List<ChainConfig>>.data([]);
     final historyRows = activity.hasValue ? [for (final x in activity.value!) _historyRow(context, x, f)] : (activity.hasError ? const <ListRowItem>[] : null);
     final fundingRows = cfg.hasValue
         ? [
@@ -315,41 +329,45 @@ class DashboardScreen extends ConsumerWidget {
         sub: t('dashboard.trader.chip'),
         action: (label: t('common.open'), href: '/trader', external: false),
       ),
-      ListRowItem(
-        key: 'copy',
-        icon: LucideIcons.copy,
-        tone: KTone.pink,
-        title: t('shell.nav.copyTrading'),
-        sub: t('shell.nav.social'),
-        action: (label: t('common.open'), href: '/social', external: false),
-      ),
-      ListRowItem(
-        key: 'ib',
-        icon: LucideIcons.award,
-        tone: KTone.amber,
-        title: t('shell.nav.partner'),
-        sub: t('dashboard.partner.chip'),
-        action: (label: t('common.open'), href: '/partner', external: false),
-      ),
-      ListRowItem(
-        key: 'loyalty',
-        icon: LucideIcons.gift,
-        tone: KTone.lavender,
-        title: t('shell.nav.loyalty'),
-        sub: rewards != null ? t('dashboard.home.points', {'points': Fmt.number(rewards.points, 0)}) : t('shell.nav.rewards'),
-        status: rewards != null ? (label: rewards.tierName, tone: KChipTone.ember) : null,
-        action: rewards == null ? (label: t('common.open'), href: '/rewards/loyalty', external: false) : null,
-      ),
+      if (copyOn)
+        ListRowItem(
+          key: 'copy',
+          icon: LucideIcons.copy,
+          tone: KTone.pink,
+          title: t('shell.nav.copyTrading'),
+          sub: t('shell.nav.social'),
+          action: (label: t('common.open'), href: '/social', external: false),
+        ),
+      if (partnerOn)
+        ListRowItem(
+          key: 'ib',
+          icon: LucideIcons.award,
+          tone: KTone.amber,
+          title: t('shell.nav.partner'),
+          sub: t('dashboard.partner.chip'),
+          action: (label: t('common.open'), href: '/partner', external: false),
+        ),
+      if (rewardsOn)
+        ListRowItem(
+          key: 'loyalty',
+          icon: LucideIcons.gift,
+          tone: KTone.lavender,
+          title: t('shell.nav.loyalty'),
+          sub: rewards != null ? t('dashboard.home.points', {'points': Fmt.number(rewards.points, 0)}) : t('shell.nav.rewards'),
+          status: rewards != null ? (label: rewards.tierName, tone: KChipTone.ember) : null,
+          action: rewards == null ? (label: t('common.open'), href: '/rewards/loyalty', external: false) : null,
+        ),
     ];
 
     // Ask Kalks AI: suggestions answered by the real support bot; account questions also show the client's own figures
     final liveAccts = totals.live;
     final aiChips = [
-      AiChip(
-        key: 'deposit',
-        label: t('dashboard.ai.chip.deposit'),
-        extra: AiLink(href: '/wallet/deposit', label: t('common.deposit')),
-      ),
+      if (walletOn)
+        AiChip(
+          key: 'deposit',
+          label: t('dashboard.ai.chip.deposit'),
+          extra: AiLink(href: '/wallet/deposit', label: t('common.deposit')),
+        ),
       AiChip(
         key: 'freeMargin',
         label: t('dashboard.ai.chip.freeMargin'),
@@ -378,7 +396,6 @@ class DashboardScreen extends ConsumerWidget {
     final kpiWidth = (width - 2 * _gutter) * 0.78;
     final rtl = Directionality.of(context) == TextDirection.rtl;
 
-    final config = ref.watch(configProvider);
     // the module's pages under the sheet's grabber (the shell's sub-nav, in the sheet while the picture shows)
     final subs = moduleOf(navFor(config, me), '/')?.sub ?? const <NavSub>[];
     final hero = dashboardHeroAt('/', config)
@@ -412,7 +429,7 @@ class DashboardScreen extends ConsumerWidget {
           // 1. header: the greeting as the title, the name in bold
           _Greeting(template: t.dyn('dashboard.greeting.${_greeting(DateTime.now())}'), name: me.firstName, verified: me.kycStatus == KycStatus.verified),
           // 1b. Ask Kalks AI
-          if (!readOnly) ...[const SizedBox(height: 16), AskAi(chips: aiChips)],
+          if (!readOnly && aiOn) ...[const SizedBox(height: 16), AskAi(chips: aiChips, chat: config.moduleOn('support_chat'))],
           const SizedBox(height: 24),
           // 2. total balance
           BalancePanel(
@@ -421,6 +438,7 @@ class DashboardScreen extends ConsumerWidget {
             changePct: todayPct,
             readOnly: readOnly,
             hidden: hidden,
+            wallet: walletOn,
           ),
           const SizedBox(height: 24),
           // 3. KPI cards
@@ -459,36 +477,40 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                   onTap: () => context.go('/portfolio/analytics'),
                 ),
-                const SizedBox(width: 12),
-                KKpiCard(
-                  width: kpiWidth,
-                  label: t('dashboard.home.walletBalance'),
-                  icon: LucideIcons.wallet,
-                  value: walletTotal == null ? const Text('—') : KMoney(walletTotal, style: context.text.moneyL, hidden: hidden),
-                  footer: Row(
-                    children: [
-                      const KCoinIcon('usdt', size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'USDT · TRC20 · BEP20',
-                        style: context.text.caption.copyWith(color: k.fg3, fontWeight: FontWeight.w600),
-                      ),
-                    ],
+                if (walletOn) ...[
+                  const SizedBox(width: 12),
+                  KKpiCard(
+                    width: kpiWidth,
+                    label: t('dashboard.home.walletBalance'),
+                    icon: LucideIcons.wallet,
+                    value: walletTotal == null ? const Text('—') : KMoney(walletTotal, style: context.text.moneyL, hidden: hidden),
+                    footer: Row(
+                      children: [
+                        const KCoinIcon('usdt', size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'USDT · TRC20 · BEP20',
+                          style: context.text.caption.copyWith(color: k.fg3, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    onTap: () => context.go('/wallet'),
                   ),
-                  onTap: () => context.go('/wallet'),
-                ),
-                const SizedBox(width: 12),
-                KKpiCard(
-                  width: kpiWidth,
-                  label: t('dashboard.home.rewards'),
-                  icon: LucideIcons.award,
-                  value: rewards == null ? const Text('—') : KMoney(rewards.points * rewards.pointValue, style: context.text.moneyL, hidden: hidden),
-                  chip: KChip(
-                    label: rewards == null ? t('shell.nav.loyalty') : t('dashboard.home.points', {'points': Fmt.number(rewards.points, 0)}),
-                    tone: KChipTone.gold,
+                ],
+                if (rewardsOn) ...[
+                  const SizedBox(width: 12),
+                  KKpiCard(
+                    width: kpiWidth,
+                    label: t('dashboard.home.rewards'),
+                    icon: LucideIcons.award,
+                    value: rewards == null ? const Text('—') : KMoney(rewards.points * rewards.pointValue, style: context.text.moneyL, hidden: hidden),
+                    chip: KChip(
+                      label: rewards == null ? t('shell.nav.loyalty') : t('dashboard.home.points', {'points': Fmt.number(rewards.points, 0)}),
+                      tone: KChipTone.gold,
+                    ),
+                    onTap: () => context.go('/rewards/loyalty'),
                   ),
-                  onTap: () => context.go('/rewards/loyalty'),
-                ),
+                ],
               ],
             ),
           ),
@@ -508,8 +530,11 @@ class DashboardScreen extends ConsumerWidget {
                 : (a) => Row(
                     children: [
                       Expanded(child: TradeButton(account: a, expand: true)),
-                      if (a.live ? !a.prop : true) const SizedBox(width: 8),
-                      if (a.live && !a.prop) FundButton(account: a) else if (!a.live) RefillButton(account: a, onDone: () => ref.invalidate(accountsProvider)),
+                      if (a.live ? !a.prop && walletOn : true) const SizedBox(width: 8),
+                      if (a.live && !a.prop && walletOn)
+                        FundButton(account: a)
+                      else if (!a.live)
+                        RefillButton(account: a, onDone: () => ref.invalidate(accountsProvider)),
                       const SizedBox(width: 4),
                       AccountMenuButton(account: a, onChanged: () => ref.invalidate(accountsProvider)),
                     ],
@@ -519,14 +544,15 @@ class DashboardScreen extends ConsumerWidget {
           // 5. quick actions
           QuickActions(
             items: [
-              (
-                label: t('common.transfer'),
-                icon: rtl ? LucideIcons.arrowRightLeft : LucideIcons.arrowLeftRight,
-                tone: KTone.lavender,
-                onTap: () => context.go('/wallet/transfer'),
-              ),
+              if (walletOn)
+                (
+                  label: t('common.transfer'),
+                  icon: rtl ? LucideIcons.arrowRightLeft : LucideIcons.arrowLeftRight,
+                  tone: KTone.lavender,
+                  onTap: () => context.go('/wallet/transfer'),
+                ),
               (label: 'Kalks Trader', icon: LucideIcons.candlestickChart, tone: KTone.accent, onTap: () => context.push('/trader')),
-              (label: t('shell.nav.copyTrading'), icon: LucideIcons.copy, tone: KTone.pink, onTap: () => context.go('/social')),
+              if (copyOn) (label: t('shell.nav.copyTrading'), icon: LucideIcons.copy, tone: KTone.pink, onTap: () => context.go('/social')),
               (label: t('shell.nav.support'), icon: LucideIcons.lifeBuoy, tone: KTone.amber, onTap: () => context.go('/support')),
             ],
           ),
@@ -539,33 +565,35 @@ class DashboardScreen extends ConsumerWidget {
           // 8. activity tabs
           ActivityTabs(
             tabs: [
-              ActivityTab(
-                key: 'history',
-                label: t('dashboard.home.history'),
-                rows: historyRows,
-                empty: t('wallet.recent.emptyText'),
-                more: (label: t('common.viewAll'), href: '/wallet/history'),
-              ),
-              ActivityTab(key: 'funding', label: t('dashboard.home.funding'), rows: fundingRows, empty: t('wallet.recent.emptyText')),
+              if (walletOn) ...[
+                ActivityTab(
+                  key: 'history',
+                  label: t('dashboard.home.history'),
+                  rows: historyRows,
+                  empty: t('wallet.recent.emptyText'),
+                  more: (label: t('common.viewAll'), href: '/wallet/history'),
+                ),
+                ActivityTab(key: 'funding', label: t('dashboard.home.funding'), rows: fundingRows, empty: t('wallet.recent.emptyText')),
+              ],
               ActivityTab(key: 'linked', label: t('dashboard.home.linked'), rows: linkedRows, empty: ''),
             ],
           ),
           const SizedBox(height: 24),
           // 9. getting started
           ChecklistCard(title: t('dashboard.steps.title'), subtitle: t('dashboard.steps.subtitle'), rows: checklist, done: done, total: steps.length),
-          // Markets
-          const SizedBox(height: 36),
-          KSectionTitle(t('dashboard.home.marketsTitle'), large: true),
-          const SizedBox(height: 16),
-          FeedGuard(title: t('dashboard.movers.title'), minHeight: 320, child: const MoversCard()),
-          const SizedBox(height: 24),
-          FeedGuard(title: t('dashboard.heatmap.title'), minHeight: 320, child: const HeatmapCard()),
-          const SizedBox(height: 24),
-          const CalendarCard(),
-          const SizedBox(height: 24),
-          const NewsCard(),
-          const SizedBox(height: 24),
-          const WorldCard(),
+          // Markets: each card with its module (Markets, Calendar, News)
+          if (marketsOn || calendarOn || newsOn) ...[
+            const SizedBox(height: 36),
+            KSectionTitle(t('dashboard.home.marketsTitle'), large: true),
+            ..._spaced([
+              if (marketsOn) ...[
+                FeedGuard(title: t('dashboard.movers.title'), minHeight: 320, child: const MoversCard()),
+                FeedGuard(title: t('dashboard.heatmap.title'), minHeight: 320, child: const HeatmapCard()),
+              ],
+              if (calendarOn) const CalendarCard(),
+              if (newsOn) ...[const NewsCard(), const WorldCard()],
+            ], first: 16),
+          ],
           // More for you
           const SizedBox(height: 36),
           KSectionTitle(t('dashboard.home.moreTitle'), large: true),
@@ -581,6 +609,11 @@ class DashboardScreen extends ConsumerWidget {
       ),
     );
   }
+
+  /// The cards of a section with the page's gaps between them (`first` above the first one).
+  static List<Widget> _spaced(List<Widget> cards, {required double first}) => [
+    for (var i = 0; i < cards.length; i++) ...[SizedBox(height: i == 0 ? first : 24), cards[i]],
+  ];
 
   ListRowItem _historyRow(BuildContext context, WalletActivity x, LocaleFormat f) {
     final t = context.t;

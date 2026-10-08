@@ -133,7 +133,7 @@ function readVar(el: Element, name: string, fallback: string) {
 export function readPalette(el: Element): Palette {
   const dark = !document.documentElement.classList.contains("light");
   return {
-    up: readVar(el, "--k-up", "#22c55e"),
+    up: readVar(el, "--k-up", "#2f7bff"),
     down: readVar(el, "--k-down", "#f04438"),
     gold: readVar(el, "--k-gold", "#e9b949"),
     ember: readVar(el, "--k-ember", "#ff5a1f"),
@@ -272,10 +272,10 @@ export function useChartEngine(
       chart.timeScale().scrollToRealTime();
     });
 
-    /* ---- bid / ask lines (account group's spread) ---- */
+    /* ---- bid / ask lines (account group's spread): the ask is the buy price, in the buy colour ---- */
     const snap = priceFeed().quote(symbol);
     const bidLine = main.createPriceLine({ price: snap.bid, color: c.fg2, lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "", axisLabelColor: c.fg2, axisLabelTextColor: c.dark ? "#0a0a0d" : "#fff" });
-    const askLine = main.createPriceLine({ price: snap.ask, color: c.down, lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "", axisLabelColor: c.down, axisLabelTextColor: "#fff" });
+    const askLine = main.createPriceLine({ price: snap.ask, color: c.up, lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "", axisLabelColor: c.up, axisLabelTextColor: "#fff" });
 
     /* ---- legend ---- */
     // today's open from the service (rolls at New York close); the simulator falls back to ~1 day of bars back
@@ -429,7 +429,7 @@ export function useChartEngine(
       main.applyOptions({ priceLineColor: c.fg2 });
       vol.setData(data.map((d) => ({ time: t(d.time), value: d.volume, color: volColor(d) })));
       indicators.setPalette(c);
-      askLine.applyOptions({ color: c.down, axisLabelColor: c.down });
+      askLine.applyOptions({ color: c.up, axisLabelColor: c.up });
       bidLine.applyOptions({ color: c.fg2, axisLabelColor: c.fg2, axisLabelTextColor: c.dark ? "#0a0a0d" : "#fff" });
       watermark.applyOptions({ dark: c.dark });
       legendRef.current(legendAt(hovering >= 0 ? hovering : data.length - 1));

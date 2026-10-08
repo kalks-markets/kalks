@@ -402,5 +402,7 @@ const order: NsMessages<"order"> = {
   "toast.sessionExpired": "세션 만료",
   "toast.sessionExpiredDesc": "{login} 세션이 종료되었습니다. 거래하려면 다시 로그인하세요.",
   "toast.loggedOut": "{login}에서 로그아웃했습니다",
+  // CFD / Options account split
+  "reject.product_mismatch": "이 계좌는 이 상품을 거래하지 않습니다",
 };
 export default order;

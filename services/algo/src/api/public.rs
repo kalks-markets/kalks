@@ -111,6 +111,10 @@ async fn run(st: AppState, peer: Option<SocketAddr>, headers: HeaderMap, method:
         Ok(k) => k,
         Err(e) => return e.into_response(),
     };
+    // the broker switched the public API off (module switches, gateway)
+    if let Err(e) = crate::modules::require(&st, &key.tenant, "api").await {
+        return e.into_response();
+    }
     let result: Result<Value, ApiError> = async {
         let needs = if write { "trade" } else { "read" };
         if !(key.scopes.iter().any(|s| s == needs) || (!write && key.scopes.iter().any(|s| s == "trade"))) {

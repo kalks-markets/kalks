@@ -31,7 +31,11 @@ async fn main() -> anyhow::Result<()> {
     store::seed_all(&pool, Path::new(&cfg.content_dir)).await?;
 
     let bind = cfg.bind.clone();
-    let app = api::router(AppState { pool, cfg: Arc::new(cfg) });
+    // module switches: a read-only lazy connection to the gateway database (modules.rs)
+    let gateway = (!cfg.gateway_database_url.is_empty())
+        .then(|| sqlx::postgres::PgPoolOptions::new().max_connections(2).connect_lazy(&cfg.gateway_database_url))
+        .and_then(|r| r.map_err(|e| tracing::warn!(error = %e, "gateway DB not usable: the Academy stays on for every broker")).ok());
+    let app = api::router(AppState { pool, cfg: Arc::new(cfg), gateway });
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     tracing::info!(%bind, "http listening");
     axum::serve(listener, app)

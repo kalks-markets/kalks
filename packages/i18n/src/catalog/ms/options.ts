@@ -64,10 +64,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "Terma opsyen tidak tersedia buat masa ini. Sila cuba lagi kemudian.",
 
   // Kalks Trader button
-  "trade.ready": "Semuanya sudah sedia. Opsyen dibuka dalam Kalks Trader, pada akaun yang sama dengan CFD anda.",
+  "trade.ready": "Semuanya sudah sedia. Opsyen didagangkan dalam Kalks Trader, pada akaun opsyen anda.",
   "trade.cta": "Dagangkan opsyen dalam Kalks Trader",
   "trade.chooseAccount": "Pilih akaun",
-  "trade.noAccount": "Anda memerlukan akaun dagangan yang aktif untuk mendagangkan opsyen.",
+  "trade.noAccount": "Anda memerlukan akaun opsyen yang aktif untuk mendagangkan opsyen.",
   "trade.openAccount": "Buka akaun",
   "trade.cashOnly": "Premium dan margin diambil daripada wang tunai akaun anda sendiri. Bonus dan kredit tidak boleh digunakan.",
   "trade.live": "Sebenar",
@@ -96,5 +96,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "Demo: tiada apa-apa di sini disimpan.",
+  // CFD / Options account split
+  "account.noneTitle": "Belum ada akaun opsyen",
+  "account.noneText": "Opsyen didagangkan dalam akaun tersendiri, berasingan daripada akaun CFD anda. Buka satu dalam seminit, langsung atau demo.",
+  "account.open": "Buka akaun opsyen",
 };
 export default options;

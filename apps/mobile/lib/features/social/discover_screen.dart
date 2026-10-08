@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../core/format/format.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
@@ -175,6 +176,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     final t = context.t;
     final k = context.k;
     final readOnly = ref.watch(meProvider)?.readOnly ?? false;
+    // the PAMM filter goes with the PAMM module
+    final pammOn = ref.watch(configProvider).moduleOn('pamm');
+    if (!pammOn && _program == 'pamm') _program = 'all';
     final provider = leaderboardProvider(_qs);
     final q = ref.watch(provider);
     final data = q.value;
@@ -260,8 +264,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 KSegmented<String>(
                   plain: true,
                   height: 32,
-                  values: const ['all', 'copy', 'pamm'],
-                  labels: [t('common.all'), t('social.program.copy'), 'PAMM'],
+                  values: ['all', 'copy', if (pammOn) 'pamm'],
+                  labels: [t('common.all'), t('social.program.copy'), if (pammOn) 'PAMM'],
                   selected: _program,
                   onChanged: (v) => setState(() => _program = v),
                 ),

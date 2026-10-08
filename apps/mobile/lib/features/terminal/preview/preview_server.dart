@@ -95,11 +95,14 @@ double _pip(_Sym s) => switch (s.cls) {
 double _round(double v, int d) => double.parse(v.toStringAsFixed(d));
 
 class _Account {
-  _Account(this.login, this.type, this.group, this.groupName, this.balance, {this.cent = false, this.leverage = 200});
+  _Account(this.login, this.type, this.group, this.groupName, this.balance, {this.cent = false, this.leverage = 200, this.product = 'cfd'});
   final int login;
   final String type, group, groupName;
   final bool cent;
   final int leverage;
+
+  /// cfd | options: an Options account refuses CFD orders (product_mismatch).
+  final String product;
 
   /// Account currency (USC on cent accounts: x 100 USD).
   double balance;
@@ -164,7 +167,9 @@ class PreviewServer {
     final pro = _Account(10042817, 'live', 'pro', 'Pro', 12480.55);
     final cent = _Account(10051123, 'live', 'cent', 'Cent', 254300, cent: true);
     final demo = _Account(20017734, 'demo', 'standard', 'Standard', 10000, leverage: 500);
-    for (final a in [pro, cent, demo]) {
+    // the Options account of the sample client (lib/preview/c1/preview_accounts.dart)
+    final options = _Account(20019001, 'demo', 'options-standard', 'Options Standard', 10000, leverage: 100, product: 'options');
+    for (final a in [pro, cent, demo, options]) {
       _accounts[a.login] = a;
     }
     final now = DateTime.now().toUtc();
@@ -377,6 +382,18 @@ class PreviewServer {
     return out;
   }
 
+  /// An account opened in the preview (the Open account wizard), so Kalks Trader can open it.
+  void addAccount({
+    required int login,
+    required String type,
+    required String group,
+    required String groupName,
+    double balance = 0,
+    bool cent = false,
+    int leverage = 100,
+    String product = 'cfd',
+  }) => _accounts[login] ??= _Account(login, type, group, groupName, balance, cent: cent, leverage: leverage, product: product);
+
   /// `GET /v1/candles` of market data, as the chart reads it.
   List<T> candlesAs<T>(String symbol, String tf, T Function(int t, double o, double h, double l, double c, double v) make, {int limit = 1000, int? to}) => [
     for (final b in _bars(symbol, tf, limit, to)) make(b.t, b.o, b.h, b.l, b.c, b.v),
@@ -408,7 +425,8 @@ class PreviewServer {
       'type': a.type,
       'group': a.group,
       'groupName': a.groupName,
-      'spreadGroup': a.group == 'cent' ? 'standard' : a.group,
+      'product': a.product,
+      'spreadGroup': _spreadGroup(a),
       'mode': 'hedging',
       'cent': a.cent,
       'currency': a.cent ? 'USC' : 'USD',
@@ -434,7 +452,7 @@ class PreviewServer {
     };
   }
 
-  String _spreadGroup(_Account a) => a.group == 'cent' ? 'standard' : a.group;
+  String _spreadGroup(_Account a) => a.group == 'cent' || a.product == 'options' ? 'standard' : a.group;
 
   /// Floating numbers in the account currency.
   ({double profit, double swap, double equity, double margin, Map<int, double> each}) _metrics(_Account a) {
@@ -619,6 +637,8 @@ class PreviewServer {
   }
 
   (int, Object) _placeOrder(_Account a, Map<String, dynamic> b) {
+    // the engine: an Options account trades options only
+    if (a.product == 'options') return (422, _err('product_mismatch', 'This is an Options account: CFDs trade in a CFD account.'));
     final symbol = '${b['symbol']}';
     final s = _sym(symbol);
     if (s == null) return (404, _err('not_found', 'Unknown symbol.'));

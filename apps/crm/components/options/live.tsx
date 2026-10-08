@@ -2,7 +2,8 @@
 
 // Live Options page: suitability from the gateway (/api/suitability/options) and the client's trading accounts from
 // the engine; "Start trading options" records the acceptance of the options terms and opens Kalks Trader through
-// the usual one-time SSO link, in options mode.
+// the usual one-time SSO link, in options mode. Only the client's Options accounts are offered (CFD / Options account
+// split); without one the page offers "Open an Options account".
 
 import * as React from "react";
 import { toast } from "sonner";
@@ -12,6 +13,7 @@ import { errorToast, tradingApi, useAccounts } from "@/components/trading/api";
 import { accountFlavor } from "@/components/trading/archive";
 import { isPropAccount } from "@/components/trading/ui";
 import { TERMINAL_URL } from "@/lib/live";
+import { productOf } from "@/lib/products";
 import { SuitabilityError, suitabilityApi, useSuitability, type Suitability } from "./api";
 import { OptionsPage, type OptionsController, type TradeAccount } from "./ui";
 
@@ -59,8 +61,9 @@ export function LiveOptions() {
 
   const accounts = React.useMemo<TradeAccount[] | null>(() => {
     if (!acc) return null;
+    // CFD / Options account split: options trade on Options accounts only
     return acc.accounts
-      .filter((a) => a.status === "active" && !isPropAccount(a) && !accountFlavor(a))
+      .filter((a) => a.status === "active" && productOf(a) === "options" && !isPropAccount(a) && !accountFlavor(a))
       .sort((a, b) => Number(!!b.isDefault) - Number(!!a.isDefault) || (a.type === b.type ? 0 : a.type === "live" ? -1 : 1) || a.login - b.login)
       .map((a) => ({ login: a.login, type: a.type, name: a.name || a.groupName }));
   }, [acc]);

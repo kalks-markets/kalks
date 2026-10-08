@@ -809,3 +809,37 @@ async fn options_share_card_shows_terms_premiums_and_no_balance() {
     assert!(shares::share_json(&r, true)["login"].is_null());
     e.drop().await;
 }
+
+/// Module switches (gateway): while a broker has `rewards` off, the rewards routes answer 403 module_disabled before
+/// any handler runs; banners and share cards stay; a broker with the module on (or a key the gateway doesn't send) is
+/// unaffected. No database needed (the switch answers first).
+#[tokio::test]
+async fn module_switch_refuses_the_rewards_routes() {
+    use axum::extract::Path;
+    let gw = axum::Router::new().route(
+        "/v1/internal/tenants/{slug}",
+        axum::routing::get(|Path(slug): Path<String>| async move { Json(json!({"id": 2, "slug": slug, "modules": if slug == "qa-rewards-off" { json!({"rewards": false}) } else { json!({"prop": false}) }})) }),
+    );
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let gw_url = format!("http://{}", l.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(l, gw).await.unwrap() });
+    let pool = sqlx::postgres::PgPoolOptions::new().acquire_timeout(std::time::Duration::from_millis(300)).connect_lazy("postgres://postgres@127.0.0.1:1/unused").unwrap();
+    let mut cfg = Config::for_tests("postgres://postgres@127.0.0.1:1/unused");
+    cfg.gateway_url = gw_url;
+    let st = AppState::new(pool, cfg);
+    assert!(!growth::modules::on(&st, "qa-rewards-off", "rewards").await);
+    assert!(growth::modules::on(&st, "qa-rewards-on", "rewards").await, "a key the gateway doesn't send is on");
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", l.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(l, growth::api::router(st)).await.unwrap() });
+    let http = reqwest::Client::new();
+    for path in ["/v1/growth/me/rewards", "/v1/growth/me/points", "/v1/growth/me/contests"] {
+        let r = http.get(format!("{base}{path}")).header("x-kalks-tenant", "qa-rewards-off").header("x-kalks-user-id", "7").send().await.unwrap();
+        assert_eq!(r.status().as_u16(), 403, "{path}");
+        assert_eq!(r.json::<Value>().await.unwrap()["error"]["code"], "module_disabled");
+    }
+    let r = http.get(format!("{base}/v1/growth/me/rewards")).header("x-kalks-tenant", "qa-rewards-on").header("x-kalks-user-id", "7").send().await.unwrap();
+    assert_ne!(r.status().as_u16(), 403);
+    let r = http.get(format!("{base}/v1/growth/me/banners")).header("x-kalks-tenant", "qa-rewards-off").header("x-kalks-user-id", "7").send().await.unwrap();
+    assert_ne!(r.status().as_u16(), 403, "banners stay");
+}

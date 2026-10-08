@@ -65,10 +65,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "Masharti ya options hayapatikani kwa sasa. Tafadhali jaribu tena baadaye.",
 
   // Kalks Trader button
-  "trade.ready": "Uko tayari. Options hufunguka kwenye Kalks Trader, kwenye akaunti ile ile ya CFD zako.",
+  "trade.ready": "Uko tayari. Options hufanyiwa biashara kwenye Kalks Trader, kwenye akaunti yako ya Options.",
   "trade.cta": "Fanya biashara ya options kwenye Kalks Trader",
   "trade.chooseAccount": "Chagua akaunti",
-  "trade.noAccount": "Unahitaji akaunti ya biashara inayotumika ili kufanya biashara ya options.",
+  "trade.noAccount": "Unahitaji akaunti ya Options inayotumika ili kufanya biashara ya options.",
   "trade.openAccount": "Fungua akaunti",
   "trade.cashOnly": "Premium na margin hutoka kwenye pesa taslimu za akaunti yako yenyewe. Bonasi na mkopo haviwezi kutumika.",
   "trade.live": "Halisi",
@@ -97,5 +97,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "Demo: hakuna kinachohifadhiwa hapa.",
+  // CFD / Options account split
+  "account.noneTitle": "Bado huna akaunti ya Options",
+  "account.noneText": "Options hufanyiwa biashara kwenye akaunti yake, tofauti na akaunti zako za CFD. Fungua moja kwa dakika moja, halisi au demo.",
+  "account.open": "Fungua akaunti ya Options",
 };
 export default options;

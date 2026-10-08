@@ -380,3 +380,31 @@ async fn phase_state_machine_and_payouts() {
     let admin = sqlx::PgPool::connect("postgres://postgres@127.0.0.1:5433/postgres").await.unwrap();
     let _ = sqlx::query(sqlx::AssertSqlSafe(format!("DROP DATABASE IF EXISTS kalks_prop_test_{} WITH (FORCE)", std::process::id()))).execute(&admin).await;
 }
+
+/// Module switches (gateway): while a broker has `prop` off, its client routes answer 403 module_disabled before any
+/// handler runs; public certificate checks and the Back Office routes stay; another broker is unaffected.
+#[tokio::test]
+async fn module_switch_refuses_the_client_routes() {
+    // no database is reached: the switch answers first, and the other requests only need a status
+    let pool = sqlx::postgres::PgPoolOptions::new().acquire_timeout(std::time::Duration::from_millis(300)).connect_lazy("postgres://postgres@127.0.0.1:1/kalks_prop_unused").unwrap();
+    let app = Arc::new(Svc::new(config("postgres://postgres@127.0.0.1:1/x", "http://127.0.0.1:1"), pool, None));
+    prop::modules::prime("qa-prop-off", "prop", false);
+    prop::modules::prime("qa-prop-on", "prop", true);
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", l.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(l, prop::api::router(app)).await.unwrap() });
+    let http = reqwest::Client::new();
+    let call = |m: reqwest::Method, path: &str, tenant: &str| http.request(m, format!("{base}{path}")).header("x-kalks-tenant", tenant).header("x-kalks-user-id", "7").send();
+    for (m, path) in [(reqwest::Method::GET, "/v1/plans"), (reqwest::Method::GET, "/v1/challenges"), (reqwest::Method::POST, "/v1/challenges"), (reqwest::Method::GET, "/v1/payouts")] {
+        let r = call(m, path, "qa-prop-off").await.unwrap();
+        assert_eq!(r.status().as_u16(), 403, "{path}");
+        let v: Value = r.json().await.unwrap();
+        assert_eq!(v["error"]["code"], "module_disabled");
+    }
+    // the same route for a broker with prop on gets past the switch (and fails later on the missing database)
+    assert_ne!(call(reqwest::Method::GET, "/v1/plans", "qa-prop-on").await.unwrap().status().as_u16(), 403);
+    // certificates stay verifiable, the Back Office keeps its routes
+    assert_ne!(call(reqwest::Method::GET, "/v1/public/certificates/KP-NOPE", "qa-prop-off").await.unwrap().status().as_u16(), 403);
+    let r = http.get(format!("{base}/v1/admin/overview")).header("x-kalks-tenant", "qa-prop-off").header("x-kalks-staff-id", "1").header("x-kalks-staff-role", "admin").send().await.unwrap();
+    assert_ne!(r.status().as_u16(), 403);
+}

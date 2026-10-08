@@ -6,7 +6,7 @@ use serde_json::json;
 use super::{Env, Reject, Tx, pnl, total_margin};
 use crate::model::{AccountKind, Book, Deal, DealEntry, DealReason, Expiry, Mode, Order, OrderStatus, OrderType, Position, RouteEvent, Side, Source, Status, Trailing, TxnKind, acct_code, house_code};
 use crate::money::{D, ZERO, r2, rdp};
-use crate::rules::{ControlMode, RouteCtx, resolve_route};
+use crate::rules::{ControlMode, Product, RouteCtx, resolve_route};
 use crate::specs::{Spec, end_of_server_day};
 use crate::state::{AccountState, Event};
 
@@ -93,6 +93,18 @@ pub fn is_opening(st: &AccountState, symbol: &str, side: Side, volume: D) -> boo
         Some(p) => p.side == side || volume > p.volume,
         None => true,
     }
+}
+
+/// Refusal of CFD trading on an Options account (CFD / Options account split).
+pub const OPTIONS_ACCOUNT: &str = "This is an Options account: CFDs trade in a CFD account";
+
+/// CFD / Options account split: an account trades the product of its group. New CFD exposure on an Options account
+/// is refused for everyone, dealers included (`product_mismatch`); closes, SL / TP and stop-out are never refused.
+pub fn cfd_product_gate(env: &Env, opening: bool) -> Result<(), Reject> {
+    if opening && env.group.product == Product::Options {
+        return Err(Reject::new("product_mismatch", OPTIONS_ACCOUNT));
+    }
+    Ok(())
 }
 
 /// Account / dealer-control / symbol-control checks (D115, D140).
@@ -241,6 +253,7 @@ pub fn place_order(tx: &mut Tx, env: &Env, req: OrderReq) -> Result<PlaceResult,
     let dealer = req.dealer.as_ref();
     let manual = dealer.is_some() && req.kind == OrderType::Market && req.price.is_some_and(|p| p > ZERO);
     let opening = req.kind != OrderType::Market || is_opening(&tx.st, &req.symbol, req.side, req.volume);
+    cfd_product_gate(env, opening)?;
     gate(env, &tx.st, &req.symbol, opening, req.volume, dealer)?;
     if !manual {
         market_open(env, &spec)?;
@@ -912,6 +925,7 @@ pub fn modify_order(tx: &mut Tx, env: &Env, ticket: i64, patch: OrderPatch, deal
         return super::options::modify_order(tx, env, ticket, &patch);
     }
     let spec = env.spec(&o.symbol)?.clone();
+    cfd_product_gate(env, patch.volume.is_some_and(|v| v > o.volume))?;
     if dealer.is_none() {
         gate(env, &tx.st, &o.symbol, true, patch.volume.unwrap_or(o.volume), None)?;
     }

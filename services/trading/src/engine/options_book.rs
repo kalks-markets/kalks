@@ -260,7 +260,7 @@ pub fn enter_with(tx: &mut Tx, env: &Env, req: BookReq, agg: &mut reserve::Agg, 
     let opening = whole(opening_c, step).unwrap_or(0);
     let opens = opening > 0;
     // gates
-    eopt::module_gate(env, &tx.st, &snap, &u.symbol)?;
+    eopt::module_gate_for(env, &tx.st, &snap, &u.symbol, req.lp)?;
     eopt::client_gate(env, &tx.st, &snap, opens)?;
     gate(env, &tx.st, &u.symbol, opens, ZERO, None)?;
     if opens && !req.eligible {

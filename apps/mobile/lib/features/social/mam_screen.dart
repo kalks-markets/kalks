@@ -11,7 +11,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/api/api_providers.dart';
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/nav.dart';
 import '../../ui/ui.dart';
 import 'mam_api.dart';
 import 'managed_screen.dart' show termsParagraphs;
@@ -49,6 +51,8 @@ class _MamManagerScreenState extends ConsumerState<MamManagerScreen> {
     final q = ref.watch(mamManagerMeProvider);
     final data = q.value;
     final approved = data?.master?['status'] == 'approved';
+    // the master application lives under copy trading (/social/master)
+    final masterOn = pageOn(ref.watch(configProvider), '/social/master');
     return KPageScroll(
       onRefresh: () async {
         _reload();
@@ -75,12 +79,14 @@ class _MamManagerScreenState extends ConsumerState<MamManagerScreen> {
                   '${data.master != null ? t('social.mm.page.profileStatus', {'status': t.dyn('social.masterStatus.${strOf(data.master!['status'])}', fallback: strOf(data.master!['status'])).toLowerCase()}) : t('social.mm.page.applyFirst')}',
                   style: context.text.footnote.copyWith(color: context.k.fg3, fontSize: 13, height: 1.5),
                 ),
-                const SizedBox(height: 14),
-                KButton(
-                  label: data.master != null ? t('social.md.title') : t('social.becomeMaster'),
-                  icon: LucideIcons.crown,
-                  onPressed: () => context.go('/social/master'),
-                ),
+                if (masterOn) ...[
+                  const SizedBox(height: 14),
+                  KButton(
+                    label: data.master != null ? t('social.md.title') : t('social.becomeMaster'),
+                    icon: LucideIcons.crown,
+                    onPressed: () => context.go('/social/master'),
+                  ),
+                ],
               ],
             ),
           )

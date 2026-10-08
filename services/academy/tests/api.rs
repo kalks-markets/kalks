@@ -118,6 +118,35 @@ impl Client {
 }
 
 const U: &[(&str, &str)] = &[("x-kalks-tenant", "kalks"), ("x-kalks-user-id", "42")];
+
+/// Module switches (gateway): while a broker has `academy` off its client routes answer 403 module_disabled before any
+/// handler runs (no database is reached); public certificate checks and the CMS keep their routes.
+#[tokio::test]
+async fn module_switch_refuses_the_client_routes() {
+    let pool = sqlx::postgres::PgPoolOptions::new().acquire_timeout(std::time::Duration::from_millis(300)).connect_lazy("postgres://postgres@127.0.0.1:1/unused").unwrap();
+    let cfg = Config {
+        bind: String::new(),
+        database_url: String::new(),
+        internal_token: "test-token".into(),
+        content_dir: String::new(),
+        verify_base_url: String::new(),
+        dev_mode: true,
+        json_logs: false,
+        gateway_database_url: String::new(),
+    };
+    let c = Client { app: router(AppState { pool, cfg: Arc::new(cfg), gateway: None }) };
+    academy::modules::prime("qa-academy-off", "academy", false);
+    let off: &[(&str, &str)] = &[("x-kalks-tenant", "qa-academy-off"), ("x-kalks-user-id", "42")];
+    for (m, path) in [("GET", "/v1/catalog"), ("GET", "/v1/chapters/p1-f-c1"), ("POST", "/v1/exams/phase-1"), ("GET", "/v1/me/certificates"), ("GET", "/v1/glossary")] {
+        let (s, v, _) = c.call(m, path, off, if m == "POST" { Some(json!({})) } else { None }).await;
+        assert_eq!((s, v["error"]["code"].as_str()), (StatusCode::FORBIDDEN, Some("module_disabled")), "{path}");
+    }
+    // no gateway connection = on: the request reaches the handler (and fails there on the missing database)
+    let (s, _, _) = c.call("GET", "/v1/catalog", U, None).await;
+    assert_ne!(s, StatusCode::FORBIDDEN);
+    let (s, _, _) = c.call("GET", "/v1/public/certificates/KA-NOPE", off, None).await;
+    assert_ne!(s, StatusCode::FORBIDDEN);
+}
 const S: &[(&str, &str)] = &[("x-kalks-tenant", "kalks"), ("x-kalks-staff", "editor@kalks.test")];
 
 #[tokio::test]
@@ -175,8 +204,9 @@ async fn academy_end_to_end() {
         verify_base_url: "https://my.example.com".into(),
         dev_mode: true,
         json_logs: false,
+        gateway_database_url: String::new(),
     };
-    let c = Client { app: router(AppState { pool: pool.clone(), cfg: Arc::new(cfg) }) };
+    let c = Client { app: router(AppState { pool: pool.clone(), cfg: Arc::new(cfg), gateway: None }) };
 
     // internal token enforced
     let res = axum::Router::clone(&c.app).oneshot(Request::get("/v1/catalog").body(Body::empty()).unwrap()).await.unwrap();

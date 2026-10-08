@@ -1,7 +1,10 @@
 //! Per-tenant runtime configuration (D112, D146): module toggles, feature flags and maintenance mode.
 //!
-//! * Modules (copy trading, PAMM, prop, IB, algo, public API, academy, wallet, rewards) are switched per tenant
-//!   by the Platform Owner. The Client Area hides a disabled module's pages and its BFF rejects its API calls.
+//! * Modules (copy trading, PAMM, MAM, prop, IB, algo, public API, academy, wallet, rewards, options, news,
+//!   calendar, markets, AI, support chat) are switched per tenant by the Platform Owner only. Off = hidden in the
+//!   Client Area, Kalks Trader, the app and the Back Office nav of the tenant's staff; the BFFs and the services
+//!   refuse its client calls with 403 `module_disabled` (they read the effective map from
+//!   `/v1/internal/tenants/{slug}`, internal.rs, or `tenant_features` directly).
 //! * Feature flags are switched by the tenant (`settings.write`); the Platform Owner can add new flags.
 //! * Maintenance mode: clients see a maintenance page and can't sign in; staff keep working.
 //!
@@ -42,28 +45,56 @@ pub const BUILTIN_FEATURES: &[FeatureDef] = &[
     FeatureDef { key: "academy", kind: "module", name: "Academy", description: "Courses, quizzes, exams and certificates.", default_enabled: true },
     FeatureDef { key: "wallet", kind: "module", name: "USDT wallet", description: "Crypto deposits, withdrawals and transfers.", default_enabled: true },
     FeatureDef { key: "rewards", kind: "module", name: "Rewards", description: "Contests, loyalty and cashback.", default_enabled: true },
+    FeatureDef { key: "options", kind: "module", name: "Options", description: "FX options: the Options page, Kalks Trader's options workspace and new option orders.", default_enabled: true },
+    FeatureDef { key: "news", kind: "module", name: "News", description: "Market news, the news map and the daily brief.", default_enabled: true },
+    FeatureDef { key: "calendar", kind: "module", name: "Economic calendar", description: "Economic events, reminders and event alerts.", default_enabled: true },
+    FeatureDef { key: "markets", kind: "module", name: "Markets", description: "The market overview pages: quotes, movers and heat maps.", default_enabled: true },
+    FeatureDef { key: "ai", kind: "module", name: "AI assistants", description: "Ask Kalks AI and AI Trader.", default_enabled: true },
+    FeatureDef { key: "mam", kind: "module", name: "MAM", description: "Multi-account managers and the accounts they manage.", default_enabled: true },
+    FeatureDef { key: "support_chat", kind: "module", name: "Support chat", description: "Live chat with the support bot and team. Email support stays.", default_enabled: true },
     FeatureDef { key: "client_registration", kind: "flag", name: "New client sign-ups", description: "Visitors can open an account. Off: existing clients can still sign in.", default_enabled: true },
     FeatureDef { key: "google_login", kind: "flag", name: "Continue with Google", description: "Clients can sign in and sign up with Google.", default_enabled: true },
     FeatureDef { key: "trade_sharing", kind: "flag", name: "Trade share links", description: "Clients can publish read-only links to their trades.", default_enabled: true },
     FeatureDef { key: "demo_accounts", kind: "flag", name: "Demo accounts", description: "Clients can open demo trading accounts.", default_enabled: true },
 ];
 
+/// Modules split out of an older one: when the new key first appears, a broker that had the old module off keeps
+/// the split-off part off too (MAM pages lived under copy trading's `/social`).
+const SPLIT_FROM: &[(&str, &str)] = &[("mam", "copy_trading")];
+
 pub async fn seed_catalogue(pool: &PgPool) -> anyhow::Result<()> {
     for f in BUILTIN_FEATURES {
-        sqlx::query(
+        let inserted: bool = sqlx::query_scalar(
             "INSERT INTO feature_flags (key, kind, name, description, default_enabled, builtin) VALUES ($1,$2,$3,$4,$5,true)
              ON CONFLICT (key) DO UPDATE SET kind = EXCLUDED.kind, name = EXCLUDED.name, description = EXCLUDED.description,
-                 default_enabled = EXCLUDED.default_enabled, builtin = true",
+                 default_enabled = EXCLUDED.default_enabled, builtin = true
+             RETURNING (xmax = 0)",
         )
         .bind(f.key)
         .bind(f.kind)
         .bind(f.name)
         .bind(f.description)
         .bind(f.default_enabled)
-        .execute(pool)
+        .fetch_one(pool)
         .await?;
+        if let Some((_, from)) = SPLIT_FROM.iter().find(|(k, _)| *k == f.key).filter(|_| inserted) {
+            sqlx::query(
+                "INSERT INTO tenant_features (tenant_id, key, enabled, updated_by)
+                 SELECT tenant_id, $1, false, updated_by FROM tenant_features WHERE key = $2 AND NOT enabled
+                 ON CONFLICT (tenant_id, key) DO NOTHING",
+            )
+            .bind(f.key)
+            .bind(from)
+            .execute(pool)
+            .await?;
+        }
     }
     Ok(())
+}
+
+/// The broker's effective modules (`key -> on`): its overrides, else the platform defaults.
+pub async fn module_map(pool: &PgPool, tenant_id: i64) -> ApiResult<Map<String, Value>> {
+    Ok(features(pool, tenant_id).await?.into_iter().filter(|f| f.kind == "module").map(|f| (f.key, json!(f.enabled))).collect())
 }
 
 pub struct Feature {
@@ -264,10 +295,18 @@ pub async fn get_features(State(st): State<AppState>, ctx: Ctx) -> ApiResult<Jso
 pub struct FeatureReq {
     /// true / false, or null to go back to the platform default.
     enabled: Option<bool>,
+    /// Why (shown in the audit log).
+    #[serde(default)]
+    reason: Option<String>,
 }
 
-/// Sets (or clears) one tenant override and audits it. Modules need `owner.tenants`.
-pub async fn write_feature(st: &AppState, ctx: &Ctx, me: &Staff, tenant_id: i64, key: &str, value: Option<bool>) -> ApiResult<Value> {
+/// An optional reason for a switch, trimmed to 300 characters (None when blank).
+pub fn clean_reason(r: Option<&str>) -> Option<String> {
+    r.map(|r| r.trim().chars().take(300).collect::<String>()).filter(|r| !r.is_empty())
+}
+
+/// Sets (or clears) one tenant override and audits it (with the optional `reason`). Modules need `owner.tenants`.
+pub async fn write_feature(st: &AppState, ctx: &Ctx, me: &Staff, tenant_id: i64, key: &str, value: Option<bool>, reason: Option<&str>) -> ApiResult<Value> {
     let f = features(&st.pool, tenant_id).await?.into_iter().find(|f| f.key == key).ok_or(ApiError::NotFound)?;
     if f.kind == "module" && !me.can("owner.tenants") {
         return Err(ApiError::Coded { status: StatusCode::FORBIDDEN, code: "forbidden", message: "Modules are switched by the platform owner." });
@@ -296,7 +335,7 @@ pub async fn write_feature(st: &AppState, ctx: &Ctx, me: &Staff, tenant_id: i64,
         actor_id: Some(me.id),
         action: if f.kind == "module" { "settings.module_toggled" } else { "settings.flag_toggled" },
         target: (tenant_id != me.tenant_id).then_some(("tenant", tenant_id)),
-        meta: json!({"key": key, "tenant_id": tenant_id, "before": {"enabled": f.enabled}, "after": {"enabled": after, "default": value.is_none()}}),
+        meta: json!({"key": key, "tenant_id": tenant_id, "reason": clean_reason(reason), "before": {"enabled": f.enabled}, "after": {"enabled": after, "default": value.is_none()}}),
     })
     .await;
     Ok(json!({ "key": key, "enabled": after, "overridden": value.is_some() }))
@@ -305,5 +344,5 @@ pub async fn write_feature(st: &AppState, ctx: &Ctx, me: &Staff, tenant_id: i64,
 pub async fn set_feature(State(st): State<AppState>, ctx: Ctx, Path(key): Path<String>, req: Result<Json<FeatureReq>, JsonRejection>) -> ApiResult<Json<Value>> {
     let r = body(req)?;
     let me = require_key(&st, &ctx, "settings.write").await?;
-    Ok(Json(write_feature(&st, &ctx, &me, me.tenant_id, &key, r.enabled).await?))
+    Ok(Json(write_feature(&st, &ctx, &me, me.tenant_id, &key, r.enabled, r.reason.as_deref()).await?))
 }

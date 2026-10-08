@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "BUY STOP LMT {lot}",
   "line.sellStopLimit": "SELL STOP LMT {lot}",
   "line.alert": "TAHADHARI",
-  "line.posTitle": "Buruta ili kuweka SL/TP · bofya mara mbili ili kurekebisha",
+  "line.posTitle": "Buruta S au T (au mstari) ili kuweka SL/TP · bofya mara mbili ili kurekebisha",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "Stop loss: buruta hadi bei fulani, au bofya kwa umbali wa kawaida",
+  "line.tpHandleTitle": "Take profit: buruta hadi bei fulani, au bofya kwa umbali wa kawaida",
   "line.dragTitle": "Buruta ili kuhamisha",
   "line.remove": "Ondoa {label}",
 

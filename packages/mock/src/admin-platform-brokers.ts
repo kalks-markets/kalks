@@ -38,18 +38,26 @@ export const BRK_PLAN_LABEL: Record<BrkPlan, string> = { starter: "Starter", gro
 /* Modules                                                             */
 /* ------------------------------------------------------------------ */
 
+/** The gateway's module keys (services/gateway/src/tenancy.rs) plus the showcase's plan-only items (trading, stocks,
+ *  mobile, kyc_auto), so the demo Brokers pages read like the live ones. */
 export type BrkModuleKey =
   | "trading"
   | "wallet"
   | "ib"
-  | "copy"
+  | "copy_trading"
   | "pamm"
+  | "mam"
   | "prop"
-  | "contests"
+  | "rewards"
   | "academy"
-  | "ai_coach"
+  | "ai"
   | "api"
-  | "strategy"
+  | "algo"
+  | "options"
+  | "news"
+  | "calendar"
+  | "markets"
+  | "support_chat"
   | "stocks"
   | "mobile"
   | "kyc_auto";
@@ -68,14 +76,20 @@ export const BRK_MODULES: BrkModule[] = [
   { key: "trading", name: "Trading", description: "Web terminal, MT-style accounts, Live/Demo, hedging & netting", addOn: 0, plans: { starter: true, growth: true, enterprise: true }, core: true, tenants: 10 },
   { key: "wallet", name: "Wallet", description: "USDT TRC20 deposits & withdrawals, internal transfers", addOn: 0, plans: { starter: true, growth: true, enterprise: true }, core: true, tenants: 10 },
   { key: "ib", name: "Partner / IB", description: "Multi-tier commissions, CPA, sub-IB trees, payouts", addOn: 900, plans: { starter: false, growth: true, enterprise: true }, tenants: 8 },
-  { key: "copy", name: "Copy trading", description: "Strategy providers, followers, performance fees", addOn: 1200, plans: { starter: false, growth: true, enterprise: true }, tenants: 6 },
+  { key: "copy_trading", name: "Copy trading", description: "Strategy providers, followers, performance fees", addOn: 1200, plans: { starter: false, growth: true, enterprise: true }, tenants: 6 },
   { key: "pamm", name: "PAMM", description: "Managed accounts, allocation by equity, fee high-water mark", addOn: 1400, plans: { starter: false, growth: false, enterprise: true }, tenants: 4 },
+  { key: "mam", name: "MAM", description: "Multi-account managers, allocation methods, managed accounts", addOn: 900, plans: { starter: false, growth: false, enterprise: true }, tenants: 3 },
   { key: "prop", name: "Prop challenges", description: "Evaluation phases, rules engine, funded accounts, payouts", addOn: 1800, plans: { starter: false, growth: false, enterprise: true }, tenants: 4 },
-  { key: "contests", name: "Contests & rewards", description: "Demo/live contests, leaderboards, loyalty points", addOn: 600, plans: { starter: false, growth: true, enterprise: true }, tenants: 6 },
+  { key: "rewards", name: "Contests & rewards", description: "Demo/live contests, leaderboards, loyalty points", addOn: 600, plans: { starter: false, growth: true, enterprise: true }, tenants: 6 },
   { key: "academy", name: "Academy", description: "Courses, lessons, quizzes and certificates", addOn: 400, plans: { starter: true, growth: true, enterprise: true }, tenants: 9 },
-  { key: "ai_coach", name: "AI Coach", description: "Trade journal insights, market Q&A, risk nudges", addOn: 1500, plans: { starter: false, growth: false, enterprise: true }, tenants: 3 },
+  { key: "ai", name: "AI Coach", description: "Trade journal insights, market Q&A, risk nudges", addOn: 1500, plans: { starter: false, growth: false, enterprise: true }, tenants: 3 },
   { key: "api", name: "API & Algo", description: "REST/WebSocket API keys, FIX bridge, rate limits", addOn: 1100, plans: { starter: false, growth: true, enterprise: true }, tenants: 5 },
-  { key: "strategy", name: "Strategy builder", description: "No-code bots, backtesting, paper deployment", addOn: 800, plans: { starter: false, growth: false, enterprise: true }, tenants: 3 },
+  { key: "algo", name: "Strategy builder", description: "No-code bots, backtesting, paper deployment", addOn: 800, plans: { starter: false, growth: false, enterprise: true }, tenants: 3 },
+  { key: "options", name: "Options", description: "FX options: chain, strategies, order book and RFQs", addOn: 1600, plans: { starter: false, growth: false, enterprise: true }, tenants: 2 },
+  { key: "news", name: "News", description: "Market news, news map and the daily brief", addOn: 0, plans: { starter: true, growth: true, enterprise: true }, core: true, tenants: 10 },
+  { key: "calendar", name: "Economic calendar", description: "Economic events, reminders and alerts", addOn: 0, plans: { starter: true, growth: true, enterprise: true }, core: true, tenants: 10 },
+  { key: "markets", name: "Markets", description: "Market overview: quotes, movers and heat map", addOn: 0, plans: { starter: true, growth: true, enterprise: true }, core: true, tenants: 10 },
+  { key: "support_chat", name: "Support chat", description: "AI bot and live agents in the Client Area", addOn: 300, plans: { starter: true, growth: true, enterprise: true }, tenants: 9 },
   { key: "stocks", name: "Stock CFDs", description: "US/EU equities with corporate actions & dividends", addOn: 700, plans: { starter: false, growth: true, enterprise: true }, tenants: 7 },
   { key: "mobile", name: "Branded mobile app", description: "iOS & Android builds under tenant brand, push", addOn: 2200, plans: { starter: false, growth: false, enterprise: true }, tenants: 4 },
   { key: "kyc_auto", name: "KYC automation", description: "Sumsub liveness, document OCR, AML screening", addOn: 500, plans: { starter: true, growth: true, enterprise: true }, tenants: 10 },
@@ -144,20 +158,20 @@ type Seed = [
 ];
 
 const ALL_MODS: BrkModuleKey[] = BRK_MODULES.map((m) => m.key);
-const GROWTH_MODS: BrkModuleKey[] = ["trading", "wallet", "ib", "copy", "contests", "academy", "api", "stocks", "kyc_auto"];
+const GROWTH_MODS: BrkModuleKey[] = ["trading", "wallet", "ib", "copy_trading", "rewards", "academy", "api", "stocks", "kyc_auto"];
 const STARTER_MODS: BrkModuleKey[] = ["trading", "wallet", "academy", "kyc_auto"];
 
 const SEEDS: Seed[] = [
   ["Kalks Markets", "Kalks Markets Ltd", "SC-8421096", "K", "#ff5a1f", "#e9b949", "kalks.com", "sc", "Seychelles", "FSA Seychelles SD142", "owner", "active", 48210, 184, 1240, 18_420_000_000, 3_842_000, "2024-02-01T09:00:00Z", 4, ALL_MODS],
-  ["Aurum FX", "Aurum Financial Services LLC", "DIFC-CL4471", "A", "#e9b949", "#ff8a3d", "aurumfx.com", "ae", "United Arab Emirates", "DFSA Cat. 3A", "enterprise", "active", 12480, 62, 860, 4_210_000_000, 1_064_000, "2024-09-14T08:00:00Z", 1, ["trading", "wallet", "ib", "copy", "pamm", "prop", "contests", "academy", "ai_coach", "api", "stocks", "mobile", "kyc_auto"]],
+  ["Aurum FX", "Aurum Financial Services LLC", "DIFC-CL4471", "A", "#e9b949", "#ff8a3d", "aurumfx.com", "ae", "United Arab Emirates", "DFSA Cat. 3A", "enterprise", "active", 12480, 62, 860, 4_210_000_000, 1_064_000, "2024-09-14T08:00:00Z", 1, ["trading", "wallet", "ib", "copy_trading", "pamm", "prop", "rewards", "academy", "ai", "api", "stocks", "mobile", "kyc_auto"]],
   ["NovaTrade Asia", "NovaTrade Asia Pte. Ltd.", "UEN 202318842K", "N", "#38bdf8", "#22c55e", "novatrade.asia", "sg", "Singapore", "MAS CMS100942", "growth", "active", 8960, 38, 380, 2_730_000_000, 612_000, "2025-01-20T08:00:00Z", 8, GROWTH_MODS],
-  ["Dunes Capital", "Dunes Capital Markets LLC", "CN-3902215", "D", "#22c55e", "#e9b949", "dunescapital.ae", "ae", "United Arab Emirates", "SCA 20200000154", "growth", "active", 5340, 24, 310, 1_620_000_000, 388_000, "2025-03-02T08:00:00Z", 5, ["trading", "wallet", "ib", "copy", "academy", "stocks", "kyc_auto"]],
-  ["Meridian Prime", "Meridian Prime Markets Ltd", "CY-HE412887", "M", "#14b8a6", "#f5f5f7", "meridianprime.eu", "cy", "Cyprus", "CySEC 418/22", "enterprise", "active", 9120, 71, 1120, 3_140_000_000, 804_000, "2024-11-05T08:00:00Z", 12, ["trading", "wallet", "ib", "copy", "pamm", "prop", "contests", "academy", "api", "strategy", "stocks", "mobile", "kyc_auto"]],
+  ["Dunes Capital", "Dunes Capital Markets LLC", "CN-3902215", "D", "#22c55e", "#e9b949", "dunescapital.ae", "ae", "United Arab Emirates", "SCA 20200000154", "growth", "active", 5340, 24, 310, 1_620_000_000, 388_000, "2025-03-02T08:00:00Z", 5, ["trading", "wallet", "ib", "copy_trading", "academy", "stocks", "kyc_auto"]],
+  ["Meridian Prime", "Meridian Prime Markets Ltd", "CY-HE412887", "M", "#14b8a6", "#f5f5f7", "meridianprime.eu", "cy", "Cyprus", "CySEC 418/22", "enterprise", "active", 9120, 71, 1120, 3_140_000_000, 804_000, "2024-11-05T08:00:00Z", 12, ["trading", "wallet", "ib", "copy_trading", "pamm", "prop", "rewards", "academy", "api", "algo", "stocks", "mobile", "kyc_auto"]],
   ["Kestrel Markets", "Kestrel Markets (Pty) Ltd", "2025/482113/07", "K", "#f04438", "#f5f5f7", "kestrelmarkets.co.za", "za", "South Africa", "FSCA FSP 53921", "starter", "trial", 1240, 7, 96, 214_000_000, 46_200, "2026-08-28T08:00:00Z", 23, STARTER_MODS],
-  ["Solace Trade", "Solace Trade Serviços Ltda", "CNPJ 48.221.905/0001-12", "S", "#ff8a3d", "#38bdf8", "solacetrade.com.br", "br", "Brazil", "FSC Mauritius GB24203118", "growth", "suspended", 3870, 19, 240, 942_000_000, 201_000, "2025-05-18T08:00:00Z", 16, ["trading", "wallet", "ib", "contests", "academy", "stocks", "kyc_auto"]],
+  ["Solace Trade", "Solace Trade Serviços Ltda", "CNPJ 48.221.905/0001-12", "S", "#ff8a3d", "#38bdf8", "solacetrade.com.br", "br", "Brazil", "FSC Mauritius GB24203118", "growth", "suspended", 3870, 19, 240, 942_000_000, 201_000, "2025-05-18T08:00:00Z", 16, ["trading", "wallet", "ib", "rewards", "academy", "stocks", "kyc_auto"]],
   ["Lotus Pacific FX", "Lotus Pacific Securities JSC", "VN-0316892271", "L", "#a3e635", "#e9b949", "lotuspacific.vn", "vn", "Vietnam", "VFSC 14912", "starter", "onboarding", 0, 3, 0, 0, 0, "2026-09-16T08:00:00Z", 3, STARTER_MODS],
   ["Atlas Brokerage", "Atlas Brokerage S.A. de C.V.", "MX-AB2019-0442", "A", "#fb7185", "#e9b949", "atlasbrokerage.mx", "mx", "Mexico", "FSA Seychelles SD188", "starter", "active", 2110, 9, 118, 391_000_000, 84_600, "2025-08-11T08:00:00Z", 11, ["trading", "wallet", "academy", "kyc_auto", "ib"]],
-  ["Cedar Global", "Cedar Global Markets Ltd", "RC-1873302", "C", "#94a3b8", "#22c55e", "cedarglobal.ng", "ng", "Nigeria", "SEC Nigeria SEC/BD/211", "growth", "active", 4420, 21, 292, 1_108_000_000, 262_000, "2025-06-30T08:00:00Z", 7, ["trading", "wallet", "ib", "copy", "contests", "academy", "kyc_auto"]],
+  ["Cedar Global", "Cedar Global Markets Ltd", "RC-1873302", "C", "#94a3b8", "#22c55e", "cedarglobal.ng", "ng", "Nigeria", "SEC Nigeria SEC/BD/211", "growth", "active", 4420, 21, 292, 1_108_000_000, 262_000, "2025-06-30T08:00:00Z", 7, ["trading", "wallet", "ib", "copy_trading", "rewards", "academy", "kyc_auto"]],
 ];
 
 export const BRK_TENANTS: BrkTenant[] = SEEDS.map((s, i) => {
@@ -418,9 +432,9 @@ export interface BrkOverride {
 export const BRK_OVERRIDES: BrkOverride[] = [
   { tenantId: "tnt_003", module: "prop", state: "on", reason: "Paid add-on — Q4 prop launch in SEA", by: PEOPLE[9]!, at: "2026-09-12T10:22:00Z", price: 1800 },
   { tenantId: "tnt_004", module: "api", state: "off", reason: "SCA pending approval for algo access", by: PEOPLE[4]!, at: "2026-08-28T14:05:00Z", price: 0 },
-  { tenantId: "tnt_004", module: "contests", state: "off", reason: "Local promo rules — contests disabled", by: PEOPLE[1]!, at: "2026-07-19T09:40:00Z", price: 0 },
+  { tenantId: "tnt_004", module: "rewards", state: "off", reason: "Local promo rules — contests disabled", by: PEOPLE[1]!, at: "2026-07-19T09:40:00Z", price: 0 },
   { tenantId: "tnt_009", module: "ib", state: "on", reason: "Paid add-on — LATAM IB network", by: PEOPLE[11]!, at: "2026-06-03T16:12:00Z", price: 900 },
-  { tenantId: "tnt_002", module: "strategy", state: "off", reason: "DFSA review of automated strategies", by: PEOPLE[4]!, at: "2026-09-02T08:30:00Z", price: 0 },
+  { tenantId: "tnt_002", module: "algo", state: "off", reason: "DFSA review of automated strategies", by: PEOPLE[4]!, at: "2026-09-02T08:30:00Z", price: 0 },
   { tenantId: "tnt_010", module: "api", state: "off", reason: "Not requested by tenant", by: PEOPLE[20]!, at: "2026-07-01T12:00:00Z", price: 0 },
   { tenantId: "tnt_010", module: "stocks", state: "off", reason: "SEC Nigeria equity CFD restriction", by: PEOPLE[4]!, at: "2026-07-01T12:00:00Z", price: 0 },
 ];

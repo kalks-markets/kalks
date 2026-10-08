@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "確認日時 {time} · 再読み込み時に15秒ごとに更新",
   "system.status.expectedBack": "{time}までに再開予定",
   "system.status.questions": "ご質問は {email} まで",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module}はお客様のアカウントではご利用いただけません。",
+  "module.copy_trading": "コピートレード",
+  "module.pamm": "PAMMファンド",
+  "module.mam": "MAM",
+  "module.prop": "プロップトレード",
+  "module.ib": "パートナープログラム",
+  "module.algo": "ストラテジービルダー",
+  "module.api": "APIとWebhook",
+  "module.academy": "アカデミー",
+  "module.wallet": "ウォレット",
+  "module.rewards": "リワード",
+  "module.options": "オプション",
+  "module.news": "ニュース",
+  "module.calendar": "経済指標カレンダー",
+  "module.markets": "マーケット",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "サポートチャット",
 };
 export default shell;

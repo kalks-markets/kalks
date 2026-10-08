@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "BUY STOP LMT {lot}",
   "line.sellStopLimit": "SELL STOP LMT {lot}",
   "line.alert": "แจ้งเตือน",
-  "line.posTitle": "ลากเพื่อตั้ง SL/TP · ดับเบิลคลิกเพื่อแก้ไข",
+  "line.posTitle": "ลาก S หรือ T (หรือเส้น) เพื่อตั้ง SL/TP · ดับเบิลคลิกเพื่อแก้ไข",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "Stop Loss: ลากไปยังราคา หรือคลิกเพื่อใช้ระยะเริ่มต้น",
+  "line.tpHandleTitle": "Take Profit: ลากไปยังราคา หรือคลิกเพื่อใช้ระยะเริ่มต้น",
   "line.dragTitle": "ลากเพื่อย้าย",
   "line.remove": "ลบ {label}",
 

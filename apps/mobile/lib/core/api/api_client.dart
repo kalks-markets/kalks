@@ -3,7 +3,8 @@
 //   X-Kalks-Device, X-Kalks-Platform: android, X-Kalks-App-Version, X-Kalks-Locale, User-Agent
 //   X-Kalks-Trade (Kalks Trader account calls), X-Kalks-Stepup (step-up protected writes, or `stepup_token` in the body)
 // Errors become ApiException (api_error.dart). A dead session (401 unauthorized) and maintenance (503) are reported
-// to the app once, so it can show sign-in or the maintenance screen.
+// to the app once, so it can show sign-in or the maintenance screen; a switched-off module (403 module_disabled), so
+// it can fetch the broker's module switches again.
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -25,17 +26,24 @@ class ApiContext {
 }
 
 class ApiClient {
-  ApiClient({required String baseUrl, required this.context, HttpClientAdapter? adapter, this.onSessionDead, this.onMaintenance, this.onDeviceMinted})
-    : dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl.endsWith('/') ? baseUrl : '$baseUrl/',
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 30),
-          sendTimeout: const Duration(seconds: 30),
-          // every status comes back as a response: errors are mapped below, never thrown by Dio
-          validateStatus: (_) => true,
-        ),
-      ) {
+  ApiClient({
+    required String baseUrl,
+    required this.context,
+    HttpClientAdapter? adapter,
+    this.onSessionDead,
+    this.onMaintenance,
+    this.onModuleDisabled,
+    this.onDeviceMinted,
+  }) : dio = Dio(
+         BaseOptions(
+           baseUrl: baseUrl.endsWith('/') ? baseUrl : '$baseUrl/',
+           connectTimeout: const Duration(seconds: 15),
+           receiveTimeout: const Duration(seconds: 30),
+           sendTimeout: const Duration(seconds: 30),
+           // every status comes back as a response: errors are mapped below, never thrown by Dio
+           validateStatus: (_) => true,
+         ),
+       ) {
     if (adapter != null) dio.httpClientAdapter = adapter;
     dio.interceptors.add(InterceptorsWrapper(onRequest: _headers));
   }
@@ -48,6 +56,9 @@ class ApiClient {
 
   /// 503 `maintenance`: the broker's maintenance mode.
   final void Function(ApiException e)? onMaintenance;
+
+  /// 403 `module_disabled`: the broker switched off the module this call belongs to.
+  final void Function(ApiException e)? onModuleDisabled;
 
   /// A sign-in answer carried a freshly minted `device` id.
   final void Function(String device)? onDeviceMinted;
@@ -181,6 +192,7 @@ class ApiClient {
     final e = ApiException.fromResponse(r.statusCode ?? 0, r.data, retryAfterHeader: r.headers.value('retry-after'));
     if (e.isUnauthorized && r.requestOptions.extra['bearer'] == true) onSessionDead?.call(e);
     if (e.isMaintenance) onMaintenance?.call(e);
+    if (e.isModuleDisabled) onModuleDisabled?.call(e);
     return e;
   }
 }

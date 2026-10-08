@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "{time} அன்று சரிபார்க்கப்பட்டது · மீண்டும் ஏற்றும்போது ஒவ்வொரு 15 வினாடிக்கும் புதுப்பிக்கப்படும்",
   "system.status.expectedBack": "{time}க்குள் மீண்டும் கிடைக்கும் என எதிர்பார்க்கப்படுகிறது",
   "system.status.questions": "கேள்விகள் உள்ளதா? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} உங்கள் கணக்கில் கிடைக்கவில்லை.",
+  "module.copy_trading": "காப்பி டிரேடிங்",
+  "module.pamm": "PAMM நிதிகள்",
+  "module.mam": "MAM",
+  "module.prop": "ப்ராப் டிரேடிங்",
+  "module.ib": "பார்ட்னர் திட்டம்",
+  "module.algo": "உத்தி உருவாக்கி",
+  "module.api": "API மற்றும் வெப்ஹூக்குகள்",
+  "module.academy": "அகாடமி",
+  "module.wallet": "வாலட்",
+  "module.rewards": "வெகுமதிகள்",
+  "module.options": "ஆப்ஷன்கள்",
+  "module.news": "செய்திகள்",
+  "module.calendar": "பொருளாதார நாட்காட்டி",
+  "module.markets": "சந்தைகள்",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "ஆதரவு அரட்டை",
 };
 export default shell;

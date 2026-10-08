@@ -548,5 +548,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "Premium ya option",
   "ledgerKind.option_settlement": "Malipo ya option",
   "ledgerKind.option_rebate": "Punguzo la maker",
+  // CFD / Options account split
+  "product.cfd": "Akaunti ya CFD",
+  "product.options": "Akaunti ya Options",
+  "product.cfdText": "Forex, madini, fahirisi, hisa na crypto kama CFD, kwa leverage.",
+  "product.optionsText": "Calls na puts kwenye forex, dhahabu, fedha na mafuta, hulipwa kwa pesa taslimu.",
+  "product.chipOptions": "OPTIONS",
+  "product.groupCfd": "Akaunti za CFD",
+  "product.groupOptions": "Akaunti za Options",
+  "wizard.step.product": "Bidhaa",
+  "wizard.productTitle": "Akaunti hii itafanya biashara ya nini?",
+  "wizard.productSubtitle": "Kila akaunti hufanya biashara ya bidhaa moja. Unaweza kuwa na zote mbili.",
+  "wizard.noGroups": "Hakuna aina za akaunti zilizo wazi kwa bidhaa hii kwa sasa.",
+  "wizard.introFirst": "Hatua moja fupi kabla ya akaunti yako ya kwanza ya Options: utangulizi wa dakika 1.",
+  "wizard.agreeLiveOptions": "Ninaelewa kwamba options zina hatari kubwa: option iliyonunuliwa inaweza kuisha bila thamani, na option iliyouzwa inaweza kupoteza zaidi ya malipo yaliyopokelewa.",
 };
 export default accounts;

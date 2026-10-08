@@ -264,6 +264,7 @@ fn place_json(env: &crate::engine::Env, st: &crate::state::AccountState, out: &P
 pub async fn place(State(st): State<AppState>, ctx: Ctx, Body(b): Body<OrderBody>) -> ApiResult<Json<Value>> {
     let s = terminal::session(&st, &ctx).await?;
     s.writable()?;
+    crate::modules::require(&st, &ctx.tenant.slug, "options").await?;
     terminal::copy_guard(&st, &s, true)?;
     let mut req = order_req(&b)?;
     if req.client_order_id.as_deref().is_none_or(str::is_empty) {

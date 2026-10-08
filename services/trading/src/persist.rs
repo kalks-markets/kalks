@@ -63,6 +63,7 @@ pub fn group_from_row(r: &sqlx::postgres::PgRow) -> Group {
         demo_refills_per_day: r.get::<i32, _>("demo_refills_per_day").max(0) as u32,
         demo_expiry_days: r.get::<i32, _>("demo_expiry_days").max(1) as u32,
         enabled: r.get("enabled"),
+        product: crate::rules::Product::parse(&r.try_get::<String, _>("product").unwrap_or_default()),
     }
 }
 

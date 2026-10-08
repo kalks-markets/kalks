@@ -179,7 +179,11 @@ on the trade API (`trade/*`, docs/MOBILE-API.md §6) and the streams in `lib/cor
   `apps/terminal/lib/indicators.ts` + `components/chart/indicators/{layer,band-fill}.ts` into
   `assets/chart/indicators.bundle.js` and writes the registry `assets/chart/indicators.json` for the menus
   (`cfd/chart_menu.dart`: chart type, indicators list, settings, templates; saved per symbol in the workspace).
+  Trade lines like the web: a position without SL / TP shows **S** / **T** handles after its P&L (drag one out to
+  place that stop, tap for the order tickets' starting distance; `ChartLine.handles`, `lineForHandle`, `clampStop`,
+  `defaultStop` in `chart_bridge.dart`, the same rules as the web's `components/chart/trade-handles.ts`). Kalks
+  Trader is blue for up / buy / profit / TP and red for down / sell / loss / SL (`KTokens.traderDark/Light`).
 - Previews (`KALKS_PREVIEW=true`): `preview/preview_server.dart` answers `trade/*` and plays the market-data and engine
   sockets (moving quotes, fills, pending triggers, SL / TP), so `?signedIn=1#/trader` works offline.
-- Tests: `test/terminal` (maths incl. cent / JPY, order rules, engine shapes, the stream, the chart codec, the order and
-  position sheets).
+- Tests: `test/terminal` (maths incl. cent / JPY, order rules, engine shapes, the stream, the chart codec, the S / T
+  handles, the order and position sheets).

@@ -11,6 +11,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { NextRequest } from "next/server";
 import { INSTRUMENTS } from "@kalks/mock";
 import { aiGate } from "@/lib/ai-guard";
+import { moduleOn } from "@/lib/tenant-brand";
+import { hostOf } from "@/lib/tenant-host";
 import { PARSE_RESULT_JSON_SCHEMA, validateSpec, type ParseResult } from "@/lib/ai-trader/schema";
 import { TIMEFRAMES } from "@/lib/trading";
 
@@ -41,9 +43,10 @@ Rules for you:
 - List every default you filled in and every interpretation you made in assumptions.
 - Never add conditions, limits or indicators the trader did not ask for.`;
 
-/** GET: whether Claude is configured (never exposes the key). */
-export function GET() {
-  return Response.json({ configured: !!process.env.ANTHROPIC_API_KEY, model: MODEL });
+/** GET: whether Claude is configured (never exposes the key); not while the broker has AI switched off. */
+export async function GET(req: NextRequest) {
+  const on = await moduleOn("ai", hostOf(req.headers));
+  return Response.json({ configured: on && !!process.env.ANTHROPIC_API_KEY, model: MODEL, ...(on ? {} : { code: "module_disabled" }) });
 }
 
 function bad(status: number, error: string) {
@@ -51,6 +54,8 @@ function bad(status: number, error: string) {
 }
 
 export async function POST(req: NextRequest) {
+  // module switches: the broker switched AI off
+  if (!(await moduleOn("ai", hostOf(req.headers)))) return Response.json({ configured: false, error: "AI isn't available on your account.", code: "module_disabled" }, { status: 403 });
   let body: { prompt?: unknown; symbol?: unknown; timeframe?: unknown };
   try {
     body = await req.json();

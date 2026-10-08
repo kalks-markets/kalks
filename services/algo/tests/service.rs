@@ -36,6 +36,8 @@ struct Mock {
     wallet_delay_ms: std::sync::atomic::AtomicU64,
     /// house account calls to the engine's staff routes: (route, body)
     house: Mutex<Vec<(String, Value)>>,
+    /// the broker's module map the gateway answers (`/v1/internal/tenants/{slug}`)
+    modules: Mutex<Value>,
 }
 
 async fn serve(app: Router) -> String {
@@ -99,13 +101,18 @@ async fn mocks(m: Arc<Mock>) -> (String, String, String, String) {
         )
         .route("/v1/social/admin/masters", get(|| async { Json(json!({"items": [{"id": 77, "status": "approved", "hidden": false, "stats": {"equity": 10000.0, "followers": 0, "aum": 0.0, "trades": 0}}]})) }))
         .with_state(m.clone());
-    let gateway = Router::new().route(
-        "/v1/internal/house-users",
-        post(|State(m): State<Arc<Mock>>, Json(b): Json<Value>| async move {
-            m.house.lock().unwrap().push(("house-user".into(), b));
-            Json(json!({"user": {"id": 900, "isHouse": true}}))
-        }),
-    );
+    let gateway = Router::new()
+        .route(
+            "/v1/internal/house-users",
+            post(|State(m): State<Arc<Mock>>, Json(b): Json<Value>| async move {
+                m.house.lock().unwrap().push(("house-user".into(), b));
+                Json(json!({"user": {"id": 900, "isHouse": true}}))
+            }),
+        )
+        .route(
+            "/v1/internal/tenants/{slug}",
+            get(|State(m): State<Arc<Mock>>, Path(slug): Path<String>| async move { Json(json!({"id": 1, "slug": slug, "status": "active", "modules": m.modules.lock().unwrap().clone()})) }),
+        );
     let gateway = gateway.with_state(m.clone());
     let md = Router::new().route("/v1/quotes", get(|| async { Json(json!({"EURUSD": {"bid": 1.1, "ask": 1.1001, "t": 0}, "BTCUSD": {"bid": 80000.0, "ask": 80010.0, "t": 0}})) }));
     let wallet = Router::new()
@@ -226,6 +233,32 @@ impl C {
 }
 
 use reqwest::Method as M;
+
+/// Module switches (gateway): with `api` off the broker's public API keys and webhooks answer 403 module_disabled
+/// (nothing reaches the engine); on again (after the 30 s cache, or in a fresh process) they work.
+#[tokio::test]
+async fn module_switch_refuses_the_public_api_and_webhooks() {
+    let Some((base, st, mock)) = setup().await else { return };
+    let c = C { base, http: reqwest::Client::new() };
+    *mock.modules.lock().unwrap() = json!({"api": false, "algo": true});
+    let (s, w) = c.user(1, M::POST, "/v1/webhooks", Some(json!({"routes": [{"login": 50000001, "sizing": {"mode": "fixed", "value": 0.1}}]}))).await;
+    assert_eq!(s, 200, "{w}");
+    let (s, r) = c.raw(M::POST, &format!("/hooks/{}", w["token"].as_str().unwrap()), &[], r#"{"action":"buy","symbol":"EURUSD","id":"m1"}"#).await;
+    assert_eq!((s, r["error"]["code"].as_str()), (403, Some("module_disabled")));
+    let (s, k) = c.user(1, M::POST, "/v1/keys", Some(json!({"name": "bot", "login": 50000001, "scopes": ["read", "trade"]}))).await;
+    assert_eq!(s, 200, "{k}");
+    let auth = vec![("authorization", format!("Bearer {}:{}", k["keyId"].as_str().unwrap(), k["secret"].as_str().unwrap())), ("content-type", "application/json".into())];
+    let (s, r) = c.raw(M::GET, "/public/v1/account", &auth, "").await;
+    assert_eq!((s, r["error"]["code"].as_str()), (403, Some("module_disabled")));
+    let (s, _) = c.raw(M::POST, "/public/v1/orders", &auth, r#"{"symbol":"EURUSD","side":"buy","type":"market","volume":0.1}"#).await;
+    assert_eq!(s, 403);
+    // a wrong secret is still a 401 (the switch is checked after authentication)
+    let (s, _) = c.raw(M::GET, "/public/v1/account", &[("authorization", format!("Bearer {}:ks_wrong", k["keyId"].as_str().unwrap()))], "").await;
+    assert_eq!(s, 401);
+    assert!(mock.orders.lock().unwrap().is_empty(), "nothing reached the engine");
+    assert!(!algo::modules::on(&st, "kalks", "api").await && algo::modules::on(&st, "kalks", "algo").await && algo::modules::on(&st, "kalks", "news").await);
+    teardown(&st).await;
+}
 
 #[tokio::test]
 async fn service_end_to_end() {

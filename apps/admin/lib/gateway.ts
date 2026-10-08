@@ -27,7 +27,8 @@ export type GatewayStaff = {
   rbac?: boolean;
   /** Platform Owner (holds owner.* permissions). */
   is_owner?: boolean;
-  tenant: { id?: number; slug: string; name: string };
+  /** `modules`: the tenant's effective module switches (gateway tenancy.rs); an off module's pages leave the nav. */
+  tenant: { id?: number; slug: string; name: string; modules?: Record<string, boolean> };
 };
 
 /** Whether a staff member holds a permission. The gateway's list is authoritative when `rbac` is set; `fallback`

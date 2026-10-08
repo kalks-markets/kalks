@@ -6,6 +6,8 @@ import { Toaster } from "sonner";
 import { TooltipProvider } from "@kalks/ui";
 import type { PartialCatalog } from "@kalks/i18n";
 import { I18nProvider, useLocale } from "@kalks/i18n/react";
+import { ModulesProvider } from "@/components/modules";
+import type { Modules } from "@/lib/modules";
 
 /** Phones get top-center toasts (full width), everything else top-right. */
 function useNarrow() {
@@ -25,14 +27,16 @@ function useNarrow() {
  * The terminal shell moves them clear of its chrome through --t-toast-top / --t-toast-right
  * (below the chart toolbar, left of the order panel); other pages use the defaults.
  */
-export function TerminalProviders({ children, locale, messages }: { children: React.ReactNode; locale: string; messages: PartialCatalog }) {
+export function TerminalProviders({ children, locale, messages, modules = null }: { children: React.ReactNode; locale: string; messages: PartialCatalog; /** the broker's module switches (lib/tenant-brand.ts) */ modules?: Modules | null }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} themes={["dark", "light"]} disableTransitionOnChange>
       <I18nProvider locale={locale} messages={messages}>
-        <TooltipProvider>
-          {children}
-          <TerminalToaster />
-        </TooltipProvider>
+        <ModulesProvider modules={modules}>
+          <TooltipProvider>
+            {children}
+            <TerminalToaster />
+          </TooltipProvider>
+        </ModulesProvider>
       </I18nProvider>
     </ThemeProvider>
   );

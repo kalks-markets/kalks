@@ -121,7 +121,7 @@ No session needed. Read it at start-up and refresh it on resume. It still answer
     }
   },
   "tenant": { "slug": "kalks", "name": "Kalks", "default": true, "logoUrl": null, "primary": null, "accent": null, "supportEmail": null, "website": null },
-  "modules": { "wallet": true, "prop": true, "ib": true, "academy": true, "copy_trading": true, "pamm": true, "algo": true, "api": true, "rewards": true },
+  "modules": { "wallet": true, "prop": true, "ib": true, "academy": true, "copy_trading": true, "pamm": true, "mam": true, "algo": true, "api": true, "rewards": true, "options": true, "news": true, "calendar": true, "markets": true, "ai": true, "support_chat": true },
   "flags": { "demo_accounts": true },
   "maintenance": { "active": false, "message": "", "until": null }
 }
@@ -129,7 +129,10 @@ No session needed. Read it at start-up and refresh it on resume. It still answer
 
 - `tenant`: the broker's branding, from the same source as the web's `brandCss`. `default: true` means the stock
   Kalks look. `primary` re-tints the ember accent and `accent` the gold. Both are `#rrggbb` or null.
-- `modules`: a module set to `false` is hidden, and its API answers `403 module_disabled`. Missing means on.
+- `modules`: a module set to `false` is hidden, and its API answers `403 module_disabled`. Missing means on. The
+  native trade routes follow `options` (`trade/options*`), `mam` (`trade/mam`) and `ai` (`trade/ai-trader`;
+  `trade/options/explain` needs both `options` and `ai`); `support_chat` closes the chat routes of `support/*` only
+  while `ai` is off too (Ask Kalks AI asks through them), the stream ticket stays open.
 - `minAppVersion`: when set (env `MOBILE_MIN_APP_VERSION`), an older app must ask the user to update.
 - A white-label broker's `terminal` and `engine` / `options` streams use its own trade domain.
 
@@ -167,6 +170,18 @@ Signing out of the gateway stops trading at once, because every trade call re-ch
 | 403 | `trade_session_foreign` | The token belongs to another client (or its SSO account changed owner): drop it |
 | 403 | `read_only` | Investor session: trading is disabled |
 | 4xx | engine codes | Kept as they are: `market_closed`, `no_money`, `invalid_sl`, `invalid_tp`, `invalid_volume`, `symbol_demo_only`, `trading_disabled`, `close_only`, … Show the message. |
+| 422 | `product_mismatch` | CFD / Options account split: a CFD order on an Options account, or an option order on a CFD account. Show the message; the app should never send one (the active account's product decides the workspace). |
+
+### CFD and Options accounts
+
+Every account trades one product: `account.product` is `"cfd"` or `"options"` on every account view (`trade/state`,
+`trade/sessions`, `trade/login`, `trade/sessions/check`, `trading/accounts`, `trading/accounts/{login}`), and every
+group of `trading/groups` has `product` too (missing on an older server = `"cfd"`). The app opens the CFD workspace
+for a CFD account and the options workspace for an Options account; its CFD | Options control switches between the
+client's accounts of each product. The open-account wizard starts with the product (CFD account | Options account)
+and lists only that product's groups; the account limit counts per (live / demo, product). A deep link
+`/trader?mode=options` picks the client's Options account. While `config.modules.options` is `false`, no Options
+account is offered and `POST trading/accounts` with an Options group answers `403 module_disabled`.
 
 ### Routes
 

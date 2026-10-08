@@ -403,5 +403,7 @@ const order: NsMessages<"order"> = {
   "toast.sessionExpired": "Oturumun süresi doldu",
   "toast.sessionExpiredDesc": "{login} oturumunuz sona erdi. İşlem yapmak için tekrar giriş yapın.",
   "toast.loggedOut": "{login} hesabından çıkış yapıldı",
+  // CFD / Options account split
+  "reject.product_mismatch": "Bu hesap bu ürünü işlem görmez",
 };
 export default order;

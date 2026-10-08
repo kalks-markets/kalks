@@ -548,5 +548,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "옵션 프리미엄",
   "ledgerKind.option_settlement": "옵션 결제",
   "ledgerKind.option_rebate": "메이커 리베이트",
+  // CFD / Options account split
+  "product.cfd": "CFD 계좌",
+  "product.options": "옵션 계좌",
+  "product.cfdText": "외환, 금속, 지수, 주식, 암호화폐를 레버리지 CFD로 거래합니다.",
+  "product.optionsText": "외환, 금, 은, 원유의 콜과 풋, 현금 결제.",
+  "product.chipOptions": "옵션",
+  "product.groupCfd": "CFD 계좌",
+  "product.groupOptions": "옵션 계좌",
+  "wizard.step.product": "상품",
+  "wizard.productTitle": "이 계좌로 무엇을 거래하시겠어요?",
+  "wizard.productSubtitle": "계좌마다 한 가지 상품만 거래합니다. 두 계좌를 모두 가질 수 있습니다.",
+  "wizard.noGroups": "현재 이 상품으로 개설할 수 있는 계좌 유형이 없습니다.",
+  "wizard.introFirst": "첫 옵션 계좌 전에 1분 옵션 소개를 확인해 주세요.",
+  "wizard.agreeLiveOptions": "옵션은 위험이 높다는 것을 이해합니다. 매수한 옵션은 가치 없이 만기될 수 있고, 매도한 옵션은 받은 프리미엄보다 큰 손실이 날 수 있습니다.",
 };
 export default accounts;

@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "BUY STOP LMT {lot}",
   "line.sellStopLimit": "SELL STOP LMT {lot}",
   "line.alert": "AVVISO",
-  "line.posTitle": "Trascina per impostare SL/TP · doppio clic per modificare",
+  "line.posTitle": "Trascina S o T (o la linea) per impostare SL/TP · doppio clic per modificare",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "Stop Loss: trascina su un prezzo o fai clic per la distanza predefinita",
+  "line.tpHandleTitle": "Take Profit: trascina su un prezzo o fai clic per la distanza predefinita",
   "line.dragTitle": "Trascina per spostare",
   "line.remove": "Rimuovi {label}",
 

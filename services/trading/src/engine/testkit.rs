@@ -54,7 +54,13 @@ pub fn group(code: &str, mode: Mode, cent: bool) -> Group {
         demo_refills_per_day: 2,
         demo_expiry_days: 10,
         enabled: true,
+        product: crate::rules::Product::Cfd,
     }
+}
+
+/// An Options group (`product = options`): what option tests open their accounts in.
+pub fn options_group(code: &str, mode: Mode, cent: bool) -> Group {
+    Group { product: crate::rules::Product::Options, ..group(code, mode, cent) }
 }
 
 pub struct Kit {
@@ -192,6 +198,10 @@ impl Kit {
         let mut ecn = group("ecn", Mode::Hedging, false);
         ecn.commission_per_lot = d("7");
         tenant.groups.insert("ecn".into(), ecn);
+        // Options accounts (CFD / Options account split): `opt` (USD) and `opt-cent` (USC)
+        for g in [options_group("opt", Mode::Hedging, false), options_group("opt-cent", Mode::Hedging, true)] {
+            tenant.groups.insert(g.code.clone(), g);
+        }
         // Monday 2026-09-28 12:00 UTC: FX open
         let now = t("2026-09-28T12:00:00Z");
         let options = FixedPricer::default();

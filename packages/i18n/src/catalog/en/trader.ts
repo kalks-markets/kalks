@@ -355,6 +355,8 @@ const trader = {
   "opt.mode.options": "Options",
   "opt.mode.cfdHint": "CFD trading: charts, Market Watch and the order panel",
   "opt.mode.optionsHint": "Kalks FX Options: option chain, strategies and payoff",
+  "acct.openCfd": "Open a CFD account",
+  "acct.openOptions": "Open an Options account",
   "opt.call": "Call",
   "opt.put": "Put",
   "opt.calls": "Calls",
@@ -518,12 +520,13 @@ const trader = {
   "opt.err.read_only": "Trading is disabled with the investor password.",
   "opt.err.unavailable": "The server is unavailable. Try again shortly.",
   "opt.err.session_expired": "Your trading session has expired. Log in again.",
+  "opt.err.product_mismatch": "This is a CFD account: options trade in an Options account.",
   "opt.onboarding.text": "Read the 1-minute options intro in the Client Area and tick “I understand”. Then come back here and trade.",
   "opt.onboarding.cta": "Open the options intro",
 
   // Module not open yet / price server down
   "opt.soon.title": "Options launching soon",
-  "opt.soon.text": "Kalks FX Options isn't open on this account yet. As soon as it is, the option chain appears here, on the same account as your CFDs.",
+  "opt.soon.text": "Kalks FX Options isn't open on this account yet. As soon as it is, the option chain appears here.",
   "opt.soon.point1": "Calls and puts on forex, gold, silver and oil",
   "opt.soon.point2": "Daily, weekly and monthly expiries, cash-settled in USD",
   "opt.soon.point3": "As a buyer you can never lose more than the premium you pay",

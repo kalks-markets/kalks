@@ -548,5 +548,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "Phí quyền chọn",
   "ledgerKind.option_settlement": "Thanh toán quyền chọn",
   "ledgerKind.option_rebate": "Hoàn phí maker",
+  // CFD / Options account split
+  "product.cfd": "Tài khoản CFD",
+  "product.options": "Tài khoản quyền chọn",
+  "product.cfdText": "Ngoại hối, kim loại, chỉ số, cổ phiếu và tiền mã hóa dưới dạng CFD, có đòn bẩy.",
+  "product.optionsText": "Quyền chọn mua và bán trên ngoại hối, vàng, bạc và dầu, thanh toán bằng tiền mặt.",
+  "product.chipOptions": "QUYỀN CHỌN",
+  "product.groupCfd": "Tài khoản CFD",
+  "product.groupOptions": "Tài khoản quyền chọn",
+  "wizard.step.product": "Sản phẩm",
+  "wizard.productTitle": "Tài khoản này sẽ giao dịch gì?",
+  "wizard.productSubtitle": "Mỗi tài khoản giao dịch một sản phẩm. Bạn có thể có cả hai.",
+  "wizard.noGroups": "Hiện chưa có loại tài khoản nào được mở cho sản phẩm này.",
+  "wizard.introFirst": "Một bước nhanh trước tài khoản quyền chọn đầu tiên: phần giới thiệu quyền chọn 1 phút.",
+  "wizard.agreeLiveOptions": "Tôi hiểu rằng quyền chọn có rủi ro cao: quyền chọn đã mua có thể đáo hạn không còn giá trị, và quyền chọn đã bán có thể lỗ nhiều hơn phí quyền chọn nhận được.",
 };
 export default accounts;

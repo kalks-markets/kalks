@@ -5,6 +5,7 @@ import { Chip, cn } from "@/components/kit";
 import { useT } from "@kalks/i18n/react";
 import type { T } from "@kalks/i18n";
 import { modeLabel, type EngineGroup } from "./api";
+import { productOf } from "@/lib/products";
 
 const PHOTO: Record<string, string> = {
   standard: "finance",
@@ -14,6 +15,8 @@ const PHOTO: Record<string, string> = {
   cent: "money",
   vip: "skyscrapers",
   prop: "trader",
+  "options-standard": "charts",
+  "options-pro": "analytics",
 };
 
 export const groupPhoto = (g: Pick<EngineGroup, "code">) => `/assets/photos/${PHOTO[g.code] ?? "stock-market"}.jpg`;
@@ -51,6 +54,8 @@ export function EngineGroupCard({
   compact?: boolean;
 }) {
   const t = useT();
+  // an Options group (CFD / Options account split): leverage, per-lot commission and position mode don't apply
+  const options = productOf(g) === "options";
   const full = used !== undefined && used >= g.maxAccountsPerUser;
   const Comp = onSelect ? "button" : "div";
   return (
@@ -73,7 +78,7 @@ export function EngineGroupCard({
           <div className="min-w-0">
             <div className="truncate text-[19px] font-semibold tracking-tight text-white">{g.name}</div>
             <div className="text-[11px] font-medium uppercase tracking-wider text-white/75">
-              {t.dyn(`accounts.mode.${g.mode}`, modeLabel(g.mode))}
+              {options ? t("accounts.product.chipOptions") : t.dyn(`accounts.mode.${g.mode}`, modeLabel(g.mode))}
               {g.cent && <span className="text-gold"> · {t("accounts.groupCard.uscCentAlt")}</span>}
             </div>
           </div>
@@ -85,14 +90,14 @@ export function EngineGroupCard({
         </div>
       </div>
       <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
-        <p className="text-[12.5px] leading-snug text-fg-2">{spreadType(g, t)}</p>
+        <p className="text-[12.5px] leading-snug text-fg-2">{options ? t("accounts.product.optionsText") : spreadType(g, t)}</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <Spec label={t("accounts.label.commission")} value={commissionText(g, t)} />
+          {!options && <Spec label={t("accounts.label.commission")} value={commissionText(g, t)} />}
           <Spec label={t("accounts.label.minDeposit")} value={g.minDeposit > 0 ? `$${g.minDeposit.toLocaleString("en-US")}` : t("common.none")} />
-          <Spec label={t("accounts.label.maxLeverage")} value={`1:${maxLeverage(g).toLocaleString("en-US")}`} />
+          {!options && <Spec label={t("accounts.label.maxLeverage")} value={`1:${maxLeverage(g).toLocaleString("en-US")}`} />}
           <Spec label={t("accounts.label.stopOut")} value={`${g.stopOutPct}%`} />
         </div>
-        {!compact && (
+        {!compact && !options && (
           <ul className="mt-3 space-y-1.5">
             {groupFeatures(g, t).slice(1).map((f) => (
               <li key={f} className="flex items-start gap-2 text-[12px] leading-snug text-fg-2">

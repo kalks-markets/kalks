@@ -80,12 +80,15 @@ export function PricingPage() {
   const now = useNow();
   const { data, error, reload } = useOpt<{ groups: GroupSettings[]; default: GroupSettings }>("/api/options/groups", { refreshMs: 60_000 });
   const unders = useOpt<{ underlyings: Underlying[] }>("/api/options/underlyings");
-  // account groups of this broker (trading engine) for the picker; demo builds use the standard set
-  const tg = useApi<{ groups: { code: string; name: string }[] }>(IS_DEMO ? null : "/api/trading/admin/groups");
+  // this broker's Options account groups (trading engine; CFD / Options account split: only an Options account trades
+  // options, so CFD groups are not offered — rows that already exist for one stay listed); demo builds use the seeded set
+  const tg = useApi<{ groups: { code: string; name: string; product?: string }[] }>(IS_DEMO ? null : "/api/trading/admin/groups");
   const groupCodes = React.useMemo(() => {
-    const fromEngine = (tg.data?.groups ?? []).map((g) => g.code);
+    const engine = tg.data?.groups ?? [];
+    const split = engine.some((g) => g.product);
+    const fromEngine = engine.filter((g) => !split || g.product === "options").map((g) => g.code);
     const fromRows = (data?.groups ?? []).map((g) => g.groupCode).filter((c) => c !== "*");
-    return Array.from(new Set([...(IS_DEMO ? ["standard", "pro", "ecn", "vip", "cent"] : []), ...fromEngine, ...fromRows])).sort();
+    return Array.from(new Set([...(IS_DEMO ? ["options-standard", "options-pro"] : []), ...fromEngine, ...fromRows])).sort();
   }, [tg.data, data]);
   const symbols = (unders.data?.underlyings ?? []).filter((u) => u.enabled).map((u) => u.symbol);
   const [edit, setEdit] = React.useState<{ g: GroupSettings | null; isNew: boolean } | null>(null);
@@ -165,7 +168,7 @@ export function PricingPage() {
     <div className="pb-10">
       <PageHeader
         title="Spreads, fees & limits"
-        subtitle="Your pricing per account group and underlying. The most specific row wins: group + underlying, then group, then underlying, then your default."
+        subtitle="Your pricing per Options account group and underlying. The most specific row wins: group + underlying, then group, then underlying, then your default."
         actions={
           <>
             <Button variant="surface" size="lg" onClick={reload}>

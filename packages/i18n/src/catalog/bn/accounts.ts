@@ -555,5 +555,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "অপশন প্রিমিয়াম",
   "ledgerKind.option_settlement": "অপশন সেটেলমেন্ট",
   "ledgerKind.option_rebate": "মেকার রিবেট",
+  // CFD / Options account split
+  "product.cfd": "CFD অ্যাকাউন্ট",
+  "product.options": "অপশন অ্যাকাউন্ট",
+  "product.cfdText": "ফরেক্স, ধাতু, সূচক, স্টক ও ক্রিপ্টো CFD হিসেবে, লিভারেজসহ।",
+  "product.optionsText": "ফরেক্স, সোনা, রুপা ও তেলের কল ও পুট, নগদে নিষ্পত্তি।",
+  "product.chipOptions": "অপশন",
+  "product.groupCfd": "CFD অ্যাকাউন্ট",
+  "product.groupOptions": "অপশন অ্যাকাউন্ট",
+  "wizard.step.product": "পণ্য",
+  "wizard.productTitle": "এই অ্যাকাউন্টে কী ট্রেড করবেন?",
+  "wizard.productSubtitle": "প্রতিটি অ্যাকাউন্ট একটি পণ্য ট্রেড করে। আপনি দুটোই রাখতে পারেন।",
+  "wizard.noGroups": "এই মুহূর্তে এই পণ্যের জন্য কোনো অ্যাকাউন্টের ধরন খোলা নেই।",
+  "wizard.introFirst": "আপনার প্রথম অপশন অ্যাকাউন্টের আগে একটি ছোট ধাপ: ১ মিনিটের অপশন পরিচিতি।",
+  "wizard.agreeLiveOptions": "আমি বুঝি যে অপশনে উচ্চ ঝুঁকি আছে: কেনা অপশন মূল্যহীন হয়ে মেয়াদ শেষ হতে পারে, আর বিক্রি করা অপশনে প্রাপ্ত প্রিমিয়ামের চেয়ে বেশি ক্ষতি হতে পারে।",
 };
 export default accounts;

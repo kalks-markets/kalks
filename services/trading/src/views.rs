@@ -38,6 +38,8 @@ pub fn account_json(env: &Env, st: &AccountState) -> Value {
         "type": a.kind.as_str(),
         "group": a.group,
         "groupName": env.group.name,
+        // CFD / Options account split: what the account trades (its group's product)
+        "product": env.group.product.as_str(),
         "mode": if a.mode == crate::model::Mode::Netting { "netting" } else { "hedging" },
         "cent": a.cent,
         "currency": a.ccy(),

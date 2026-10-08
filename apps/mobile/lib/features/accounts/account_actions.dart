@@ -5,7 +5,8 @@
 //   showAccountMenu(context, ref, account, onChanged:)    the full ⋯ menu (action sheet + every dialog)
 //   AccountMenuButton(account:, onChanged:)               the round ⋯ button that opens it
 //   TradeButton(account:, size:, expand:)                 opens Kalks Trader (/trader?login=)
-//   FundButton(account:, size:)                           Fund: wallet -> this live account
+//   FundButton(account:, size:)                           Fund: wallet -> this live account (nothing when the broker
+//                                                         switched the wallet module off)
 //   RefillButton(account:, onDone:, size:)                demo refill
 //   showTransferBetweenSheet(context, from:)              move money between two trading accounts (step-up)
 // Optional extras: showAccountMenu(onTab:) switches the detail page's tab instead of opening the detail again;
@@ -25,6 +26,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/api/api_providers.dart';
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../core/files.dart';
 import '../../core/format/format.dart';
 import '../../core/models/account.dart';
@@ -177,14 +179,18 @@ class FundButton extends ConsumerWidget {
   final bool expand;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => KButton(
-    label: context.t('accounts.fund.button'),
-    icon: LucideIcons.arrowDownToLine,
-    variant: variant,
-    size: size,
-    expand: expand,
-    onPressed: () => showFundSheet(context, account),
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    // funding comes from the wallet: none without the wallet module
+    if (!ref.watch(configProvider).moduleOn('wallet')) return const SizedBox.shrink();
+    return KButton(
+      label: context.t('accounts.fund.button'),
+      icon: LucideIcons.arrowDownToLine,
+      variant: variant,
+      size: size,
+      expand: expand,
+      onPressed: () => showFundSheet(context, account),
+    );
+  }
 }
 
 /// Refill: tops a demo account back up to its starting balance (off when none are left today, the balance is full or

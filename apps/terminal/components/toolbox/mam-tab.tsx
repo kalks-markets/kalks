@@ -14,6 +14,7 @@ import { engineApi, type MamInfo } from "@/lib/engine/client";
 import { fmtServer } from "@/lib/trading";
 import { Td, Th } from "@/components/ui/panel";
 import { Badge, Empty, KV, TInput } from "@/components/ui/primitives";
+import { useModuleOn } from "@/components/modules";
 
 const METHOD: Record<string, string> = { equity: "Equity share", balance: "Balance share", multiplier: "Multiplier", percent: "Percent" };
 const lots = (v: number | null | undefined) => (typeof v === "number" ? v.toFixed(2) : "—");
@@ -23,7 +24,9 @@ const note = (r: string | null) => (!r ? "" : r === "below_min_lot" ? "below min
 /** MAM role of the live account (polled; null while unknown or outside the engine). */
 export function useMam(symbol?: string, volume?: number): MamInfo | null {
   const T = useTerminal();
-  const login = T.engine && T.live && !T.guest ? T.account.login : null;
+  // the broker switched MAM off (module switches): no polling, no MAM tab or allocation preview
+  const on = useModuleOn()("mam");
+  const login = on && T.engine && T.live && !T.guest ? T.account.login : null;
   const [info, setInfo] = React.useState<MamInfo | null>(null);
   React.useEffect(() => {
     if (!login) {

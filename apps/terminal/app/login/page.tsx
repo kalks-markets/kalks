@@ -276,7 +276,7 @@ function Ticker({ symbol }: { symbol: string }) {
         <div className="text-[11.5px] font-medium text-white/85">{symbol}</div>
         <LivePrice symbol={symbol} className="text-[13px] [&>span:first-child]:text-white/60 [&>span:nth-child(2)]:text-white" />
       </div>
-      <span className={cn("k-num font-mono text-[11px]", q.change >= 0 ? "text-[#22c55e]" : "text-[#f04438]")}>
+      <span className={cn("k-num font-mono text-[11px]", q.change >= 0 ? "text-[#2f7bff]" : "text-[#f04438]")}>
         {q.change >= 0 ? "+" : ""}
         {q.change.toFixed(2)}%
       </span>

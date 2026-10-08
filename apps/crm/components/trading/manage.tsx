@@ -339,9 +339,12 @@ export function SettingsPanel({ a, onChanged }: { a: EngineAccount; onChanged: (
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
       <div className="space-y-4 xl:col-span-7">
-        <Reveal>
-          <LeverageCard a={a} onChanged={onChanged} />
-        </Reveal>
+        {/* leverage is a CFD setting: an Options account has none to change (CFD / Options account split) */}
+        {a.product !== "options" && (
+          <Reveal>
+            <LeverageCard a={a} onChanged={onChanged} />
+          </Reveal>
+        )}
       </div>
       <div className="space-y-4 xl:col-span-5">
         {a.type === "demo" && (

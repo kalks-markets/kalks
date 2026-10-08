@@ -193,10 +193,15 @@ const List<NavModule> kNav = [
 /// The four modules of the bottom bar; everything else is under More.
 const List<String> kPrimaryModules = ['dashboard', 'accounts', 'wallet', 'portfolio'];
 
-/// Nav path -> module switch (apps/crm/components/tenant-config.tsx PAGE_MODULES).
+/// Nav path -> module switch (apps/crm/components/tenant-config.tsx PAGE_MODULES); the longest prefix wins, so
+/// /social/mam is MAM while the rest of /social is copy trading. Modules without a page of their own gate parts of
+/// other pages instead: `ai` (Ask Kalks AI, the options AI explanation) and `support_chat` (the live chat on
+/// /support, the floating chat button; the page itself stays for the email channel).
 const List<(String, String)> _pageModules = [
   ('/social/pamm', 'pamm'),
   ('/social/investments', 'pamm'),
+  ('/social/mam', 'mam'),
+  ('/social/managed', 'mam'),
   ('/social', 'copy_trading'),
   ('/prop', 'prop'),
   ('/partner', 'ib'),
@@ -208,6 +213,10 @@ const List<(String, String)> _pageModules = [
   ('/academy', 'academy'),
   ('/wallet', 'wallet'),
   ('/rewards', 'rewards'),
+  ('/options', 'options'),
+  ('/news', 'news'),
+  ('/calendar', 'calendar'),
+  ('/markets', 'markets'),
 ];
 
 bool _under(String path, String prefix) => prefix == '/' ? path == '/' : path == prefix || path.startsWith('$prefix/');
@@ -217,12 +226,18 @@ String? pageModule(String href) {
   return hits.isEmpty ? null : hits.first.$2;
 }
 
+/// The switched-off module that `path` belongs to (null when the page has no module or its module is on).
+String? offModuleOf(Map<String, bool> modules, String path) {
+  final m = pageModule(path);
+  return m != null && modules[m] == false ? m : null;
+}
+
+/// Whether the page at `href` is offered (its module, if any, is on).
+bool pageOn(AppConfig cfg, String href) => offModuleOf(cfg.modules, href) == null;
+
 /// Without the modules this broker switched off.
 List<NavModule> navForFeatures(List<NavModule> nav, AppConfig cfg) {
-  bool on(String href) {
-    final m = pageModule(href);
-    return m == null || cfg.moduleOn(m);
-  }
+  bool on(String href) => pageOn(cfg, href);
 
   return [
     for (final m in nav)

@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "{time} पर जाँचा गया · रीलोड करने पर हर 15 सेकंड में अपडेट होता है",
   "system.status.expectedBack": "{time} तक वापस आने की उम्मीद है",
   "system.status.questions": "कोई प्रश्न? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} आपके खाते पर उपलब्ध नहीं है।",
+  "module.copy_trading": "कॉपी ट्रेडिंग",
+  "module.pamm": "PAMM फ़ंड",
+  "module.mam": "MAM",
+  "module.prop": "प्रॉप ट्रेडिंग",
+  "module.ib": "पार्टनर प्रोग्राम",
+  "module.algo": "स्ट्रैटेजी बिल्डर",
+  "module.api": "API और वेबहुक",
+  "module.academy": "अकादमी",
+  "module.wallet": "वॉलेट",
+  "module.rewards": "रिवॉर्ड्स",
+  "module.options": "ऑप्शंस",
+  "module.news": "समाचार",
+  "module.calendar": "आर्थिक कैलेंडर",
+  "module.markets": "मार्केट्स",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "सपोर्ट चैट",
 };
 export default shell;

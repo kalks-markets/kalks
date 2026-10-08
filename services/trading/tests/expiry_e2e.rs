@@ -88,7 +88,7 @@ fn account(login: i64, user: i64) -> Account {
         login,
         user_id: user,
         kind,
-        group: if cent { "cent".into() } else { "standard".into() },
+        group: if cent { "options-cent".into() } else { "options-standard".into() },
         mode: Mode::Hedging,
         cent,
         leverage: 100,
@@ -133,6 +133,8 @@ struct Eng {
 /// against the ledger, the hub, the real feeds and options snapshot, then the order book recovery.
 async fn boot(url: &str, fresh: bool) -> Eng {
     let pool = trading::persist::connect(url).await.expect("PostgreSQL :5433");
+    // an Options cent group for the cent accounts (CFD / Options account split; only `options-standard` is seeded)
+    sqlx::query("INSERT INTO groups (tenant_id, code, name, mode, cent, leverages, default_leverage, margin_call_pct, stop_out_pct, spread_group, product) VALUES (1, 'options-cent', 'Options Cent', 'hedging', true, '{100}', 100, 60, 20, 'cent', 'options') ON CONFLICT DO NOTHING").execute(&pool).await.unwrap();
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../config");
     let specs = Arc::new(Specs::load(&format!("{root}/instruments.json"), &format!("{root}/trading-specs.json")).unwrap());
     let registry = Registry::default();

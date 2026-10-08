@@ -425,5 +425,7 @@ const order: NsMessages<"order"> = {
   "toast.sessionExpired": "Сеанс истёк",
   "toast.sessionExpiredDesc": "Ваш сеанс для {login} завершён. Войдите снова, чтобы торговать.",
   "toast.loggedOut": "Выход из {login} выполнен",
+  // CFD / Options account split
+  "reject.product_mismatch": "Этот счёт не торгует этим продуктом",
 };
 export default order;

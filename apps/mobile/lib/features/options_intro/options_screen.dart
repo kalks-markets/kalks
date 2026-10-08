@@ -4,7 +4,10 @@
 //     (scrolls to the intro) + Options course; the 13 underlyings by class; four features
 //   3 not accepted yet: "Options in three simple ideas" (Buy a Call / Buy a Put / limited risk, payoff sketches),
 //     "I understand how options work", the terms link, "Start trading options" (records the acceptance through
-//     suitability, then opens Kalks Trader in options mode on the chosen account)
+//     suitability, then opens Kalks Trader on the chosen Options account; none -> the open-account wizard on the
+//     Options product). The open-account wizard shows the same intro before a first Options account.
+// Options trade in an Options account only (the account's product): the Trade button lists those, and offers
+// "Open an Options account" when the client has none.
 //   4 How Kalks FX Options work (facts) and New to options? (the Academy course)
 //   sheets: the full terms (key points translated + the binding English text), How options work
 // API: GET suitability/options · POST suitability/options/accept {version}; accounts from trading/accounts.
@@ -67,20 +70,48 @@ final suitabilityProvider = FutureProvider.autoDispose<Suitability>(
   (ref) async => Suitability.fromJson(await ref.watch(apiProvider).get<Map<String, dynamic>>('suitability/options')),
 );
 
-/// Accounts options can be traded on: active, not prop, not a copy / PAMM / MAM account; default first, live first.
+/// Accounts options can be traded on: Options accounts that are active, not prop, not a copy / PAMM / MAM account;
+/// default first, live first.
 List<EngineAccount> optionsAccounts(List<EngineAccount> all) {
   bool flavor(EngineAccount a) {
     final g = a.group.toLowerCase();
     return ['copy', 'pamm', 'mam'].any((c) => g == c || g.startsWith('$c-'));
   }
 
-  final list = all.where((a) => a.status == 'active' && !a.prop && !flavor(a)).toList()
+  final list = all.where((a) => a.isOptions && a.status == 'active' && !a.prop && !flavor(a)).toList()
     ..sort((a, b) {
       if (a.isDefault != b.isDefault) return a.isDefault ? -1 : 1;
       if (a.live != b.live) return a.live ? -1 : 1;
       return a.login.compareTo(b.login);
     });
   return list;
+}
+
+/// View-only logins and staff sessions (even full access) can't accept the options terms for the client.
+bool optionsTermsReadOnly(WidgetRef ref) {
+  final me = ref.read(meProvider);
+  return me == null || me.readOnly || me.raw['impersonation'] != null;
+}
+
+/// Records the acceptance of the options terms `version` (`POST suitability/options/accept`); false (after its own
+/// banner) when it failed.
+Future<bool> acceptOptionsTerms(WidgetRef ref, T t, int version) async {
+  final toast = ref.read(notificationsProvider.notifier);
+  try {
+    await ref.read(apiProvider).post<Map<String, dynamic>>('suitability/options/accept', body: {'version': version});
+    KHaptics.success();
+    toast.toast(NotificationKind.success, t('options.intro.toastStarted'));
+    ref.invalidate(suitabilityProvider);
+    return true;
+  } on ApiException catch (e) {
+    if (e.code == 'disclosure_outdated') {
+      toast.toast(NotificationKind.warning, t('options.intro.toastUpdated'));
+      ref.invalidate(suitabilityProvider);
+    } else {
+      toast.toast(NotificationKind.error, t('options.intro.toastFailed'), description: localizeError(e, t));
+    }
+    return false;
+  }
 }
 
 class OptionsScreen extends ConsumerStatefulWidget {
@@ -95,35 +126,13 @@ class _OptionsScreenState extends ConsumerState<OptionsScreen> {
   bool _understood = false;
   bool _busy = false;
 
-  bool get _readOnly {
-    final me = ref.read(meProvider);
-    // view-only logins and staff sessions (even full access) can't accept the terms for the client
-    return me == null || me.readOnly || me.raw['impersonation'] != null;
-  }
+  bool get _readOnly => optionsTermsReadOnly(ref);
 
   /// Records the acceptance of `version`; false (after its own banner) when it failed.
-  Future<bool> _accept(int version) async {
-    final t = context.t;
-    final toast = ref.read(notificationsProvider.notifier);
-    try {
-      await ref.read(apiProvider).post<Map<String, dynamic>>('suitability/options/accept', body: {'version': version});
-      KHaptics.success();
-      toast.toast(NotificationKind.success, t('options.intro.toastStarted'));
-      ref.invalidate(suitabilityProvider);
-      return true;
-    } on ApiException catch (e) {
-      if (e.code == 'disclosure_outdated') {
-        toast.toast(NotificationKind.warning, t('options.intro.toastUpdated'));
-        ref.invalidate(suitabilityProvider);
-      } else {
-        toast.toast(NotificationKind.error, t('options.intro.toastFailed'), description: localizeError(e, t));
-      }
-      return false;
-    }
-  }
+  Future<bool> _accept(int version) => acceptOptionsTerms(ref, context.t, version);
 
-  /// Opens Kalks Trader in options mode: one account directly, several through a choice, none -> open an account
-  /// (the web's TraderButton). `before` runs first and must succeed.
+  /// Opens Kalks Trader on an Options account: one directly, several through a choice, none -> the open-account
+  /// wizard on the Options product (the web's TraderButton). `before` runs first and must succeed.
   Future<void> _trade({Future<bool> Function()? before}) async {
     final t = context.t;
     final router = GoRouter.of(context);
@@ -151,7 +160,7 @@ class _OptionsScreenState extends ConsumerState<OptionsScreen> {
     try {
       if (before != null && !await before()) return;
       if (accounts != null && accounts.isEmpty) {
-        router.go('/accounts/new');
+        router.go('/accounts/new?product=options');
       } else if (pick != null) {
         unawaited(router.push('/trader?login=${pick.login}&mode=options'));
       } else {
@@ -175,7 +184,8 @@ class _OptionsScreenState extends ConsumerState<OptionsScreen> {
     final readOnly = _readOnly;
     final accountsLoading = accounts == null && !acc.hasError;
 
-    final tradeLabel = accounts != null && accounts.isEmpty ? t('options.trade.openAccount') : t('options.trade.cta');
+    final noAccount = accounts != null && accounts.isEmpty;
+    final tradeLabel = noAccount ? t('options.account.open') : t('options.trade.cta');
 
     return KPageScroll(
       onRefresh: () async {
@@ -214,9 +224,18 @@ class _OptionsScreenState extends ConsumerState<OptionsScreen> {
                     Text(t('options.hero.text'), style: context.text.body.copyWith(color: k.fg2, height: 1.55)),
                     const SizedBox(height: 20),
                     if (eligible) ...[
+                      if (noAccount) ...[
+                        KNotice(
+                          key: const ValueKey('options-no-account'),
+                          icon: LucideIcons.wallet,
+                          title: t('options.account.noneTitle'),
+                          text: t('options.account.noneText'),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
                       KButton(
                         label: tradeLabel,
-                        icon: LucideIcons.candlestickChart,
+                        icon: noAccount ? LucideIcons.plus : LucideIcons.candlestickChart,
                         size: KButtonSize.lg,
                         loading: _busy || accountsLoading,
                         onPressed: _trade,
@@ -247,7 +266,7 @@ class _OptionsScreenState extends ConsumerState<OptionsScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              t(accounts != null && accounts.isEmpty ? 'options.trade.noAccount' : 'options.trade.ready'),
+                              t(noAccount ? 'options.trade.noAccount' : 'options.trade.ready'),
                               style: context.text.footnote.copyWith(color: k.fg2, fontSize: 13),
                             ),
                           ),
@@ -321,7 +340,7 @@ class _OptionsScreenState extends ConsumerState<OptionsScreen> {
           KeyedSubtree(
             key: _introKey,
             child: data != null
-                ? _IntroCard(
+                ? OptionsIntroCard(
                     data: data,
                     readOnly: readOnly,
                     understood: _understood,
@@ -703,20 +722,25 @@ class _PayoffPainter extends CustomPainter {
   bool shouldRepaint(_PayoffPainter old) => old.kind != kind || old.up != up;
 }
 
-class _IntroCard extends StatelessWidget {
-  const _IntroCard({
+/// The options intro: the three ideas, "I understand how options work", the terms link and the start button (the
+/// Options page; the open-account wizard before a first Options account, where its own Continue records the
+/// acceptance: `onStart` null hides the button).
+class OptionsIntroCard extends StatelessWidget {
+  const OptionsIntroCard({
+    super.key,
     required this.data,
     required this.readOnly,
     required this.understood,
     required this.busy,
     required this.onUnderstood,
     required this.onTerms,
-    required this.onStart,
+    this.onStart,
   });
   final Suitability data;
   final bool readOnly, understood, busy;
   final ValueChanged<bool> onUnderstood;
-  final VoidCallback onTerms, onStart;
+  final VoidCallback onTerms;
+  final VoidCallback? onStart;
 
   @override
   Widget build(BuildContext context) {
@@ -790,15 +814,17 @@ class _IntroCard extends StatelessWidget {
                           ],
                         ),
                 ),
-                const SizedBox(height: 14),
-                KButton(
-                  label: t('options.intro.start'),
-                  icon: LucideIcons.candlestickChart,
-                  size: KButtonSize.lg,
-                  expand: true,
-                  loading: busy,
-                  onPressed: !understood || d == null || readOnly ? null : onStart,
-                ),
+                if (onStart != null) ...[
+                  const SizedBox(height: 14),
+                  KButton(
+                    label: t('options.intro.start'),
+                    icon: LucideIcons.candlestickChart,
+                    size: KButtonSize.lg,
+                    expand: true,
+                    loading: busy,
+                    onPressed: !understood || d == null || readOnly ? null : onStart,
+                  ),
+                ],
               ],
             ),
           ),
@@ -849,6 +875,9 @@ void _showHowItWorks(BuildContext context, Suitability data) {
     },
   );
 }
+
+/// The full options terms (key points translated + the binding English text).
+void showOptionsTerms(BuildContext context, Suitability data) => _showTerms(context, data);
 
 void _showTerms(BuildContext context, Suitability data) {
   final d = data.disclosure;

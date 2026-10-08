@@ -17,7 +17,8 @@ use crate::validate;
 const K: Kind = Kind::Staff;
 
 /// The staff member as the apps see them. `permissions` is the full, authoritative list (`rbac: true`); `role`
-/// is the built-in role name downstream services understand (see `rbac::service_role`).
+/// is the built-in role name downstream services understand (see `rbac::service_role`). `tenant.modules` is the
+/// tenant's effective module map: the Back Office hides a switched-off module from that tenant's staff.
 async fn staff_json(st: &AppState, id: i64) -> ApiResult<Value> {
     let r = sqlx::query(
         "SELECT s.id, s.email, s.name, s.role, s.last_login_at, t.id AS tenant_id, t.slug, t.name AS tenant_name,
@@ -33,6 +34,8 @@ async fn staff_json(st: &AppState, id: i64) -> ApiResult<Value> {
     let key: String = r.get("rkey");
     let perms = crate::rbac::effective(r.get("rkind"), &key, r.get("rc"), &r.get::<Vec<String>, _>("rp"));
     let owner = perms.iter().any(|p| crate::rbac::is_owner_perm(p));
+    let tenant_id: i64 = r.get("tenant_id");
+    let modules = crate::tenancy::module_map(&st.pool, tenant_id).await?;
     Ok(json!({
         "id": r.get::<i64, _>("id"),
         "email": r.get::<String, _>("email"),
@@ -44,7 +47,7 @@ async fn staff_json(st: &AppState, id: i64) -> ApiResult<Value> {
         "permissions": perms,
         "rbac": true,
         "is_owner": owner,
-        "tenant": { "id": r.get::<i64, _>("tenant_id"), "slug": r.get::<String, _>("slug"), "name": r.get::<String, _>("tenant_name") },
+        "tenant": { "id": tenant_id, "slug": r.get::<String, _>("slug"), "name": r.get::<String, _>("tenant_name"), "modules": modules },
     }))
 }
 

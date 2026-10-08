@@ -65,10 +65,10 @@ const options: NsMessages<"options"> = {
   "terms.unavailable": "شروط الخيارات غير متاحة حاليًا. يُرجى المحاولة لاحقًا.",
 
   // Kalks Trader button
-  "trade.ready": "كل شيء جاهز. تُفتح الخيارات في Kalks Trader، على الحساب نفسه الذي تتداول عليه عقود الفروقات.",
+  "trade.ready": "كل شيء جاهز. تُتداول الخيارات في Kalks Trader، في حساب الخيارات الخاص بك.",
   "trade.cta": "تداول الخيارات في Kalks Trader",
   "trade.chooseAccount": "اختر حسابًا",
-  "trade.noAccount": "تحتاج إلى حساب تداول نشط لتداول الخيارات.",
+  "trade.noAccount": "تحتاج إلى حساب خيارات نشط لتداول الخيارات.",
   "trade.openAccount": "فتح حساب",
   "trade.cashOnly": "تُؤخذ العلاوات والهامش من الرصيد النقدي لحسابك نفسه. لا يمكن استخدام المكافآت أو الائتمان.",
   "trade.live": "حقيقي",
@@ -97,5 +97,9 @@ const options: NsMessages<"options"> = {
 
   // Demo build
   "demo.note": "نسخة تجريبية: لا يُحفظ أي شيء هنا.",
+  // CFD / Options account split
+  "account.noneTitle": "لا يوجد حساب خيارات بعد",
+  "account.noneText": "تُتداول الخيارات في حساب خاص بها، منفصل عن حسابات عقود الفروقات. افتح حسابًا في دقيقة، حقيقيًا أو تجريبيًا.",
+  "account.open": "فتح حساب خيارات",
 };
 export default options;

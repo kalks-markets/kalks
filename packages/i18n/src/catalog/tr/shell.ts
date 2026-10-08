@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "Kontrol zamanı: {time} · yeniden yüklendiğinde her 15 saniyede bir güncellenir",
   "system.status.expectedBack": "Tahmini dönüş: {time}",
   "system.status.questions": "Sorularınız mı var? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} hesabınızda kullanılamıyor.",
+  "module.copy_trading": "Kopya işlem",
+  "module.pamm": "PAMM fonları",
+  "module.mam": "MAM",
+  "module.prop": "Prop trading",
+  "module.ib": "Ortaklık programı",
+  "module.algo": "Strateji oluşturucu",
+  "module.api": "API ve webhook'lar",
+  "module.academy": "Akademi",
+  "module.wallet": "Cüzdan",
+  "module.rewards": "Ödüller",
+  "module.options": "Opsiyonlar",
+  "module.news": "Haberler",
+  "module.calendar": "Ekonomik takvim",
+  "module.markets": "Piyasalar",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "Destek sohbeti",
 };
 export default shell;

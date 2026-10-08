@@ -131,6 +131,7 @@ class LiveAccountRow extends ConsumerWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     KindBadge(account: a),
+                    if (a.isOptions) ProductChip(account: a),
                     FlavorChip(account: a),
                     Text(title, style: context.text.headline.copyWith(fontWeight: FontWeight.w500)),
                     LoginCopy(login: a.login),
@@ -259,6 +260,7 @@ class _ArchivedAccountRowState extends ConsumerState<ArchivedAccountRow> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               KindBadge(account: a),
+              if (a.isOptions) ProductChip(account: a),
               FlavorChip(account: a),
               Text(
                 a.groupName,

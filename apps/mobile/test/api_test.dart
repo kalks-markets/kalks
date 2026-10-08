@@ -1,5 +1,5 @@
 // The API client against docs/MOBILE-API.md: the headers every call carries (and never a cookie), error mapping,
-// a dead session and maintenance reported once, and the localized messages.
+// a dead session, maintenance and a switched-off module reported once, and the localized messages.
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -44,6 +44,7 @@ void main() {
   late FakeAdapter adapter;
   final dead = <ApiException>[];
   final maintenance = <ApiException>[];
+  final disabled = <ApiException>[];
   final minted = <String>[];
 
   ApiClient client() => ApiClient(
@@ -58,6 +59,7 @@ void main() {
     ),
     onSessionDead: dead.add,
     onMaintenance: maintenance.add,
+    onModuleDisabled: disabled.add,
     onDeviceMinted: minted.add,
   );
 
@@ -65,6 +67,7 @@ void main() {
     token = 'a' * 43;
     dead.clear();
     maintenance.clear();
+    disabled.clear();
     minted.clear();
   });
 
@@ -157,6 +160,21 @@ void main() {
     await expectLater(client().get<Object?>('wallet/overview'), throwsA(isA<ApiException>().having((e) => e.isNetwork, 'isNetwork', true)));
   });
 
+  test('a switched-off module (403 module_disabled) is reported, with the server\'s sentence', () async {
+    adapter = FakeAdapter((_) => (403, _err('module_disabled', 'Options trading is not available on your account.'), const {}));
+    await expectLater(
+      client().get<Object?>('trade/options/chain'),
+      throwsA(isA<ApiException>().having((e) => e.isModuleDisabled, 'isModuleDisabled', true).having((e) => e.status, 'status', 403)),
+    );
+    expect(disabled.single.message, 'Options trading is not available on your account.');
+    expect(maintenance, isEmpty);
+    expect(dead, isEmpty);
+    // any other 403 is not
+    adapter = FakeAdapter((_) => (403, _err('viewer_read_only', 'View-only.'), const {}));
+    await expectLater(client().post<Object?>('wallet/withdrawals'), throwsA(isA<ApiException>()));
+    expect(disabled, hasLength(1));
+  });
+
   group('localizeError (apps/crm/lib/auth-client.ts)', () {
     final t = T('en', null, {
       'auth.apiError.invalid_credentials': 'Wrong email or password.',
@@ -168,6 +186,7 @@ void main() {
       'auth.apiError.network': "Can't reach Kalks.",
       'accounts.error.positions_open': 'Close the positions first.',
       'common.unavailable': 'Temporarily unavailable.',
+      'shell.system.unavailable.text': "This section isn't offered on your account.",
     });
     ApiException e(String code, String message, {int? retry, int? attempts}) =>
         ApiException(status: 400, code: code, message: message, retryAfter: retry, attemptsLeft: attempts);
@@ -183,6 +202,9 @@ void main() {
       expect(localizeError(e('unavailable', 'x'), t), 'Temporarily unavailable.');
       expect(localizeError(ApiException.network, t), "Can't reach Kalks.");
       expect(localizeError(e('wrong_server', 'This login is on Kalks-Demo.'), t), 'This login is on Kalks-Demo.');
+      // a switched-off module: the server's sentence, else the "not available" text
+      expect(localizeError(e('module_disabled', 'MAM is not available on your account.'), t), 'MAM is not available on your account.');
+      expect(localizeError(e('module_disabled', ' '), t), "This section isn't offered on your account.");
     });
   });
 }

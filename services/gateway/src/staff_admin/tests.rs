@@ -301,6 +301,73 @@ async fn maintenance_and_features() {
 }
 
 #[tokio::test]
+async fn module_switches_owner_only_with_reason() {
+    let Some(db) = TestDb::new("modules").await else { return };
+    let st = db.st.clone();
+    let t = kalks(&st).await;
+    let ip = "203.0.113.9";
+    let (_, owner) = staff(&st, t, "owner@example.com", "platform_owner").await;
+    let (_, admin) = staff(&st, t, "admin@example.com", "admin").await;
+
+    // every module key, on by default (flags stay out of the module map)
+    let Json(cfg) = tenancy::public_config(State(st.clone()), ctx(None, ip)).await.unwrap();
+    for k in ["copy_trading", "pamm", "mam", "prop", "ib", "algo", "api", "academy", "wallet", "rewards", "options", "news", "calendar", "markets", "ai", "support_chat"] {
+        assert_eq!(cfg["modules"][k], true, "{k} on by default");
+    }
+    assert_eq!(cfg["modules"].as_object().unwrap().len(), 16);
+    assert!(cfg["flags"].get("options").is_none());
+
+    // the owner switches modules of the Kalks tenant itself, with a reason that is audited with each switch
+    let mut m = Map::new();
+    m.insert("options".into(), json!(false));
+    m.insert("support_chat".into(), json!(false));
+    m.insert("reason".into(), json!("  Options launch postponed  "));
+    let Json(v) = owner::set_tenant_features(State(st.clone()), ctx(Some(&owner), ip), Path(t), Ok(Json(m))).await.unwrap();
+    assert_eq!(v["items"].as_array().unwrap().len(), 2);
+    let Json(cfg) = tenancy::public_config(State(st.clone()), ctx(None, ip)).await.unwrap();
+    assert_eq!((cfg["modules"]["options"].as_bool(), cfg["modules"]["support_chat"].as_bool(), cfg["modules"]["news"].as_bool()), (Some(false), Some(false), Some(true)));
+    let reasons: Vec<Option<String>> = sqlx::query_scalar("SELECT meta->>'reason' FROM audit_log WHERE action = 'settings.module_toggled' ORDER BY id").fetch_all(&st.pool).await.unwrap();
+    assert_eq!(reasons, vec![Some("Options launch postponed".to_string()); 2]);
+    // a reason must be text; an unknown key is still refused
+    let mut bad = Map::new();
+    bad.insert("reason".into(), json!(5));
+    assert_eq!(code(&owner::set_tenant_features(State(st.clone()), ctx(Some(&owner), ip), Path(t), Ok(Json(bad))).await.unwrap_err()), "validation");
+    let mut bad = Map::new();
+    bad.insert("no_such_module".into(), json!(false));
+    assert_eq!(code(&owner::set_tenant_features(State(st.clone()), ctx(Some(&owner), ip), Path(t), Ok(Json(bad))).await.unwrap_err()), "validation");
+
+    // a tenant admin can't switch a module, by either route
+    let mut m = Map::new();
+    m.insert("options".into(), json!(true));
+    assert!(matches!(owner::set_tenant_features(State(st.clone()), ctx(Some(&admin), ip), Path(t), Ok(Json(m))).await, Err(ApiError::Forbidden)));
+    let r = tenancy::set_feature(State(st.clone()), ctx(Some(&admin), ip), Path("options".into()), Ok(Json(serde_json::from_value(json!({"enabled": true, "reason": "x"})).unwrap()))).await;
+    assert_eq!(code(&r.unwrap_err()), "forbidden");
+    assert!(!tenancy::enabled(&st.pool, t, "options").await.unwrap());
+
+    // the staff's /me carries the tenant's modules (the Back Office hides off modules from its nav)
+    let me = me_json(&st, &admin, ip).await.unwrap();
+    assert_eq!(me["staff"]["tenant"]["modules"]["options"], false);
+    assert_eq!(me["staff"]["tenant"]["modules"]["prop"], true);
+
+    // back to the platform default (null)
+    let mut m = Map::new();
+    m.insert("options".into(), Value::Null);
+    owner::set_tenant_features(State(st.clone()), ctx(Some(&owner), ip), Path(t), Ok(Json(m))).await.unwrap();
+    assert!(tenancy::enabled(&st.pool, t, "options").await.unwrap());
+
+    // MAM was split out of copy trading: when the key first appears, a broker with copy trading off keeps MAM off
+    sqlx::query("INSERT INTO tenant_features (tenant_id, key, enabled) VALUES ($1, 'copy_trading', false)").bind(t).execute(&st.pool).await.unwrap();
+    sqlx::query("DELETE FROM feature_flags WHERE key = 'mam'").execute(&st.pool).await.unwrap();
+    tenancy::seed_catalogue(&st.pool).await.unwrap();
+    assert!(!tenancy::enabled(&st.pool, t, "mam").await.unwrap());
+    // later starts leave the owner's choice alone
+    owner::set_tenant_features(State(st.clone()), ctx(Some(&owner), ip), Path(t), Ok(Json([("mam".to_string(), json!(true))].into_iter().collect()))).await.unwrap();
+    tenancy::seed_catalogue(&st.pool).await.unwrap();
+    assert!(tenancy::enabled(&st.pool, t, "mam").await.unwrap());
+    db.drop_db().await;
+}
+
+#[tokio::test]
 async fn owner_tenants_billing_and_dashboard() {
     let Some(db) = TestDb::new("owner").await else { return };
     let st = db.st.clone();

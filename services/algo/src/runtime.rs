@@ -426,6 +426,11 @@ async fn on_bar(st: &AppState, d: &Dep, closed: &[Bar], warmup: bool) -> anyhow:
         log(st, d.id, "warn", "signal", &format!("Signals ignored: {why}")).await;
         return Ok(());
     }
+    // the broker switched the strategy builder off: the deployment pauses (kept as it is) until it is back on
+    if !crate::modules::on(st, &d.tenant, "algo").await {
+        log(st, d.id, "warn", "signal", "Signals ignored: strategies are switched off for this broker").await;
+        return Ok(());
+    }
     // rule exits
     if xb {
         close_tracked(st, d, Some("buy"), "Exit rule").await;

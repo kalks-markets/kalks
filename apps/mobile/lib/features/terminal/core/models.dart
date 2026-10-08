@@ -152,6 +152,7 @@ class TAccount {
     required this.maxLot,
     required this.refillsLeft,
     required this.demoInitial,
+    this.product = 'cfd',
   });
 
   final String login;
@@ -179,7 +180,11 @@ class TAccount {
   final int? refillsLeft;
   final double? demoInitial;
 
+  /// cfd | options (the group's product; missing = cfd): an Options account opens the options workspace.
+  final String product;
+
   bool get live => type == 'live';
+  bool get isOptions => product == 'options';
   bool get demo => type == 'demo';
   bool get hedging => mode == 'hedging';
 
@@ -221,6 +226,7 @@ class TAccount {
       maxLot: _dn(controls['maxLot']),
       refillsLeft: demo == null ? null : (_i(demo['refillsPerDay']) - _i(demo['refillsUsedToday'])).clamp(0, 1 << 20),
       demoInitial: demo == null ? null : _dn(demo['initialBalance']),
+      product: a['product'] == 'options' ? 'options' : 'cfd',
     );
   }
 }

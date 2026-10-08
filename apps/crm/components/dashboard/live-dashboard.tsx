@@ -46,6 +46,7 @@ import { OverviewLayout, SectionTitle } from "@/components/dashboard/home/overvi
 import { RANGE_DAYS, StatisticCard, type StatMode, type StatRange } from "@/components/dashboard/home/statistic-card";
 import type { TrendPoint } from "@/components/dashboard/home/trend-chart";
 import { AiFacts, AiLink, AskAi, type AiChip } from "@/components/ai/ask-ai";
+import { useModules } from "@/components/tenant-config";
 
 function greeting() {
   const h = new Date().getHours();
@@ -372,6 +373,7 @@ function toCard(a: EngineAccount, t: T): CardAccount {
     leverage: a.leverage,
     server: serverOf(a),
     positions: a.positions,
+    product: a.product === "options" ? "options" : "cfd",
   };
 }
 
@@ -388,6 +390,8 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
   const t = useT();
   const f = useFormat();
   const readOnly = useReadOnly();
+  // modules the broker switched off (gateway): their cards, KPIs, links and quick actions are left out
+  const on = useModules();
   const acc = useAccounts(10000);
   // Archived / closed accounts live on the Accounts page's Archived tab only.
   const accounts = React.useMemo(() => acc.data?.accounts.filter((a) => !isArchived(a)) ?? null, [acc.data]);
@@ -420,7 +424,9 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
   const ordered = React.useMemo(() => [...totals.live, ...totals.demo, ...(accounts ?? []).filter((a) => isPropAccount(a))], [accounts, totals.live, totals.demo]);
   const cards = React.useMemo(() => (accounts ? ordered.slice(0, 8).map((a) => toCard(a, t)) : null), [accounts, ordered, t]);
 
-  const list = steps(me, accounts, t, f).map((s) => (s.key === "wallet" ? walletStep(wallet, t) : s));
+  const list = steps(me, accounts, t, f)
+    .filter((s) => s.key !== "wallet" || on("wallet"))
+    .map((s) => (s.key === "wallet" ? walletStep(wallet, t) : s));
   const done = list.filter((s) => s.state === "done").length;
   const checklist: ListRowItem[] = list.map((s) => {
     const chip = STATE_CHIP[s.state];
@@ -441,7 +447,7 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
   const prompts: Prompt[] = [];
   if (!readOnly && kyc.state !== "done")
     prompts.push({ id: `kyc-${kyc.state}`, title: t("dashboard.steps.kyc.title"), text: kyc.text, icon: <IdCard />, tone: kyc.state === "rejected" ? "coral" : "amber", action: { label: kyc.state === "review" ? t("common.details") : t("dashboard.home.verifyNow"), href: "/profile/verification" } });
-  if (!readOnly && wallet && walletTotal === 0 && !wallet.pending_deposits.length)
+  if (!readOnly && on("wallet") && wallet && walletTotal === 0 && !wallet.pending_deposits.length)
     prompts.push({ id: "fund", title: t("dashboard.home.fundTitle"), text: t("dashboard.home.fundText"), icon: <Wallet />, tone: "mint", action: { label: t("dashboard.home.depositNow"), href: "/wallet/deposit" } });
 
   const r = rewards.data;
@@ -487,23 +493,27 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
       : null;
   const linkedRows: ListRowItem[] = [
     { key: "trader", icon: <CandlestickChart />, tone: "accent", title: "Kalks Trader", sub: t("dashboard.trader.chip"), action: { label: t("common.open"), href: TERMINAL_URL, external: true } },
-    { key: "copy", icon: <Copy />, tone: "pink", title: t("shell.nav.copyTrading"), sub: t("shell.nav.social"), action: { label: t("common.open"), href: "/social" } },
-    { key: "ib", icon: <Award />, tone: "amber", title: t("shell.nav.partner"), sub: t("dashboard.partner.chip"), action: { label: t("common.open"), href: "/partner" } },
-    {
-      key: "loyalty",
-      icon: <Gift />,
-      tone: "lavender",
-      title: t("shell.nav.loyalty"),
-      sub: r ? t("dashboard.home.points", { points: r.points.balance.toLocaleString("en-US") }) : t("shell.nav.rewards"),
-      ...(r ? { status: { label: r.tier.name, tone: "ember" as const } } : { action: { label: t("common.open"), href: "/rewards/loyalty" } }),
-    },
+    ...(on("copy_trading") ? [{ key: "copy", icon: <Copy />, tone: "pink" as const, title: t("shell.nav.copyTrading"), sub: t("shell.nav.social"), action: { label: t("common.open"), href: "/social" } }] : []),
+    ...(on("ib") ? [{ key: "ib", icon: <Award />, tone: "amber" as const, title: t("shell.nav.partner"), sub: t("dashboard.partner.chip"), action: { label: t("common.open"), href: "/partner" } }] : []),
+    ...(on("rewards")
+      ? [
+          {
+            key: "loyalty",
+            icon: <Gift />,
+            tone: "lavender" as const,
+            title: t("shell.nav.loyalty"),
+            sub: r ? t("dashboard.home.points", { points: r.points.balance.toLocaleString("en-US") }) : t("shell.nav.rewards"),
+            ...(r ? { status: { label: r.tier.name, tone: "ember" as const } } : { action: { label: t("common.open"), href: "/rewards/loyalty" } }),
+          },
+        ]
+      : []),
   ];
 
   // Ask Kalks AI: suggestions answered by the real support bot; account questions also show the client's own figures
   const liveAccts = totals.live;
   const money2 = (a: EngineAccount, v: number) => `${curOf(a)}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const aiChips: AiChip[] = [
-    { key: "deposit", label: t("dashboard.ai.chip.deposit"), extra: <AiLink href="/wallet/deposit">{t("common.deposit")}</AiLink> },
+    ...(on("wallet") ? [{ key: "deposit", label: t("dashboard.ai.chip.deposit"), extra: <AiLink href="/wallet/deposit">{t("common.deposit")}</AiLink> }] : []),
     {
       key: "freeMargin",
       label: t("dashboard.ai.chip.freeMargin"),
@@ -521,7 +531,7 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
     <div className="pb-16">
       <BannerSlot placement="dashboard" />
       <OverviewLayout
-        ai={readOnly ? undefined : <AskAi chips={aiChips} />}
+        ai={readOnly || !on("ai") ? undefined : <AskAi chips={aiChips} chat={on("support_chat")} />}
         header={
           <PageHeader
             className="mb-0"
@@ -558,6 +568,7 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
               href="/portfolio/analytics"
               delay={0.05}
             />
+            {on("wallet") && (
             <KpiCard
               label={t("dashboard.home.walletBalance")}
               icon={<Wallet />}
@@ -572,6 +583,8 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
               href="/wallet"
               delay={0.1}
             />
+            )}
+            {on("rewards") && (
             <KpiCard
               label={t("dashboard.home.rewards")}
               icon={<Award />}
@@ -582,6 +595,7 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
               href="/rewards/loyalty"
               delay={0.15}
             />
+            )}
           </div>
         }
         statistic={<StatisticCard mode={mode} onMode={setMode} range={range} onRange={setRange} points={series?.points ?? (chart.loading ? null : [])} compare={series?.compare} loading={chart.loading} />}
@@ -613,8 +627,12 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
         activity={
           <ActivityTabs
             tabs={[
-              { key: "history", label: t("dashboard.home.history"), rows: historyRows, empty: t("wallet.recent.emptyText"), more: { label: t("common.viewAll"), href: "/wallet/history" } },
-              { key: "funding", label: t("dashboard.home.funding"), rows: fundingRows, empty: t("wallet.recent.emptyText") },
+              ...(on("wallet")
+                ? [
+                    { key: "history", label: t("dashboard.home.history"), rows: historyRows, empty: t("wallet.recent.emptyText"), more: { label: t("common.viewAll"), href: "/wallet/history" } },
+                    { key: "funding", label: t("dashboard.home.funding"), rows: fundingRows, empty: t("wallet.recent.emptyText") },
+                  ]
+                : []),
               { key: "linked", label: t("dashboard.home.linked"), rows: linkedRows, empty: "" },
             ]}
           />
@@ -633,9 +651,9 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
           <QuickActions
             title={t("dashboard.home.quickActions")}
             items={[
-              { key: "transfer", label: t("common.transfer"), href: "/wallet/transfer", icon: <ArrowLeftRight className="rtl:-scale-x-100" />, tone: "lavender" },
+              ...(on("wallet") ? [{ key: "transfer", label: t("common.transfer"), href: "/wallet/transfer", icon: <ArrowLeftRight className="rtl:-scale-x-100" />, tone: "lavender" as const }] : []),
               { key: "trader", label: "Kalks Trader", href: TERMINAL_URL, icon: <CandlestickChart />, tone: "accent", external: true },
-              { key: "copy", label: t("shell.nav.copyTrading"), href: "/social", icon: <Copy />, tone: "pink" },
+              ...(on("copy_trading") ? [{ key: "copy", label: t("shell.nav.copyTrading"), href: "/social", icon: <Copy />, tone: "pink" as const }] : []),
               { key: "support", label: t("shell.nav.support"), href: "/support", icon: <LifeBuoy />, tone: "amber" },
             ]}
           />
@@ -643,30 +661,40 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
         notifications={<NotificationsPanel prompts={prompts} />}
       />
 
-      <SectionTitle>{t("dashboard.home.marketsTitle")}</SectionTitle>
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-        <Reveal delay={0.05} className="xl:col-span-4">
-          <FeedGuard title={t("dashboard.movers.title")} minHeight={320}>
-            {movers}
-          </FeedGuard>
-        </Reveal>
-        <Reveal delay={0.1} className="xl:col-span-8">
-          <FeedGuard title={t("dashboard.heatmap.title")} minHeight={320}>
-            <HeatmapCard />
-          </FeedGuard>
-        </Reveal>
-      </div>
-      <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <Reveal delay={0.05}>
-          <LiveCalendarCard />
-        </Reveal>
-        <Reveal delay={0.1}>
-          <LiveNewsCard />
-        </Reveal>
-        <Reveal delay={0.15} className="md:col-span-2 xl:col-span-1">
-          <LiveWorldCard />
-        </Reveal>
-      </div>
+      {(on("markets") || on("calendar") || on("news")) && <SectionTitle>{t("dashboard.home.marketsTitle")}</SectionTitle>}
+      {on("markets") && (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
+          <Reveal delay={0.05} className="xl:col-span-4">
+            <FeedGuard title={t("dashboard.movers.title")} minHeight={320}>
+              {movers}
+            </FeedGuard>
+          </Reveal>
+          <Reveal delay={0.1} className="xl:col-span-8">
+            <FeedGuard title={t("dashboard.heatmap.title")} minHeight={320}>
+              <HeatmapCard />
+            </FeedGuard>
+          </Reveal>
+        </div>
+      )}
+      {(on("calendar") || on("news")) && (
+        <div className={cn("grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3", on("markets") && "mt-5")}>
+          {on("calendar") && (
+            <Reveal delay={0.05}>
+              <LiveCalendarCard />
+            </Reveal>
+          )}
+          {on("news") && (
+            <>
+              <Reveal delay={0.1}>
+                <LiveNewsCard />
+              </Reveal>
+              <Reveal delay={0.15} className="md:col-span-2 xl:col-span-1">
+                <LiveWorldCard />
+              </Reveal>
+            </>
+          )}
+        </div>
+      )}
 
       <SectionTitle>{t("dashboard.home.moreTitle")}</SectionTitle>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">

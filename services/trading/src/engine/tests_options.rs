@@ -1,9 +1,9 @@
-//! Kalks FX Options in the engine core: premium cash flows, commission, cash-only, scenario margin and CFD
-//! offsets, combos (all or nothing), closes and cut-offs, gates, pending limit / trigger orders, premium SL / TP,
+//! Kalks FX Options in the engine core (on Options accounts): premium cash flows, commission, cash-only, scenario
+//! margin (no CFD offsets on an Options account), the CFD / Options product gates, combos (all or nothing), closes and cut-offs, gates, pending limit / trigger orders, premium SL / TP,
 //! barrier knocks (once), settlement (idempotent, re-run nets, hold), void, stop-out by units, metrics, replay.
 
 use super::options::{self, BarrierReq, LegReq, OptClose, OptKind, OptOrderReq, PlaceOut};
-use super::testkit::{Harness, Kit, d, group, opt_snapshot, t};
+use super::testkit::{Harness, Kit, d, group, options_group, opt_snapshot, t};
 use super::{Reject, funds, metrics, risk, trade};
 use crate::model::{AccountKind, BarrierKind, Deal, DealReason, Expiry, Side, Trigger, TriggerOp};
 use crate::money::{D, ZERO, r2};
@@ -55,7 +55,7 @@ fn deals_of(h: &Harness, ticket: i64) -> Vec<Deal> {
 #[test]
 fn buy_then_close_books_premium_commission_and_realised_pnl() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let f = filled(place(&mut h, &kit, req(vec![leg(C116, Side::Buy, "2")], "o1")).unwrap());
     let t = f.legs[0].ticket;
     // premium 0.0052 × 2 × 10 000 = 104; commission min(0.25 × 2, 10 % × 104) = 0.50
@@ -90,7 +90,7 @@ fn buy_then_close_books_premium_commission_and_realised_pnl() {
 #[test]
 fn a_short_receives_premium_and_pays_scenario_margin() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     filled(place(&mut h, &kit, req(vec![leg(C116, Side::Sell, "1")], "s1")).unwrap());
     assert_eq!(h.st.balance, d("10049.75")); // + 50 - 0.25
     let m = metrics(&kit.env(&h.st), &h.st);
@@ -105,7 +105,7 @@ fn a_short_receives_premium_and_pays_scenario_margin() {
 #[test]
 fn premiums_are_paid_from_cash_never_from_credit() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "50");
+    let mut h = Harness::live(&kit, "opt", "50");
     h.run(&kit, |tx, env| funds::adjust(tx, env, funds::AdjustKind::Credit, d("1000"), "cr-1", "BON", "credit")).unwrap();
     let e = place(&mut h, &kit, req(vec![leg(C116, Side::Buy, "1")], "c1")).unwrap_err();
     assert_eq!(e.code, "insufficient_cash", "{e}");
@@ -119,7 +119,7 @@ fn premiums_are_paid_from_cash_never_from_credit() {
 #[test]
 fn short_margin_must_come_from_own_funds() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "100");
+    let mut h = Harness::live(&kit, "opt", "100");
     h.run(&kit, |tx, env| funds::adjust(tx, env, funds::AdjustKind::Credit, d("100000"), "cr-1", "BON", "credit")).unwrap();
     let e = place(&mut h, &kit, req(vec![leg(C116, Side::Sell, "10")], "s1")).unwrap_err();
     assert_eq!(e.code, "insufficient_margin", "{e}");
@@ -127,32 +127,100 @@ fn short_margin_must_come_from_own_funds() {
 }
 
 #[test]
-fn long_options_carry_no_margin_and_cfd_offsets_only_reduce_option_margin() {
+fn long_options_carry_no_margin_and_an_options_account_takes_no_cfd_offsets() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "50000");
+    let mut h = Harness::live(&kit, "opt", "50000");
     filled(place(&mut h, &kit, req(vec![leg(C117, Side::Buy, "5")], "l1")).unwrap());
     assert_eq!(metrics(&kit.env(&h.st), &h.st).option_margin, ZERO, "a long option is paid in full");
     filled(place(&mut h, &kit, req(vec![leg(C116, Side::Sell, "10")], "s1")).unwrap());
     let base = metrics(&kit.env(&h.st), &h.st).option_margin;
     assert!(base > ZERO);
-    // every CFD exposure on the underlying (long or short, any size) leaves the option margin at or below `base`
-    for (side, lots) in [(Side::Buy, "0.1"), (Side::Buy, "0.5"), (Side::Buy, "1"), (Side::Sell, "0.3"), (Side::Sell, "1.5"), (Side::Buy, "3")] {
-        let mut x = Harness { st: h.st.clone(), log: h.log.clone() };
-        x.run(&kit, |tx, env| trade::place_order(tx, env, trade::OrderReq::market("EURUSD", side, d(lots))).map(|_| ())).unwrap();
-        let m = metrics(&kit.env(&x.st), &x.st);
-        assert!(m.option_margin <= base, "{side:?} {lots}: {} > {base}", m.option_margin);
+    // an Options account opens no CFD exposure (CFD / Options account split), dealers included
+    let e = h.run(&kit, |tx, env| trade::place_order(tx, env, trade::OrderReq::market("EURUSD", Side::Buy, d("1"))).map(|_| ())).unwrap_err();
+    assert_eq!(e.code, "product_mismatch", "{e}");
+    let none = std::collections::BTreeSet::new();
+    let covered: std::collections::BTreeMap<String, (D, D)> = [("EURUSD".to_string(), (d("1"), ZERO))].into();
+    // and its option margin never takes a same-underlying CFD offset: a covered call is margined like a naked one
+    let env = kit.env(&h.st);
+    assert_eq!(options::margin(&env, &h.st, &covered, &[], &none), base);
+    // a pre-split account in a CFD group keeps the old cross-margin rule: offsets can only reduce the option margin
+    // (every CFD exposure on the underlying, long or short, any size, leaves it at or below `base`)
+    let legacy = super::Env { group: &kit.tenant.groups["hedge"], ..kit.env(&h.st) };
+    for (long, short) in [("0.1", "0"), ("0.5", "0"), ("1", "0"), ("0", "0.3"), ("0", "1.5"), ("3", "0")] {
+        let exp: std::collections::BTreeMap<String, (D, D)> = [("EURUSD".to_string(), (d(long), d(short)))].into();
+        let m = options::margin(&legacy, &h.st, &exp, &[], &none);
+        assert!(m <= base, "{long}/{short}: {m} > {base}");
     }
-    // a covered call (long 1 lot = 100 000 EUR against 10 short calls = 100 000 EUR) needs no extra option margin
-    // beyond the long calls' offset
-    let mut x = Harness { st: h.st.clone(), log: h.log.clone() };
-    x.run(&kit, |tx, env| trade::place_order(tx, env, trade::OrderReq::market("EURUSD", Side::Buy, d("1"))).map(|_| ())).unwrap();
-    assert!(metrics(&kit.env(&x.st), &x.st).option_margin < base);
+    assert!(options::margin(&legacy, &h.st, &covered, &[], &none) < base, "the covered call's offset");
+}
+
+/// CFD / Options account split, both ways: options (market, pending, preview) are refused on a CFD account and CFDs
+/// (market, pending, dealer trades, volume added by a dealer) on an Options account, with `product_mismatch`;
+/// closing is never refused for the product, and a refusal books nothing.
+#[test]
+fn each_account_trades_only_its_own_product() {
+    let kit = kit();
+    // options on a CFD account
+    let mut c = Harness::live(&kit, "hedge", "10000");
+    let e = place(&mut c, &kit, req(vec![leg(C116, Side::Buy, "1")], "x1")).unwrap_err();
+    assert_eq!((e.code, e.message.as_str()), ("product_mismatch", options::CFD_ACCOUNT));
+    let lim = OptOrderReq { kind: OptKind::Limit, limit_premium: Some(d("0.0010")), ..req(vec![leg(C116, Side::Buy, "1")], "x2") };
+    assert_eq!(place(&mut c, &kit, lim).unwrap_err().code, "product_mismatch");
+    let pv = options::preview(&kit.env(&c.st), &c.st, &req(vec![leg(C116, Side::Sell, "1")], "pv"));
+    assert!(pv.reasons.iter().any(|r| r.code == "product_mismatch"), "{:?}", pv.reasons);
+    assert!(c.st.positions.is_empty() && c.st.orders.is_empty() && c.st.balance == d("10000"));
+    // CFDs still trade there
+    c.run(&kit, |tx, env| trade::place_order(tx, env, trade::OrderReq::market("EURUSD", Side::Buy, d("0.1"))).map(|_| ())).unwrap();
+    // CFDs on an Options account: market, pending, a dealer's trade, a dealer adding volume
+    let mut o = Harness::live(&kit, "opt", "10000");
+    let e = o.run(&kit, |tx, env| trade::place_order(tx, env, trade::OrderReq::market("EURUSD", Side::Buy, d("0.1"))).map(|_| ())).unwrap_err();
+    assert_eq!((e.code, e.message.as_str()), ("product_mismatch", trade::OPTIONS_ACCOUNT));
+    let pending = trade::OrderReq { kind: crate::model::OrderType::Limit, price: Some(d("1.1000")), ..trade::OrderReq::market("EURUSD", Side::Buy, d("0.1")) };
+    assert_eq!(o.run(&kit, |tx, env| trade::place_order(tx, env, pending).map(|_| ())).unwrap_err().code, "product_mismatch");
+    let dealer = trade::DealerCtx { force: true, ..Default::default() };
+    let by_dealer = trade::OrderReq { dealer: Some(dealer.clone()), ..trade::OrderReq::market("EURUSD", Side::Buy, d("0.1")) };
+    assert_eq!(o.run(&kit, |tx, env| trade::place_order(tx, env, by_dealer).map(|_| ())).unwrap_err().code, "product_mismatch");
+    // options trade there
+    let t = filled(place(&mut o, &kit, req(vec![leg(C116, Side::Buy, "1")], "o1")).unwrap()).legs[0].ticket;
+    // a pre-split CFD position on what is now an Options group: no more volume (dealers neither), but it closes
+    let cfd = *c.st.positions.keys().next().unwrap();
+    let mut flipped = Kit::new();
+    flipped.tenant.groups.get_mut("hedge").unwrap().product = crate::rules::Product::Options;
+    flipped.quote("EURUSD", "1.15990", "1.16010");
+    assert_eq!(c.run(&flipped, |tx, env| super::dealing::add_volume(tx, env, cfd, d("0.1"), &dealer).map(|_| ())).unwrap_err().code, "product_mismatch");
+    c.run(&flipped, |tx, env| trade::close_position(tx, env, cfd, trade::CloseReq::default())).unwrap();
+    assert!(c.st.positions.is_empty());
+    o.run(&kit, |tx, env| options::close(tx, env, t, OptClose::client())).unwrap();
+    c.assert_ledger();
+    c.assert_replay();
+    o.assert_ledger();
+    o.assert_replay();
+}
+
+/// A group move never crosses products (CFD / Options account split), whoever asks; within a product it works.
+#[test]
+fn group_moves_stay_within_the_product() {
+    let kit = kit();
+    let mut c = Harness::live(&kit, "hedge", "1000");
+    let e = c.run(&kit, |tx, env| funds::change_group(tx, env, &kit.tenant.groups["opt"]).map(|_| ())).unwrap_err();
+    assert_eq!(e.code, "product_mismatch", "{e}");
+    assert!(e.message.starts_with("A CFD account can't move to opt, an Options group"), "{e}");
+    c.run(&kit, |tx, env| funds::change_group(tx, env, &kit.tenant.groups["ecn"]).map(|_| ())).unwrap();
+    assert_eq!(c.st.account.group, "ecn");
+    let mut o = Harness::live(&kit, "opt", "1000");
+    assert_eq!(o.run(&kit, |tx, env| funds::change_group(tx, env, &kit.tenant.groups["hedge"]).map(|_| ())).unwrap_err().code, "product_mismatch");
+    let mut kit2 = Kit::new();
+    kit2.tenant.groups.insert("opt-pro".into(), options_group("opt-pro", crate::model::Mode::Hedging, false));
+    o.run(&kit2, |tx, env| funds::change_group(tx, env, &kit2.tenant.groups["opt-pro"]).map(|_| ())).unwrap();
+    assert_eq!(o.st.account.group, "opt-pro");
+    c.assert_replay();
+    o.assert_replay();
 }
 
 #[test]
 fn combos_fill_and_close_all_or_nothing() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let v0 = h.st.version;
     // second leg above the 100-contract maximum: nothing is booked
     let e = place(&mut h, &kit, req(vec![leg(C116, Side::Buy, "1"), leg(P115, Side::Sell, "101")], "x1")).unwrap_err();
@@ -189,7 +257,7 @@ fn no_opens_in_the_last_15_minutes_and_closes_until_one_minute_before_the_cut() 
     let mut kit = kit();
     let today = "EURUSD-20260928-1.1600-C";
     kit.options.fix(today, "0.0020", "0.0022");
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let f = filled(place(&mut h, &kit, req(vec![leg(today, Side::Buy, "2")], "a")).unwrap());
     kit.now = t("2026-09-28T13:50:00Z");
     assert_eq!(place(&mut h, &kit, req(vec![leg(today, Side::Buy, "1")], "b")).unwrap_err().code, "cutoff");
@@ -201,7 +269,7 @@ fn no_opens_in_the_last_15_minutes_and_closes_until_one_minute_before_the_cut() 
 #[test]
 fn gates_switches_suitability_limits_controls_staleness_and_sessions() {
     let mut kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     // live switched off for the tenant
     let mut s = opt_snapshot();
     s["tenants"] = serde_json::json!([{"tenant": "kalks", "enabledDemo": true, "enabledLive": false}]);
@@ -211,7 +279,7 @@ fn gates_switches_suitability_limits_controls_staleness_and_sessions() {
     // eligibility (the options intro accepted): live and demo accounts alike
     let r = OptOrderReq { eligible: false, ..req(vec![leg(C116, Side::Buy, "1")], "g2") };
     assert_eq!(place(&mut h, &kit, r.clone()).unwrap_err().code, "not_eligible");
-    let mut demo = Harness::demo(&kit, "hedge");
+    let mut demo = Harness::demo(&kit, "opt");
     assert_eq!(demo.st.account.kind, AccountKind::Demo);
     let e = place(&mut demo, &kit, r.clone()).unwrap_err();
     assert_eq!(e.code, "not_eligible");
@@ -263,7 +331,7 @@ fn gates_switches_suitability_limits_controls_staleness_and_sessions() {
 #[test]
 fn pending_limit_and_underlying_trigger_orders() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let lim = OptOrderReq { kind: OptKind::Limit, limit_premium: Some(d("0.0045")), ..req(vec![leg(C116, Side::Buy, "1")], "p1") };
     let PlaceOut::Pending { ticket } = place(&mut h, &kit, lim).unwrap() else { panic!("pending") };
     let o = &h.st.orders[&ticket];
@@ -310,7 +378,7 @@ fn pending_limit_and_underlying_trigger_orders() {
 #[test]
 fn premium_take_profit_and_stop_loss() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let r = OptOrderReq { tp: Some(d("0.0070")), sl: Some(d("0.0030")), ..req(vec![leg(C116, Side::Buy, "1")], "t1") };
     // a TP below the bid is refused
     assert_eq!(place(&mut h, &kit, OptOrderReq { tp: Some(d("0.0040")), ..r.clone() }).unwrap_err().code, "invalid_tp");
@@ -330,7 +398,7 @@ fn premium_take_profit_and_stop_loss() {
 #[test]
 fn barrier_knock_out_pays_the_rebate_once_and_knock_in_flips_once() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let uo = LegReq { barrier: Some(BarrierReq { kind: BarrierKind::UO, level: d("1.18"), rebate: d("0.0005") }), ..leg(C116, Side::Buy, "2") };
     let di = LegReq { barrier: Some(BarrierReq { kind: BarrierKind::DI, level: d("1.14"), rebate: ZERO }), ..leg(P115, Side::Buy, "1") };
     // a barrier already reached is refused; an up-and-out call below its strike can never pay
@@ -367,7 +435,7 @@ fn barrier_knock_out_pays_the_rebate_once_and_knock_in_flips_once() {
 #[test]
 fn settlement_is_idempotent_reruns_net_and_holds_the_proceeds_for_an_hour() {
     let mut kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let long = filled(place(&mut h, &kit, req(vec![leg(C116, Side::Buy, "2")], "e1")).unwrap()).legs[0].ticket;
     let di = LegReq { barrier: Some(BarrierReq { kind: BarrierKind::DI, level: d("1.10"), rebate: d("0.0002") }), ..leg(P115, Side::Buy, "1") };
     filled(place(&mut h, &kit, req(vec![di], "e2")).unwrap());
@@ -418,7 +486,7 @@ fn settlement_is_idempotent_reruns_net_and_holds_the_proceeds_for_an_hour() {
 fn a_barrier_the_fixing_reached_settles_as_touched() {
     let mut kit2 = kit();
     let mut kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let uo = LegReq { barrier: Some(BarrierReq { kind: BarrierKind::UO, level: d("1.18"), rebate: d("0.0005") }), ..leg(C116, Side::Buy, "2") };
     let di = LegReq { barrier: Some(BarrierReq { kind: BarrierKind::DI, level: d("1.14"), rebate: d("0.0002") }), ..leg(P115, Side::Buy, "1") };
     filled(place(&mut h, &kit, req(vec![uo], "t1")).unwrap());
@@ -432,7 +500,7 @@ fn a_barrier_the_fixing_reached_settles_as_touched() {
     assert_eq!(h.st.balance - bal, d("12.00"));
     h.assert_ledger();
 
-    let mut h2 = Harness::live(&kit2, "hedge", "10000");
+    let mut h2 = Harness::live(&kit2, "opt", "10000");
     let di = LegReq { barrier: Some(BarrierReq { kind: BarrierKind::DI, level: d("1.14"), rebate: d("0.0002") }), ..leg(P115, Side::Buy, "1") };
     filled(place(&mut h2, &kit2, req(vec![di], "t3")).unwrap());
     kit2.now = t("2026-10-02T14:05:00Z");
@@ -447,7 +515,7 @@ fn a_barrier_the_fixing_reached_settles_as_touched() {
 #[test]
 fn a_short_itm_settlement_charges_the_client_and_nbp_covers_a_deficit() {
     let mut kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     filled(place(&mut h, &kit, req(vec![leg(C116, Side::Sell, "1")], "n1")).unwrap());
     let bal = h.st.balance;
     kit.now = t("2026-10-02T14:05:00Z");
@@ -460,7 +528,7 @@ fn a_short_itm_settlement_charges_the_client_and_nbp_covers_a_deficit() {
 #[test]
 fn void_reverses_premium_proceeds_and_commission_as_corrections() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let t0 = filled(place(&mut h, &kit, req(vec![leg(C116, Side::Buy, "2")], "v1")).unwrap()).legs[0].ticket;
     kit.options.fix(C116, "0.0060", "0.0062");
     h.run(&kit, |tx, env| options::close(tx, env, t0, OptClose { volume: Some(d("1")), ..OptClose::client() })).unwrap();
@@ -480,7 +548,7 @@ fn quote_currency_premiums_convert_to_usd() {
     let kit = kit();
     let s = "USDJPY-20261002-150.00-C";
     kit.options.fix(s, "1.00", "1.02");
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let f = filled(place(&mut h, &kit, req(vec![leg(s, Side::Buy, "1")], "j1")).unwrap());
     // 1.02 JPY × 10 000 / 150 = 68.00 USD
     assert_eq!((f.legs[0].premium, f.legs[0].commission), (d("68.00"), d("0.25")));
@@ -491,7 +559,7 @@ fn quote_currency_premiums_convert_to_usd() {
 #[test]
 fn preview_prices_like_the_fill_and_changes_nothing() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let r = req(vec![leg(C116, Side::Buy, "2"), leg(C117, Side::Sell, "2")], "pv");
     kit.options.fix(C117, "0.0010", "0.0012");
     let p = options::preview(&kit.env(&h.st), &h.st, &r);
@@ -506,7 +574,7 @@ fn preview_prices_like_the_fill_and_changes_nothing() {
     assert_eq!(f.legs.iter().map(|l| l.premium).collect::<Vec<_>>(), vec![d("104.00"), d("20.00")]);
     assert_eq!(h.st.balance, p.cash_after);
     // a refused order lists its reasons
-    let small = Harness::live(&kit, "hedge", "100");
+    let small = Harness::live(&kit, "opt", "100");
     let p = options::preview(&kit.env(&small.st), &small.st, &req(vec![leg(C116, Side::Buy, "10")], "pv2"));
     assert_eq!(p.reasons.iter().map(|r| r.code).collect::<Vec<_>>(), vec!["insufficient_cash"]);
     let p = options::preview(&kit.env(&small.st), &small.st, &req(vec![leg(C116, Side::Sell, "10")], "pv3"));
@@ -517,7 +585,7 @@ fn preview_prices_like_the_fill_and_changes_nothing() {
 #[test]
 fn stop_out_closes_by_units_keeps_strategies_together_and_terminates() {
     let kit = Kit::new(); // real model prices: values follow the spot
-    let mut h = Harness::live(&kit, "hedge", "3000");
+    let mut h = Harness::live(&kit, "opt", "3000");
     filled(place(&mut h, &kit, req(vec![leg(C116, Side::Sell, "4")], "so1")).unwrap());
     let combo = filled(place(&mut h, &kit, req(vec![leg("EURUSD-20261002-1.1650-C", Side::Sell, "2"), leg(C117, Side::Buy, "2")], "so2")).unwrap()).combo_id.unwrap();
     let level0 = metrics(&kit.env(&h.st), &h.st).level.unwrap();
@@ -535,7 +603,7 @@ fn stop_out_closes_by_units_keeps_strategies_together_and_terminates() {
     assert!(m.level.is_none_or(|l| l > d("50")) || h.st.positions.is_empty(), "{m:?}");
     // nothing closable (the weekend): no stop-out is recorded, however often the margin is checked
     let mut kit = kit;
-    let mut w = Harness::live(&kit, "hedge", "3000");
+    let mut w = Harness::live(&kit, "opt", "3000");
     kit.options.spot("EURUSD", "1.16", kit.now);
     filled(place(&mut w, &kit, req(vec![leg(C116, Side::Sell, "4")], "w1")).unwrap());
     kit.options.spot("EURUSD", "1.235", kit.now);
@@ -556,9 +624,12 @@ fn stop_out_closes_by_units_keeps_strategies_together_and_terminates() {
 
 #[test]
 fn metrics_count_every_position_cfd_and_option() {
-    let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    // an account from before the CFD / Options account split may hold both: its group was a CFD group then
+    let mut kit = kit();
+    kit.tenant.groups.get_mut("opt").unwrap().product = crate::rules::Product::Cfd;
+    let mut h = Harness::live(&kit, "opt", "10000");
     h.run(&kit, |tx, env| trade::place_order(tx, env, trade::OrderReq::market("EURUSD", Side::Buy, d("0.1"))).map(|_| ())).unwrap();
+    kit.tenant.groups.get_mut("opt").unwrap().product = crate::rules::Product::Options;
     filled(place(&mut h, &kit, req(vec![leg(C116, Side::Buy, "1")], "m1")).unwrap());
     filled(place(&mut h, &kit, req(vec![leg(C117, Side::Sell, "1")], "m2")).unwrap());
     let env = kit.env(&h.st);
@@ -608,7 +679,7 @@ fn copy_pamm_mam_and_prop_accounts_never_trade_options() {
     for code in ["standard-copytrader", "hedge"] {
         assert!(!options::system_group(code), "{code}");
     }
-    kit.tenant.groups.insert("standard-copytrader".into(), group("standard-copytrader", crate::model::Mode::Hedging, false));
+    kit.tenant.groups.insert("standard-copytrader".into(), options_group("standard-copytrader", crate::model::Mode::Hedging, false));
     let mut ok = Harness::live(&kit, "standard-copytrader", "10000");
     filled(place(&mut ok, &kit, req(vec![leg(C116, Side::Buy, "1")], "ok-1")).unwrap());
 }
@@ -616,13 +687,15 @@ fn copy_pamm_mam_and_prop_accounts_never_trade_options() {
 #[test]
 fn deal_feeds_flag_option_deals_for_downstream_consumers() {
     let kit = kit();
-    let mut h = Harness::live(&kit, "hedge", "10000");
+    let mut h = Harness::live(&kit, "opt", "10000");
     let f = filled(place(&mut h, &kit, req(vec![leg(C116, Side::Buy, "2")], "feed-1")).unwrap());
     let t = f.legs[0].ticket;
     h.run(&kit, |tx, env| options::close(tx, env, t, OptClose::client())).unwrap();
-    h.run(&kit, |tx, env| trade::place_order(tx, env, trade::OrderReq::market("EURUSD", Side::Buy, d("0.1"))).map(|_| ())).unwrap();
-    let cfd = *h.st.positions.keys().next().unwrap();
-    h.run(&kit, |tx, env| trade::close_position(tx, env, cfd, trade::CloseReq::default())).unwrap();
+    // CFDs trade on a CFD account
+    let mut c = Harness::live(&kit, "hedge", "10000");
+    c.run(&kit, |tx, env| trade::place_order(tx, env, trade::OrderReq::market("EURUSD", Side::Buy, d("0.1"))).map(|_| ())).unwrap();
+    let cfd = *c.st.positions.keys().next().unwrap();
+    c.run(&kit, |tx, env| trade::close_position(tx, env, cfd, trade::CloseReq::default())).unwrap();
     let opt_deals = deals_of(&h, t);
     assert_eq!(opt_deals.len(), 2);
     for dl in &opt_deals {
@@ -635,7 +708,7 @@ fn deal_feeds_flag_option_deals_for_downstream_consumers() {
     }
     let exit = opt_deals.iter().find(|x| x.entry != crate::model::DealEntry::In).unwrap();
     assert_eq!(crate::views::desk_deal_json(exit, 7, false)["option"]["commissionCharged"].as_f64(), Some(0.5), "the exit's own commission");
-    for dl in deals_of(&h, cfd) {
+    for dl in deals_of(&c, cfd) {
         for v in [crate::views::desk_deal_json(&dl, 7, false), crate::views::deal_json(&dl)] {
             assert_eq!(v["instrument"], "cfd");
             assert!(v["option"].is_null());
@@ -652,6 +725,8 @@ fn old_events_without_option_fields_still_read_and_write_the_same() {
         let v = serde_json::to_value(e).unwrap();
         let s = v.to_string();
         assert!(!s.contains("\"option\"") && !s.contains("combo_id") && !s.contains("\"premium\"") && !s.contains("holds"), "CFD events are unchanged: {s}");
+        // the CFD / Options account split lives in the group, never in an event
+        assert!(!s.contains("product"), "no product in events: {s}");
         assert_eq!(&serde_json::from_value::<Event>(v).unwrap(), e);
     }
     assert!(!serde_json::to_string(&h.st).unwrap().contains("holds"));
@@ -692,7 +767,7 @@ mod property {
         #[test]
         fn ledger_equity_and_replay_hold(ops in proptest::collection::vec(op(), 1..18)) {
             let kit = Kit::new();
-            let mut h = Harness::live(&kit, "hedge", "20000");
+            let mut h = Harness::live(&kit, "opt", "20000");
             let mut n = 0;
             for o in ops {
                 n += 1;

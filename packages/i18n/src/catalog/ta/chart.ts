@@ -94,7 +94,11 @@ const chart: NsMessages<"chart"> = {
   "line.buyStopLimit": "வாங்கு ஸ்டாப் லிமிட் {lot}",
   "line.sellStopLimit": "விற்பனை ஸ்டாப் லிமிட் {lot}",
   "line.alert": "அலர்ட்",
-  "line.posTitle": "SL/TP அமைக்க இழுக்கவும் · மாற்ற இருமுறை கிளிக் செய்யுங்கள்",
+  "line.posTitle": "SL/TP அமைக்க S அல்லது T-ஐ (அல்லது கோட்டை) இழுக்கவும் · மாற்ற இருமுறை கிளிக் செய்யுங்கள்",
+  "line.slHandle": "S",
+  "line.tpHandle": "T",
+  "line.slHandleTitle": "ஸ்டாப் லாஸ்: ஒரு விலைக்கு இழுக்கவும், அல்லது இயல்புநிலை தூரத்திற்கு கிளிக் செய்யுங்கள்",
+  "line.tpHandleTitle": "டேக் ப்ராஃபிட்: ஒரு விலைக்கு இழுக்கவும், அல்லது இயல்புநிலை தூரத்திற்கு கிளிக் செய்யுங்கள்",
   "line.dragTitle": "நகர்த்த இழுக்கவும்",
   "line.remove": "{label} ஐ நீக்கு",
 

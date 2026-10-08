@@ -120,18 +120,21 @@ pub async fn referral_users(State(st): State<AppState>, q: Result<Query<Referral
 
 /// `GET /v1/internal/tenants/{slug}`: a broker's id, name and status. The trading engine and the wallet keep their
 /// own tenant rows (ids mirror this table) and provision a broker the Platform Owner created (D110) on its first
-/// request.
+/// request. `modules` is the broker's effective module map (`key -> on`, tenancy.rs): the services refuse a switched-off
+/// module's client calls with 403 `module_disabled` (each caches it for 30 s; a missing key counts as on).
 pub async fn tenant(State(st): State<AppState>, Path(slug): Path<String>) -> ApiResult<Json<Value>> {
     let slug = slug.trim().to_lowercase();
     if slug.is_empty() || slug.len() > 64 || !slug.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
         return Err(ApiError::NotFound);
     }
     let row = sqlx::query("SELECT id, slug, name, status FROM tenants WHERE slug = $1").bind(&slug).fetch_optional(&st.pool).await?.ok_or(ApiError::NotFound)?;
+    let id: i64 = row.get("id");
     Ok(Json(json!({
-        "id": row.get::<i64, _>("id"),
+        "id": id,
         "slug": row.get::<String, _>("slug"),
         "name": row.get::<String, _>("name"),
         "status": row.get::<String, _>("status"),
+        "modules": crate::tenancy::module_map(&st.pool, id).await?,
     })))
 }
 
@@ -147,6 +150,13 @@ mod tests {
         let v = super::tenant(State(db.st.clone()), Path("Kalks".into())).await.unwrap().0;
         assert_eq!((v["slug"].as_str(), v["status"].as_str()), (Some("kalks"), Some("active")));
         assert!(v["id"].as_i64().is_some_and(|id| id > 0));
+        // the effective modules: every built-in one, on by default; an override shows
+        assert_eq!(v["modules"]["options"], true);
+        assert_eq!(v["modules"]["support_chat"], true);
+        assert!(v["modules"].get("client_registration").is_none(), "flags are not modules");
+        sqlx::query("INSERT INTO tenant_features (tenant_id, key, enabled) VALUES ($1, 'options', false)").bind(v["id"].as_i64().unwrap()).execute(&db.st.pool).await.unwrap();
+        let v = super::tenant(State(db.st.clone()), Path("kalks".into())).await.unwrap().0;
+        assert_eq!((v["modules"]["options"].as_bool(), v["modules"]["news"].as_bool()), (Some(false), Some(true)));
         assert!(matches!(super::tenant(State(db.st.clone()), Path("no-such-broker".into())).await, Err(ApiError::NotFound)));
         assert!(matches!(super::tenant(State(db.st.clone()), Path("../etc".into())).await, Err(ApiError::NotFound)));
         db.drop_db().await;

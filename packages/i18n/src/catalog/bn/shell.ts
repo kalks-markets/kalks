@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "{time}-এ যাচাই করা হয়েছে · রিলোড করলে প্রতি 15 সেকেন্ডে হালনাগাদ হয়",
   "system.status.expectedBack": "{time}-এর মধ্যে ফিরে আসার সম্ভাবনা",
   "system.status.questions": "প্রশ্ন আছে? {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module} আপনার অ্যাকাউন্টে উপলব্ধ নয়।",
+  "module.copy_trading": "কপি ট্রেডিং",
+  "module.pamm": "PAMM ফান্ড",
+  "module.mam": "MAM",
+  "module.prop": "প্রপ ট্রেডিং",
+  "module.ib": "পার্টনার প্রোগ্রাম",
+  "module.algo": "স্ট্র্যাটেজি বিল্ডার",
+  "module.api": "API ও ওয়েবহুক",
+  "module.academy": "অ্যাকাডেমি",
+  "module.wallet": "ওয়ালেট",
+  "module.rewards": "পুরস্কার",
+  "module.options": "অপশন",
+  "module.news": "সংবাদ",
+  "module.calendar": "অর্থনৈতিক ক্যালেন্ডার",
+  "module.markets": "মার্কেট",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "সাপোর্ট চ্যাট",
 };
 export default shell;

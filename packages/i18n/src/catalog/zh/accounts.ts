@@ -548,5 +548,19 @@ const accounts: NsMessages<"accounts"> = {
   "ledgerKind.option_premium": "期权权利金",
   "ledgerKind.option_settlement": "期权结算",
   "ledgerKind.option_rebate": "做市商返佣",
+  // CFD / Options account split
+  "product.cfd": "CFD 账户",
+  "product.options": "期权账户",
+  "product.cfdText": "以差价合约（CFD）交易外汇、金属、指数、股票和加密货币，可用杠杆。",
+  "product.optionsText": "外汇、黄金、白银和原油的看涨与看跌期权，现金结算。",
+  "product.chipOptions": "期权",
+  "product.groupCfd": "CFD 账户",
+  "product.groupOptions": "期权账户",
+  "wizard.step.product": "产品",
+  "wizard.productTitle": "这个账户交易什么？",
+  "wizard.productSubtitle": "每个账户只交易一种产品，您可以同时持有两种账户。",
+  "wizard.noGroups": "该产品目前暂无可开立的账户类型。",
+  "wizard.introFirst": "开立首个期权账户前的一小步：1 分钟期权入门。",
+  "wizard.agreeLiveOptions": "我了解期权风险很高：买入的期权可能到期时毫无价值，卖出的期权亏损可能超过收到的权利金。",
 };
 export default accounts;

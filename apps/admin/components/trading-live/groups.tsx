@@ -6,7 +6,7 @@ import { Button, Card, Chip, Dialog, DialogClose, EmptyState, Field, Input, KpiC
 import { ErrorState, useApi } from "@/components/live/kit";
 import { useCan } from "@/components/staff-session";
 import { AuditNotice, BookChip, ErrorBanner, ReasonFields, reportResult, useReason } from "@/components/trading-desk/kit";
-import { loadGroups, type LiveGroup } from "@/lib/trading-desk";
+import { loadGroups, productOf, type LiveGroup, type Product } from "@/lib/trading-desk";
 import { GRP_REASONS, tradingWrite } from "./kit";
 
 const LEVERAGES = [10, 20, 30, 50, 100, 200, 300, 400, 500, 1000, 2000];
@@ -41,28 +41,44 @@ function blank(): LiveGroup {
     demoRefillsPerDay: 3,
     demoExpiryDays: 30,
     enabled: true,
+    product: "cfd",
   };
+}
+
+/** CFD / Options chip of a group or account (CFD / Options account split). */
+export function ProductChip({ product, size = "sm" }: { product?: string | null; size?: "sm" | "md" }) {
+  return productOf({ product }) === "options" ? (
+    <Chip size={size} tone="ember">
+      OPTIONS
+    </Chip>
+  ) : (
+    <Chip size={size} tone="neutral">
+      CFD
+    </Chip>
+  );
 }
 
 export function LiveGroupsPage() {
   const { data, error, reload } = useApi<{ groups: LiveGroup[] }>("/api/trading/admin/groups", { refreshMs: 30_000 });
   const canEdit = useCan("groups.write");
   const [edit, setEdit] = React.useState<{ g: LiveGroup; isNew: boolean } | null>(null);
-  const groups = data?.groups ?? [];
+  const [product, setProduct] = React.useState<"all" | Product>("all");
+  const all = data?.groups ?? [];
+  const groups = product === "all" ? all : all.filter((g) => productOf(g) === product);
   const accounts = groups.reduce((s, g) => s + (g.accounts ?? 0), 0);
 
   return (
     <div className="pb-10">
       <PageHeader
         title="Account groups"
-        subtitle="Trading conditions per group on the trading engine — execution mode, leverage, margin call / stop-out, commission, swaps, routing and spread group."
+        subtitle="Trading conditions per group on the trading engine — product (CFD or Options), execution mode, leverage, margin call / stop-out, commission, swaps, routing and spread group."
         actions={
           <>
             <Button variant="surface" size="lg" onClick={reload}>
               <RefreshCw /> Refresh
             </Button>
             {canEdit && (
-              <Button variant="ember" size="lg" onClick={() => setEdit({ g: { ...blank(), spreadGroup: spreadGroupsOf(groups).find((s) => s === "standard" || s.endsWith("-standard")) ?? spreadGroupsOf(groups)[0]! }, isNew: true })}>
+              <Button variant="ember" size="lg" onClick={() => setEdit({ g: { ...blank(), product: product === "options" ? "options" : "cfd", spreadGroup: spreadGroupsOf(all).find((s) => s === "standard" || s.endsWith("-standard")) ?? spreadGroupsOf(all)[0]! }, isNew: true })}>
                 <Plus /> New group
               </Button>
             )}
@@ -70,10 +86,23 @@ export function LiveGroupsPage() {
         }
       />
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <KpiCard label="Groups" icon={<Layers />} value={<span className="k-num">{groups.length}</span>} chip={`${groups.filter((g) => g.enabled).length} enabled`} chipTone="up" />
+        <KpiCard label="Groups" icon={<Layers />} value={<span className="k-num">{groups.length}</span>} chip={`${groups.filter((g) => g.enabled).length} enabled · ${all.filter((g) => productOf(g) === "options").length} Options`} chipTone="up" />
         <KpiCard label="Accounts" icon={<Users />} value={<span className="k-num">{accounts}</span>} chip="across all groups" delay={0.04} />
         <KpiCard label="Netting groups" icon={<Layers />} value={<span className="k-num">{groups.filter((g) => g.mode === "netting").length}</span>} chip={`${groups.filter((g) => g.cent).length} cent`} delay={0.08} />
         <KpiCard label="A-book by default" icon={<Layers />} value={<span className="k-num">{groups.filter((g) => g.route === "A").length}</span>} chip="new trades, before routing rules" chipTone="info" delay={0.12} />
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Segmented
+          size="sm"
+          value={product}
+          onChange={(v) => setProduct(v)}
+          options={[
+            { value: "all", label: `All · ${all.length}` },
+            { value: "cfd", label: `CFD · ${all.filter((g) => productOf(g) === "cfd").length}` },
+            { value: "options", label: `Options · ${all.filter((g) => productOf(g) === "options").length}` },
+          ]}
+        />
+        <span className="text-[12px] text-fg-3">An account trades its group's product only: CFD groups CFDs, Options groups Kalks FX Options.</span>
       </div>
       {error ? (
         <Card className="mt-4">
@@ -87,7 +116,7 @@ export function LiveGroupsPage() {
         </div>
       ) : groups.length === 0 ? (
         <Card className="mt-4">
-          <EmptyState title="No groups yet" text="Create the first account group." illustration="bank" />
+          <EmptyState title={product === "all" ? "No groups yet" : `No ${product === "options" ? "Options" : "CFD"} groups`} text="Create the first account group." illustration="bank" />
         </Card>
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
@@ -100,7 +129,7 @@ export function LiveGroupsPage() {
       )}
       <GroupEditor
         edit={edit}
-        spreadGroups={spreadGroupsOf(groups)}
+        spreadGroups={spreadGroupsOf(all)}
         onClose={() => setEdit(null)}
         onSaved={() => {
           reload();
@@ -112,17 +141,26 @@ export function LiveGroupsPage() {
 }
 
 function GroupCard({ g, canEdit, onEdit, onDuplicate }: { g: LiveGroup; canEdit: boolean; onEdit: () => void; onDuplicate: () => void }) {
-  const rows: [string, React.ReactNode][] = [
-    ["Leverage", `1:${Math.min(...g.leverages)} – 1:${Math.max(...g.leverages)} · default 1:${g.defaultLeverage}`],
-    ["Margin call / stop-out", `${g.marginCallPct}% / ${g.stopOutPct}%`],
-    ["Hedged margin", `${g.hedgedMarginPct}%`],
-    ["Min deposit", `$${formatNumber(g.minDeposit, 0)}`],
-    ["Commission", g.commissionPerLot ? `$${formatNumber(g.commissionPerLot, 2)} per lot RT` : "None"],
-    ["Swaps", g.swapFree ? "Swap-free" : "Charged at rollover"],
+  const options = productOf(g) === "options";
+  const rows: [string, React.ReactNode][] = options
+    ? [
+        ["Margin call / stop-out", `${g.marginCallPct}% / ${g.stopOutPct}%`],
+        ["Min deposit", `$${formatNumber(g.minDeposit, 0)}`],
+        ["Fees", "Per contract · Options › Pricing"],
+      ]
+    : [
+        ["Leverage", `1:${Math.min(...g.leverages)} – 1:${Math.max(...g.leverages)} · default 1:${g.defaultLeverage}`],
+        ["Margin call / stop-out", `${g.marginCallPct}% / ${g.stopOutPct}%`],
+        ["Hedged margin", `${g.hedgedMarginPct}%`],
+        ["Min deposit", `$${formatNumber(g.minDeposit, 0)}`],
+        ["Commission", g.commissionPerLot ? `$${formatNumber(g.commissionPerLot, 2)} per lot RT` : "None"],
+        ["Swaps", g.swapFree ? "Swap-free" : "Charged at rollover"],
+      ];
+  rows.push(
     ["Spread group", <span key="s" className="font-mono">{g.spreadGroup}</span>],
-    ["Accounts per client", String(g.maxAccountsPerUser)],
+    ["Accounts per client", `${g.maxAccountsPerUser} ${options ? "Options" : "CFD"} (per live / demo)`],
     ["Demo", `$${formatNumber(g.demoInitialBalance, 0)} · ${g.demoRefillsPerDay} refills/day · ${g.demoExpiryDays} d`],
-  ];
+  );
   return (
     <Card className="flex h-full flex-col">
       <div className="flex items-start gap-3 px-5 pt-5">
@@ -134,6 +172,7 @@ function GroupCard({ g, canEdit, onEdit, onDuplicate }: { g: LiveGroup; canEdit:
             {!g.enabled && <Chip size="sm" tone="neutral">Disabled</Chip>}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <ProductChip product={g.product} />
             <Chip size="sm" tone={g.mode === "netting" ? "gold" : "neutral"}>{g.mode}</Chip>
             {g.cent && <Chip size="sm" tone="info">Cent · USC</Chip>}
             <Chip size="sm" tone="neutral">{g.accountTypes === "both" ? "Live + demo" : g.accountTypes === "live" ? "Live only" : "Demo only"}</Chip>
@@ -276,6 +315,20 @@ function GroupEditor({ edit, spreadGroups, onClose, onSaved }: { edit: { g: Live
             <Input value={g.code} disabled={!edit.isNew} onChange={(e) => set({ code: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} aria-label="Group code" className="font-mono" />
           </Field>
         </div>
+        <Field label="Product" hint={locked ? "fixed: has accounts" : "what the group's accounts trade; fixed once it has accounts"}>
+          <Segmented
+            size="sm"
+            value={productOf(g)}
+            onChange={(v) => !locked && set({ product: v })}
+            options={[
+              { value: "cfd", label: "CFD" },
+              { value: "options", label: "Options" },
+            ]}
+          />
+        </Field>
+        {productOf(g) === "options" && (
+          <p className="-mt-2 text-[12px] text-fg-3">Options accounts trade Kalks FX Options only (house prices and the order book), never CFDs. Leverage, hedged margin and commission per lot don't apply to options: per-contract fees, spreads and limits per group are set in Options › Pricing.</p>
+        )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label="Execution mode" hint={locked ? "fixed: has accounts" : undefined}>
             <Segmented size="sm" value={g.mode} onChange={(v) => !locked && set({ mode: v })} options={[{ value: "hedging", label: "Hedging" }, { value: "netting", label: "Netting" }]} />

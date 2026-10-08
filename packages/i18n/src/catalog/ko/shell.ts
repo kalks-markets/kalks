@@ -142,5 +142,23 @@ const shell: NsMessages<"shell"> = {
   "system.status.checked": "{time} 확인 · 새로고침 시 15초마다 갱신",
   "system.status.expectedBack": "{time}까지 복구 예정",
   "system.status.questions": "문의 사항: {email}",
+  // module switches (gateway tenancy.rs): names for the "not available" page and the app
+  "system.unavailable.module": "{module}은(는) 고객님의 계정에서 사용할 수 없습니다.",
+  "module.copy_trading": "카피 트레이딩",
+  "module.pamm": "PAMM 펀드",
+  "module.mam": "MAM",
+  "module.prop": "프롭 트레이딩",
+  "module.ib": "파트너 프로그램",
+  "module.algo": "전략 빌더",
+  "module.api": "API 및 웹훅",
+  "module.academy": "아카데미",
+  "module.wallet": "지갑",
+  "module.rewards": "리워드",
+  "module.options": "옵션",
+  "module.news": "뉴스",
+  "module.calendar": "경제 캘린더",
+  "module.markets": "시장",
+  "module.ai": "Kalks AI",
+  "module.support_chat": "지원 채팅",
 };
 export default shell;

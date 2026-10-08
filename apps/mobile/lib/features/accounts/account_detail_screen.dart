@@ -246,6 +246,7 @@ class _HeaderCard extends ConsumerWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               KindBadge(account: a),
+              if (a.isOptions) ProductChip(account: a),
               FlavorChip(account: a),
               Text(
                 '${a.groupName} · ${t.dyn('accounts.mode.${a.mode}', fallback: modeLabel(a.mode))}',

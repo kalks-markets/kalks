@@ -8,4 +8,5 @@ pub mod api;
 pub mod cert;
 pub mod config;
 pub mod content;
+pub mod modules;
 pub mod store;
