@@ -150,7 +150,7 @@ test("mobile paths resolve to rewrites of the cookie routes or to native routes;
   for (const family of mobile.REWRITE_FAMILIES) {
     assert.deepEqual(mobile.mobileRoute(`/api/mobile/${family}/x/1`), { kind: "rewrite", target: `/api/${family}/x/1`, policyPath: `/api/${family}/x/1` }, family);
   }
-  assert.equal(mobile.REWRITE_FAMILIES.length, 16);
+  assert.equal(mobile.REWRITE_FAMILIES.length, 17);
   assert.deepEqual(mobile.mobileRoute("/api/mobile/notifications"), { kind: "rewrite", target: "/api/notifications", policyPath: "/api/notifications" });
   assert.deepEqual(mobile.mobileRoute("/api/mobile/suitability/options/quiz"), { kind: "rewrite", target: "/api/suitability/options/quiz", policyPath: "/api/suitability/options/quiz" });
   assert.deepEqual(mobile.mobileRoute("/api/mobile/auth/heartbeat"), { kind: "rewrite", target: "/api/auth/heartbeat", policyPath: "/api/auth/heartbeat" });
@@ -462,7 +462,8 @@ test("config: service URLs, streams and the broker's branding", async () => {
     app: "https://app.kalkstrade.com",
     terminal: "https://trade.kalkstrade.com",
     marketData: { http: "https://api.kalkstrade.com", ws: "wss://api.kalkstrade.com/v1/stream" },
-    streams: { engine: "wss://trade.kalkstrade.com/engine/stream", options: "wss://trade.kalkstrade.com/options/stream", support: "wss://app.kalkstrade.com/support/stream" },
+    streams: { engine: "wss://trade.kalkstrade.com/engine/stream", options: "wss://trade.kalkstrade.com/options/stream", support: "wss://app.kalkstrade.com/support/stream", circle: "wss://app.kalkstrade.com/circle/stream" },
+    uploads: { circle: "https://app.kalkstrade.com/circle/upload" },
   });
   assert.equal(c.tenant.slug, "kalks");
   assert.equal(c.tenant.default, true);
@@ -479,6 +480,7 @@ test("config: service URLs, streams and the broker's branding", async () => {
   assert.equal(b.urls.streams.engine, "wss://trade.broker.test/engine/stream");
   assert.equal(b.urls.streams.options, "wss://trade.broker.test/options/stream");
   assert.equal(b.urls.streams.support, "wss://app.broker.test/support/stream");
+  assert.equal(b.urls.streams.circle, "wss://app.broker.test/circle/stream");
   assert.deepEqual(b.tenant, { slug: "acme", name: "Acme FX", default: false, logoUrl: "https://cdn.acme.test/logo.png", primary: "#12ab34", accent: null, supportEmail: "help@acme.test", website: "https://acme.test" });
   assert.deepEqual(b.modules, { prop: false });
 
@@ -499,6 +501,8 @@ test("service URLs on a local stack point at the services' own ports", async () 
     assert.match(u.streams.engine, /^ws:\/\/127\.0\.0\.1:\d+\/v1\/terminal\/stream$/);
     assert.match(u.streams.options, /^ws:\/\/127\.0\.0\.1:\d+\/v1\/options\/stream$/);
     assert.match(u.streams.support, /^ws:\/\/127\.0\.0\.1:\d+\/v1\/stream$/);
+    assert.match(u.streams.circle, /^ws:\/\/127\.0\.0\.1:8105\/v1\/stream$/);
+    assert.equal(u.uploads.circle, "http://127.0.0.1:8105/v1/upload");
   } finally {
     process.env.NEXT_PUBLIC_TERMINAL_URL = saved.t;
     process.env.NEXT_PUBLIC_MARKET_DATA_URL = saved.md;

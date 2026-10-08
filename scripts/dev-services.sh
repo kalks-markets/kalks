@@ -27,7 +27,7 @@ else
 fi
 
 # ---- Rust services (name:port) — market-data and gateway first, others depend on them ----
-SERVICES="market-data:8081 gateway:8080 trading:8090 wallet:8095 ib:8096 prop:8097 academy:8098 algo:8099 support:8100 growth:8101 reports:8102 news:8103 options:8104"
+SERVICES="market-data:8081 gateway:8080 trading:8090 wallet:8095 ib:8096 prop:8097 academy:8098 algo:8099 support:8100 growth:8101 reports:8102 news:8103 options:8104 circle:8105"
 for entry in $SERVICES; do
   name=${entry%%:*}; port=${entry##*:}
   if up "$port"; then echo "$(printf '%-10s' "$name") :$port already up"; continue; fi

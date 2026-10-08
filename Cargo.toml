@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["services/market-data", "services/gateway", "services/trading", "services/wallet", "services/prop", "services/academy", "services/algo", "services/ib", "services/support", "services/growth", "services/news", "services/reports", "services/options", "crates/optmath", "crates/markethours"]
+members = ["services/market-data", "services/gateway", "services/trading", "services/wallet", "services/prop", "services/academy", "services/algo", "services/ib", "services/support", "services/growth", "services/news", "services/reports", "services/options", "services/circle", "crates/optmath", "crates/markethours"]
 
 [profile.release]
 lto = "thin"

@@ -13,9 +13,50 @@
 	}
 }
 
+# Kalks Circle on the app and trade hosts (services/circle :8105, docs/CIRCLE-API.md):
+# /circle/stream = realtime stream (one-time ticket from the BFF); /circle/upload/{id} = resumable direct uploads
+# (one-time upload token, chunks of up to 8 MB, no Next.js in the way for large videos); /circle/media/* = photos,
+# HLS video, voice notes and files from local storage (CIRCLE_STORAGE=local; with R2 the CDN serves them instead).
+# Media keys are random and immutable; files are never rendered as pages (sandbox CSP, nosniff).
+(circle) {
+	handle /circle/stream {
+		rewrite * /v1/stream?{query}
+		reverse_proxy 127.0.0.1:8105
+	}
+	handle /circle/upload/* {
+		request_body {
+			max_size 9MB
+		}
+		uri replace /circle/upload/ /v1/upload/
+		reverse_proxy 127.0.0.1:8105
+	}
+	handle_path /circle/media/* {
+		root * /srv/kalks/circle-media
+		@playlist path *.m3u8
+		header @playlist Content-Type application/vnd.apple.mpegurl
+		@segment path *.ts
+		header @segment Content-Type video/mp2t
+		@files path */f/*
+		header @files Content-Disposition attachment
+		header {
+			Cache-Control "public, max-age=31536000, immutable"
+			X-Content-Type-Options "nosniff"
+			Content-Security-Policy "default-src 'none'; sandbox"
+			Access-Control-Allow-Origin "*"
+		}
+		file_server
+	}
+	# Circle BFF upload chunks (8 MB + headers)
+	@circleChunk path /api/circle/uploads/* /api/mobile/circle/uploads/*
+	request_body @circleChunk {
+		max_size 9MB
+	}
+}
+
 # Client Area (CRM). /support/stream = support chat + notifications stream (one-time ticket from the CRM BFF).
 app.kalkstrade.com {
 	import common
+	import circle
 	handle /support/stream {
 		rewrite * /v1/stream?{query}
 		reverse_proxy 127.0.0.1:8100
@@ -37,6 +78,7 @@ app.kalkstrade.com {
 # /options/stream = options chain stream (one-time ticket from the terminal BFF, or the guest public chain).
 trade.kalkstrade.com {
 	import common
+	import circle
 	handle /engine/stream {
 		rewrite * /v1/terminal/stream?{query}
 		reverse_proxy 127.0.0.1:8090
@@ -80,6 +122,21 @@ api.kalkstrade.com {
 			reverse_proxy 127.0.0.1:8099
 		}
 		respond 404
+	}
+	# Kalks Circle public profile / post pages for the website (read-only, public content only) and its media
+	handle_path /circle/public/* {
+		rewrite * /v1/public{path}?{query}
+		reverse_proxy 127.0.0.1:8105
+	}
+	handle_path /circle/media/* {
+		root * /srv/kalks/circle-media
+		header {
+			Cache-Control "public, max-age=31536000, immutable"
+			X-Content-Type-Options "nosniff"
+			Content-Security-Policy "default-src 'none'; sandbox"
+			Access-Control-Allow-Origin "*"
+		}
+		file_server
 	}
 	# Kalks FX Options public chain (read-only; the service answers 404 until the public chain is switched on)
 	handle /v1/public/options/* {
@@ -155,6 +212,7 @@ demo-trade.kalkstrade.com {
 # 	@trade header_regexp Host ^(trade|trader|webtrader)\.
 # 	@admin header_regexp Host ^(admin|backoffice|bo)\.
 # 	handle @app {
+# 		import circle
 # 		handle /support/stream {
 # 			rewrite * /v1/stream?{query}
 # 			reverse_proxy 127.0.0.1:8100
@@ -166,6 +224,7 @@ demo-trade.kalkstrade.com {
 # 		reverse_proxy 127.0.0.1:3000
 # 	}
 # 	handle @trade {
+# 		import circle
 # 		handle /engine/stream {
 # 			rewrite * /v1/terminal/stream?{query}
 # 			reverse_proxy 127.0.0.1:8090

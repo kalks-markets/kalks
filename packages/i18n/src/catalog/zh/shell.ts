@@ -160,5 +160,6 @@ const shell: NsMessages<"shell"> = {
   "module.markets": "市场",
   "module.ai": "Kalks AI",
   "module.support_chat": "客服聊天",
+  "module.circle": "Kalks Circle",
 };
 export default shell;

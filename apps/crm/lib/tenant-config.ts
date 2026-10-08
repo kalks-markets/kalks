@@ -106,6 +106,9 @@ const MODULE_PATHS: [string, string][] = [
   // the support chat (Ask Kalks AI asks through it too); the stream ticket also serves the bell and stays open, and so
   // does the Support page (email)
   ...["me", "conversations", "messages", "handover", "read", "typing", "attachments"].map((p): [string, string] => [`/api/support/${p}`, "support_chat|ai"]),
+  // Kalks Circle: its pages, the BFF and the app's /api/mobile/circle/* rewrite (the stream ticket included)
+  ["/circle", "circle"],
+  ["/api/circle", "circle"],
   // the mobile app's native trade routes (Kalks Trader in the app)
   ["/api/mobile/trade/options", "options"],
   ["/api/mobile/trade/options/explain", "options+ai"],

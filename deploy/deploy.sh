@@ -21,6 +21,7 @@ cargo build --release -p growth
 cargo build --release -p reports
 cargo build --release -p news
 cargo build --release -p options
+cargo build --release -p circle
 
 # trading engine secrets are generated on the server on first deploy (never committed, never printed)
 touch .env.local
@@ -41,7 +42,7 @@ if ! grep -q '^IB_DATABASE_URL=' .env.local && grep -q '^GATEWAY_DATABASE_URL=' 
   printf 'IB_DATABASE_URL=%s\n' "$(grep '^GATEWAY_DATABASE_URL=' .env.local | cut -d= -f2- | sed -E 's#/[^/?]+([?].*)?$#/kalks_ib\1#')" >> .env.local
 fi
 # the Client Area and Back Office BFFs reach the IB service with the same token
-for app in apps/crm apps/admin; do
+for app in apps/crm apps/admin apps/terminal; do
   f="$app/.env.production.local"; touch "$f"
   grep -q '^IB_URL=' "$f" || printf 'IB_URL=http://127.0.0.1:8096\n' >> "$f"
   grep -q '^IB_INTERNAL_TOKEN=' "$f" || printf 'IB_INTERNAL_TOKEN=%s\n' "$(grep '^IB_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
@@ -64,7 +65,7 @@ if ! grep -q '^PROP_DATABASE_URL=' .env.local && grep -q '^GATEWAY_DATABASE_URL=
   printf 'PROP_DATABASE_URL=%s\n' "$(grep '^GATEWAY_DATABASE_URL=' .env.local | cut -d= -f2- | sed -E 's#/[^/?]+([?].*)?$#/kalks_prop\1#')" >> .env.local
 fi
 # the Client Area and Back Office BFFs reach the prop service with the same token
-for app in apps/crm apps/admin; do
+for app in apps/crm apps/admin apps/terminal; do
   f="$app/.env.production.local"; touch "$f"
   grep -q '^PROP_URL=' "$f" || printf 'PROP_URL=http://127.0.0.1:8097\n' >> "$f"
   grep -q '^PROP_INTERNAL_TOKEN=' "$f" || printf 'PROP_INTERNAL_TOKEN=%s\n' "$(grep '^PROP_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
@@ -80,7 +81,7 @@ if ! grep -q '^ANTHROPIC_API_KEY=' .env.claude 2>/dev/null && grep -q '^ANTHROPI
   (umask 077; grep '^ANTHROPIC_API_KEY=' apps/terminal/.env.production.local > .env.claude)
 fi
 # the Client Area and Back Office BFFs reach the ALGO service with the same token
-for app in apps/crm apps/admin; do
+for app in apps/crm apps/admin apps/terminal; do
   f="$app/.env.production.local"; touch "$f"
   grep -q '^ALGO_URL=' "$f" || printf 'ALGO_URL=http://127.0.0.1:8099\n' >> "$f"
   grep -q '^ALGO_INTERNAL_TOKEN=' "$f" || printf 'ALGO_INTERNAL_TOKEN=%s\n' "$(grep '^ALGO_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
@@ -96,7 +97,7 @@ if ! grep -q '^ANTHROPIC_API_KEY=' .env.claude 2>/dev/null && grep -q '^ANTHROPI
   (umask 077; grep '^ANTHROPIC_API_KEY=' apps/terminal/.env.production.local > .env.claude)
 fi
 # the Client Area and Back Office BFFs reach the ALGO service with the same token
-for app in apps/crm apps/admin; do
+for app in apps/crm apps/admin apps/terminal; do
   f="$app/.env.production.local"; touch "$f"
   grep -q '^ALGO_URL=' "$f" || printf 'ALGO_URL=http://127.0.0.1:8099\n' >> "$f"
   grep -q '^ALGO_INTERNAL_TOKEN=' "$f" || printf 'ALGO_INTERNAL_TOKEN=%s\n' "$(grep '^ALGO_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
@@ -114,7 +115,7 @@ if ! grep -q '^TRONGRID_API_KEY=' .env.local && [ -f .env.tron ] && grep -q '^TR
   grep '^TRONGRID_API_KEY=' .env.tron >> .env.local
 fi
 # the Client Area and Back Office BFFs reach the wallet with the same token
-for app in apps/crm apps/admin; do
+for app in apps/crm apps/admin apps/terminal; do
   f="$app/.env.production.local"; touch "$f"
   grep -q '^WALLET_URL=' "$f" || printf 'WALLET_URL=http://127.0.0.1:8095\n' >> "$f"
   grep -q '^WALLET_INTERNAL_TOKEN=' "$f" || printf 'WALLET_INTERNAL_TOKEN=%s\n' "$(grep '^WALLET_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
@@ -157,7 +158,7 @@ grep -q '^REPORTS_INTERNAL_TOKEN=' .env.local || printf 'REPORTS_INTERNAL_TOKEN=
 if ! grep -q '^REPORTS_DATABASE_URL=' .env.local && grep -q '^GATEWAY_DATABASE_URL=' .env.local; then
   printf 'REPORTS_DATABASE_URL=%s\n' "$(grep '^GATEWAY_DATABASE_URL=' .env.local | cut -d= -f2- | sed -E 's#/[^/?]+([?].*)?$#/kalks_reports\1#')" >> .env.local
 fi
-for app in apps/crm apps/admin; do
+for app in apps/crm apps/admin apps/terminal; do
   f="$app/.env.production.local"; touch "$f"
   grep -q '^REPORTS_URL=' "$f" || printf 'REPORTS_URL=http://127.0.0.1:8102\n' >> "$f"
   grep -q '^REPORTS_INTERNAL_TOKEN=' "$f" || printf 'REPORTS_INTERNAL_TOKEN=%s\n' "$(grep '^REPORTS_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
@@ -186,6 +187,30 @@ for app in apps/crm apps/admin apps/terminal; do
   f="$app/.env.production.local"; touch "$f"
   grep -q '^OPTIONS_URL=' "$f" || printf 'OPTIONS_URL=http://127.0.0.1:8104\n' >> "$f"
   grep -q '^OPTIONS_INTERNAL_TOKEN=' "$f" || printf 'OPTIONS_INTERNAL_TOKEN=%s\n' "$(grep '^OPTIONS_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
+done
+# Kalks Circle (community): internal token and trade-card signing key generated once (never printed), database
+# kalks_circle next to the gateway's. Media on local disk at /srv/kalks/circle-media (served by Caddy at
+# /circle/media/*) until Cloudflare R2 is configured (CIRCLE_STORAGE=s3 + CIRCLE_S3_*); private upload / transcode
+# space under ~/.kalks-data/circle. Video needs ffmpeg (installed here when sudo allows it). The AI checks use the
+# Claude key from .env.claude; push stays off until FCM_SERVICE_ACCOUNT_FILE points at the Firebase service account.
+grep -q '^CIRCLE_INTERNAL_TOKEN=' .env.local || printf 'CIRCLE_INTERNAL_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env.local
+grep -q '^CIRCLE_CARD_SECRET=' .env.local || printf 'CIRCLE_CARD_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env.local
+if ! grep -q '^CIRCLE_DATABASE_URL=' .env.local && grep -q '^GATEWAY_DATABASE_URL=' .env.local; then
+  printf 'CIRCLE_DATABASE_URL=%s\n' "$(grep '^GATEWAY_DATABASE_URL=' .env.local | cut -d= -f2- | sed -E 's#/[^/?]+([?].*)?$#/kalks_circle\1#')" >> .env.local
+fi
+grep -q '^CIRCLE_MEDIA_DIR=' .env.local || printf 'CIRCLE_MEDIA_DIR=/srv/kalks/circle-media\n' >> .env.local
+grep -q '^CIRCLE_WORK_DIR=' .env.local || printf 'CIRCLE_WORK_DIR=%s\n' "$HOME/.kalks-data/circle/work" >> .env.local
+sudo install -d -o "$(id -un)" -g "$(id -gn)" -m 755 /srv/kalks/circle-media
+install -d -m 700 "$(grep '^CIRCLE_WORK_DIR=' .env.local | cut -d= -f2-)"
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg >/dev/null 2>&1 \
+    || echo "WARNING: ffmpeg is missing and could not be installed: run 'sudo apt install ffmpeg' (Circle video uploads fail until then)"
+fi
+# the Client Area BFF (and the Back Office, for Back Office > Circle) reach the service with the same token
+for app in apps/crm apps/admin; do
+  f="$app/.env.production.local"; touch "$f"
+  grep -q '^CIRCLE_URL=' "$f" || printf 'CIRCLE_URL=http://127.0.0.1:8105\n' >> "$f"
+  grep -q '^CIRCLE_INTERNAL_TOKEN=' "$f" || printf 'CIRCLE_INTERNAL_TOKEN=%s\n' "$(grep '^CIRCLE_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
 done
 # the Client Area's public URLs, inlined at build time: market-data at the public edge (live quotes in the browser)
 # and Kalks Trader (Trade links and sign-in hand-off)
@@ -234,6 +259,7 @@ sudo systemctl enable kalks-growth >/dev/null && sudo systemctl restart kalks-gr
 sudo systemctl enable kalks-reports >/dev/null && sudo systemctl restart kalks-reports
 sudo systemctl enable kalks-news >/dev/null && sudo systemctl restart kalks-news
 sudo systemctl enable kalks-options >/dev/null && sudo systemctl restart kalks-options
+sudo systemctl enable kalks-circle >/dev/null && sudo systemctl restart kalks-circle
 sudo systemctl reload caddy || echo "caddy reload timed out (long-lived connections); config is validated, continuing"
 sleep 5
 for u in 127.0.0.1:8081/health 127.0.0.1:8080/health 127.0.0.1:8090/health 127.0.0.1:8096/health 127.0.0.1:8097/health 127.0.0.1:3000/login 127.0.0.1:3001/login 127.0.0.1:3002/login; do
@@ -247,3 +273,4 @@ printf "%-26s %s\n" 127.0.0.1:8101/health "$(curl -s -o /dev/null -w '%{http_cod
 printf "%-26s %s\n" 127.0.0.1:8102/health "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8102/health)"
 printf "%-26s %s\n" 127.0.0.1:8103/health "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8103/health)"
 printf "%-26s %s\n" 127.0.0.1:8104/health "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8104/health)"
+printf "%-26s %s\n" 127.0.0.1:8105/health "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8105/health)"

@@ -41,3 +41,4 @@ run kalks-market-data "Price feed" http://127.0.0.1:8081/health "d.get('ok') and
 run kalks-gateway     "Sign-in service" http://127.0.0.1:8080/health "d.get('status')=='ok' and d.get('db')"
 run kalks-trading     "Trading engine" http://127.0.0.1:8090/health "d.get('status')=='ok' and d.get('feedConnected')"
 run kalks-options     "Options service" http://127.0.0.1:8104/health "d.get('status')=='ok' and d.get('db')"
+run kalks-circle      "Kalks Circle" http://127.0.0.1:8105/health "d.get('status')=='ok' and d.get('db')"

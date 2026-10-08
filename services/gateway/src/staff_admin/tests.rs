@@ -311,10 +311,10 @@ async fn module_switches_owner_only_with_reason() {
 
     // every module key, on by default (flags stay out of the module map)
     let Json(cfg) = tenancy::public_config(State(st.clone()), ctx(None, ip)).await.unwrap();
-    for k in ["copy_trading", "pamm", "mam", "prop", "ib", "algo", "api", "academy", "wallet", "rewards", "options", "news", "calendar", "markets", "ai", "support_chat"] {
+    for k in ["copy_trading", "pamm", "mam", "prop", "ib", "algo", "api", "academy", "wallet", "rewards", "options", "news", "calendar", "markets", "ai", "support_chat", "circle"] {
         assert_eq!(cfg["modules"][k], true, "{k} on by default");
     }
-    assert_eq!(cfg["modules"].as_object().unwrap().len(), 16);
+    assert_eq!(cfg["modules"].as_object().unwrap().len(), 17);
     assert!(cfg["flags"].get("options").is_none());
 
     // the owner switches modules of the Kalks tenant itself, with a reason that is audited with each switch
