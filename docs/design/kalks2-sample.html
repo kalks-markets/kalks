@@ -1,0 +1,1438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Kalks 2 Direction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Instrument+Sans:wdth,wght@75..100,400..700&family=JetBrains+Mono:wght@400..700&family=Unbounded:wght@600..800&family=Onest:wght@400..600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   KALKS 2 — tokens. Light is the base; dark is applied by the OS
+   (prefers-color-scheme) or by the toggle (data-theme).
+   ============================================================ */
+:root{
+  --f-disp:'Archivo',ui-sans-serif,system-ui,sans-serif;
+  --f-text:'Instrument Sans',ui-sans-serif,system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --k-red:#D4112A; --k-yel:#FFD21F; --k-ink:#0B0809;
+  --neon-r:#FF2D55; --neon-y:#F4FF4A;
+  --img-yel:#FFD224; --img-red:#E00302;
+
+  --page:#EDE6E3;
+  --bg:#F6F1EE; --bg2:#EEE7E3; --s1:#FFFFFF; --s2:#FBF8F7; --s3:#F2ECE9; --s4:#E9E1DE;
+  --line:rgba(46,22,20,.08); --line2:rgba(46,22,20,.15);
+  --tx:#160F0E; --tx2:#5A4E4C; --tx3:#6F6260;
+  --red:#D4112A; --red-edge:#8A0A1B; --red-tx:#C8102E; --red-soft:#FFE1E1; --red-pastel:#FFC9C9;
+  --yel:#FFD21F; --yel-edge:#B58C00; --yel-soft:#FFF1A8; --yel-tx:#7A5D00;
+  --ink:#231B1C; --ink-edge:#000000; --ink-lbl:#FFFFFF;
+  --wht-edge:#CDBFBB;
+  --up:#1F5FE0; --up-face:#1F5FE0; --up-edge:#0B2F80; --up-tx:#1A56D6; --up-soft:#E3ECFF;
+  --dn:#E0182F; --dn-face:#D4112A; --dn-edge:#8A0A1B; --dn-tx:#C8102E; --dn-soft:#FFE4E4;
+  --ok:#137A45; --ok-soft:#DCF2E5; --warn-tx:#7A5D00; --warn-soft:#FFF1A8;
+  --glass:rgba(255,255,255,.62); --glass-line:rgba(255,255,255,.8); --glass-strong:rgba(255,255,255,.86);
+  --focus:#160F0E; --focus-halo:#F4FF4A;
+  --accent-line:#160F0E; --accent-fill:#F4FF4A;
+  --sh1:0 1px 2px rgba(40,18,16,.04),0 12px 32px -14px rgba(40,18,16,.14);
+  --sh2:0 30px 80px -24px rgba(40,18,16,.30);
+  --bloom-a:rgba(255,186,186,.75); --bloom-b:rgba(255,238,150,.7);
+  --grid:rgba(46,22,20,.055); --axis:#6F6260; --ma:#C99A00; --draw:#5A4E4C;
+  --tog-on:#160F0E; --seg-edge:#D9CCC8; --puck-edge:#C9BCB8;
+  --tabbar:#160F0E; --tab-ic:#B8AAA5; --tab-on:#FFFFFF; --tab-on-ic:#160F0E;
+  --chart-bg:#FFFFFF;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#050404;
+    --bg:#0B0809; --bg2:#070505; --s1:#141011; --s2:#1B1517; --s3:#251C1F; --s4:#30252A;
+    --line:rgba(255,236,230,.07); --line2:rgba(255,236,230,.13);
+    --tx:#F6EEE8; --tx2:#B8AAA5; --tx3:#928380;
+    --red:#D4112A; --red-edge:#5E0611; --red-tx:#FF5A66; --red-soft:rgba(212,17,42,.18); --red-pastel:#3A0A12;
+    --yel:#FFD21F; --yel-edge:#9A7700; --yel-soft:rgba(255,210,31,.12); --yel-tx:#FFD21F;
+    --ink:#F6EEE8; --ink-edge:#7D6F6B; --ink-lbl:#0B0809;
+    --wht-edge:#9E928E;
+    --up:#2F7BFF; --up-face:#1F62EA; --up-edge:#0A2C78; --up-tx:#5B97FF; --up-soft:rgba(47,123,255,.15);
+    --dn:#F23645; --dn-face:#D4112A; --dn-edge:#5E0611; --dn-tx:#FF5A66; --dn-soft:rgba(242,54,69,.15);
+    --ok:#3CCB7F; --ok-soft:rgba(60,203,127,.14); --warn-tx:#FFD21F; --warn-soft:rgba(255,210,31,.13);
+    --glass:rgba(22,13,15,.56); --glass-line:rgba(255,255,255,.09); --glass-strong:rgba(18,11,13,.72);
+    --sh1:0 1px 0 rgba(255,255,255,.025) inset,0 24px 48px -28px rgba(0,0,0,.7);
+    --sh2:0 40px 100px -20px rgba(0,0,0,.75);
+    --bloom-a:rgba(212,17,42,.26); --bloom-b:rgba(255,210,31,.06);
+    --grid:rgba(255,236,230,.05); --axis:#928380; --ma:#FFD21F; --draw:#B8AAA5;
+    --focus:#F4FF4A; --focus-halo:rgba(244,255,74,.16); --accent-line:#FFD21F; --accent-fill:#FFD21F;
+    --tog-on:#FFD21F; --seg-edge:#000000; --puck-edge:#8E817D;
+    --tabbar:#1B1517; --tab-ic:#928380; --tab-on:#FFD21F; --tab-on-ic:#0B0809;
+    --chart-bg:#0E0A0B;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#050404;
+  --bg:#0B0809; --bg2:#070505; --s1:#141011; --s2:#1B1517; --s3:#251C1F; --s4:#30252A;
+  --line:rgba(255,236,230,.07); --line2:rgba(255,236,230,.13);
+  --tx:#F6EEE8; --tx2:#B8AAA5; --tx3:#928380;
+  --red:#D4112A; --red-edge:#5E0611; --red-tx:#FF5A66; --red-soft:rgba(212,17,42,.18); --red-pastel:#3A0A12;
+  --yel:#FFD21F; --yel-edge:#9A7700; --yel-soft:rgba(255,210,31,.12); --yel-tx:#FFD21F;
+  --ink:#F6EEE8; --ink-edge:#7D6F6B; --ink-lbl:#0B0809;
+  --wht-edge:#9E928E;
+  --up:#2F7BFF; --up-face:#1F62EA; --up-edge:#0A2C78; --up-tx:#5B97FF; --up-soft:rgba(47,123,255,.15);
+  --dn:#F23645; --dn-face:#D4112A; --dn-edge:#5E0611; --dn-tx:#FF5A66; --dn-soft:rgba(242,54,69,.15);
+  --ok:#3CCB7F; --ok-soft:rgba(60,203,127,.14); --warn-tx:#FFD21F; --warn-soft:rgba(255,210,31,.13);
+  --glass:rgba(22,13,15,.56); --glass-line:rgba(255,255,255,.09); --glass-strong:rgba(18,11,13,.72);
+  --sh1:0 1px 0 rgba(255,255,255,.025) inset,0 24px 48px -28px rgba(0,0,0,.7);
+  --sh2:0 40px 100px -20px rgba(0,0,0,.75);
+  --bloom-a:rgba(212,17,42,.26); --bloom-b:rgba(255,210,31,.06);
+  --grid:rgba(255,236,230,.05); --axis:#928380; --ma:#FFD21F; --draw:#B8AAA5;
+  --focus:#F4FF4A; --focus-halo:rgba(244,255,74,.16); --accent-line:#FFD21F; --accent-fill:#FFD21F;
+    --tog-on:#FFD21F; --seg-edge:#000000; --puck-edge:#8E817D;
+  --tabbar:#1B1517; --tab-ic:#928380; --tab-on:#FFD21F; --tab-on-ic:#0B0809;
+  --chart-bg:#0E0A0B;
+}
+
+/* ============================================================ base */
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{background:var(--page);color:var(--tx);font:400 15px/1.5 var(--f-text);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden;transition:background-color .25s}
+img{display:block;max-width:100%}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:inherit;text-decoration:none}
+.mono{font-family:var(--f-mono);font-feature-settings:'zero' 0}
+.num{font-variant-numeric:tabular-nums}
+.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.i.s16{width:16px;height:16px}.i.s18{width:18px;height:18px}.i.s14{width:14px;height:14px}
+.fill{fill:currentColor;stroke:none}
+.wrap{max-width:1440px;margin:0 auto;padding:0 32px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* display type */
+.d{font-family:var(--f-disp);font-variation-settings:'wdth' 125;font-weight:800;letter-spacing:-.035em;line-height:.94}
+.d-wide{font-family:var(--f-disp);font-variation-settings:'wdth' 112;font-weight:700;letter-spacing:-.02em}
+.money{font-family:var(--f-disp);font-variation-settings:'wdth' 108;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+
+/* ============================================================ NeoPOP buttons
+   flat face + solid edge bottom/right (stepped 1px shadows = diagonal joins);
+   pressed = the face slides into the edge. No blur shadows. */
+.btn{--h:40px;--px:16px;--r:12px;--fs:14px;--d:4px;
+  --face:var(--ink);--edge:var(--ink-edge);--lbl:var(--ink-lbl);
+  --e:1px 1px 0 var(--edge),2px 2px 0 var(--edge),3px 3px 0 var(--edge),4px 4px 0 var(--edge);
+  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:var(--h);padding:0 var(--px);margin:0 var(--d) var(--d) 0;border-radius:var(--r);
+  background:var(--face);color:var(--lbl);font:600 var(--fs)/1 var(--f-text);letter-spacing:-.003em;white-space:nowrap;
+  box-shadow:var(--e);transition:transform 90ms cubic-bezier(.3,.7,.4,1),box-shadow 90ms cubic-bezier(.3,.7,.4,1),filter 120ms;
+  -webkit-tap-highlight-color:transparent;user-select:none;cursor:pointer}
+.btn:hover{filter:brightness(1.07)}
+.btn:active,.btn.is-pressed{transform:translate(var(--d),var(--d));box-shadow:0 0 0 var(--edge)}
+.btn:focus-visible,.btn.is-focus{outline:2px solid var(--focus);outline-offset:3px;box-shadow:var(--e),0 0 0 7px var(--focus-halo)}
+.btn .i{width:18px;height:18px}
+.s32{--h:32px;--px:12px;--r:10px;--fs:13px;--d:3px;--e:1px 1px 0 var(--edge),2px 2px 0 var(--edge),3px 3px 0 var(--edge)}
+.s32 .i{width:16px;height:16px}
+.s48{--h:48px;--px:20px;--r:14px;--fs:15px;--d:5px;--e:1px 1px 0 var(--edge),2px 2px 0 var(--edge),3px 3px 0 var(--edge),4px 4px 0 var(--edge),5px 5px 0 var(--edge)}
+.s56{--h:56px;--px:26px;--r:16px;--fs:16px;--d:6px;--e:1px 1px 0 var(--edge),2px 2px 0 var(--edge),3px 3px 0 var(--edge),4px 4px 0 var(--edge),5px 5px 0 var(--edge),6px 6px 0 var(--edge)}
+.v-red{--face:var(--red);--edge:var(--red-edge);--lbl:#fff}
+.v-yel{--face:var(--yel);--edge:var(--yel-edge);--lbl:#0B0809}
+.v-wht{--face:#fff;--edge:var(--wht-edge);--lbl:#0B0809}
+.v-buy{--face:var(--up-face);--edge:var(--up-edge);--lbl:#fff}
+.v-sell{--face:var(--dn-face);--edge:var(--dn-edge);--lbl:#fff}
+.v-ghost{--face:transparent;--lbl:var(--tx);box-shadow:inset 0 0 0 1.5px var(--line2);margin:0}
+.v-ghost:hover{filter:none;background:var(--s3)}
+.v-ghost:active,.v-ghost.is-pressed{transform:translate(1px,1px);box-shadow:inset 0 0 0 1.5px var(--line2)}
+.btn[disabled],.btn.is-disabled{--face:var(--s3);--lbl:var(--tx3);box-shadow:none;transform:translate(calc(var(--d) / 2),calc(var(--d) / 2));cursor:not-allowed;filter:none}
+.btn.round{--px:0;width:var(--h);border-radius:50%}
+.btn.sharp{--r:3px}
+.btn.block{display:flex;width:calc(100% - var(--d))}
+.btn .sub{font:500 12px/1 var(--f-mono);opacity:.75}
+.btn.is-loading{color:transparent}
+.btn.is-loading::after{content:"";position:absolute;inset:0;margin:auto;width:24px;height:6px;
+  background:radial-gradient(circle,var(--lbl) 2.4px,transparent 2.6px) 0 50%/8px 6px repeat-x}
+
+/* ============================================================ chips, tags, segmented, toggle, slider, fields */
+.chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 13px;border-radius:999px;background:var(--s3);color:var(--tx2);font:600 13px/1 var(--f-text);white-space:nowrap}
+.chip.sel{background:var(--tx);color:var(--bg)}
+.chip.out{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line2);color:var(--tx)}
+.st{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;font:600 12px/1 var(--f-text);white-space:nowrap}
+.st::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.st-ok{background:var(--ok-soft);color:var(--ok)}
+.st-warn{background:var(--warn-soft);color:var(--warn-tx)}
+.st-bad{background:var(--red-soft);color:var(--red-tx)}
+.st-info{background:var(--up-soft);color:var(--up-tx)}
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;font:700 10.5px/1 var(--f-text);letter-spacing:.06em;text-transform:uppercase;background:var(--s3);color:var(--tx2);white-space:nowrap}
+.tag.live{background:transparent;box-shadow:inset 0 0 0 1.25px var(--tx);color:var(--tx)}
+.tag.opt{background:var(--yel);color:#0B0809}
+.tag.cfd{background:var(--tx);color:var(--bg)}
+.tag.new{background:var(--red);color:#fff}
+.chg{display:inline-flex;align-items:center;height:22px;padding:0 7px;border-radius:7px;font:600 12px/1 var(--f-mono);font-variant-numeric:tabular-nums}
+.chg.up{background:var(--up-soft);color:var(--up-tx)}
+.chg.dn{background:var(--dn-soft);color:var(--dn-tx)}
+.up-tx{color:var(--up-tx)}.dn-tx{color:var(--dn-tx)}
+
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:13px;background:var(--bg2);box-shadow:inset 0 1px 2px rgba(0,0,0,.08),inset 0 0 0 1px var(--line)}
+.seg button{height:30px;padding:0 13px;border-radius:10px;font:600 13px/1 var(--f-text);color:var(--tx2);white-space:nowrap;transition:background .15s,color .15s}
+.seg button:hover{color:var(--tx)}
+.seg button[aria-pressed="true"]{background:var(--s1);color:var(--tx);box-shadow:1px 1px 0 var(--seg-edge),2px 2px 0 var(--seg-edge)}
+.seg.sm button{height:26px;padding:0 10px;font-size:12.5px;border-radius:8px}
+
+.tog{position:relative;width:46px;height:28px;flex:none;border-radius:999px;background:var(--s4);box-shadow:inset 0 1px 3px rgba(0,0,0,.18);transition:background .18s}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;
+  box-shadow:1px 1px 0 var(--puck-edge),2px 2px 0 var(--puck-edge);transition:transform .22s cubic-bezier(.3,1.4,.5,1)}
+.tog.on{background:var(--tog-on)}
+.tog.on::after{transform:translateX(18px)}
+
+.slider{position:relative;height:28px}
+.slider .track{position:absolute;left:0;right:0;top:11px;height:6px;border-radius:99px;background:var(--s4);box-shadow:inset 0 1px 2px rgba(0,0,0,.18)}
+.slider .fillr{position:absolute;left:0;top:11px;height:6px;border-radius:99px;background:var(--tog-on)}
+.slider .puck{position:absolute;top:2px;width:24px;height:24px;margin-left:-12px;border-radius:50%;background:#fff;box-shadow:1px 1px 0 var(--puck-edge),2px 2px 0 var(--puck-edge),3px 3px 0 var(--puck-edge)}
+.slider .bub{position:absolute;bottom:34px;transform:translateX(-50%);padding:5px 8px;border-radius:8px;background:var(--tx);color:var(--bg);font:600 12px/1 var(--f-mono);white-space:nowrap}
+.ticks{display:flex;justify-content:space-between;margin-top:6px;font:500 11.5px/1 var(--f-mono);color:var(--tx3)}
+
+.lbl{display:block;margin-bottom:7px;font:600 12.5px/1.2 var(--f-text);color:var(--tx2)}
+.field{display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;border-radius:12px;background:var(--s2);box-shadow:inset 0 0 0 1px var(--line2),inset 0 1px 2px rgba(0,0,0,.05);font:500 15px/1 var(--f-text);color:var(--tx)}
+.field .ph{color:var(--tx3)}
+.field .suf{margin-left:auto;font:500 13px/1 var(--f-text);color:var(--tx3)}
+.field.focus{box-shadow:inset 0 0 0 1.5px var(--focus),0 0 0 4px var(--focus-halo)}
+.field.err{box-shadow:inset 0 0 0 1.5px var(--red-tx)}
+.hint{margin-top:7px;font:500 12.5px/1.35 var(--f-text);color:var(--tx3)}
+.hint.err{color:var(--red-tx)}
+.kbd{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 5px;border-radius:6px;background:var(--s3);box-shadow:inset 0 -1px 0 var(--line2);font:600 11px/1 var(--f-mono);color:var(--tx2)}
+
+.card{background:var(--s1);border-radius:24px;box-shadow:var(--sh1),inset 0 0 0 1px var(--line)}
+.glass{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(160%);backdrop-filter:blur(26px) saturate(160%);box-shadow:inset 0 0 0 1px var(--glass-line)}
+
+/* ============================================================ page chrome */
+.mast{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--page) 82%,transparent);-webkit-backdrop-filter:blur(20px) saturate(150%);backdrop-filter:blur(20px) saturate(150%);border-bottom:1px solid var(--line)}
+.mast .wrap{display:flex;align-items:center;gap:24px;height:64px}
+.mast-l{display:flex;align-items:center;gap:12px}
+.mast-l b{display:block;font:800 15px/1.1 var(--f-disp);font-variation-settings:'wdth' 118;letter-spacing:-.01em}
+.mast-l span{display:block;font:500 12px/1.2 var(--f-mono);color:var(--tx3)}
+.mast-idx{display:flex;gap:4px;margin-left:auto}
+.mast-idx a{padding:8px 11px;border-radius:9px;font:600 13px/1 var(--f-text);color:var(--tx2)}
+.mast-idx a:hover{background:var(--s3);color:var(--tx)}
+.mast-idx a b{font:600 11px/1 var(--f-mono);color:var(--tx3);margin-right:6px}
+
+.intro{padding-top:72px;padding-bottom:40px}
+.intro h1{font-size:clamp(48px,7.4vw,112px)}
+.intro h1 .r{color:var(--red)}
+.intro h1 .hl{display:inline-block;background:#FFD21F;color:#0B0809;padding:0 .08em .02em;margin-left:-.02em;border-radius:.06em;box-shadow:.05em .05em 0 #9A7700}
+.intro-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:44px;padding-top:28px;border-top:1px solid var(--line2)}
+.intro-grid h3{font:700 16px/1.25 var(--f-text);margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.intro-grid p{color:var(--tx2);font-size:14.5px;max-width:38ch}
+.intro-grid .n{font:600 12px/1 var(--f-mono);color:var(--tx3)}
+
+.sec{padding-top:56px;padding-bottom:24px}
+.sec-h{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:22px}
+.sec-h h2{font:800 34px/1 var(--f-disp);font-variation-settings:'wdth' 118;letter-spacing:-.025em}
+.sec-h h2 .n{display:block;margin-bottom:10px;font:600 12px/1 var(--f-mono);letter-spacing:.02em;color:var(--red-tx)}
+.sec-h p{max-width:56ch;color:var(--tx2);font-size:14.5px}
+.frame{position:relative;border-radius:30px;overflow:hidden;background:var(--bg);box-shadow:var(--sh2),inset 0 0 0 1px var(--line);isolation:isolate}
+
+/* ============================================================ 01 WEBSITE */
+.web-hero{position:relative;background:var(--img-yel);color:#0B0809;min-height:748px;overflow:hidden;
+  --tx:#0B0809;--tx2:#3B2E1C;--line2:rgba(11,8,9,.22);--ink:#0B0809;--ink-edge:#5C4600;--ink-lbl:#FFD224;--red-edge:#7A0816;--focus:#0B0809;--focus-halo:#F4FF4A}
+.web-nav{position:relative;z-index:3;display:flex;align-items:center;gap:28px;height:84px;padding:0 44px}
+.web-nav ul{display:flex;gap:4px;list-style:none;margin-left:12px}
+.web-nav li a{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px;border-radius:10px;font:600 14.5px/1 var(--f-text)}
+.web-nav li a:hover{background:rgba(11,8,9,.07)}
+.web-nav .tag.new{height:18px;font-size:9.5px}
+.web-nav .r{margin-left:auto;display:flex;align-items:center;gap:6px}
+.web-nav .lnk{height:36px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font:600 14.5px/1 var(--f-text);border-radius:10px}
+.web-nav .menu{display:none}
+.web-copy{position:relative;z-index:3;padding:58px 44px 0;max-width:960px}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;height:34px;padding:0 14px 0 5px;border-radius:999px;background:rgba(11,8,9,.9);color:#FFD224;font:600 13px/1 var(--f-text)}
+.eyebrow .tag.new{height:24px;padding:0 9px;border-radius:999px}
+.web-h1{margin-top:28px;font-size:clamp(46px,5.5vw,80px);line-height:.9;letter-spacing:-.045em}
+.web-lede{margin-top:26px;max-width:34ch;font:500 21px/1.42 var(--f-text);letter-spacing:-.01em;color:#2A2016}
+.web-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px;align-items:center}
+.web-facts{margin-top:18px;font:500 13px/1.4 var(--f-mono);color:#4A3A20}
+.web-fig{position:absolute;z-index:1;right:4%;top:40px;height:118%;width:auto;max-width:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 14%);mask-image:linear-gradient(90deg,transparent 0,#000 14%)}
+.web-strip{position:absolute;z-index:4;left:20px;right:20px;bottom:20px;display:grid;grid-template-columns:repeat(4,1fr);border-radius:22px;
+  background:rgba(11,8,9,.9);-webkit-backdrop-filter:blur(24px) saturate(140%);backdrop-filter:blur(24px) saturate(140%);color:#FFF6E0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.web-strip div{padding:20px 26px 22px}
+.web-strip div+div{border-left:1px solid rgba(255,255,255,.09)}
+.web-strip b{display:block;font:700 30px/1 var(--f-disp);font-variation-settings:'wdth' 112;letter-spacing:-.02em;color:#fff}
+.web-strip span{display:block;margin-top:9px;font:500 13px/1.35 var(--f-text);color:rgba(255,246,224,.7)}
+.web-strip b em{font-style:normal;color:#FFD224}
+
+.web-tick{display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
+.web-tick .lab{display:flex;flex-direction:column;justify-content:center;gap:6px;padding:0 28px 0 44px;border-right:1px solid var(--line);min-width:200px}
+.web-tick .lab b{font:700 14px/1 var(--f-text)}
+.web-tick .lab span{display:inline-flex;align-items:center;gap:7px;font:500 12px/1 var(--f-mono);color:var(--tx3)}
+.web-tick .lab span::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--up)}
+.tick-row{display:grid;grid-template-columns:repeat(5,1fr);flex:1}
+.tk{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;row-gap:4px;align-items:center;padding:18px 20px;border-right:1px solid var(--line)}
+.tk:last-child{border-right:0}
+.tk .pair{grid-row:1/3}
+.tk b{font:600 13.5px/1 var(--f-text)}
+.tk .px{font:600 14px/1 var(--f-mono);font-variant-numeric:tabular-nums}
+.tk .ln{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.web-cards{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:16px;padding:28px 28px 32px}
+.pcard{position:relative;min-height:300px;padding:28px;border-radius:24px;display:flex;flex-direction:column;overflow:hidden}
+.pcard .k{font:600 12.5px/1 var(--f-mono);letter-spacing:.02em;opacity:.8}
+.pcard h3{margin-top:16px;font:800 34px/.98 var(--f-disp);font-variation-settings:'wdth' 118;letter-spacing:-.03em;max-width:11ch}
+.pcard p{margin-top:14px;font:500 15px/1.45 var(--f-text);max-width:36ch;opacity:.86}
+.pcard .go{margin-top:auto;padding-top:22px;display:flex;align-items:center;justify-content:space-between}
+.pcard .go span{font:600 14px/1 var(--f-text)}
+.pc-red{background:var(--k-red);color:#fff;--ink:#fff;--ink-edge:#5E0611;--ink-lbl:#0B0809}
+.pc-ink{background:#0B0809;color:#F6EEE8;--ink:#FFD21F;--ink-edge:#7A5D00;--ink-lbl:#0B0809;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.pc-yel{background:#FFD21F;color:#0B0809;--ink:#0B0809;--ink-edge:#7A5D00;--ink-lbl:#FFD21F}
+.pc-red .payoff{position:absolute;right:26px;top:28px;width:28%;opacity:.95}
+.pc-red h3{max-width:9.5ch}.pc-red p{max-width:30ch}
+.web-risk{padding:0 44px 26px;font:500 12px/1.5 var(--f-text);color:var(--tx3);max-width:120ch}
+
+/* ============================================================ 02 CLIENT AREA */
+.ca{display:grid;grid-template-columns:84px 1fr;min-height:1000px;
+  background:radial-gradient(60% 50% at 88% -6%,var(--bloom-a),transparent 70%),radial-gradient(50% 40% at -6% 104%,var(--bloom-b),transparent 70%),var(--bg)}
+.ca-rail{display:flex;flex-direction:column;align-items:center;gap:6px;margin:14px 0 14px 14px;padding:16px 0;border-radius:24px;background:#0B0809;color:#8A7B77}
+:root:not([data-theme="dark"]) .ca-rail{background:#0B0809}
+.ca-rail .logo{display:grid;place-items:center;width:44px;height:44px;margin-bottom:14px}
+.rb{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;color:#9C8D89;transition:background .15s,color .15s}
+.rb:hover{background:#1E1719;color:#F6EEE8}
+.rb.on{background:#FFD21F;color:#0B0809;box-shadow:1px 1px 0 #9A7700,2px 2px 0 #9A7700}
+.ca-rail .sp{flex:1}
+.ca-rail .dot{position:relative}
+.ca-rail .dot::after{content:"";position:absolute;top:11px;right:12px;width:7px;height:7px;border-radius:50%;background:#FF2D55;box-shadow:0 0 0 2px #0B0809}
+.ava{width:36px;height:36px;border-radius:50%;flex:none;background:linear-gradient(135deg,#3A0A12,#D4112A);display:grid;place-items:center;font:700 13px/1 var(--f-text);color:#fff}
+.ca-main{min-width:0;padding:22px 30px 34px}
+.ca-top{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+.crumb{font:500 12.5px/1 var(--f-mono);color:var(--tx3);margin-bottom:9px}
+.ca-h1{font:400 34px/1 var(--f-disp);font-variation-settings:'wdth' 112;letter-spacing:-.03em}
+.ca-h1 b{font-weight:800}
+.ca-act{margin-left:auto;display:flex;align-items:center;gap:10px}
+.search{display:flex;align-items:center;gap:9px;width:250px;height:42px;padding:0 8px 0 14px;border-radius:13px;color:var(--tx3);font:500 14px/1 var(--f-text)}
+.search .kbd{margin-left:auto}
+.accpill{display:flex;align-items:center;gap:10px;height:42px;padding:0 12px 0 8px;border-radius:13px;font:600 13.5px/1 var(--f-text)}
+.accpill .tag{height:22px}
+.accpill .bal{font:600 13.5px/1 var(--f-mono)}
+.icb{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;color:var(--tx2);flex:none}
+.ca-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.hero-card{grid-column:span 8;position:relative;height:440px;border-radius:28px;overflow:hidden;color:#fff;background:#140405}
+.hero-card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:60% 22%}
+.hero-card::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(12,3,4,.78) 0%,rgba(12,3,4,.5) 32%,rgba(12,3,4,0) 58%)}
+.hc-tabs{position:absolute;z-index:2;top:18px;right:18px;display:flex;gap:2px;padding:4px;border-radius:14px;background:rgba(14,6,7,.42);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.hc-tabs button{height:30px;padding:0 13px;border-radius:10px;font:600 13px/1 var(--f-text);color:rgba(255,255,255,.75)}
+.hc-tabs button.on{background:rgba(255,255,255,.95);color:#0B0809}
+.hc-copy{position:absolute;z-index:2;left:34px;top:34px;max-width:430px}
+.hc-copy .k{display:inline-flex;align-items:center;gap:8px;font:600 12px/1 var(--f-mono);letter-spacing:.04em;color:#FFD21F}
+.hc-copy h2{margin-top:14px;font-size:46px;line-height:.95}
+.hc-copy p{margin-top:14px;font:500 15.5px/1.45 var(--f-text);color:rgba(255,255,255,.82);max-width:36ch}
+.hc-copy .cta{display:flex;align-items:center;gap:16px;margin-top:22px}
+.hc-copy .cta a{font:600 14px/1 var(--f-text);color:#fff;opacity:.9;display:inline-flex;gap:6px;align-items:center}
+.hc-copy .btn{--wht-edge:#9E8C88}
+.hc-strip{position:absolute;z-index:2;left:12px;right:12px;bottom:12px;display:flex;align-items:center;border-radius:20px;
+  background:var(--glass-strong);-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%);box-shadow:inset 0 0 0 1px var(--glass-line);color:var(--tx)}
+.kpi{flex:1;padding:16px 22px 17px;min-width:0}
+.kpi+.kpi{border-left:1px solid var(--line)}
+.kpi .v{font-size:27px;line-height:1;white-space:nowrap}
+.kpi .v small{font-size:.58em;font-weight:600;color:var(--tx2);margin-left:3px}
+.kpi .l{display:flex;align-items:center;gap:7px;margin-top:8px;font:500 12.5px/1 var(--f-text);color:var(--tx2)}
+.kpi .l i{width:8px;height:8px;border-radius:3px;flex:none}
+.kpi .bar{height:3px;margin-top:11px;border-radius:9px;background:var(--line2);overflow:hidden}
+.kpi .bar span{display:block;height:100%;border-radius:9px}
+.hc-strip .btn{margin-right:18px}
+
+.ai-card{grid-column:span 4;position:relative;height:440px;border-radius:28px;padding:22px;display:flex;flex-direction:column;color:#0B0809;overflow:hidden;
+  background:linear-gradient(180deg,#FFE768 0%,#FFD21F 62%);--ink:#0B0809;--ink-edge:#7A5D00;--ink-lbl:#FFD21F;--tx:#0B0809;--tx2:#4A3A0A}
+.ai-h{display:flex;align-items:center;gap:10px;font:700 15px/1 var(--f-text)}
+.ai-h .ic{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#0B0809;color:#FFD21F}
+.ai-h .x{margin-left:auto;display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:rgba(11,8,9,.07)}
+.ai-q{margin-top:auto;font:400 25px/1.22 var(--f-text);letter-spacing:-.018em}
+.ai-q b{font-weight:700}
+.ai-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.ai-chips span{height:32px;padding:0 13px;display:inline-flex;align-items:center;border-radius:11px;background:rgba(255,255,255,.55);font:600 13px/1 var(--f-text);box-shadow:inset 0 0 0 1px rgba(11,8,9,.08)}
+.ai-in{display:flex;align-items:center;gap:10px;margin-top:16px;padding:6px 6px 6px 16px;height:56px;border-radius:18px;background:rgba(255,255,255,.72);box-shadow:inset 0 0 0 1px rgba(11,8,9,.08);font:500 14.5px/1 var(--f-text);color:#6B5A2A}
+.ai-in .btn{margin-left:auto}
+
+.blk-h{grid-column:1/-1;display:flex;align-items:center;gap:14px;margin-top:14px}
+.blk-h h3{font:700 21px/1 var(--f-disp);font-variation-settings:'wdth' 110;letter-spacing:-.015em}
+.blk-h .seg{margin-left:auto}
+.acc-grp{grid-column:span 6;display:grid;gap:14px;min-width:0}
+.acc-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grp-l{grid-column:1/-1;display:flex;align-items:center;gap:10px;font:600 13px/1 var(--f-text);color:var(--tx2)}
+.grp-l .ln{flex:1;height:1px;background:var(--line2)}
+.acard{padding:20px 20px 18px;border-radius:24px;display:flex;flex-direction:column;gap:14px}
+.acard .top{display:flex;align-items:center;gap:6px}
+.acard .top .id{margin-left:auto;font:500 12.5px/1 var(--f-mono);color:var(--tx3)}
+.acard .nm{font:600 13.5px/1 var(--f-text);color:var(--tx2)}
+.acard .bal{font-size:30px;line-height:1;margin-top:-4px}
+.acard .rows{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;padding-top:13px;border-top:1px solid var(--line)}
+.acard .rows span{display:block;font:500 12px/1 var(--f-text);color:var(--tx3);margin-bottom:6px}
+.acard .rows b{font:600 13.5px/1 var(--f-mono);font-variant-numeric:tabular-nums}
+.acard .acts{display:flex;align-items:center;gap:8px}
+.acard .acts .more{margin-left:auto}
+.acard.add{align-items:flex-start;justify-content:space-between;background:transparent;box-shadow:inset 0 0 0 1.5px var(--line2);border-radius:24px}
+.acard.add .t{font:700 18px/1.2 var(--f-disp);font-variation-settings:'wdth' 110;letter-spacing:-.01em}
+.acard.add p{font-size:13.5px;color:var(--tx2);max-width:28ch;margin-top:8px}
+
+.act{grid-column:span 8;border-radius:24px;padding:20px 8px 8px}
+.act-h{display:flex;align-items:center;gap:12px;padding:0 14px 12px}
+.act-h h3{font:700 19px/1 var(--f-disp);font-variation-settings:'wdth' 110;letter-spacing:-.015em}
+.act-h .seg{margin-left:auto}
+table.tb{width:100%;border-collapse:separate;border-spacing:0}
+.tb th{padding:10px 14px;text-align:left;font:600 11px/1 var(--f-text);letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);border-bottom:1px solid var(--line)}
+.tb td{padding:12px 14px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle;white-space:nowrap}
+.tb tr:last-child td{border-bottom:0}
+.tb tbody tr:hover td{background:color-mix(in srgb,var(--s3) 60%,transparent)}
+.tb .r{text-align:right}
+.tb .amt{font:600 13.5px/1 var(--f-mono);font-variant-numeric:tabular-nums}
+.tb .tm{font:500 12.5px/1 var(--f-mono);color:var(--tx3)}
+.ev{display:flex;align-items:center;gap:12px}
+.ev .ic{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--s3);color:var(--tx2);flex:none}
+.ev .ic.up{background:var(--up-soft);color:var(--up-tx)}
+.ev .ic.y{background:var(--yel-soft);color:var(--yel-tx)}
+.ev b{display:block;font:600 14px/1.2 var(--f-text)}
+.ev span{display:block;font:500 12.5px/1.2 var(--f-text);color:var(--tx3);margin-top:3px}
+.eq{grid-column:span 4;border-radius:24px;padding:20px;display:flex;flex-direction:column}
+.eq-h{display:flex;align-items:center;justify-content:space-between}
+.eq-h h3{font:700 19px/1 var(--f-disp);font-variation-settings:'wdth' 110;letter-spacing:-.015em}
+.eq .big{margin-top:16px;font-size:34px;line-height:1}
+.eq .sub{margin-top:8px;font:500 13px/1 var(--f-text);color:var(--tx2)}
+.eq svg{margin-top:18px;flex:1;width:100%;min-height:150px;overflow:visible}
+.eq .ax{display:flex;justify-content:space-between;margin-top:6px;font:500 11.5px/1 var(--f-mono);color:var(--tx3)}
+.ca-tabbar{display:none}
+
+/* ============================================================ 03 KALKS TRADER */
+.tr{display:grid;grid-template-columns:48px minmax(0,1fr) 312px;grid-template-rows:54px minmax(0,1fr) 186px;gap:6px;padding:0 6px 6px;height:880px;background:var(--bg2)}
+.pnl{background:var(--s1);border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);min-width:0;min-height:0;position:relative}
+.t-title{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:0 6px}
+.t-title .logo{display:grid;place-items:center;width:38px;height:38px;margin-right:4px}
+.stabs{display:flex;align-items:center;gap:2px;min-width:0;overflow:hidden}
+.stab{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px 0 8px;border-radius:12px;font:600 13.5px/1 var(--f-text);color:var(--tx2);white-space:nowrap;position:relative}
+.stab .px{font:500 12px/1 var(--f-mono);color:var(--tx3)}
+.stab.on{background:var(--s1);color:var(--tx);box-shadow:inset 0 0 0 1px var(--line)}
+.stab.on::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;border-radius:2px;background:var(--yel)}
+.stab .x{opacity:.45;margin-left:2px}
+.addt{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;color:var(--tx2)}
+.t-title .r{margin-left:auto;display:flex;align-items:center;gap:8px}
+.t-acc{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px 0 10px;border-radius:12px;background:var(--s1);box-shadow:inset 0 0 0 1px var(--line)}
+.t-acc .l{font:600 11px/1 var(--f-text);color:var(--tx3);letter-spacing:.03em}
+.t-acc .v{font:600 13.5px/1 var(--f-mono);font-variant-numeric:tabular-nums;margin-top:4px}
+.t-acc .tag{height:18px;font-size:9.5px}
+
+.t-rail{grid-column:1;grid-row:2;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0}
+.t-rail button{display:grid;place-items:center;width:36px;height:34px;border-radius:9px;color:var(--tx2)}
+.t-rail button:hover{background:var(--s3);color:var(--tx)}
+.t-rail button.on{background:var(--yel-soft);color:var(--tx);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--yel) 55%,transparent)}
+.t-rail hr{width:22px;height:1px;border:0;background:var(--line2);margin:5px 0}
+.t-rail .sp{flex:1}
+
+.t-chart{grid-column:2;grid-row:2;display:flex;flex-direction:column}
+.cbar{display:flex;align-items:center;gap:2px;height:44px;padding:0 8px;border-bottom:1px solid var(--line);flex:none}
+.cb{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;min-width:30px;padding:0 8px;border-radius:8px;font:600 12.5px/1 var(--f-text);color:var(--tx2);white-space:nowrap}
+.cb:hover{background:var(--s3);color:var(--tx)}
+.cb.on{color:var(--tx);background:var(--s3)}
+.cb.tf.on{background:var(--tx);color:var(--bg)}
+.cb .i{width:17px;height:17px}
+.cbar .div{width:1px;height:20px;background:var(--line2);margin:0 6px;flex:none}
+.cbar .sp{flex:1}
+.qtrade{display:flex;align-items:center;gap:0}
+.qtrade .btn{--h:32px;--fs:12.5px;--px:10px;gap:7px}
+.qtrade .btn b{font:600 12.5px/1 var(--f-mono)}
+.qtrade .sprd{margin:0 7px 3px 4px;font:600 11px/1 var(--f-mono);color:var(--tx3)}
+.chart{position:relative;flex:1;min-height:0;background:var(--chart-bg);overflow:hidden}
+#csvg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.c-grid{stroke:var(--grid);stroke-width:1}
+.c-up{fill:var(--up);stroke:var(--up)}
+.c-dn{fill:var(--dn);stroke:var(--dn)}
+.c-volu{fill:var(--up);opacity:.18}.c-vold{fill:var(--dn);opacity:.18}
+.c-ma{fill:none;stroke:var(--ma);stroke-width:1.25;opacity:.9}
+.c-draw{stroke:var(--draw);stroke-width:1.5}
+.c-hdl{fill:var(--chart-bg);stroke:var(--draw);stroke-width:1.5}
+.c-ax{font:500 11px var(--f-mono);fill:var(--axis)}
+.c-pos{stroke:var(--up);stroke-width:1.25}
+.c-last{stroke:var(--up);stroke-width:1;stroke-dasharray:3 3}
+.c-cross{stroke:var(--tx3);stroke-width:1;stroke-dasharray:4 4;opacity:.75}
+.c-axbg{fill:var(--chart-bg)}
+.legend{position:absolute;left:12px;top:10px;z-index:2;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.legend .l1{display:flex;align-items:center;gap:8px;font:600 14px/1 var(--f-text)}
+.legend .l1 .tfx{color:var(--tx3);font-weight:500}
+.legend .ohlc{display:flex;gap:10px;font:500 12px/1 var(--f-mono);color:var(--tx3)}
+.legend .ohlc b{font-weight:600;color:var(--up-tx)}
+.legend .ind{display:flex;align-items:center;gap:8px;font:500 12px/1 var(--f-mono);color:var(--tx3)}
+.legend .ind b{color:var(--ma);font-weight:600}
+.pchip{position:absolute;z-index:3;display:flex;align-items:center;gap:4px;transform:translateY(-50%)}
+.pchip .ps{display:flex;align-items:center;height:24px;padding:0 8px;border-radius:7px 0 0 7px;background:var(--up-face);color:#fff;font:700 11.5px/1 var(--f-mono)}
+.pchip .pl{display:flex;align-items:center;height:24px;padding:0 9px;margin-left:-4px;border-radius:0 7px 7px 0;background:var(--s1);box-shadow:inset 0 0 0 1.25px var(--up);color:var(--up-tx);font:700 12px/1 var(--f-mono)}
+.pchip .h{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--s1);font:800 12px/1 var(--f-text);cursor:grab}
+.pchip .h.s{color:var(--dn-tx);box-shadow:inset 0 0 0 1.5px var(--dn)}
+.pchip .h.t{color:var(--up-tx);box-shadow:inset 0 0 0 1.5px var(--up)}
+.pchip .h.c{color:var(--tx2);box-shadow:inset 0 0 0 1.25px var(--line2)}
+.pchip .h .i{width:13px;height:13px;stroke-width:2.2}
+.tip{position:absolute;z-index:4;padding:7px 10px;border-radius:9px;background:var(--tx);color:var(--bg);font:600 12px/1.25 var(--f-text);white-space:nowrap;transform:translate(-50%,-100%)}
+.tip::after{content:"";position:absolute;left:50%;bottom:-4px;width:8px;height:8px;margin-left:-4px;background:inherit;transform:rotate(45deg);border-radius:1px}
+.ptag{position:absolute;right:0;z-index:3;width:70px;transform:translateY(-50%);padding:5px 0 5px 8px;border-radius:5px 0 0 5px;font:700 11.5px/1.15 var(--f-mono);color:#fff;background:var(--up-face)}
+.ptag small{display:block;font-weight:500;font-size:10.5px;opacity:.8}
+.xtag{position:absolute;z-index:3;padding:4px 7px;border-radius:5px;background:var(--tx);color:var(--bg);font:600 11px/1 var(--f-mono);white-space:nowrap}
+.rbar{display:flex;align-items:center;gap:2px;height:36px;padding:0 8px;border-top:1px solid var(--line);flex:none}
+.rbar .cb{height:26px;font-size:12px}
+.rbar .clk{font:500 12px/1 var(--f-mono);color:var(--tx2);padding:0 8px}
+
+.t-order{grid-column:3;grid-row:2/4;display:flex;flex-direction:column;padding:14px 14px 14px}
+.o-h{display:flex;align-items:center;gap:10px}
+.o-h b{font:700 15px/1.1 var(--f-text)}
+.o-h span{display:block;font:500 12px/1.2 var(--f-text);color:var(--tx3)}
+.o-h .icb{width:32px;height:32px;margin-left:auto;border-radius:10px}
+.o-sides{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.side{--d:4px;position:relative;height:66px;padding:10px 12px;border-radius:14px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;margin:0 4px 4px 0}
+.side .k{font:700 11.5px/1 var(--f-text);letter-spacing:.08em;text-transform:uppercase}
+.side .p{font:600 14px/1 var(--f-mono);font-variant-numeric:tabular-nums}
+.side .p b{font-size:24px;font-weight:700;letter-spacing:-.02em}
+.side.sell{background:var(--s2);color:var(--dn-tx);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--dn) 45%,transparent);transform:translate(2px,2px)}
+.side.buy{background:var(--up-face);color:#fff;box-shadow:1px 1px 0 var(--up-edge),2px 2px 0 var(--up-edge),3px 3px 0 var(--up-edge),4px 4px 0 var(--up-edge)}
+.side.buy .k{opacity:.85}
+.side.buy{text-align:right;align-items:flex-end}
+.sprd-pill{position:absolute;left:50%;top:50%;z-index:2;transform:translate(-50%,-50%);height:22px;padding:0 8px;display:grid;place-items:center;border-radius:8px;background:var(--s1);box-shadow:inset 0 0 0 1px var(--line2);font:600 11px/1 var(--f-mono);color:var(--tx2)}
+.o-sec{margin-top:16px}
+.o-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.o-row .lbl{margin:0}
+.step{display:flex;align-items:center;gap:6px;margin-top:8px}
+.step .field{flex:1;justify-content:center;font:600 17px/1 var(--f-mono);height:44px}
+.step .btn{--h:44px;--d:3px;--r:12px;--e:1px 1px 0 var(--edge),2px 2px 0 var(--edge),3px 3px 0 var(--edge);--face:var(--s3);--edge:var(--line2);--lbl:var(--tx)}
+.qv{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:8px}
+.qv button{height:28px;border-radius:8px;background:var(--s2);box-shadow:inset 0 0 0 1px var(--line);font:600 12px/1 var(--f-mono);color:var(--tx2)}
+.qv button.on{background:var(--tx);color:var(--bg);box-shadow:none}
+.o-note{margin-top:8px;font:500 12px/1.3 var(--f-mono);color:var(--tx3)}
+.o-line{display:flex;align-items:center;gap:10px;height:44px;padding:0 4px 0 0;border-top:1px solid var(--line)}
+.o-line:first-child{border-top:0}
+.o-line .hb{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;font:800 11.5px/1 var(--f-text)}
+.o-line .hb.s{color:var(--dn-tx);box-shadow:inset 0 0 0 1.5px var(--dn)}
+.o-line .hb.t{color:var(--up-tx);box-shadow:inset 0 0 0 1.5px var(--up)}
+.o-line .hb.r{color:var(--tx2);box-shadow:inset 0 0 0 1.5px var(--line2)}
+.o-line .t{font:600 13.5px/1 var(--f-text)}
+.o-line .v{margin-left:auto;font:600 13px/1 var(--f-mono);font-variant-numeric:tabular-nums;color:var(--tx2)}
+.o-line .tog{width:40px;height:24px}
+.o-line .tog::after{width:16px;height:16px}
+.o-line .tog.on::after{transform:translateX(16px)}
+.o-sum{margin-top:6px;padding:10px 12px;border-radius:12px;background:var(--s2);box-shadow:inset 0 0 0 1px var(--line)}
+.o-sum div{display:flex;justify-content:space-between;padding:4px 0;font:500 12.5px/1.3 var(--f-text);color:var(--tx2)}
+.o-sum b{font:600 12.5px/1.3 var(--f-mono);color:var(--tx);font-variant-numeric:tabular-nums}
+.o-go{margin-top:auto;padding-top:14px}
+.o-range{margin-top:16px}
+.rg{position:relative;height:6px;margin-top:10px;border-radius:9px;background:var(--s4)}
+.rg span{position:absolute;top:0;bottom:0;border-radius:9px;background:var(--up-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--up) 35%,transparent)}
+.rg i{position:absolute;top:-4px;width:3px;height:14px;margin-left:-1.5px;border-radius:2px;background:var(--tx)}
+.o-go .btn{justify-content:space-between}
+.o-foot{display:flex;justify-content:space-between;margin-top:10px;font:500 11.5px/1 var(--f-mono);color:var(--tx3)}
+
+.t-bottom{grid-column:1/3;grid-row:3;display:flex;flex-direction:column}
+.b-tabs{display:flex;align-items:center;gap:4px;height:42px;padding:0 10px;border-bottom:1px solid var(--line)}
+.b-tabs button{height:28px;padding:0 10px;border-radius:8px;font:600 13px/1 var(--f-text);color:var(--tx2)}
+.b-tabs button.on{background:var(--s3);color:var(--tx)}
+.b-tabs button em{font-style:normal;font:600 11px/1 var(--f-mono);margin-left:6px;padding:2px 5px;border-radius:5px;background:var(--s4);color:var(--tx2)}
+.b-tabs .tot{margin-left:auto;display:flex;gap:18px;font:500 12px/1 var(--f-text);color:var(--tx3)}
+.b-tabs .tot b{font:600 12.5px/1 var(--f-mono);color:var(--tx);margin-left:6px}
+.t-bottom .tb th{padding:9px 12px;font-size:10.5px}
+.t-bottom .tb td{padding:10px 12px;font-size:13px}
+.t-bottom .tb .amt{font-size:12.5px}
+.sym{display:flex;align-items:center;gap:8px;font-weight:600}
+.sd{font:700 11px/1 var(--f-text);letter-spacing:.06em;text-transform:uppercase}
+.sd.b{color:var(--up-tx)}.sd.s{color:var(--dn-tx)}
+.xbtn{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;color:var(--tx3);box-shadow:inset 0 0 0 1px var(--line2)}
+
+/* flags */
+.pair{position:relative;display:inline-block;width:30px;height:20px;flex:none}
+.pair svg{position:absolute;top:0;width:20px;height:20px;border-radius:50%}
+.pair svg:first-child{left:0;z-index:2;box-shadow:0 0 0 1.5px var(--s1)}
+.pair svg:last-child{left:10px}
+.pair.one{width:20px}
+
+/* ============================================================ 04 COMPONENTS */
+.cgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.cc{padding:24px;border-radius:24px}
+.cc h4{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font:700 16px/1.2 var(--f-text);margin-bottom:18px}
+.cc h4 span{font:500 12px/1.2 var(--f-mono);color:var(--tx3)}
+.cc .row{display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px 10px}
+.cc .row+.row{margin-top:18px}
+.cap{display:block;margin-top:8px;font:500 11.5px/1 var(--f-mono);color:var(--tx3);text-align:center}
+.cell{display:flex;flex-direction:column;align-items:flex-start}
+.imgsw{padding:18px;border-radius:18px;background:url(img/robot-red.jpg) 70% 30%/cover;display:flex;align-items:center;gap:14px}
+.swg{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.sw{display:flex;flex-direction:column;gap:6px}
+.sw .c{height:56px;border-radius:14px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06);display:flex;align-items:flex-end;padding:8px 10px;font:600 11px/1 var(--f-mono)}
+.sw b{font:600 12.5px/1.2 var(--f-text)}
+.sw span{font:500 11.5px/1.2 var(--f-mono);color:var(--tx3)}
+.ingrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.typo .ln{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:baseline;padding:12px 0;border-top:1px solid var(--line)}
+.typo .ln:first-of-type{border-top:0}
+.typo .m{font:500 11.5px/1.3 var(--f-mono);color:var(--tx3)}
+.toast{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:20px;max-width:420px}
+.toast .ic{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--up-face);color:#fff;flex:none}
+.toast b{display:block;font:600 14px/1.2 var(--f-text)}
+.toast span{display:block;font:500 13px/1.3 var(--f-text);color:var(--tx2);margin-top:2px}
+.toast time{margin-left:auto;align-self:flex-start;font:500 11.5px/1 var(--f-mono);color:var(--tx3)}
+.modal{padding:22px;border-radius:26px;max-width:420px}
+.modal h5{font:700 20px/1.15 var(--f-disp);font-variation-settings:'wdth' 110;letter-spacing:-.015em}
+.modal p{margin-top:8px;font-size:14px;color:var(--tx2)}
+.modal .acts{display:flex;gap:10px;margin-top:18px}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line2);margin:-8px auto 16px}
+
+/* ============================================================ 05 BRAND */
+.bgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.lock{grid-column:span 3;height:190px;box-shadow:inset 0 0 0 1px var(--line);border-radius:24px;display:grid;place-items:center;position:relative;overflow:hidden}
+.lock .cap2{position:absolute;left:16px;bottom:14px;font:500 11.5px/1 var(--f-mono);opacity:.7}
+.icons{grid-column:span 6;padding:24px;border-radius:24px;display:flex;align-items:flex-end;gap:22px 26px;flex-wrap:wrap;align-content:space-between}
+.appic{width:112px;height:112px;border-radius:26px;box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;flex:none}
+.appic.sm{width:60px;height:60px;border-radius:15px}
+.fav{display:flex;align-items:flex-end;gap:14px}
+.ich{flex:1 1 100%;margin-bottom:auto}.ich p{margin-top:6px;font-size:14px;color:var(--tx2);max-width:60ch}
+.rc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
+.rcard{position:relative;padding:14px 14px 14px;border-radius:16px;background:var(--s2);box-shadow:inset 0 0 0 1px var(--line2);display:flex;flex-direction:column;gap:4px}
+.rcard b{font:700 14px/1.2 var(--f-text)}.rcard span:not(.rd){font:500 12.5px/1.3 var(--f-text);color:var(--tx3)}
+.rcard .rd{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--line2);margin-bottom:8px}
+.rcard.on{background:var(--s1);box-shadow:inset 0 0 0 1.5px var(--tx),2px 2px 0 var(--tx)}
+.rcard.on .rd{box-shadow:inset 0 0 0 5.5px var(--tx)}
+.meter{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.mbar{position:relative;height:10px;margin:10px 0 8px;border-radius:99px;background:var(--s4);box-shadow:inset 0 1px 2px rgba(0,0,0,.18)}
+.mbar span{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--up)}
+.mbar i{position:absolute;top:-4px;width:3px;height:18px;margin-left:-1.5px;border-radius:2px;background:var(--tx)}
+.fav .fi{display:grid;place-items:center;background:#0B0809;border-radius:7px;box-shadow:inset 0 0 0 1px var(--line)}
+.imgrule{grid-column:span 6;padding:24px;border-radius:24px}
+.thumbs{display:grid;grid-template-columns:1.4fr 1fr 1.4fr;gap:10px;margin-top:4px}
+.thumbs div{border-radius:16px;overflow:hidden;height:150px;position:relative}
+.thumbs img{width:100%;height:100%;object-fit:cover}
+.thumbs span{position:absolute;left:8px;bottom:8px;padding:4px 7px;border-radius:7px;background:rgba(11,8,9,.75);color:#fff;font:600 11px/1 var(--f-mono)}
+.rules{margin-top:16px;display:grid;gap:8px;font-size:14px;color:var(--tx2)}
+.rules b{color:var(--tx)}
+footer.end{padding:48px 0 64px;color:var(--tx3);font:500 12.5px/1.5 var(--f-mono)}
+
+/* ============================================================ responsive */
+@media (max-width:1180px){
+  .mast-idx{display:none}
+  .tr{grid-template-columns:48px minmax(0,1fr) 288px}
+  .web-fig{right:-6%}
+  .hero-card,.ai-card{grid-column:span 12}
+  .ai-card{height:auto;min-height:340px}
+  .act,.eq{grid-column:span 12}
+  .acc-grp{grid-column:span 12}
+  .lock{grid-column:span 6}.icons,.imgrule{grid-column:span 12}
+}
+@media (max-width:760px){
+  .wrap{padding:0 16px}
+  .mast .wrap{height:56px}
+  .intro{padding-top:40px;padding-bottom:24px}
+  .intro-grid{grid-template-columns:1fr;gap:18px;margin-top:28px}
+  .sec{padding-top:40px;padding-bottom:12px}
+  .sec-h{flex-direction:column;align-items:flex-start;gap:10px}
+  .sec-h h2{font-size:26px}
+  .frame{border-radius:24px}
+  /* website */
+  .web-hero{min-height:0;padding-bottom:0}
+  .web-nav{height:64px;padding:0 16px;gap:10px}
+  .web-nav ul,.web-nav .lnk.lg{display:none}
+  .web-nav .menu{display:grid}
+  .web-copy{padding:18px 18px 0}
+  .web-h1{font-size:46px;margin-top:20px}
+  .web-lede{font-size:17px;margin-top:18px}
+  .web-cta{gap:10px;margin-top:24px}
+  .web-cta .btn{--h:48px;--px:18px;--fs:15px;--d:5px;--r:14px;--e:1px 1px 0 var(--edge),2px 2px 0 var(--edge),3px 3px 0 var(--edge),4px 4px 0 var(--edge),5px 5px 0 var(--edge)}
+  .web-fig{position:relative;right:auto;top:auto;height:auto;width:118%;max-width:none;margin:-10px 0 0 -4%;-webkit-mask-image:none;mask-image:none}
+  .web-strip{position:relative;left:auto;right:auto;bottom:auto;margin:-120px 10px 10px;grid-template-columns:1fr 1fr}
+  .web-strip div{padding:14px 16px 15px}
+  .web-strip div:nth-child(3){border-left:0}
+  .web-strip div:nth-child(n+3){border-top:1px solid rgba(255,255,255,.09)}
+  .web-strip b{font-size:22px}
+  .web-tick{flex-direction:column}
+  .web-tick .lab{flex-direction:row;align-items:center;justify-content:space-between;padding:14px 18px;border-right:0;border-bottom:1px solid var(--line)}
+  .tick-row{grid-template-columns:1fr}
+  .tk{border-right:0;border-bottom:1px solid var(--line);padding:13px 18px;grid-template-columns:auto 1fr auto}
+  .tk:nth-child(n+4){display:none}
+  .web-cards{grid-template-columns:1fr;padding:14px}
+  .pcard{min-height:250px;padding:22px}
+  .pcard h3{font-size:28px}
+  .web-risk{padding:0 18px 20px}
+  /* client area */
+  .ca{grid-template-columns:1fr;min-height:0}
+  .ca-rail{display:none}
+  .ca-main{padding:16px 12px 96px}
+  .ca-top{flex-wrap:wrap;gap:12px;margin-bottom:16px}
+  .ca-h1{font-size:28px}
+  .search,.accpill,.ca-act .icb.hide-s{display:none}
+  .ca-grid{gap:12px}
+  .hero-card{height:560px}
+  .hero-card img{object-position:62% 0%}
+  .hero-card::before{background:linear-gradient(180deg,rgba(12,3,4,.75) 0%,rgba(12,3,4,.3) 45%,rgba(12,3,4,0) 60%)}
+  .hc-tabs{display:none}
+  .hc-copy{left:20px;right:20px;top:22px}
+  .hc-copy h2{font-size:34px}
+  .hc-copy p{font-size:14.5px}
+  .hc-strip{flex-wrap:wrap}
+  .hc-strip .kpi{flex:1 1 50%;padding:13px 15px}
+  .hc-strip .kpi:nth-child(3){border-left:0}
+  .hc-strip .kpi:nth-child(n+3){border-top:1px solid var(--line)}
+  .hc-strip .btn{display:none}
+  .kpi .v{font-size:21px}
+  .ai-card{padding:18px}
+  .ai-q{font-size:21px;margin-top:40px}
+  .blk-h .seg{display:none}
+  .act{padding:16px 4px 4px}
+  .act .tb thead,.act .tb td.hide-s{display:none}
+  .act .tb td{padding:11px 12px}
+  .act-h .seg{display:none}
+  .ca-tabbar{display:flex;position:absolute;left:14px;right:14px;bottom:14px;z-index:5;align-items:center;justify-content:space-around;height:64px;border-radius:24px;background:var(--tabbar);box-shadow:0 18px 40px -16px rgba(0,0,0,.5)}
+  .ca-tabbar span{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;color:var(--tab-ic)}
+  .ca-tabbar span.on{background:var(--tab-on);color:var(--tab-on-ic)}
+  /* trader */
+  .tr{grid-template-columns:minmax(0,1fr);grid-template-rows:52px 470px auto;height:auto;padding:0 4px 4px;gap:4px}
+  .t-title{padding:0 2px}
+  .t-title .logo{display:none}
+  .stab:not(.on){display:none}
+  .addt{display:none}
+  .t-acc .l,.t-title .r .icb{display:none}
+  .t-rail{display:none}
+  .t-chart{grid-column:1;grid-row:2}
+  .cbar .hide-s{display:none}
+  .qtrade{display:none}
+  .rbar .hide-s{display:none}
+  .t-order{grid-column:1;grid-row:3}
+  .t-bottom{display:none}
+  .legend .ohlc span:nth-child(n+3){display:none}
+  .stab .px{display:none}
+  .stabs{flex:none}
+  .t-title .r{gap:6px}
+  .ingrid{grid-template-columns:1fr}
+  .web-fig{height:500px;width:100%;object-fit:cover;object-position:50% 0;margin:-10px 0 0}
+  .act .tb td:nth-child(4),.act .tb td:nth-child(5){display:none}
+  .act .tb td:nth-child(3){padding-left:4px}
+  .acc-cards{display:flex !important;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;margin:0 -12px;padding:2px 12px 8px;scrollbar-width:none}
+  .acc-cards>*{flex:0 0 84%;scroll-snap-align:start}
+  /* components & brand */
+  .cc{grid-column:span 12 !important;padding:18px}
+  .lock{grid-column:span 12;height:150px}
+  .thumbs{grid-template-columns:1fr 1fr 1fr}
+  .thumbs div{height:110px}
+  .typo .ln{grid-template-columns:1fr;gap:6px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;scroll-behavior:auto !important}}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ SVG sprite: icons, flags, logo -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <clipPath id="fc"><circle cx="10" cy="10" r="10"/></clipPath>
+    <path id="k-path" d="M 403.1 2.5 C 382.2 7.1, 370.8 13.7, 346.5 35.1 C 338.3 42.3, 320.9 57.4, 308 68.6 C 295.1 79.7, 271.2 100.4, 255 114.5 C 238.8 128.7, 217.9 146.8, 208.6 154.8 C 184.1 176, 178.5 183.3, 173.5 200.6 L 171 209.2 171 273.5 C 171 343.2, 170.7 339.4, 176.1 341.3 C 179.1 342.3, 187.4 337.4, 223.5 313.1 C 299.9 261.7, 352.8 224.5, 423 173 C 436.9 162.8, 455.2 149.4, 463.8 143.1 C 472.5 136.9, 484.4 128.1, 490.5 123.6 C 496.6 119, 506.2 111.9, 512 107.6 C 525.7 97.5, 590.5 48.6, 602.8 39.1 C 608.1 35, 617.8 27.6, 624.4 22.6 C 631.1 17.6, 640 10.7, 644.3 7.3 L 652.2 1 530.8 1.1 C 431.4 1.1, 408.3 1.4, 403.1 2.5 M 135.1 63.5 C 106.2 79.8, 63.8 105.7, 49.6 115.8 C 39.3 123.2, 23.9 137.8, 18.5 145.5 C 12.7 153.7, 7.6 164.2, 4.3 174.7 L 1.5 183.5 1.2 338.3 L 1 493.2 5.2 490.2 C 7.6 488.5, 21.9 479, 37 468.9 C 102.8 425.2, 131.2 400.6, 140.7 378.9 C 146.9 365, 146.5 375.3, 146.5 210.5 L 146.5 60.5 144 60.2 C 142.6 60.1, 138.7 61.5, 135.1 63.5 M 320 284.6 C 300.1 288.5, 288.5 295, 231.5 334.3 C 199.9 356.1, 192.9 361.3, 193.2 362.5 C 193.7 364.9, 322.1 498.5, 338.9 514.2 C 351.5 526, 366.5 534.2, 382.1 538 C 390.3 539.9, 393.7 540, 500.3 540 C 560.6 540, 610 539.7, 610 539.4 C 610 538.5, 568 494.1, 509 432.6 C 478.5 400.7, 447.7 368.6, 440.6 361.1 C 415.2 334.4, 386.4 305.7, 380 300.9 C 366.1 290.4, 351 285.2, 333 284.5 C 327.2 284.3, 321.4 284.4, 320 284.6"/>
+    <path id="rest-path" fill-rule="evenodd" d="M 1017.9 68.2 C 1017.9 77.7, 1017.9 153.2, 1017.9 236 C 1018 318.8, 1018 407.7, 1018 433.6 L 1018 480.7 1061.8 480.5 C 1085.8 480.4, 1109 480.3, 1113.3 480.2 L 1121 480 1120.8 265.8 L 1120.5 51.5 1069.3 51.2 L 1018 51 1017.9 68.2 M 1159 265.3 L 1159 479.7 1179.3 480.3 C 1205.1 481.2, 1234.3 481.2, 1249.8 480.3 L 1262 479.7 1262 409.7 L 1262 339.7 1269.8 347.1 C 1320.7 395.5, 1393.1 463.8, 1405.5 475 L 1411.5 480.5 1467 480.3 C 1497.5 480.3, 1529.3 480.1, 1537.5 480.1 L 1552.5 480 1547.5 475.2 C 1537.6 465.9, 1491 422.9, 1467 401 C 1423.5 361.3, 1420.6 358.7, 1401.2 341.1 C 1390.6 331.6, 1382 323.6, 1382 323.4 C 1382 323.2, 1388.3 318.3, 1395.9 312.6 C 1403.6 306.8, 1425.1 290.3, 1443.8 275.8 C 1497.9 233.8, 1518.7 217.8, 1542.6 199.5 L 1558.3 187.5 1484.1 187.2 L 1409.9 187 1405.2 190.8 C 1402.6 193, 1390.4 202.7, 1378 212.6 C 1365.6 222.4, 1345.9 238.3, 1334.1 248 C 1322.4 257.6, 1301.4 274.8, 1287.6 286.1 L 1262.5 306.7 1262.3 271.1 C 1262.1 251.5, 1261.9 194.1, 1261.8 143.5 L 1261.5 51.5 1210.3 51.2 L 1159 51 1159 265.3 M 1654.5 186.1 C 1619.5 189, 1590 206.4, 1571.3 235.2 C 1555.7 259.1, 1554.1 289.6, 1567.1 313.8 C 1579.6 337.2, 1602.5 355.7, 1630 364.9 C 1647.2 370.5, 1643.4 370.3, 1739.5 370.9 L 1828.5 371.5 1832.7 373.7 C 1840 377.7, 1842.5 382, 1842.5 391.1 C 1842.5 398.2, 1842.3 399.1, 1839.4 402.6 C 1837.8 404.7, 1834.6 407.3, 1832.4 408.4 C 1828.5 410.5, 1827.7 410.5, 1710 410.7 C 1644.8 410.9, 1588.5 411, 1584.8 411 L 1578 411 1578 445.4 L 1578 479.7 1591.8 480.4 C 1614.6 481.4, 1846.3 481.1, 1858 479.9 C 1904 475.5, 1941.5 445.5, 1951.1 405.5 C 1954.2 392.6, 1953.5 373, 1949.6 361.5 C 1940 333.1, 1916.5 312.6, 1884.3 304.4 C 1869 300.6, 1853 300, 1767 300.3 C 1723.3 300.5, 1686 300.3, 1684.2 299.9 C 1675.5 298, 1669.5 290.2, 1669.6 280.9 C 1669.7 274.2, 1671.8 270.1, 1677.3 265.6 L 1681.2 262.5 1804.6 262.2 L 1928 262 1928 224.1 L 1928 186.3 1910.8 185.6 C 1888.1 184.7, 1666.1 185.2, 1654.5 186.1 M 727 187.1 C 680.4 187.7, 674.5 188.2, 655.5 193.6 C 594.1 210.8, 551.3 254.1, 541.4 309 C 537.6 329.7, 539.7 357.9, 546.4 377.7 C 565.2 432.9, 625.4 475.3, 691.5 479.8 C 714.7 481.4, 778.2 480.6, 787.8 478.6 C 816.9 472.6, 835.6 461.3, 869.7 429.2 L 885 414.8 885.2 447.7 L 885.5 480.5 915 480.8 C 931.2 481, 952.7 480.8, 962.8 480.5 L 981 479.8 981 399.6 C 981 312.8, 980.6 304.1, 975.6 286.8 C 965 250.2, 937.6 219.9, 898.5 201.4 C 887.2 196, 868.5 190.4, 856.1 188.5 C 844.6 186.8, 792.5 186.2, 727 187.1 M 698.6 265.6 C 668.6 272.1, 644.9 292.2, 638.5 316.6 C 636.6 324, 636.6 337.6, 638.5 345.8 C 643.5 367, 662.1 386.1, 686.5 394.9 C 700.1 399.8, 705.7 400.2, 761 399.8 C 810 399.4, 811.7 399.3, 819.5 397.1 C 848.7 388.8, 871.4 368.7, 878.4 345.1 C 880.4 338.3, 880.5 324.3, 878.5 317 C 871.8 291.9, 848.8 272, 819.5 265.9 C 807.4 263.4, 710.1 263.2, 698.6 265.6"/>
+    <!-- K mark, NeoPOP: red face, extruded edge (yellow by default; colour via --kedge) -->
+    <symbol id="kmark" viewBox="0 0 690 580">
+      <g style="fill:var(--kedge,#FFD21F)">
+        <use href="#k-path" x="6" y="6"/><use href="#k-path" x="12" y="12"/><use href="#k-path" x="18" y="18"/><use href="#k-path" x="24" y="24"/><use href="#k-path" x="30" y="30"/>
+      </g>
+      <use href="#k-path" style="fill:var(--kface,#D4112A)"/>
+    </symbol>
+    <symbol id="wordmark" viewBox="0 0 1990 580">
+      <g style="fill:var(--kedge,#FFD21F)">
+        <use href="#k-path" x="6" y="6"/><use href="#k-path" x="12" y="12"/><use href="#k-path" x="18" y="18"/><use href="#k-path" x="24" y="24"/><use href="#k-path" x="30" y="30"/>
+      </g>
+      <use href="#k-path" style="fill:var(--kface,#D4112A)"/>
+      <use href="#rest-path" style="fill:var(--kword,currentColor)"/>
+    </symbol>
+  </defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v10.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.75L12 13 3.5 8.25 12 3.5Z"/><path d="m3.5 12.5 8.5 4.75 8.5-4.75"/><path d="m3.5 16.5 8.5 4.75 8.5-4.75"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7.5V6a2 2 0 0 0-2-2H5.5A2.5 2.5 0 0 0 3 6.5v11A2.5 2.5 0 0 0 5.5 20H19a2 2 0 0 0 2-2v-8.5a2 2 0 0 0-2-2H5.5A2.5 2.5 0 0 1 3 5"/><circle cx="16.5" cy="13.75" r="1.25" class="fill"/></symbol>
+  <symbol id="i-candles" viewBox="0 0 24 24"><path d="M7 3.5v3.5M7 17v3.5M17 3.5V6M17 15.5v5"/><rect x="4.75" y="7" width="4.5" height="10" rx="1.2"/><rect x="14.75" y="6" width="4.5" height="9.5" rx="1.2"/></symbol>
+  <symbol id="i-option" viewBox="0 0 24 24"><path d="M3 16.5h8.5L21 7"/><path d="M15.5 7H21v5.5"/><path d="M3 20.5h18" opacity=".35"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.75 20a6.25 6.25 0 0 1 12.5 0"/><path d="M15.5 5a3.5 3.5 0 0 1 0 7"/><path d="M18 14.25A6.2 6.2 0 0 1 21.25 20"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5.5a4 4 0 0 1-8 0V4Z"/><path d="M8 6H5.5a2.5 2.5 0 0 0 2.6 4.4M16 6h2.5a2.5 2.5 0 0 1-2.6 4.4"/><path d="M12 13.5V17M8.5 20.5h7M9.5 17h5v3.5h-5z"/></symbol>
+  <symbol id="i-network" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.25"/><circle cx="5" cy="18.5" r="2.25"/><circle cx="19" cy="18.5" r="2.25"/><path d="M12 7.25v4.25M12 11.5l-5.4 5.2M12 11.5l5.4 5.2"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 24 24"><path d="M2.5 9 12 4.5 21.5 9 12 13.5 2.5 9Z"/><path d="M6.5 11v4.75c3.2 2.4 7.8 2.4 11 0V11M21.5 9v5.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9.5a6 6 0 1 1 12 0c0 5.5 2.25 7 2.25 7H3.75S6 15 6 9.5Z"/><path d="M10 20a2.1 2.1 0 0 0 4 0"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-upright" viewBox="0 0 24 24"><path d="M7 17 17 7M8.5 7H17v8.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.75 2.6 5.3 5.85.85-4.23 4.12 1 5.82L12 17.1l-5.22 2.74 1-5.82L3.55 9.9l5.85-.85L12 3.75Z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M11 3.5c.55 4.3 2.2 5.95 6.5 6.5-4.3.55-5.95 2.2-6.5 6.5-.55-4.3-2.2-5.95-6.5-6.5 4.3-.55 5.95-2.2 6.5-6.5Z" class="fill"/><path d="M18.5 14.5c.25 1.9 1 2.65 2.9 2.9-1.9.25-2.65 1-2.9 2.9-.25-1.9-1-2.65-2.9-2.9 1.9-.25 2.65-1 2.9-2.9Z" class="fill"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l1.75-2.5h6.5L17 8h3v11H4V8Z"/><circle cx="12" cy="13.25" r="3.25"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+  <symbol id="i-replay" viewBox="0 0 24 24"><path d="M11 6.5 4.5 12l6.5 5.5v-11ZM19.5 6.5 13 12l6.5 5.5v-11Z"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></symbol>
+  <symbol id="i-fx" viewBox="0 0 24 24"><path d="M10.5 4.5c-2.2-.6-3.4.4-3.7 2.6L5 19.5c-.3 2-1.5 2.6-3 2.1"/><path d="M4.5 10h6M13 10.5l6 7M19 10.5l-6 7"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 24 24"><path d="M12 3.5v6M12 14.5v6M3.5 12h6M14.5 12h6"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M6 18 18 6"/><circle cx="5" cy="19" r="1.9"/><circle cx="19" cy="5" r="1.9"/></symbol>
+  <symbol id="i-hlines" viewBox="0 0 24 24"><path d="M3.5 6.5h17M3.5 12h17M3.5 17.5h17"/><circle cx="8" cy="12" r="1.6" class="fill"/></symbol>
+  <symbol id="i-channel" viewBox="0 0 24 24"><path d="M3.5 14.5 14.5 3.5M9.5 20.5l11-11"/><path d="M6 17.5l3 3" opacity=".5"/></symbol>
+  <symbol id="i-fib" viewBox="0 0 24 24"><path d="M3.5 5h17M3.5 9.5h17M3.5 14h17M3.5 19h17"/><path d="M5.5 19 18.5 5" stroke-dasharray="2 2.4"/></symbol>
+  <symbol id="i-zig" viewBox="0 0 24 24"><path d="m3 17 4.5-8 4 6 4.5-9 5 8.5"/></symbol>
+  <symbol id="i-brush" viewBox="0 0 24 24"><path d="M19.5 3.5 10 13"/><path d="M10 13c-2.6-.7-5 .9-5 3.6 0 1.6-.8 2.6-2 3.2 4.3 1.3 8.4-.6 8.6-4.2L10 13Z"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 7V4.5h14V7M12 4.5v15M9 19.5h6"/></symbol>
+  <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14c1.9 2.2 5.1 2.2 7 0"/><circle cx="9.25" cy="9.75" r="1" class="fill"/><circle cx="14.75" cy="9.75" r="1" class="fill"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24"><path d="m3.5 16.5 13-13 4 4-13 13-4-4Z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></symbol>
+  <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2M8.25 11h5.5M11 8.25v5.5"/></symbol>
+  <symbol id="i-magnet" viewBox="0 0 24 24"><path d="M5 4h4.5v7.5a2.5 2.5 0 0 0 5 0V4H19v7.5a7 7 0 0 1-14 0V4Z"/><path d="M5 8h4.5M14.5 8H19"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l.9 12.2a1.5 1.5 0 0 0 1.5 1.3h6.2a1.5 1.5 0 0 0 1.5-1.3L17.5 7M9.5 7V4.5h5V7"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15.5" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.75"/><path d="M3.5 12h17M12 3.25c2.9 3.4 2.9 14.1 0 17.5M12 3.25c-2.9 3.4-2.9 14.1 0 17.5"/></symbol>
+  <symbol id="i-dep" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-wd" viewBox="0 0 24 24"><path d="M12 20V9M7 13.5l5-5 5 5M5 4h14"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8.5h15l-3.5-3.5M20 15.5H5l3.5 3.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.5" class="fill"/><circle cx="12" cy="12" r="1.5" class="fill"/><circle cx="18.5" cy="12" r="1.5" class="fill"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7.5h16M4 12h16M4 16.5h16"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A7.75 7.75 0 1 1 9.5 4.5a6.25 6.25 0 0 0 10 10Z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.75"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="m7.5 14 3.5-4 3 2.5 5-6"/></symbol>
+  <!-- flags (round) -->
+  <symbol id="f-eu" viewBox="0 0 20 20"><g clip-path="url(#fc)"><rect width="20" height="20" fill="#1D3E9E"/><g fill="#FFD21F"><circle cx="15.2" cy="10" r=".95"/><circle cx="14.5" cy="12.6" r=".95"/><circle cx="12.6" cy="14.5" r=".95"/><circle cx="10" cy="15.2" r=".95"/><circle cx="7.4" cy="14.5" r=".95"/><circle cx="5.5" cy="12.6" r=".95"/><circle cx="4.8" cy="10" r=".95"/><circle cx="5.5" cy="7.4" r=".95"/><circle cx="7.4" cy="5.5" r=".95"/><circle cx="10" cy="4.8" r=".95"/><circle cx="12.6" cy="5.5" r=".95"/><circle cx="14.5" cy="7.4" r=".95"/></g></g></symbol>
+  <symbol id="f-us" viewBox="0 0 20 20"><g clip-path="url(#fc)"><rect width="20" height="20" fill="#fff"/><g fill="#C8102E"><rect y="0" width="20" height="1.55"/><rect y="3.1" width="20" height="1.55"/><rect y="6.2" width="20" height="1.55"/><rect y="9.3" width="20" height="1.55"/><rect y="12.4" width="20" height="1.55"/><rect y="15.5" width="20" height="1.55"/><rect y="18.6" width="20" height="1.55"/></g><rect width="10.5" height="10.8" fill="#24337A"/><g fill="#fff"><circle cx="2.6" cy="2.6" r=".6"/><circle cx="5.3" cy="2.6" r=".6"/><circle cx="8" cy="2.6" r=".6"/><circle cx="4" cy="5.3" r=".6"/><circle cx="6.7" cy="5.3" r=".6"/><circle cx="2.6" cy="8" r=".6"/><circle cx="5.3" cy="8" r=".6"/><circle cx="8" cy="8" r=".6"/></g></g></symbol>
+  <symbol id="f-jp" viewBox="0 0 20 20"><g clip-path="url(#fc)"><rect width="20" height="20" fill="#F7F4F2"/><circle cx="10" cy="10" r="4.6" fill="#C8102E"/></g></symbol>
+  <symbol id="f-gb" viewBox="0 0 20 20"><g clip-path="url(#fc)"><rect width="20" height="20" fill="#1D3E9E"/><path d="M0 0 20 20M20 0 0 20" stroke="#fff" stroke-width="4"/><path d="M0 0 20 20M20 0 0 20" stroke="#C8102E" stroke-width="1.4"/><path d="M10 0v20M0 10h20" stroke="#fff" stroke-width="5.5"/><path d="M10 0v20M0 10h20" stroke="#C8102E" stroke-width="3"/></g></symbol>
+  <symbol id="f-xau" viewBox="0 0 20 20"><g clip-path="url(#fc)"><rect width="20" height="20" fill="#E8B523"/><circle cx="10" cy="10" r="7" fill="none" stroke="#B9850E" stroke-width="1.2"/><text x="10" y="13.3" text-anchor="middle" font-family="Archivo,sans-serif" font-weight="800" font-size="8.6" fill="#6E4C00">Au</text></g></symbol>
+  <symbol id="f-oil" viewBox="0 0 20 20"><g clip-path="url(#fc)"><rect width="20" height="20" fill="#231B1C"/><path d="M10 4.2c2.4 3.2 3.8 5.3 3.8 7.4a3.8 3.8 0 0 1-7.6 0c0-2.1 1.4-4.2 3.8-7.4Z" fill="#F6EEE8"/></g></symbol>
+</svg>
+
+<!-- ============================================================ masthead -->
+<header class="mast">
+  <div class="wrap">
+    <div class="mast-l">
+      <svg width="34" height="29" style="--kedge:#FFD21F" aria-label="Kalks"><use href="#kmark"/></svg>
+      <div><b>Kalks 2</b><span>Direction R0 · 9 Oct 2026</span></div>
+    </div>
+    <nav class="mast-idx" aria-label="Sections">
+      <a href="#web"><b>01</b>Website</a><a href="#ca"><b>02</b>Client Area</a><a href="#tr"><b>03</b>Kalks Trader</a><a href="#cmp"><b>04</b>Components</a><a href="#brand"><b>05</b>Brand</a>
+    </nav>
+    <div class="seg sm" role="group" aria-label="Theme" id="theme" style="margin-left:auto">
+      <button data-mode="auto" aria-pressed="true">Auto</button>
+      <button data-mode="light" aria-pressed="false"><svg class="i s14"><use href="#i-sun"/></svg></button>
+      <button data-mode="dark" aria-pressed="false"><svg class="i s14"><use href="#i-moon"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main>
+<section class="wrap intro">
+  <h1 class="d">Black, <span class="r">red</span><br>and <span class="hl">yellow.</span></h1>
+  <div class="intro-grid">
+    <div><h3><span class="n">01</span>Solid-colour imagery</h3><p>One striking subject on one flat, saturated colour. The picture carries the brand; the interface stays quiet around it.</p></div>
+    <div><h3><span class="n">02</span>Controls you press</h3><p>NeoPOP buttons: a flat face on a solid edge that sinks in when tapped. No blur shadows, no glow.</p></div>
+    <div><h3><span class="n">03</span>Colour means something</h3><p>Red is the brand and the sell side. Blue is up, buy and profit. Yellow marks what is active or new.</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ 01 WEBSITE -->
+<section class="wrap sec" id="web">
+  <div class="sec-h">
+    <h2><span class="n">01 — Website · Home</span>Hero, prices, products</h2>
+    <p>The image is the hero: the figure sits on Kalks yellow and the page extends the same flat colour. One headline, one red action, facts from the platform only.</p>
+  </div>
+  <div class="frame">
+    <div class="web-hero">
+      <nav class="web-nav">
+        <a href="#web" aria-label="Kalks home"><svg width="128" height="37" style="--kedge:#0B0809;--kword:#0B0809"><use href="#wordmark"/></svg></a>
+        <ul>
+          <li><a href="#web">Options <span class="tag new">New</span></a></li>
+          <li><a href="#web">Markets</a></li>
+          <li><a href="#web">Accounts</a></li>
+          <li><a href="#web">Platforms</a></li>
+          <li><a href="#web">Prop</a></li>
+          <li><a href="#web">More <svg class="i s16"><use href="#i-down"/></svg></a></li>
+        </ul>
+        <div class="r">
+          <a class="lnk lg" href="#web"><svg class="i s18"><use href="#i-globe"/></svg>EN</a>
+          <a class="lnk lg" href="#web">Log in</a>
+          <button class="btn s40">Open account</button>
+          <button class="icb menu" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></button>
+        </div>
+      </nav>
+      <div class="web-copy">
+        <span class="eyebrow"><span class="tag new">New</span>Kalks FX Options</span>
+        <h1 class="d web-h1">Options on forex,<br>made simple.</h1>
+        <p class="web-lede">Calls and puts on forex, gold, silver and oil. Buy an option and the premium is the most you can lose.</p>
+        <div class="web-cta">
+          <button class="btn v-red s56">Open account <svg class="i"><use href="#i-arrow"/></svg></button>
+          <button class="btn v-ghost s56" style="--line2:rgba(11,8,9,.85)">Try the demo</button>
+        </div>
+        <p class="web-facts">$10 to start · Fund with USDT · 22 languages</p>
+      </div>
+      <img class="web-fig" src="img/figure-yellow.jpg" alt="A black figure with yellow circuitry, seated cross-legged on a flat yellow backdrop">
+      <div class="web-strip">
+        <div><b>12</b><span>Live underlyings: 8 FX pairs, gold, silver, US and UK oil</span></div>
+        <div><b>Daily</b><span>Plus weekly and monthly expiries, cut at 10:00 New York</span></div>
+        <div><b>$0.25</b><span>Per contract, capped at 10% of the premium</span></div>
+        <div><b>USD</b><span>Settled in cash, straight to your balance</span></div>
+      </div>
+    </div>
+
+    <div class="web-tick">
+      <div class="lab"><b>Live prices</b><span>Streaming</span></div>
+      <div class="tick-row">
+        <div class="tk"><span class="pair"><svg><use href="#f-eu"/></svg><svg><use href="#f-us"/></svg></span><div class="ln"><b>EUR/USD</b><span class="chg up">+0.18%</span></div><div class="ln"><span class="px">1.16412</span><svg width="64" height="18" class="spk" data-seed="3" data-dir="1"></svg></div></div>
+        <div class="tk"><span class="pair"><svg><use href="#f-us"/></svg><svg><use href="#f-jp"/></svg></span><div class="ln"><b>USD/JPY</b><span class="chg dn">−0.42%</span></div><div class="ln"><span class="px">157.894</span><svg width="64" height="18" class="spk" data-seed="7" data-dir="-1"></svg></div></div>
+        <div class="tk"><span class="pair one"><svg><use href="#f-xau"/></svg></span><div class="ln"><b>XAU/USD</b><span class="chg up">+0.63%</span></div><div class="ln"><span class="px">4,086.25</span><svg width="64" height="18" class="spk" data-seed="11" data-dir="1"></svg></div></div>
+        <div class="tk"><span class="pair"><svg><use href="#f-gb"/></svg><svg><use href="#f-us"/></svg></span><div class="ln"><b>GBP/USD</b><span class="chg dn">−0.07%</span></div><div class="ln"><span class="px">1.34044</span><svg width="64" height="18" class="spk" data-seed="5" data-dir="-1"></svg></div></div>
+        <div class="tk"><span class="pair one"><svg><use href="#f-oil"/></svg></span><div class="ln"><b>US Oil</b><span class="chg up">+1.12%</span></div><div class="ln"><span class="px">61.42</span><svg width="64" height="18" class="spk" data-seed="2" data-dir="1"></svg></div></div>
+      </div>
+    </div>
+
+    <div class="web-cards">
+      <article class="pcard pc-red">
+        <svg class="payoff" viewBox="0 0 200 120" fill="none" aria-hidden="true"><path d="M0 92h108L196 8" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M0 108h200" stroke="rgba(255,255,255,.3)" stroke-width="2" stroke-dasharray="4 6"/><circle cx="108" cy="92" r="7" fill="#FFD21F" stroke="#D4112A" stroke-width="3"/></svg>
+        <span class="k">KALKS FX OPTIONS</span>
+        <h3>Know your risk before you trade.</h3>
+        <p>Buy a call or a put and your loss is capped at the premium you pay. Daily, weekly and monthly expiries.</p>
+        <div class="go"><span>Explore options</span><button class="btn round s48" aria-label="Explore options"><svg class="i"><use href="#i-arrow"/></svg></button></div>
+      </article>
+      <article class="pcard pc-ink">
+        <span class="k">CFDs</span>
+        <h3>Six asset classes. Start with $10.</h3>
+        <p>Forex, metals, energies, indices, crypto and stocks. All-in spreads or raw pricing with commission. Leverage up to 1:1000.</p>
+        <div class="go"><span>Compare accounts</span><button class="btn round s48" aria-label="Compare accounts"><svg class="i"><use href="#i-arrow"/></svg></button></div>
+      </article>
+      <article class="pcard pc-yel">
+        <span class="k">PROP CHALLENGES</span>
+        <h3>Get funded. Keep up to 90%.</h3>
+        <p>A 1-step or 2-step evaluation, or instant funding. Simulated accounts from $5k to $200k.</p>
+        <div class="go"><span>See the plans</span><button class="btn round s48" aria-label="See the plans"><svg class="i"><use href="#i-arrow"/></svg></button></div>
+      </article>
+    </div>
+    <p class="web-risk">CFDs are complex instruments and come with a high risk of losing money rapidly due to leverage. Buying an option can lose 100% of the premium paid; selling an option can lose more than the premium received.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 02 CLIENT AREA -->
+<section class="wrap sec" id="ca">
+  <div class="sec-h">
+    <h2><span class="n">02 — Client Area · Dashboard</span>Photo hero, money first</h2>
+    <p>A black icon rail, a photo hero with a frosted strip of the four numbers that matter, Ask Kalks AI in yellow, and accounts split into CFD and Options.</p>
+  </div>
+  <div class="frame ca">
+    <aside class="ca-rail" aria-label="Main">
+      <div class="logo"><svg width="34" height="29"><use href="#kmark"/></svg></div>
+      <button class="rb on" aria-label="Dashboard"><svg class="i"><use href="#i-home"/></svg></button>
+      <button class="rb" aria-label="Accounts"><svg class="i"><use href="#i-layers"/></svg></button>
+      <button class="rb" aria-label="Wallet"><svg class="i"><use href="#i-wallet"/></svg></button>
+      <button class="rb" aria-label="Trade"><svg class="i"><use href="#i-candles"/></svg></button>
+      <button class="rb" aria-label="Options"><svg class="i"><use href="#i-option"/></svg></button>
+      <button class="rb" aria-label="Copy and PAMM"><svg class="i"><use href="#i-users"/></svg></button>
+      <button class="rb" aria-label="Prop"><svg class="i"><use href="#i-trophy"/></svg></button>
+      <button class="rb" aria-label="Partner"><svg class="i"><use href="#i-network"/></svg></button>
+      <button class="rb" aria-label="Academy"><svg class="i"><use href="#i-cap"/></svg></button>
+      <div class="sp"></div>
+      <button class="rb dot" aria-label="Notifications"><svg class="i"><use href="#i-bell"/></svg></button>
+      <button class="rb" aria-label="Settings"><svg class="i"><use href="#i-sliders"/></svg></button>
+      <div class="ava" style="margin-top:8px">AK</div>
+    </aside>
+    <div class="ca-main">
+      <header class="ca-top">
+        <div>
+          <p class="crumb">Friday 9 October</p>
+          <h1 class="ca-h1">Good evening, <b>Arjun</b></h1>
+        </div>
+        <div class="ca-act">
+          <div class="search glass"><svg class="i s18"><use href="#i-search"/></svg>Search or ask<span class="kbd">⌘K</span></div>
+          <div class="accpill glass"><span class="tag cfd">CFD</span><span>Live · 1048213</span><span class="bal">$12,480.20</span><svg class="i s16"><use href="#i-down"/></svg></div>
+          <button class="btn v-yel s40"><svg class="i"><use href="#i-dep"/></svg>Deposit</button>
+          <button class="icb glass hide-s" aria-label="Notifications" style="display:none"><svg class="i"><use href="#i-bell"/></svg></button>
+        </div>
+      </header>
+
+      <div class="ca-grid">
+        <article class="hero-card">
+          <img src="img/robot-red.jpg" alt="A black helmeted robot in profile on a flat red backdrop">
+          <div class="hc-tabs" role="tablist"><button class="on">Options</button><button>Copy</button><button>Prop</button><button>Academy</button></div>
+          <div class="hc-copy">
+            <span class="k"><svg class="i s14"><use href="#i-option"/></svg>NEW · OPTIONS ACCOUNT</span>
+            <h2 class="d">Add an Options account.</h2>
+            <p>Calls and puts on forex, gold and oil. Your risk is the premium, and you see it before you buy.</p>
+            <div class="cta"><button class="btn v-wht s48">Open Options account</button><a href="#ca">How it works <svg class="i s16"><use href="#i-right"/></svg></a></div>
+          </div>
+          <div class="hc-strip">
+            <div class="kpi"><div class="v money">$24,806<small>.42</small></div><div class="l"><i style="background:var(--tx)"></i>Total equity</div></div>
+            <div class="kpi"><div class="v money up-tx">+$312<small style="color:inherit">.80</small></div><div class="l"><i style="background:var(--up)"></i>Open P&amp;L today</div></div>
+            <div class="kpi"><div class="v money">1,240<small>USDT</small></div><div class="l"><i style="background:var(--yel)"></i>Wallet</div></div>
+            <div class="kpi"><div class="v money">$18,220<small>.55</small></div><div class="l"><i style="background:var(--tx3)"></i>Free margin</div></div>
+            <button class="btn round s40" aria-label="More numbers"><svg class="i"><use href="#i-right"/></svg></button>
+          </div>
+        </article>
+
+        <article class="ai-card">
+          <div class="ai-h"><span class="ic"><svg class="i s18"><use href="#i-spark"/></svg></span>Ask Kalks AI<span class="x"><svg class="i s16"><use href="#i-expand"/></svg></span></div>
+          <p class="ai-q">Ask about <b>your margin</b>, size a trade by <b>risk</b>, or get <b>the week ahead</b> in plain words.</p>
+          <div class="ai-chips"><span>Why did my margin drop?</span><span>Size 1% risk on EUR/USD</span><span>Week ahead</span></div>
+          <div class="ai-in">Ask anything…<button class="btn round s40" aria-label="Speak"><svg class="i"><use href="#i-mic"/></svg></button></div>
+        </article>
+
+        <div class="blk-h"><h3>Accounts</h3><span class="chip out" style="height:26px;font-size:12px">4</span>
+          <div class="seg sm" role="group"><button aria-pressed="true">All</button><button aria-pressed="false">Live</button><button aria-pressed="false">Demo</button></div>
+          <button class="btn v-ghost s32"><svg class="i"><use href="#i-plus"/></svg>New account</button>
+        </div>
+        <div class="acc-grp">
+          <div class="grp-l"><span class="tag cfd">CFD</span>Forex, metals, indices, crypto, stocks<span class="ln"></span></div>
+          <div class="acc-cards">
+          <article class="acard card">
+            <div class="top"><span class="tag live">Live</span><span class="nm">Standard · 1:500</span><span class="id">#1048213</span></div>
+            <div class="bal money">$12,480<small style="font-size:.6em;color:var(--tx2)">.20</small></div>
+            <div class="rows"><div><span>Equity</span><b>$12,541.20</b></div><div><span>Open P&amp;L</span><b class="up-tx">+$61.00</b></div><div><span>Margin level</span><b>2,486%</b></div><div><span>Positions</span><b>2</b></div></div>
+            <div class="acts"><button class="btn s32">Trade</button><button class="btn v-ghost s32">Deposit</button><button class="icb more" style="width:32px;height:32px" aria-label="More"><svg class="i s18"><use href="#i-more"/></svg></button></div>
+          </article>
+          <article class="acard card">
+            <div class="top"><span class="tag">Demo</span><span class="nm">Pro · 1:500</span><span class="id">#2051877</span></div>
+            <div class="bal money">$10,284<small style="font-size:.6em;color:var(--tx2)">.60</small></div>
+            <div class="rows"><div><span>Equity</span><b>$10,231.10</b></div><div><span>Open P&amp;L</span><b class="dn-tx">−$53.50</b></div><div><span>Margin level</span><b>1,912%</b></div><div><span>Refills left</span><b>3 today</b></div></div>
+            <div class="acts"><button class="btn s32">Trade</button><button class="btn v-ghost s32">Refill</button><button class="icb more" style="width:32px;height:32px" aria-label="More"><svg class="i s18"><use href="#i-more"/></svg></button></div>
+          </article>
+          </div>
+        </div>
+        <div class="acc-grp">
+          <div class="grp-l"><span class="tag opt">Options</span>Calls and puts, cash-settled in USD<span class="ln"></span></div>
+          <div class="acc-cards">
+          <article class="acard card">
+            <div class="top"><span class="tag live">Live</span><span class="nm">Options Standard</span><span class="id">#3100452</span></div>
+            <div class="bal money">$2,085<small style="font-size:.6em;color:var(--tx2)">.02</small></div>
+            <div class="rows"><div><span>Premium at risk</span><b>$118.40</b></div><div><span>Open options</span><b>3</b></div><div><span>Next expiry</span><b>Mon 10:00 NY</b></div><div><span>Today</span><b class="up-tx">+$42.10</b></div></div>
+            <div class="acts"><button class="btn s32">Option chain</button><button class="btn v-ghost s32">Deposit</button><button class="icb more" style="width:32px;height:32px" aria-label="More"><svg class="i s18"><use href="#i-more"/></svg></button></div>
+          </article>
+          <article class="acard add">
+            <div><div class="t">Options Pro</div><p>A lower fee per contract for active option traders.</p></div>
+            <button class="btn v-yel s32"><svg class="i"><use href="#i-plus"/></svg>Open Options Pro</button>
+          </article>
+          </div>
+        </div>
+
+        <section class="act glass">
+          <div class="act-h"><h3>Activity</h3><div class="seg sm" role="group"><button aria-pressed="true">All</button><button aria-pressed="false">Money</button><button aria-pressed="false">Trades</button></div></div>
+          <table class="tb">
+            <thead><tr><th>What happened</th><th class="hide-s">Account</th><th class="r">Amount</th><th>Status</th><th class="r">Time</th></tr></thead>
+            <tbody>
+              <tr><td><div class="ev"><span class="ic"><svg class="i s18"><use href="#i-dep"/></svg></span><div><b>Deposit</b><span>USDT · TRC20</span></div></div></td><td class="hide-s">Wallet</td><td class="r amt">+500.00 USDT</td><td><span class="st st-ok">Completed</span></td><td class="r tm">18:02</td></tr>
+              <tr><td><div class="ev"><span class="ic"><svg class="i s18"><use href="#i-swap"/></svg></span><div><b>Transfer</b><span>Wallet to CFD #1048213</span></div></div></td><td class="hide-s">CFD · Live</td><td class="r amt">300.00 USDT</td><td><span class="st st-ok">Completed</span></td><td class="r tm">17:40</td></tr>
+              <tr><td><div class="ev"><span class="ic up"><svg class="i s18"><use href="#i-candles"/></svg></span><div><b>EUR/USD buy closed</b><span>0.50 lots · 1.16118 → 1.16286</span></div></div></td><td class="hide-s">CFD · Live</td><td class="r amt up-tx">+$84.20</td><td><span class="st st-info">Closed</span></td><td class="r tm">16:15</td></tr>
+              <tr><td><div class="ev"><span class="ic y"><svg class="i s18"><use href="#i-option"/></svg></span><div><b>Bought EUR/USD call 1.1700</b><span>2 contracts · expires 16 Oct, 10:00 NY</span></div></div></td><td class="hide-s">Options · Live</td><td class="r amt">−$18.40</td><td><span class="st st-info">Open</span></td><td class="r tm">14:31</td></tr>
+              <tr><td><div class="ev"><span class="ic"><svg class="i s18"><use href="#i-wd"/></svg></span><div><b>Withdrawal</b><span>USDT · BEP20 · fee 1 USDT</span></div></div></td><td class="hide-s">Wallet</td><td class="r amt">250.00 USDT</td><td><span class="st st-warn">Pending</span></td><td class="r tm">11:08</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <article class="eq card">
+          <div class="eq-h"><h3>Equity</h3><div class="seg sm" role="group"><button aria-pressed="false">1W</button><button aria-pressed="true">1M</button><button aria-pressed="false">3M</button></div></div>
+          <div class="big money">$24,806<small style="font-size:.55em;color:var(--tx2)">.42</small></div>
+          <div class="sub"><span class="up-tx" style="font-weight:600">+$1,912.30</span> · +8.4% this month</div>
+          <svg id="eqsvg" viewBox="0 0 320 150" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div class="ax"><span>9 Sep</span><span>16</span><span>23</span><span>30</span><span>9 Oct</span></div>
+        </article>
+      </div>
+
+      <nav class="ca-tabbar" aria-label="Tabs">
+        <span class="on"><svg class="i"><use href="#i-home"/></svg></span><span><svg class="i"><use href="#i-layers"/></svg></span><span><svg class="i"><use href="#i-candles"/></svg></span><span><svg class="i"><use href="#i-wallet"/></svg></span><span><svg class="i"><use href="#i-more"/></svg></span>
+      </nav>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 03 KALKS TRADER -->
+<section class="wrap sec" id="tr">
+  <div class="sec-h">
+    <h2><span class="n">03 — Kalks Trader · CFD workspace</span>A TradingView-grade chart</h2>
+    <p>Symbol tabs with flags, a full chart bar with inline Sell / Buy, the drawing rail, range presets and a UTC clock. Blue is up, buy and profit; red is down, sell and loss. Drag S or T off the position line to set a stop or a target.</p>
+  </div>
+  <div class="frame tr">
+    <div class="t-title">
+      <span class="logo"><svg width="30" height="26"><use href="#kmark"/></svg></span>
+      <div class="stabs">
+        <button class="stab on"><span class="pair"><svg><use href="#f-eu"/></svg><svg><use href="#f-us"/></svg></span>EUR/USD<span class="px up-tx">1.16412</span></button>
+        <button class="stab"><span class="pair"><svg><use href="#f-us"/></svg><svg><use href="#f-jp"/></svg></span>USD/JPY<span class="px">157.894</span></button>
+        <button class="stab"><span class="pair one"><svg><use href="#f-xau"/></svg></span>XAU/USD<span class="px">4,086.25</span></button>
+        <button class="stab"><span class="pair"><svg><use href="#f-gb"/></svg><svg><use href="#f-jp"/></svg></span>GBP/JPY<span class="px">211.630</span></button>
+        <button class="addt" aria-label="Add symbol"><svg class="i s18"><use href="#i-plus"/></svg></button>
+      </div>
+      <div class="r">
+        <div class="t-acc"><span class="tag cfd">CFD</span><div><div class="l">LIVE · STANDARD</div><div class="v">$12,541.20</div></div><svg class="i s16" style="color:var(--tx3)"><use href="#i-down"/></svg></div>
+        <button class="icb" aria-label="Alerts"><svg class="i"><use href="#i-bell"/></svg></button>
+        <button class="btn v-yel s32">Deposit</button>
+      </div>
+    </div>
+
+    <div class="pnl t-rail" aria-label="Drawing tools">
+      <button class="on" title="Crosshair"><svg class="i s18"><use href="#i-cross"/></svg></button>
+      <button title="Trend line"><svg class="i s18"><use href="#i-trend"/></svg></button>
+      <button title="Horizontal levels"><svg class="i s18"><use href="#i-hlines"/></svg></button>
+      <button title="Parallel channel"><svg class="i s18"><use href="#i-channel"/></svg></button>
+      <button title="Fibonacci"><svg class="i s18"><use href="#i-fib"/></svg></button>
+      <button title="Patterns"><svg class="i s18"><use href="#i-zig"/></svg></button>
+      <button title="Brush"><svg class="i s18"><use href="#i-brush"/></svg></button>
+      <button title="Text"><svg class="i s18"><use href="#i-text"/></svg></button>
+      <button title="Icons"><svg class="i s18"><use href="#i-smile"/></svg></button>
+      <hr>
+      <button title="Measure"><svg class="i s18"><use href="#i-ruler"/></svg></button>
+      <button title="Zoom"><svg class="i s18"><use href="#i-zoom"/></svg></button>
+      <div class="sp"></div>
+      <button title="Magnet"><svg class="i s18"><use href="#i-magnet"/></svg></button>
+      <button title="Lock drawings"><svg class="i s18"><use href="#i-lock"/></svg></button>
+      <button title="Hide drawings"><svg class="i s18"><use href="#i-eye"/></svg></button>
+      <button title="Remove drawings"><svg class="i s18"><use href="#i-trash"/></svg></button>
+    </div>
+
+    <div class="pnl t-chart">
+      <div class="cbar">
+        <button class="cb hide-s" aria-label="Compare"><svg class="i"><use href="#i-plus"/></svg></button>
+        <span class="div hide-s"></span>
+        <button class="cb tf">1m</button><button class="cb tf hide-s">5m</button><button class="cb tf on">15m</button><button class="cb tf">1h</button><button class="cb tf">4h</button><button class="cb tf">D</button><button class="cb hide-s" aria-label="More timeframes"><svg class="i s16"><use href="#i-down"/></svg></button>
+        <span class="div"></span>
+        <button class="cb" aria-label="Chart type"><svg class="i"><use href="#i-candles"/></svg></button>
+        <button class="cb"><svg class="i"><use href="#i-fx"/></svg><span class="hide-s">Indicators</span></button>
+        <button class="cb hide-s" aria-label="Layouts"><svg class="i"><use href="#i-grid"/></svg></button>
+        <button class="cb hide-s" aria-label="Bar replay"><svg class="i"><use href="#i-replay"/></svg></button>
+        <span class="div hide-s"></span>
+        <button class="cb hide-s" aria-label="Undo"><svg class="i"><use href="#i-undo"/></svg></button>
+        <button class="cb hide-s" aria-label="Redo" style="opacity:.45"><svg class="i"><use href="#i-redo"/></svg></button>
+        <span class="sp"></span>
+        <button class="cb hide-s">Save<svg class="i s16"><use href="#i-down"/></svg></button>
+        <button class="cb hide-s" aria-label="Screenshot"><svg class="i"><use href="#i-camera"/></svg></button>
+        <button class="cb" aria-label="Full screen"><svg class="i"><use href="#i-max"/></svg></button>
+        <span class="div hide-s"></span>
+        <div class="qtrade">
+          <button class="btn v-sell s32">Sell <b>1.16412</b></button>
+          <span class="sprd">0.6</span>
+          <button class="btn v-buy s32">Buy <b>1.16418</b></button>
+        </div>
+      </div>
+      <div class="chart" id="chart">
+        <div class="legend">
+          <div class="l1"><span class="pair"><svg><use href="#f-eu"/></svg><svg><use href="#f-us"/></svg></span>Euro / US Dollar<span class="tfx">· 15m · Kalks</span></div>
+          <div class="ohlc" id="ohlc"></div>
+          <div class="ind"><b>MA 20</b><span id="maval">1.16371</span></div>
+        </div>
+        <svg id="csvg" aria-label="EUR/USD 15 minute candlestick chart"></svg>
+      </div>
+      <div class="rbar">
+        <button class="cb">5y</button><button class="cb">1y</button><button class="cb hide-s">6m</button><button class="cb">3m</button><button class="cb">1m</button><button class="cb on">5d</button><button class="cb">1d</button>
+        <span class="div hide-s" style="width:1px;height:16px;background:var(--line2);margin:0 6px"></span>
+        <button class="cb hide-s" aria-label="Go to date"><svg class="i s16"><use href="#i-cal"/></svg></button>
+        <span style="flex:1"></span>
+        <span class="clk">18:16:10 UTC</span>
+        <button class="cb hide-s">%</button><button class="cb hide-s">log</button><button class="cb on">auto</button>
+      </div>
+    </div>
+
+    <div class="pnl t-order">
+      <div class="o-h">
+        <span class="pair"><svg><use href="#f-eu"/></svg><svg><use href="#f-us"/></svg></span>
+        <div><b>EUR/USD</b><span>Market order · hedging</span></div>
+        <button class="icb" aria-label="Order settings"><svg class="i s18"><use href="#i-sliders"/></svg></button>
+      </div>
+      <div class="seg" role="group" style="display:flex;margin-top:14px"><button aria-pressed="true" style="flex:1">Market</button><button aria-pressed="false" style="flex:1">Limit</button><button aria-pressed="false" style="flex:1">Stop</button></div>
+      <div class="o-sides">
+        <button class="side sell"><span class="k">Sell</span><span class="p">1.164<b>12</b></span></button>
+        <button class="side buy"><span class="k">Buy</span><span class="p">1.164<b>18</b></span></button>
+        <span class="sprd-pill">0.6</span>
+      </div>
+      <div class="o-sec">
+        <div class="o-row"><span class="lbl">Volume</span><span class="o-note" style="margin:0">lots</span></div>
+        <div class="step">
+          <button class="btn round" aria-label="Less"><svg class="i"><use href="#i-minus"/></svg></button>
+          <div class="field">0.50</div>
+          <button class="btn round" aria-label="More"><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+        <div class="qv"><button>0.01</button><button>0.10</button><button class="on">0.50</button><button>1.00</button><button>2.00</button></div>
+        <div class="o-note">≈ €50,000 · margin $116.42 at 1:500</div>
+      </div>
+      <div class="o-sec" style="margin-top:10px">
+        <div class="o-line"><span class="hb s">S</span><span class="t">Stop loss</span><span class="v">off</span><span class="tog"></span></div>
+        <div class="o-line"><span class="hb t">T</span><span class="t">Take profit</span><span class="v up-tx">1.16720 · +$151</span><span class="tog on"></span></div>
+        <div class="o-line"><span class="hb r">%</span><span class="t">Size by risk</span><span class="v">1% = 0.46</span><span class="tog"></span></div>
+      </div>
+      <div class="o-sum">
+        <div>Pip value<b>$5.00</b></div>
+        <div>Commission<b>$0.00</b></div>
+        <div>Swap per night<b class="dn-tx">−$3.10</b></div>
+      </div>
+      <div class="o-range">
+        <div class="o-row"><span class="lbl" style="margin:0">Day range</span><span class="o-note" style="margin:0">+0.18% today</span></div>
+        <div class="rg"><span style="left:0;width:88%"></span><i style="left:88%"></i></div>
+        <div class="o-row o-note" style="margin-top:6px"><span>1.16052</span><span>1.16441</span></div>
+      </div>
+      <div class="o-go">
+        <button class="btn v-buy block">Buy 0.50 lots<span class="sub">at 1.16418</span></button>
+        <div class="o-foot"><span>Free margin $18,220.55</span><span>Level 2,486%</span></div>
+      </div>
+    </div>
+
+    <div class="pnl t-bottom">
+      <div class="b-tabs">
+        <button class="on">Positions<em>2</em></button><button>Pending<em>0</em></button><button>History</button><button>Alerts</button>
+        <div class="tot"><span>Balance<b>$12,480.20</b></span><span>Equity<b>$12,541.20</b></span><span>Margin<b>$148.71</b></span><span>Free<b>$12,392.49</b></span></div>
+      </div>
+      <table class="tb">
+        <thead><tr><th>Symbol</th><th>Side</th><th class="r">Volume</th><th class="r">Open</th><th class="r">Price</th><th class="r">S / L</th><th class="r">T / P</th><th class="r">Swap</th><th class="r">P&amp;L</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><span class="sym"><span class="pair"><svg><use href="#f-eu"/></svg><svg><use href="#f-us"/></svg></span>EUR/USD</span></td><td><span class="sd b">Buy</span></td><td class="r amt">0.50</td><td class="r amt">1.16290</td><td class="r amt">1.16412</td><td class="r amt" style="color:var(--tx3)">add S</td><td class="r amt" style="color:var(--tx3)">add T</td><td class="r amt">0.00</td><td class="r amt up-tx">+$61.00</td><td class="r"><span class="xbtn"><svg class="i s14"><use href="#i-x"/></svg></span></td></tr>
+          <tr><td><span class="sym"><span class="pair one"><svg><use href="#f-xau"/></svg></span>XAU/USD</span></td><td><span class="sd s">Sell</span></td><td class="r amt">0.10</td><td class="r amt">4,083.40</td><td class="r amt">4,086.25</td><td class="r amt">4,095.00</td><td class="r amt">4,060.00</td><td class="r amt">−0.42</td><td class="r amt dn-tx">−$28.50</td><td class="r"><span class="xbtn"><svg class="i s14"><use href="#i-x"/></svg></span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 04 COMPONENTS -->
+<section class="wrap sec" id="cmp">
+  <div class="sec-h">
+    <h2><span class="n">04 — Components</span>Pressable, quiet, exact</h2>
+    <p>Press any button: the face slides into its edge. Focus is the only neon. Disabled controls sit flat — there is nothing to press.</p>
+  </div>
+  <div class="cgrid">
+    <div class="cc card" style="grid-column:span 7">
+      <h4>Buttons · variants <span>40 px · edge 4 px</span></h4>
+      <div class="row">
+        <div class="cell"><button class="btn v-red">Open account</button><span class="cap">primary</span></div>
+        <div class="cell"><button class="btn v-yel"><svg class="i"><use href="#i-dep"/></svg>Deposit</button><span class="cap">highlight</span></div>
+        <div class="cell"><button class="btn">Trade</button><span class="cap">ink</span></div>
+        <div class="cell"><button class="btn v-ghost">Cancel</button><span class="cap">ghost</span></div>
+        <div class="cell"><button class="btn v-sell">Sell 0.50</button><span class="cap">sell</span></div>
+        <div class="cell"><button class="btn v-buy">Buy 0.50</button><span class="cap">buy</span></div>
+      </div>
+      <div class="row">
+        <div class="cell" style="flex:1;min-width:260px"><div class="imgsw"><button class="btn v-wht s40">Start now</button><button class="btn round s40" style="--ink:#0B0809;--ink-edge:#000;--ink-lbl:#fff" aria-label="Next"><svg class="i"><use href="#i-arrow"/></svg></button></div><span class="cap" style="text-align:left">white · on imagery only</span></div>
+        <div class="cell"><div style="display:flex;gap:6px"><button class="btn round" aria-label="Add"><svg class="i"><use href="#i-plus"/></svg></button><button class="btn round v-yel" aria-label="Speak"><svg class="i"><use href="#i-mic"/></svg></button><button class="btn round v-red" aria-label="Next"><svg class="i"><use href="#i-arrow"/></svg></button></div><span class="cap">round icon</span></div>
+      </div>
+    </div>
+    <div class="cc card" style="grid-column:span 5">
+      <h4>Sizes <span>32 · 40 · 48 · 56</span></h4>
+      <div class="row" style="align-items:flex-end">
+        <div class="cell"><button class="btn v-red s32">Trade</button><span class="cap">32 · d3</span></div>
+        <div class="cell"><button class="btn v-red">Trade</button><span class="cap">40 · d4</span></div>
+        <div class="cell"><button class="btn v-red s48">Trade</button><span class="cap">48 · d5</span></div>
+        <div class="cell"><button class="btn v-red s56">Trade</button><span class="cap">56 · d6</span></div>
+      </div>
+      <div class="row" style="margin-top:22px;align-items:flex-end">
+        <div class="cell"><button class="btn v-red s48">Soft</button><span class="cap">corner 14 (used)</span></div>
+        <div class="cell"><button class="btn v-red s48 sharp">Sharp</button><span class="cap">corner 3 (true NeoPOP)</span></div>
+      </div>
+    </div>
+    <div class="cc card" style="grid-column:span 7">
+      <h4>Button states <span>primary 40</span></h4>
+      <div class="row">
+        <div class="cell"><button class="btn v-red">Confirm</button><span class="cap">rest</span></div>
+        <div class="cell"><button class="btn v-red" style="filter:brightness(1.07)">Confirm</button><span class="cap">hover</span></div>
+        <div class="cell"><button class="btn v-red is-pressed">Confirm</button><span class="cap">pressed</span></div>
+        <div class="cell"><button class="btn v-red is-focus">Confirm</button><span class="cap">focus</span></div>
+        <div class="cell"><button class="btn v-red is-loading">Confirm</button><span class="cap">loading</span></div>
+        <div class="cell"><button class="btn v-red" disabled>Confirm</button><span class="cap">disabled</span></div>
+      </div>
+      <div class="row">
+        <div class="cell"><button class="btn v-buy is-pressed">Buy</button><span class="cap">buy pressed</span></div>
+        <div class="cell"><button class="btn v-yel is-pressed">Deposit</button><span class="cap">yellow pressed</span></div>
+        <div class="cell"><button class="btn is-focus">Trade</button><span class="cap">ink focus</span></div>
+      </div>
+    </div>
+    <div class="cc card" style="grid-column:span 5">
+      <h4>Chips &amp; tags</h4>
+      <div class="row"><span class="chip sel">All</span><span class="chip">Forex</span><span class="chip">Metals</span><span class="chip">Indices</span><span class="chip">Crypto</span></div>
+      <div class="row"><span class="st st-ok">Completed</span><span class="st st-warn">Pending</span><span class="st st-bad">Rejected</span><span class="st st-info">Open</span></div>
+      <div class="row"><span class="tag live">Live</span><span class="tag">Demo</span><span class="tag cfd">CFD</span><span class="tag opt">Options</span><span class="tag new">New</span><span class="chg up">+0.18%</span><span class="chg dn">−0.42%</span></div>
+    </div>
+    <div class="cc card" style="grid-column:span 4">
+      <h4>Segmented &amp; toggle</h4>
+      <div class="row"><div class="seg" role="group"><button aria-pressed="false">Market</button><button aria-pressed="true">Limit</button><button aria-pressed="false">Stop</button></div></div>
+      <div class="row"><div class="seg sm" role="group"><button aria-pressed="false">1m</button><button aria-pressed="false">5m</button><button aria-pressed="true">15m</button><button aria-pressed="false">1h</button><button aria-pressed="false">4h</button><button aria-pressed="false">D</button></div></div>
+      <div class="row" style="align-items:center;gap:14px"><span class="tog on"></span><span style="font-weight:600;font-size:14px">One-click trading</span><span class="tog" style="margin-left:auto"></span></div>
+      <div class="rc-row">
+        <div class="rcard on"><span class="rd"></span><b>CFD account</b><span>Forex, metals, indices, crypto, stocks</span></div>
+        <div class="rcard"><span class="rd"></span><b>Options account</b><span>Calls and puts, settled in USD</span></div>
+      </div>
+    </div>
+    <div class="cc card" style="grid-column:span 4">
+      <h4>Slider <span>risk per trade</span></h4>
+      <div style="padding-top:36px">
+        <div class="slider"><div class="track"></div><div class="fillr" style="width:28%"></div><div class="puck" style="left:28%"></div><div class="bub" style="left:28%">1.0%</div></div>
+        <div class="ticks"><span>0.25%</span><span>1%</span><span>2%</span><span>3%</span><span>5%</span></div>
+      </div>
+      <p class="hint" style="margin-top:16px">Risks $124.80 with a 20-pip stop → 0.62 lots</p>
+      <div class="meter">
+        <div class="o-row"><span class="lbl" style="margin:0">Phase 1 · profit target</span><span class="mono" style="font-size:12.5px;font-weight:600">5.2% <span style="color:var(--tx3)">/ 8%</span></span></div>
+        <div class="mbar"><span style="width:65%"></span><i style="left:65%"></i></div>
+        <div class="o-row"><span class="hint" style="margin:0">Daily loss 1.1% of 5%</span><span class="hint" style="margin:0">Day 3 of 4 minimum</span></div>
+      </div>
+    </div>
+    <div class="cc card" style="grid-column:span 4">
+      <h4>Toast &amp; sheet</h4>
+      <div class="toast glass" style="--glass:var(--s2)"><span class="ic"><svg class="i s18"><use href="#i-check"/></svg></span><div><b>Order filled</b><span>Bought 0.50 EUR/USD at 1.16418</span></div><time>now</time></div>
+      <div class="modal card" style="margin-top:14px;box-shadow:var(--sh2),inset 0 0 0 1px var(--line)"><div class="grab"></div><h5>Close this position?</h5><p>EUR/USD buy 0.50 · P&amp;L <b class="up-tx">+$61.00</b></p><div class="acts"><button class="btn v-ghost" style="flex:1">Keep open</button><button class="btn" style="flex:1">Close position</button></div></div>
+    </div>
+    <div class="cc card" style="grid-column:span 6">
+      <h4>Inputs</h4>
+      <div class="ingrid">
+        <div><span class="lbl">Amount</span><div class="field focus"><span>500</span><span class="suf">USDT</span></div><p class="hint">Minimum 10 USDT · usually credited within a minute</p></div>
+        <div><span class="lbl">Email</span><div class="field"><span class="ph">you@example.com</span></div></div>
+        <div><span class="lbl">Withdrawal address</span><div class="field err"><span>TQ9x…h4</span></div><p class="hint err">This is a TRC20 address. Choose TRON as the network.</p></div>
+        <div><span class="lbl">Search</span><div class="field"><svg class="i s18" style="color:var(--tx3)"><use href="#i-search"/></svg><span class="ph">Symbols, pages, help</span><span class="kbd" style="margin-left:auto">⌘K</span></div></div>
+      </div>
+    </div>
+    <div class="cc card typo" style="grid-column:span 6">
+      <h4>Type <span>Archivo · Instrument Sans · JetBrains Mono</span></h4>
+      <div class="ln"><span class="m">Display 800<br>wdth 125</span><span class="d" style="font-size:44px">Made simple.</span></div>
+      <div class="ln"><span class="m">Money 700<br>wdth 108</span><span class="money" style="font-size:32px">$24,806.42</span></div>
+      <div class="ln"><span class="m">Text 400/600</span><span style="font-size:15px">Your risk is the premium, and you see it <b>before you buy</b>.</span></div>
+      <div class="ln"><span class="m">Mono 500</span><span class="mono" style="font-size:14px">EUR/USD 1.16412 / 1.16418 · 0.50</span></div>
+      <div class="ln"><span class="m">Option B<br>Unbounded + Onest</span><span style="font:700 30px/1 'Unbounded';letter-spacing:-.04em">Made simple.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 05 BRAND -->
+<section class="wrap sec" id="brand">
+  <div class="sec-h">
+    <h2><span class="n">05 — Brand</span>A red K with a yellow edge</h2>
+    <p>The founder's K, now a NeoPOP block: red face, yellow edge. On yellow the edge turns black; on red the face turns black.</p>
+  </div>
+  <div class="bgrid">
+    <div class="lock" style="background:#0B0809;color:#F6EEE8"><svg width="190" height="55" style="--kword:#F6EEE8"><use href="#wordmark"/></svg><span class="cap2">on black</span></div>
+    <div class="lock" style="background:#FFFFFF;color:#0B0809;box-shadow:inset 0 0 0 1px var(--line)"><svg width="190" height="55" style="--kword:#0B0809"><use href="#wordmark"/></svg><span class="cap2">on white</span></div>
+    <div class="lock" style="background:#D4112A;color:#fff"><svg width="190" height="55" style="--kface:#0B0809;--kedge:#FFD21F;--kword:#fff"><use href="#wordmark"/></svg><span class="cap2">on red</span></div>
+    <div class="lock" style="background:#FFD21F;color:#0B0809"><svg width="190" height="55" style="--kedge:#0B0809;--kword:#0B0809"><use href="#wordmark"/></svg><span class="cap2">on yellow</span></div>
+    <div class="icons card">
+      <div class="ich"><h4 style="font:700 16px/1.2 var(--f-text)">App icon &amp; favicon</h4><p>Black is the default: the red face and yellow edge read at every size, on any wallpaper. Red and yellow are for campaigns and white-label previews.</p></div>
+      <div><div class="appic" style="background:#0B0809"><svg width="66" height="56"><use href="#kmark"/></svg></div><span class="cap">app · black</span></div>
+      <div><div class="appic" style="background:#D4112A"><svg width="66" height="56" style="--kface:#0B0809"><use href="#kmark"/></svg></div><span class="cap">app · red</span></div>
+      <div><div class="appic" style="background:#FFD21F"><svg width="66" height="56" style="--kedge:#0B0809"><use href="#kmark"/></svg></div><span class="cap">app · yellow</span></div>
+      <div class="fav"><div><div class="fi" style="width:32px;height:32px"><svg width="22" height="19"><use href="#kmark"/></svg></div><span class="cap">32</span></div><div><div class="fi" style="width:16px;height:16px;border-radius:4px"><svg width="12" height="10" style="--kedge:#D4112A"><use href="#kmark"/></svg></div><span class="cap">16</span></div></div>
+    </div>
+    <div class="imgrule card">
+      <h4 style="font:700 16px/1.2 var(--f-text);margin-bottom:14px">Imagery: one subject, one flat colour</h4>
+      <div class="thumbs">
+        <div><img src="img/robot-red.jpg" alt="" style="object-position:62% 30%"><span>#E00302</span></div>
+        <div><img src="img/figure-yellow.jpg" alt="" style="object-position:50% 20%"><span>#FFD224</span></div>
+        <div><img src="img/emblem-crimson.jpg" alt="" style="object-position:50% 40%"><span>#F80E0D</span></div>
+      </div>
+      <div class="rules">
+        <div><b>Backdrop</b> — one flat palette colour, extended in CSS so the frame never ends.</div>
+        <div><b>Subject</b> — black, glossy, sculptural; faces or moves toward the text.</div>
+        <div><b>Never</b> — stock-photo traders, screens, charts, cityscapes, rainbow light.</div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="wrap end">Kalks 2 · R0 direction sample · static page, no live data. Numbers on the website frame come from the platform's facts file; account numbers are examples.</footer>
+
+<script>
+(function(){
+  /* ---------- theme: Auto follows the OS; Light / Dark override (remembered per viewer) */
+  var root=document.documentElement, mq=window.matchMedia('(prefers-color-scheme: dark)'), mode='auto';
+  try{mode=localStorage.getItem('k2-theme')||'auto'}catch(e){}
+  var seg=document.getElementById('theme');
+  function apply(){
+    if(mode==='auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme',mode);
+    seg.querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.mode===mode))});
+  }
+  seg.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;mode=b.dataset.mode;try{localStorage.setItem('k2-theme',mode)}catch(err){}apply()});
+  var q=new URLSearchParams(location.search).get('theme'); if(q){mode=q}
+  apply();
+
+  /* ---------- seeded random */
+  function rng(s){return function(){s=(s*1664525+1013904223)%4294967296;return s/4294967296}}
+  var NS='http://www.w3.org/2000/svg';
+  function el(n,a,p){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+
+  /* ---------- sparklines */
+  document.querySelectorAll('.spk').forEach(function(s){
+    var r=rng(+s.dataset.seed*977+13),dir=+s.dataset.dir,v=[],x=0;for(var i=0;i<24;i++){x+=(r()-.5)*1.4+dir*.12;v.push(x)}
+    var mn=Math.min.apply(0,v),mx=Math.max.apply(0,v),W=64,H=18;
+    var d=v.map(function(y,i){return (i?'L':'M')+(i*W/23).toFixed(1)+' '+(H-2-(y-mn)/(mx-mn||1)*(H-4)).toFixed(1)}).join('');
+    el('path',{d:d,fill:'none','stroke-width':1.5,'stroke-linecap':'round','stroke-linejoin':'round',style:'stroke:var('+(dir>0?'--up':'--dn')+')'},s);
+  });
+
+  /* ---------- equity line */
+  (function(){
+    var s=document.getElementById('eqsvg'),r=rng(4242),v=[],x=0;for(var i=0;i<60;i++){x+=(r()-.42)*1.1;if(i>38&&i<44)x-=.9;v.push(x)}
+    var mn=Math.min.apply(0,v),mx=Math.max.apply(0,v),W=320,H=150;
+    var pts=v.map(function(y,i){return [i*W/59,H-10-(y-mn)/(mx-mn)*(H-30)]});
+    var d=pts.map(function(p,i){return (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)}).join('');
+    var g=el('linearGradient',{id:'eqg',x1:0,y1:0,x2:0,y2:1},el('defs',{},s));
+    el('stop',{offset:0,style:'stop-color:var(--accent-fill);stop-opacity:.55'},g);el('stop',{offset:1,style:'stop-color:var(--accent-fill);stop-opacity:0'},g);
+    for(var k=1;k<4;k++)el('line',{x1:0,x2:W,y1:k*H/4,y2:k*H/4,style:'stroke:var(--line)','vector-effect':'non-scaling-stroke'},s);
+    el('path',{d:d+'L'+W+' '+H+'L0 '+H+'Z',fill:'url(#eqg)'},s);
+    el('path',{d:d,fill:'none','stroke-width':2,'vector-effect':'non-scaling-stroke','stroke-linejoin':'round',style:'stroke:var(--accent-line)'},s);
+  })();
+
+  /* ---------- candlestick chart (static, seeded) */
+  function drawChart(){
+    var host=document.getElementById('chart'),svg=document.getElementById('csvg');
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    host.querySelectorAll('.pchip,.tip,.ptag,.xtag').forEach(function(n){n.remove()});
+    var W=host.clientWidth,H=host.clientHeight; if(!W||!H)return;
+    svg.setAttribute('viewBox','0 0 '+W+' '+H);
+    var AX=72,TB=26,cw=W-AX,ch=H-TB,step=W<600?7:9,N=Math.floor((cw-40)/step);
+    var r=rng(20261009),c=[],p=0;
+    for(var i=0;i<N;i++){
+      var t=i/N,drift=t<.35?.10:t<.55?-.02:t<.68?-.55:t<.74?-.1:.45;
+      p+=drift+(r()-.5)*1.5; c.push(p);
+    }
+    // map to price: last close = 1.16412, scale so range ~ 32 pips
+    var mn=Math.min.apply(0,c),mx=Math.max.apply(0,c),last=c[N-1];
+    var k=0.0032/(mx-mn), P=c.map(function(v){return 1.16412+(v-last)*k});
+    var C=[],prev=P[0]-0.00004;
+    for(i=0;i<N;i++){var o=prev,cl=P[i],hi=Math.max(o,cl)+r()*0.00022,lo=Math.min(o,cl)-r()*0.00022;C.push({o:o,h:hi,l:lo,c:cl,v:.3+r()*.7+(i/N>.55&&i/N<.75?.6:0)});prev=cl}
+    C[N-1].c=1.16412; if(C[N-1].o>C[N-1].c)C[N-1].o=1.16396;
+    var lo=Math.min.apply(0,C.map(function(d){return d.l})),hi=Math.max.apply(0,C.map(function(d){return d.h}));
+    lo=Math.min(lo,1.16290);var pad=(hi-lo)*.12;lo-=pad;hi+=pad*1.4;
+    function Y(v){return (hi-v)/(hi-lo)*ch}
+    function X(i){return 14+i*step+step/2}
+    // grid + price axis
+    var ci=12*Math.round(N*.8/12),cd=C[ci],cxp=Math.round(X(ci))+.5,cyp=Math.round(Y(cd.c))+.5,pyp=Y(1.16290),lyp=Y(1.16412);
+    var g=el('g',{},svg),stepP=0.0005;
+    for(var v=Math.ceil(lo/stepP)*stepP;v<hi;v+=stepP){var y=Math.round(Y(v))+.5;el('line',{x1:0,x2:cw,y1:y,y2:y,class:'c-grid'},g);if(Math.abs(y-pyp)<15||Math.abs(y-lyp)<20||Math.abs(y-cyp)<15)continue;var tx=el('text',{x:cw+10,y:y+4,class:'c-ax'},svg);tx.textContent=v.toFixed(4)}
+    var hours=['06:00','09:00','12:00','15:00','18:00','21:00','Fri 9','03:00','06:00','09:00','12:00','15:00','18:00'];
+    for(i=6,k=0;i<N;i+=12,k++){var x=Math.round(X(i))+.5;el('line',{x1:x,x2:x,y1:0,y2:ch,class:'c-grid'},g);if(Math.abs(x-cxp)<75)continue;var tt=el('text',{x:x,y:ch+17,class:'c-ax','text-anchor':'middle'},svg);tt.textContent=hours[k%hours.length]}
+    el('line',{x1:cw+.5,x2:cw+.5,y1:0,y2:H,style:'stroke:var(--line)'},svg);
+    el('line',{x1:0,x2:W,y1:ch+.5,y2:ch+.5,style:'stroke:var(--line)'},svg);
+    // volume
+    var vg=el('g',{},svg);
+    C.forEach(function(d,i){var vh=d.v*ch*.11;el('rect',{x:X(i)-step*.32,y:ch-vh,width:step*.64,height:vh,class:d.c>=d.o?'c-volu':'c-vold'},vg)});
+    // trend line drawing (between two swing lows)
+    if(W>=600){var a=0;for(i=1;i<N;i++)if(C[i].l<C[a].l)a=i;
+    var b=Math.min(N-3,a+14);for(i=a+14;i<Math.min(N-2,a+30);i++)if(C[i].l<C[b].l)b=i;
+    var sl=(C[b].l-C[a].l)/(b-a),off=0;for(i=a;i<N;i++){var dv=C[i].l-(C[a].l+sl*(i-a));if(dv<off)off=dv}
+    var L0=function(i){return C[a].l+off+sl*(i-a)};
+    el('line',{x1:X(a),y1:Y(L0(a))+2,x2:X(N+1),y2:Y(L0(N+1))+2,class:'c-draw'},svg);
+    el('circle',{cx:X(a),cy:Y(L0(a))+2,r:3.5,class:'c-hdl'},svg);el('circle',{cx:X(b),cy:Y(L0(b))+2,r:3.5,class:'c-hdl'},svg);}
+    // candles
+    var cg=el('g',{},svg);
+    C.forEach(function(d,i){var up=d.c>=d.o,cls=up?'c-up':'c-dn',x=X(i),bw=Math.max(3,step*.62);
+      el('line',{x1:x,x2:x,y1:Y(d.h),y2:Y(d.l),class:cls,'stroke-width':1},cg);
+      var yt=Y(Math.max(d.o,d.c)),hb=Math.max(1,Math.abs(Y(d.o)-Y(d.c)));
+      el('rect',{x:x-bw/2,y:yt,width:bw,height:hb,rx:.8,class:cls,'stroke-width':0},cg)});
+    // MA 20
+    var ma=[],md='';for(i=0;i<N;i++){if(i<19)continue;var s=0;for(var j=i-19;j<=i;j++)s+=C[j].c;ma[i]=s/20;md+=(md?'L':'M')+X(i).toFixed(1)+' '+Y(ma[i]).toFixed(1)}
+    el('path',{d:md,class:'c-ma'},svg);
+    document.getElementById('maval').textContent=ma[N-1].toFixed(5);
+    // crosshair at a candle
+    var cx=cxp,cy=cyp;
+    el('line',{x1:cx,x2:cx,y1:0,y2:ch,class:'c-cross'},svg);el('line',{x1:0,x2:cw,y1:cy,y2:cy,class:'c-cross'},svg);
+    var xt=document.createElement('div');xt.className='xtag';xt.textContent='Fri 9 Oct 14:45';host.appendChild(xt);xt.style.left=(cx-xt.offsetWidth/2)+'px';xt.style.top=(ch+5)+'px';
+    var yt=document.createElement('div');yt.className='xtag';yt.textContent=cd.c.toFixed(5);host.appendChild(yt);yt.style.left=(cw+2)+'px';yt.style.top=(cy-9)+'px';
+    var f=function(v){return v.toFixed(5)},chg=cd.c-cd.o,cl=chg>=0?'up-tx':'dn-tx';
+    document.getElementById('ohlc').innerHTML='<span>O <b class="'+cl+'">'+f(cd.o)+'</b></span><span>H <b class="'+cl+'">'+f(cd.h)+'</b></span><span>L <b class="'+cl+'">'+f(cd.l)+'</b></span><span>C <b class="'+cl+'">'+f(cd.c)+'</b></span><span><b class="'+cl+'">'+(chg>=0?'+':'−')+Math.abs(chg*1e5).toFixed(0)+' pts</b></span>';
+    // position line: buy 0.50 @ 1.16290
+    var py=Math.round(Y(1.16290))+.5;
+    el('line',{x1:0,x2:cw,y1:py,y2:py,class:'c-pos'},svg);
+    var chip=document.createElement('div');chip.className='pchip';
+    chip.innerHTML='<span class="ps">BUY 0.50</span><span class="pl">+$61.00</span><span class="h s" title="Drag to set stop loss">S</span><span class="h t" title="Drag to set take profit">T</span><span class="h c" title="Close"><svg class="i s14"><use href="#i-x"/></svg></span>';
+    host.appendChild(chip);var chx=Math.round(cw*(W<600?.08:.30));chip.style.left=chx+'px';chip.style.top=py+'px';
+    var sEl=chip.querySelector('.h.s');var tip=document.createElement('div');tip.className='tip';tip.textContent='Drag S down for a stop · T up for a target';host.appendChild(tip);
+    tip.style.left=(chx+sEl.offsetLeft+24)+'px';tip.style.top=(py-18)+'px';
+    var pt=document.createElement('div');pt.className='ptag';pt.style.background='var(--up-face)';pt.style.top=py+'px';pt.style.right='auto';pt.style.left=(cw)+'px';pt.style.padding='4px 0 4px 8px';pt.innerHTML='1.16290';host.appendChild(pt);
+    // last price
+    var ly=Math.round(Y(1.16412))+.5;
+    el('line',{x1:0,x2:cw,y1:ly,y2:ly,class:'c-last'},svg);
+    var lt=document.createElement('div');lt.className='ptag';lt.style.left=cw+'px';lt.style.right='auto';lt.style.top=ly+'px';lt.innerHTML='1.16412<small>04:12</small>';host.appendChild(lt);
+  }
+  drawChart();
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawChart);
+  var rt;window.addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(drawChart,120)});
+})();
+</script>
+</body>
+</html>
