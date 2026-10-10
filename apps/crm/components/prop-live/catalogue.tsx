@@ -22,6 +22,7 @@ import {
 } from "./api";
 import { CredentialField, ErrorNote, LoadError, PropTradeButton } from "./ui";
 import { fmt as fmtUsdt, usdtAvailable, useWallet, type Overview } from "@/components/wallet-live/api";
+import { PageHero } from "@/components/page-hero";
 
 const TYPE_ORDER: PlanType[] = ["1-step", "2-step", "instant"];
 const TYPE_ICON: Record<PlanType, React.ReactNode> = {
@@ -543,9 +544,11 @@ export function LivePropStore() {
 
   return (
     <div className="pb-24">
-      <PageHeader
+      <PageHero
+        page="prop"
+        overlap
         title={t("prop.store.title")}
-        subtitle={t("prop.store.subtitle")}
+        lead={t("prop.store.subtitle")}
         actions={
           <Link href="/prop/mine">
             <Button variant="surface" size="lg">

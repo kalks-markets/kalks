@@ -34,20 +34,20 @@ export function categoryLabel(c: string, t: T = tr) {
   return t.dyn(`news.category.${c}`, CATEGORY_LABEL[c] ?? c);
 }
 
-/** Local photo per category (publisher images are never copied; cards use our own library). */
-const COVER: Record<string, string[]> = {
-  macro: ["/assets/photos/finance.jpg", "/assets/photos/skyscrapers.jpg", "/assets/photos/london.jpg", "/assets/photos/nyc.jpg"],
-  forex: ["/assets/photos/money.jpg", "/assets/photos/charts.jpg"],
-  metals: ["/assets/photos/gold.jpg"],
-  indices: ["/assets/photos/stock-market.jpg", "/assets/photos/trading-screen.jpg"],
-  energies: ["/assets/photos/dubai.jpg", "/assets/photos/skyline.jpg"],
-  crypto: ["/assets/photos/bitcoin.jpg", "/assets/photos/crypto-coins.jpg", "/assets/photos/crypto.jpg"],
-  stocks: ["/assets/photos/analytics.jpg", "/assets/photos/stock-market.jpg"],
-  markets: ["/assets/photos/dashboard.jpg", "/assets/photos/trader.jpg", "/assets/photos/singapore.jpg"],
+/** A cover per category from the founder's own solid-colour photos (2026-10-10: the old stock library is retired;
+ *  publisher images are never copied). */
+const COVER: Record<string, string> = {
+  macro: "/heroes/news.jpg",
+  forex: "/heroes/markets.jpg",
+  metals: "/heroes/rewards.jpg",
+  indices: "/heroes/portfolio.jpg",
+  energies: "/heroes/profile.jpg",
+  crypto: "/heroes/copy.jpg",
+  stocks: "/heroes/accounts.jpg",
+  markets: "/heroes/wallet.jpg",
 };
 export function coverFor(n: Pick<NewsItem, "id" | "category">) {
-  const list = COVER[n.category] ?? COVER.markets!;
-  return list[n.id % list.length]!;
+  return COVER[n.category] ?? COVER.markets!;
 }
 
 export function ago(iso: string, now = Date.now()) {

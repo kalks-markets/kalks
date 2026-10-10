@@ -11,6 +11,7 @@ import { InstrumentDrawer } from "@/components/markets/instrument-drawer";
 import { FeedGuard } from "@/components/feed-guard";
 import { useT } from "@kalks/i18n/react";
 import { TERMINAL_URL } from "@/lib/live";
+import { PageHero } from "@/components/page-hero";
 
 type Tab = "all" | "fav" | AssetClass;
 const CLASSES: AssetClass[] = ["forex", "metals", "indices", "energies", "crypto", "stocks"];
@@ -196,9 +197,9 @@ export default function MarketsPage() {
 
   return (
     <div className="pb-24">
-      <PageHeader
+      <PageHero page="markets" overlap
         title={t("news.markets.title")}
-        subtitle={t("news.markets.subtitle", { count: INSTRUMENTS.length })}
+        lead={t("news.markets.subtitle", { count: INSTRUMENTS.length })}
         actions={
           <Link target="_blank" rel="noopener" href={TERMINAL_URL}>
             <Button variant="ember" shimmer>

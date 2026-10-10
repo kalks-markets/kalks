@@ -14,7 +14,8 @@ import { activeSub } from "./nav-utils";
 
 /** The module's pages as text tabs with an accent underline. `fit` (desktop): as many tabs as the space allows, the
  *  rest in a "More" menu (the current page always stays visible); otherwise the row scrolls sideways (touch). */
-export function SubNav({ items, className, fit = false }: { items: SubNavItem[]; className?: string; fit?: boolean }) {
+/** `iconOnly`: the compact top bar, every page as a small icon box (its name on hover). */
+export function SubNav({ items, className, fit = false, iconOnly = false }: { items: SubNavItem[]; className?: string; fit?: boolean; iconOnly?: boolean }) {
   const t = useT();
   const pathname = usePathname();
   const cur = activeSub(pathname, items);
@@ -88,9 +89,19 @@ export function SubNav({ items, className, fit = false }: { items: SubNavItem[];
     overflow = items.filter((s) => !keep.has(s));
   }
 
-  const tabCls = (on: boolean) => cn("relative flex h-11 shrink-0 items-center gap-2 whitespace-nowrap px-2.5 text-[14px] font-semibold transition-colors", on ? "text-fg" : "text-fg-3 hover:text-fg");
+  const tabCls = (on: boolean) =>
+    iconOnly
+      ? cn("relative grid size-10 shrink-0 place-items-center rounded-[12px] border transition-colors", on ? "border-line-2 bg-surface-3 text-fg" : "border-transparent text-fg-3 hover:bg-surface-3 hover:text-fg")
+      : cn("relative flex h-11 shrink-0 items-center gap-2 whitespace-nowrap px-2.5 text-[14px] font-semibold transition-colors", on ? "text-fg" : "text-fg-3 hover:text-fg");
   const body = (s: SubNavItem, on: boolean) => {
     const Icon = s.icon;
+    if (iconOnly)
+      return (
+        <>
+          {Icon ? <Icon className={cn("size-[18px] shrink-0", on ? "text-ember" : "")} strokeWidth={1.9} /> : <span className="text-[13px] font-bold">{String(s.label).slice(0, 1)}</span>}
+          {s.badge !== undefined && <span className="absolute -end-0.5 -top-0.5 size-2 rounded-full bg-ember ring-2 ring-[var(--k-bg)]" />}
+        </>
+      );
     return (
       <>
         {Icon && <Icon className={cn("size-[17px] shrink-0", on ? "text-ember" : "")} strokeWidth={1.9} />}
@@ -119,9 +130,18 @@ export function SubNav({ items, className, fit = false }: { items: SubNavItem[];
       {visible.map((s) => {
         const on = s === cur;
         return (
-          <Link key={s.href} href={s.href} prefetch data-sub-active={on || undefined} aria-current={on ? "page" : undefined} className={tabCls(on)}>
+          <Link
+            key={s.href}
+            href={s.href}
+            prefetch
+            data-sub-active={on || undefined}
+            aria-current={on ? "page" : undefined}
+            aria-label={iconOnly ? String(s.label) : undefined}
+            title={iconOnly ? String(s.label) : undefined}
+            className={tabCls(on)}
+          >
             {body(s, on)}
-            {on && <motion.span layoutId={`crm-subnav-${lid}`} className="absolute inset-x-2.5 bottom-0.5 h-[2.5px] rounded-full bg-ember" transition={{ type: "spring", bounce: 0.18, duration: 0.45 }} />}
+            {on && !iconOnly && <motion.span layoutId={`crm-subnav-${lid}`} className="absolute inset-x-2.5 bottom-0.5 h-[2.5px] rounded-full bg-ember" transition={{ type: "spring", bounce: 0.18, duration: 0.45 }} />}
           </Link>
         );
       })}

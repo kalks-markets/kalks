@@ -2,16 +2,17 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Columns3, Crown, Landmark, LineChart, Repeat, ShieldCheck, SlidersHorizontal, Trophy, Users, Wallet, X as XIcon } from "lucide-react";
+import { Check, ChevronDown, Columns3, Crown, Landmark, LineChart, Repeat, Search, ShieldCheck, SlidersHorizontal, Trophy, Users, Wallet, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
-import { Button, Card, CardHeader, Chip, DataTable, EmptyState, Menu, PageHeader, Popover, Segmented, Skeleton, Sparkline, Toggle, Tooltip, cn, type Column } from "@/components/kit";
+import { Button, Card, CardHeader, Chip, EmptyState, Menu, Popover, Segmented, Skeleton, Toggle, Tooltip, cn } from "@/components/kit";
 import { useFormat, useT } from "@kalks/i18n/react";
-import { compactUsd, formatAge, pct, useSocial, type Leaderboard, type MasterView } from "./api";
-import { HouseBadge, MasterIdentity, RiskBadge, SocialError } from "./bits";
+import { compactUsd, pct, useSocial, type Leaderboard, type MasterView } from "./api";
+import { SocialError } from "./bits";
 import { COMPARE_MAX, CompareDialog } from "./compare";
 import { FollowDialog } from "./follow-dialog";
 import { InvestDialog } from "./invest-dialog";
+import { PageHero } from "@/components/page-hero";
+import { VcBadge, VisitingCard } from "@/components/visiting-card";
 
 type Period = "1m" | "3m" | "1y" | "all";
 type SortKey = "return" | "dd" | "aum" | "followers" | "age";
@@ -45,7 +46,6 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
 export function LiveDiscoverPage() {
   const t = useT();
   const f = useFormat();
-  const router = useRouter();
   const [period, setPeriod] = React.useState<Period>("3m");
   const [sort, setSort] = React.useState<SortKey>("return");
   const [program, setProgram] = React.useState<ProgramF>("all");
@@ -85,127 +85,97 @@ export function LiveDiscoverPage() {
     setPicked((p) => [...p, m]);
   };
 
-  const columns: Column<MasterView>[] = [
-    {
-      key: "cmp",
-      header: <span className="sr-only">{t("social.compare.title")}</span>,
-      cell: (m) => {
-        const on = isPicked(m.id);
-        return (
+  // the board as visiting cards (founder 2026-10-10), searchable, 12 at a time
+  const [q, setQ] = React.useState("");
+  const [shown, setShown] = React.useState(12);
+  const needle = q.trim().toLowerCase();
+  const list = needle ? rows.filter((m) => `${m.nickname} ${m.strategy}`.toLowerCase().includes(needle)) : rows;
+  const programLabel = (m: MasterView) => (m.program === "pamm" ? "PAMM" : m.program === "both" && m.fund ? `${t("social.program.copy")} · PAMM` : t("social.program.copy"));
+
+  const masterCard = (m: MasterView, i: number) => {
+    const r = retOf(m, period);
+    const on = isPicked(m.id);
+    const ivory = m.program === "pamm";
+    return (
+      <div key={m.id} className="flex flex-col" data-testid="master-card">
+        <div className="relative">
+          <Link href={`/social/masters/${m.id}`} className="block transition-transform hover:-translate-y-0.5">
+            <VisitingCard
+              finish={ivory ? "ivory" : "black"}
+              kicker={`#${i + 1} · ${programLabel(m)}`}
+              name={m.nickname}
+              title={m.strategy}
+              badges={
+                (m.house || (m.program !== "pamm" && m.acceptingNew === false)) && (
+                  <>
+                    {m.house && <VcBadge finish={ivory ? "ivory" : "black"}>{t("social.house.badge")}</VcBadge>}
+                    {m.program !== "pamm" && m.acceptingNew === false && <VcBadge finish={ivory ? "ivory" : "black"}>{t("social.lb.closedChip")}</VcBadge>}
+                  </>
+                )
+              }
+              stats={[
+                { label: t("social.lb.col.return", { period: t(PERIOD_LABEL[period]) }), value: pct(r, 1), tone: r > 0 ? "up" : r < 0 ? "down" : undefined },
+                { label: t("social.maxDd"), value: m.stats.maxDd > 0 ? `-${m.stats.maxDd.toFixed(1)}%` : "0.0%", tone: m.stats.maxDd > 0 ? "down" : undefined },
+                { label: t("social.followers"), value: f.number(m.stats.followers, 0) },
+                { label: t("social.risk"), value: `${Math.max(1, Math.min(10, Math.round(m.stats.riskScore || 1)))}/10` },
+              ]}
+            />
+          </Link>
+          {/* pick up to three to compare */}
           <Tooltip content={on ? t("social.compare.remove", { name: m.nickname }) : t("social.compare.add")}>
             <button
               type="button"
               aria-pressed={on}
               aria-label={on ? t("social.compare.remove", { name: m.nickname }) : t("social.compare.add")}
-              onClick={(e) => {
-                e.stopPropagation();
-                togglePick(m);
-              }}
-              className={cn("grid size-5 place-items-center rounded-[6px] border transition-colors", on ? "border-ember bg-ember text-white" : "border-line bg-surface-2 text-transparent hover:border-ember/50")}
+              onClick={() => togglePick(m)}
+              className={cn(
+                "absolute end-3 top-3 grid size-7 place-items-center rounded-full border transition-colors",
+                on ? "border-ember bg-ember text-white" : ivory ? "border-black/20 bg-black/5 text-transparent hover:border-ember/60" : "border-white/25 bg-white/10 text-transparent hover:border-white/60",
+              )}
               data-testid="copy-compare-toggle"
             >
-              <Check className="size-3.5" />
+              <Check className="size-4" />
             </button>
           </Tooltip>
-        );
-      },
-      width: "36px",
-    },
-    {
-      key: "rank",
-      header: "#",
-      cell: (_, i) => <span className={cn("font-mono text-[12px]", i < 3 && sort === "return" ? "text-gold" : "text-fg-3")}>{i + 1}</span>,
-      width: "48px",
-    },
-    {
-      key: "m",
-      header: t("social.master"),
-      cell: (m) => (
-        <MasterIdentity
-          nickname={m.nickname}
-          size={36}
-          sub={
-            <span className="flex items-center gap-1.5">
-              {m.house && <HouseBadge />}
-              <span className="truncate">{m.strategy}</span>
-              {m.program === "both" && m.fund && (
-                <Chip size="sm" tone="gold">
-                  PAMM
-                </Chip>
-              )}
-              {m.program === "pamm" && (
-                <Chip size="sm" tone="gold">
-                  {t("social.lb.pammOnly")}
-                </Chip>
-              )}
-              {m.program !== "pamm" && m.acceptingNew === false && (
-                <Chip size="sm" tone="warn">
-                  {t("social.lb.closedChip")}
-                </Chip>
-              )}
-            </span>
-          }
-        />
-      ),
-      width: "260px",
-    },
-    {
-      key: "ret",
-      header: <span className="whitespace-nowrap">{t("social.lb.col.return", { period: t(PERIOD_LABEL[period]) })}</span>,
-      align: "right",
-      cell: (m) => {
-        const r = retOf(m, period);
-        return <span className={cn("k-num text-[14px] font-semibold", r > 0 ? "text-up" : r < 0 ? "text-down" : "text-fg-2")}>{pct(r, 1)}</span>;
-      },
-      sort: (m) => retOf(m, period),
-    },
-    {
-      key: "spark",
-      header: t("social.lb.col.growth"),
-      align: "right",
-      cell: (m) => (m.stats.spark?.length > 1 ? <Sparkline data={m.stats.spark} width={72} height={26} tone={m.stats.spark[m.stats.spark.length - 1]! >= m.stats.spark[0]! ? "up" : "down"} className="ms-auto" /> : <span className="text-fg-3">—</span>),
-      hideOn: "lg",
-    },
-    { key: "dd", header: <span className="whitespace-nowrap">{t("social.maxDd")}</span>, align: "right", cell: (m) => <span className={cn("k-num", m.stats.maxDd > 0 ? "text-down" : "text-fg-2")}>{m.stats.maxDd > 0 ? `-${m.stats.maxDd.toFixed(1)}%` : "0.0%"}</span>, sort: (m) => -m.stats.maxDd },
-    { key: "aum", header: t("social.aum"), align: "right", cell: (m) => <span className="k-num">{compactUsd(m.stats.aum)}</span>, sort: (m) => m.stats.aum },
-    { key: "fol", header: t("social.followers"), align: "right", cell: (m) => <span className="k-num text-fg-2">{f.number(m.stats.followers, 0)}</span>, sort: (m) => m.stats.followers, hideOn: "md" },
-    { key: "age", header: t("social.lb.col.age"), align: "right", cell: (m) => <span className="k-num whitespace-nowrap text-fg-2">{formatAge(m.ageDays)}</span>, sort: (m) => m.ageDays, hideOn: "sm" },
-    { key: "risk", header: t("social.risk"), align: "center", cell: (m) => <RiskBadge risk={m.stats.riskScore} />, sort: (m) => m.stats.riskScore },
-    {
-      key: "act",
-      header: "",
-      align: "right",
-      cell: (m) => (
-        <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          {m.fund && m.program !== "copy" && m.fund.status === "active" && (
-            <Button size="xs" variant="surface" onClick={() => setInvestFund(m.fund!.id)}>
-              {t("social.invest")}
-            </Button>
-          )}
-          {m.program !== "pamm" && !m.frozen && m.acceptingNew !== false && (
-            <Button size="xs" variant="ember" onClick={() => setCopyM(m)}>
-              {t("social.program.copy")}
-            </Button>
-          )}
-          {m.program !== "pamm" && !m.frozen && m.acceptingNew === false && (
-            <Tooltip content={t("social.notAccepting")}>
-              <span>
-                <Button size="xs" variant="surface" disabled>
-                  {t("social.program.copy")}
-                </Button>
-              </span>
-            </Tooltip>
-          )}
         </div>
-      ),
-    },
-  ];
+        <div className="mt-3 flex items-center gap-2">
+          {m.program !== "pamm" && !m.frozen && (
+            m.acceptingNew === false ? (
+              <Tooltip content={t("social.notAccepting")}>
+                <span className="flex-1">
+                  <Button size="sm" variant="surface" disabled className="w-full">
+                    {t("social.program.copy")}
+                  </Button>
+                </span>
+              </Tooltip>
+            ) : (
+              <Button size="sm" variant="ember" className="flex-1" onClick={() => setCopyM(m)}>
+                <Repeat /> {t("social.program.copy")}
+              </Button>
+            )
+          )}
+          {m.fund && m.program !== "copy" && m.fund.status === "active" && (
+            <Button size="sm" variant="surface" className="flex-1" onClick={() => setInvestFund(m.fund!.id)}>
+              <Wallet /> {t("social.invest")}
+            </Button>
+          )}
+          <Link href={`/social/masters/${m.id}`} className="shrink-0">
+            <Button size="sm" variant="ghost">
+              {t("common.details")}
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="pb-24">
-      <PageHeader
+      <PageHero
+        page="copy"
+        overlap
         title={t("social.lb.title")}
-        subtitle={t("social.lb.subtitle")}
+        lead={t("social.lb.subtitle")}
         actions={
           <>
             <Link href="/social/copy">
@@ -376,15 +346,35 @@ export function LiveDiscoverPage() {
                   }
                 />
               ) : (
-                <DataTable
-                  columns={columns}
-                  rows={rows}
-                  pageSize={15}
-                  rowKey={(m) => String(m.id)}
-                  onRowClick={(m) => router.push(`/social/masters/${m.id}`)}
-                  search={(m) => `${m.nickname} ${m.strategy}`}
-                  searchPlaceholder={t("social.lb.searchPlaceholder")}
-                />
+                <>
+                  <div className="mb-5 flex h-10 max-w-[360px] items-center gap-2 rounded-full border border-line bg-surface-2 px-3.5">
+                    <Search className="size-4 text-fg-3" />
+                    <input
+                      value={q}
+                      onChange={(e) => {
+                        setQ(e.target.value);
+                        setShown(12);
+                      }}
+                      placeholder={t("social.lb.searchPlaceholder")}
+                      aria-label={t("social.lb.searchPlaceholder")}
+                      className="w-full bg-transparent text-[13px] outline-none placeholder:text-fg-3"
+                    />
+                  </div>
+                  {list.length === 0 ? (
+                    <p className="py-10 text-center text-[13px] text-fg-3">{t("social.lb.empty.filteredText")}</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-x-5 gap-y-7 md:grid-cols-2 xl:grid-cols-3" data-testid="master-grid">
+                      {list.slice(0, shown).map((m) => masterCard(m, rows.indexOf(m)))}
+                    </div>
+                  )}
+                  {list.length > shown && (
+                    <div className="mt-6 flex justify-center">
+                      <Button variant="surface" onClick={() => setShown((n) => n + 12)}>
+                        {t.dyn("common.showMore", "Show more")} <ChevronDown />
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </Card>

@@ -8,14 +8,15 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight, Briefcase, FileText, Loader2, Settings2, ShieldCheck, Unlink, Users } from "lucide-react";
 import { toast } from "sonner";
-import { Avatar, Button, Card, CardHeader, Chip, DataTable, Dialog, EmptyState, Field, Input, PageHeader, StatusChip, cn, type Column } from "@/components/kit";
+import { Button, Card, CardHeader, Chip, DataTable, Dialog, EmptyState, Field, Input, PageHeader, StatusChip, cn, type Column } from "@/components/kit";
 import { Trans, useT } from "@kalks/i18n/react";
 import { Checkbox } from "@/components/social/controls";
 import { TradeButton } from "@/components/trading/ui";
 import { fmtDate, fmtPrice, serverTime } from "@/components/trading/api";
 import { PERIOD_LABEL, pct, socialApi, usd, useSocial } from "./api";
-import { BlockSkeleton, InfoBox, RiskBadge, SocialError, Tile, useNumber } from "./bits";
+import { BlockSkeleton, InfoBox, SocialError, Tile, useNumber } from "./bits";
 import { FeesTable } from "./subscriptions";
+import { VisitingCard } from "@/components/visiting-card";
 import { METHOD_HINT, METHOD_LABEL, STOP_REASON, lots, valueText, type Candidate, type LinkDetail, type LinkView, type ManagerDetail, type ManagerView } from "./mam-api";
 
 const tone = (v: number) => (v > 0 ? "text-up" : v < 0 ? "text-down" : "text-fg-2");
@@ -371,10 +372,20 @@ function LinkCard({ l, onDetails, onLimits, onRevoke }: { l: LinkView; onDetails
   const t = useT();
   const active = l.status === "active";
   return (
-    <div className="k-row px-4 py-4" data-testid={`mam-link-${l.id}`}>
+    <div className="k-row grid grid-cols-1 gap-5 px-4 py-4 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)]" data-testid={`mam-link-${l.id}`}>
+      <VisitingCard
+        finish="graphite"
+        kicker={`MAM · ${l.manager ? METHOD_LABEL[l.manager.method] : ""}`}
+        name={l.manager?.name ?? t("social.mam.programme")}
+        title={l.manager?.nickname}
+        stats={[
+          { label: t("common.equity"), value: usd(l.equity) },
+          { label: t("social.mam.result"), value: usd(l.mamResult, 2, true), tone: l.mamResult > 0 ? "up" : l.mamResult < 0 ? "down" : undefined },
+        ]}
+      />
+      <div className="min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar name={l.manager?.nickname ?? "MAM"} size={40} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="truncate text-[14px] font-medium">{l.manager?.name ?? t("social.mam.programme")}</span>
@@ -402,11 +413,7 @@ function LinkCard({ l, onDetails, onLimits, onRevoke }: { l: LinkView; onDetails
           <TradeButton a={{ login: Number(l.login), status: "active" }} />
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <Tile label={t("common.equity")}>{usd(l.equity)}</Tile>
-        <Tile label={t("social.mam.result")}>
-          <span className={tone(l.mamResult)}>{usd(l.mamResult, 2, true)}</span>
-        </Tile>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Tile label={t("social.mam.openTrades")}>
           {l.mamPositions}
           {l.mamOrders ? <span className="text-fg-3"> {t("social.mam.plusPending", { n: l.mamOrders })}</span> : null}
@@ -416,6 +423,7 @@ function LinkCard({ l, onDetails, onLimits, onRevoke }: { l: LinkView; onDetails
           {l.maxLot ?? "—"} · {l.equityStop ? usd(l.equityStop, 0) : "—"}
         </Tile>
         <Tile label={t("social.inv.kpi.feesPaid")}>{usd(l.feesPaid)}</Tile>
+      </div>
       </div>
     </div>
   );
@@ -434,43 +442,40 @@ export function LiveManagedPage() {
   const ended = items.filter((l) => l.status !== "active");
   const linkedTo = new Set(active.map((l) => l.managerId));
 
-  const cols: Column<ManagerView>[] = [
-    {
-      key: "m",
-      header: t("social.md.programme"),
-      cell: (m) => (
-        <span className="flex min-w-0 items-center gap-3">
-          <Avatar name={m.nickname ?? m.name} size={34} />
-          <span className="min-w-0">
-            <span className="block truncate text-[13.5px] font-medium">{m.name}</span>
-            <span className="block truncate text-[12px] text-fg-3">{m.nickname}</span>
+  // the programmes as visiting cards (founder 2026-10-10)
+  const managerCard = (m: ManagerView) => {
+    const r = m.track?.return1y ?? 0;
+    return (
+      <div key={m.id} className="flex flex-col">
+        <VisitingCard
+          finish="graphite"
+          kicker={`MAM · ${METHOD_LABEL[m.method]}`}
+          name={m.name}
+          title={m.nickname ?? undefined}
+          stats={[
+            { label: t("social.lb.col.return", { period: t("social.lb.period.1y") }), value: pct(r, 1), tone: r > 0 ? "up" : r < 0 ? "down" : undefined },
+            { label: t("social.maxDd"), value: `${(m.track?.maxDd ?? 0).toFixed(1)}%` },
+            { label: t("social.fees"), value: `${m.perfFeePct}%${m.mgmtFeePct ? `+${m.mgmtFeePct}` : ""}` },
+            { label: t("common.accounts"), value: String(m.accounts) },
+          ]}
+        />
+        <div className="mt-3 flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3" title={METHOD_HINT[m.method]}>
+            {METHOD_HINT[m.method]}
           </span>
-        </span>
-      ),
-      sort: (m) => m.name,
-    },
-    { key: "a", header: t("social.allocation"), cell: (m) => <span className="text-fg-2" title={METHOD_HINT[m.method]}>{METHOD_LABEL[m.method]}</span>, hideOn: "md" },
-    { key: "r", header: t("social.lb.col.return", { period: t("social.lb.period.1y") }), align: "right", cell: (m) => <span className={cn("k-num", tone(m.track?.return1y ?? 0))}>{pct(m.track?.return1y ?? 0)}</span>, sort: (m) => m.track?.return1y ?? 0, hideOn: "sm" },
-    { key: "dd", header: t("social.maxDd"), align: "right", cell: (m) => <span className="k-num text-fg-2">{(m.track?.maxDd ?? 0).toFixed(1)}%</span>, hideOn: "sm" },
-    { key: "risk", header: t("social.risk"), cell: (m) => <RiskBadge risk={m.track?.riskScore ?? 1} />, hideOn: "lg" },
-    { key: "f", header: t("social.fees"), align: "right", cell: (m) => <span className="k-num whitespace-nowrap text-fg-2">{m.perfFeePct}%{m.mgmtFeePct ? ` + ${m.mgmtFeePct}%/y` : ""}</span>, hideOn: "sm" },
-    { key: "n", header: t("common.accounts"), align: "right", cell: (m) => <span className="k-num">{m.accounts}</span>, sort: (m) => m.accounts, hideOn: "md" },
-    {
-      key: "x",
-      header: "",
-      align: "right",
-      cell: (m) =>
-        linkedTo.has(m.id) ? (
-          <Chip size="sm" tone="up">
-            {t("social.mam.linked")}
-          </Chip>
-        ) : (
-          <Button size="sm" variant="ember" onClick={() => setConnect(m.id)} data-testid={`mam-connect-${m.id}`}>
-            {t("social.mam.connect")}
-          </Button>
-        ),
-    },
-  ];
+          {linkedTo.has(m.id) ? (
+            <Chip size="sm" tone="up">
+              {t("social.mam.linked")}
+            </Chip>
+          ) : (
+            <Button size="sm" variant="ember" onClick={() => setConnect(m.id)} data-testid={`mam-connect-${m.id}`}>
+              {t("social.mam.connect")}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="pb-24">
@@ -523,7 +528,7 @@ export function LiveManagedPage() {
           ) : managers.data.items.length === 0 ? (
             <EmptyState art="copyTrading" title={t("social.mam.page.noProgrammes")} text={t("social.mam.page.noProgrammesText")} />
           ) : (
-            <DataTable columns={cols} rows={managers.data.items} dense pageSize={10} rowKey={(m) => String(m.id)} />
+            <div className="grid grid-cols-1 gap-x-5 gap-y-7 md:grid-cols-2 xl:grid-cols-3">{managers.data.items.map(managerCard)}</div>
           )}
         </div>
       </Card>

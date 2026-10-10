@@ -8,15 +8,16 @@ import { Button, Card, CardHeader, Chip, KpiCard, PageHeader, Progress, Reveal, 
 import { tr, useT } from "@kalks/i18n/react";
 import { LEVEL_TONE, fmtDay, fmtMin, isElective, levelLabel, pct, trackShort, trackTallies, tracksOf, useAcademy, type Catalog, type Certificate } from "./api";
 import { AcademyUnavailable, BackLink, PageSkeleton } from "./shared";
+import { CertificateCard } from "./book";
 
 function CertificateTile({ c }: { c: Certificate }) {
   const t = useT();
   const img = `/api/academy/certificates/${c.code}/image`;
   return (
-    <Card className="flex flex-col overflow-hidden" data-testid="certificate-tile">
-      <a href={img} target="_blank" rel="noopener" className="block border-b border-line">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={img} alt={t("academy.cert.alt", { n: c.phase_order })} className="block aspect-[1600/1131] w-full bg-[#0b0b0e]" />
+    <Card className="flex flex-col overflow-hidden rounded-[26px]" data-testid="certificate-tile">
+      {/* the certificate as paper (the full image opens on click and downloads below) */}
+      <a href={img} target="_blank" rel="noopener" aria-label={t("academy.cert.alt", { n: c.phase_order })} className="block p-4 pb-0 transition-transform hover:-translate-y-0.5">
+        <CertificateCard c={c} />
       </a>
       <div className="flex flex-1 flex-col p-5">
         <div className="flex flex-wrap items-center gap-2">

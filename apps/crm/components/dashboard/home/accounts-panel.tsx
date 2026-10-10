@@ -7,6 +7,7 @@ import * as React from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Plus } from "lucide-react";
+import { useHideMoney } from "@/components/hide-money";
 import { Button, CopyButton, LogoMark, Skeleton, cn, formatMoney } from "@/components/kit";
 import { useT } from "@kalks/i18n/react";
 import { productOrder } from "@/lib/products";
@@ -63,31 +64,77 @@ function Ribbon() {
   );
 }
 
-export function AccountVisual({ a, hidden }: { a: CardAccount; hidden?: boolean }) {
-  const t = useT();
-  const live = a.type === "live" && !a.prop;
+/** the payment chip printed on the card (decorative) */
+function CardChip() {
   return (
-    <div className={cn("k-acct-card relative aspect-[1.6/1] w-full overflow-hidden rounded-[24px] p-5 text-white sm:p-6", live ? "k-acct-live" : "k-acct-demo")}>
+    <svg viewBox="0 0 40 30" className="h-[26px] w-[34px] drop-shadow-[0_1px_2px_rgba(0,0,0,.25)]" aria-hidden>
+      <defs>
+        <linearGradient id="kchip" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f6e3a8" />
+          <stop offset="0.5" stopColor="#d4b062" />
+          <stop offset="1" stopColor="#a8823c" />
+        </linearGradient>
+      </defs>
+      <rect x="0.5" y="0.5" width="39" height="29" rx="6" fill="url(#kchip)" stroke="rgba(0,0,0,.18)" />
+      <path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14" stroke="rgba(80,55,15,.45)" strokeWidth="1" fill="none" />
+    </svg>
+  );
+}
+
+/** One trading account drawn as a debit card (founder 2026-10-10): logo, chip, number, the key figures, name and
+ *  balance on the card itself. Live = Kalks orange, demo = black, prop = gold. */
+export function AccountVisual({ a, hidden: hiddenProp }: { a: CardAccount; hidden?: boolean }) {
+  // follows the client's "hide amounts" eye unless the caller decides
+  const [hiddenAll] = useHideMoney();
+  const hidden = hiddenProp ?? hiddenAll;
+  const t = useT();
+  const kind = a.prop ? "prop" : a.type === "live" ? "live" : "demo";
+  const mask = (v: string) => (hidden ? "••••••" : v);
+  return (
+    <div
+      className={cn(
+        "k-acct-card relative aspect-[1.586/1] w-full overflow-hidden rounded-[22px] p-5 text-white [container-type:inline-size]",
+        kind === "live" ? "k-acct-live" : kind === "prop" ? "k-acct-prop" : "k-acct-demo",
+      )}
+    >
       <Ribbon />
       <div className="relative flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">
-          <LogoMark size={26} className="text-white" />
+          <LogoMark size={24} className="text-white" />
           <span className="flex items-center gap-1.5">
-            {a.product === "options" && <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10.5px] font-bold tracking-[0.08em] backdrop-blur-sm">{t("accounts.product.chipOptions")}</span>}
-            <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10.5px] font-bold tracking-[0.08em] backdrop-blur-sm">{a.prop ? t("accounts.badge.prop") : a.type === "live" ? t("accounts.badge.live") : t("accounts.badge.demo")}</span>
+            {a.product === "options" && <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] backdrop-blur-sm">{t("accounts.product.chipOptions")}</span>}
+            <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] backdrop-blur-sm">{a.prop ? t("accounts.badge.prop") : a.type === "live" ? t("accounts.badge.live") : t("accounts.badge.demo")}</span>
           </span>
         </div>
-        <div dir="ltr" className="k-num mt-auto text-start font-mono text-[19px] font-semibold tracking-[0.14em] [text-shadow:0_1px_8px_rgba(0,0,0,0.18)] sm:text-[22px]">
+        <div className="mt-[4cqw] flex items-center gap-2.5">
+          <CardChip />
+          <svg viewBox="0 0 24 24" className="size-5 text-white/75" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+            <path d="M8.5 7.5a6 6 0 0 1 0 9M12 5a9.5 9.5 0 0 1 0 14M5 10a2.5 2.5 0 0 1 0 4" />
+          </svg>
+        </div>
+        <div dir="ltr" className="k-num mt-auto text-start font-mono text-[clamp(15px,6cqw,22px)] font-semibold tracking-[0.14em] [text-shadow:0_1px_8px_rgba(0,0,0,0.18)]">
           {spacedLogin(a.login)}
         </div>
-        <div className="mt-3 flex items-end justify-between gap-3">
+        <div dir="ltr" className="mt-[2.5cqw] grid grid-cols-3 gap-2">
+          {[
+            [t.dyn("dashboard.account.equity", "Equity"), mask(money(a.equity, a.currency))],
+            [t.dyn("accounts.card.freeMargin", "Free margin"), mask(money(a.freeMargin, a.currency))],
+            [t.dyn("accounts.card.leverage", "Leverage"), `1:${a.leverage}`],
+          ].map(([k, v]) => (
+            <div key={String(k)} className="min-w-0">
+              <div className="truncate text-[9px] font-semibold uppercase tracking-[0.12em] text-white/65">{k}</div>
+              <div className="k-num truncate text-[clamp(11px,3.6cqw,13.5px)] font-semibold">{v}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-[2.5cqw] flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <div className="truncate text-[10.5px] font-semibold uppercase tracking-[0.1em] text-white/75">{a.name || t("dashboard.home.tradingAccount")}</div>
-            <div className="truncate text-[13px] font-semibold">{a.title}</div>
+            <div className="truncate text-[9.5px] font-semibold uppercase tracking-[0.12em] text-white/70">{a.name || t("dashboard.home.tradingAccount")}</div>
+            <div className="truncate text-[clamp(11.5px,3.8cqw,13.5px)] font-semibold">{a.title}</div>
           </div>
           <div className="shrink-0 text-end">
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-white/75">{t("common.balance")}</div>
-            <div dir="ltr" className="k-num text-[15px] font-bold">{hidden ? "••••••" : money(a.balance, a.currency)}</div>
+            <div className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-white/70">{t("common.balance")}</div>
+            <div dir="ltr" className="k-num text-[clamp(13px,4.6cqw,17px)] font-bold">{mask(money(a.balance, a.currency))}</div>
           </div>
         </div>
       </div>
@@ -116,7 +163,7 @@ export function AccountsPanel({
   const t = useT();
   const [i, setI] = React.useState(0);
   const [dir, setDir] = React.useState(1);
-  const [hidden, setHidden] = React.useState(false);
+  const [hidden, toggleHidden] = useHideMoney();
   // CFD accounts first, then Options accounts (CFD / Options account split)
   const list = React.useMemo(() => productOrder(accounts ?? []), [accounts]);
   const idx = Math.min(i, Math.max(0, list.length - 1));
@@ -248,21 +295,12 @@ export function AccountsPanel({
 
       {a && (
         <>
-          <div className="mt-7 flex items-center justify-between gap-3">
-            <h3 className="k-display text-[17px] font-semibold tracking-[-0.01em]">{t("dashboard.home.accountInfo")}</h3>
-            <button type="button" onClick={() => setHidden((h) => !h)} aria-pressed={hidden} aria-label={hidden ? t("dashboard.home.showBalances") : t("dashboard.home.hideBalances")} className="grid size-10 place-items-center rounded-full text-fg-3 hover:bg-surface-3 hover:text-fg">
-              {hidden ? <Eye className="size-[18px]" /> : <EyeOff className="size-[18px]" />}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {actions?.(a)}
+            <button type="button" onClick={toggleHidden} aria-pressed={hidden} aria-label={hidden ? t("dashboard.home.showBalances") : t("dashboard.home.hideBalances")} className="grid size-10 place-items-center rounded-full text-fg-3 hover:bg-surface-3 hover:text-fg">
+              {hidden ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
             </button>
           </div>
-          <div className="k-card mt-3 grid grid-cols-2 gap-x-5 gap-y-4 p-5">
-            {rows.map(([k, v]) => (
-              <div key={k} className="min-w-0">
-                <div className="truncate text-[12px] text-fg-3">{k}</div>
-                <div className="mt-1 flex min-w-0 items-center truncate text-[14.5px] font-semibold text-fg">{v}</div>
-              </div>
-            ))}
-          </div>
-          {actions && <div className="mt-3 flex flex-wrap items-center gap-2">{actions(a)}</div>}
         </>
       )}
     </section>

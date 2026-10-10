@@ -117,11 +117,13 @@ function TeamNote({ text, onView }: { text: string; onView: () => void }) {
 /* Panel (card body and sheet body)                                    */
 /* ------------------------------------------------------------------ */
 
-function Panel({ e, chips, variant, onOpenChat, chat, onClose, inputRef }: { e: AiEngine; chips: AiChip[]; variant: "card" | "sheet"; onOpenChat: () => void; chat: boolean; onClose?: () => void; inputRef: React.RefObject<HTMLInputElement | null> }) {
+function Panel({ e, chips, variant, onOpenChat, chat, onClose, inputRef }: { e: AiEngine; chips: AiChip[]; variant: "card" | "sheet" | "hero"; onOpenChat: () => void; chat: boolean; onClose?: () => void; inputRef: React.RefObject<HTMLInputElement | null> }) {
   const t = useT();
   const [q, setQ] = React.useState("");
   const scroller = React.useRef<HTMLDivElement>(null);
   const sheet = variant === "sheet";
+  // "hero": a slim, long glass bar on the dashboard photo (like the Claude / ChatGPT home), answers in a glass panel
+  const hero = variant === "hero";
   const has = e.turns.length > 0 || e.streaming !== null;
   const human = e.status === "waiting" || e.status === "assigned";
   const byKey = new Map(chips.map((c) => [c.key, c]));
@@ -147,7 +149,7 @@ function Panel({ e, chips, variant, onOpenChat, chat, onClose, inputRef }: { e: 
   return (
     <div className={cn("flex min-h-0 flex-col", sheet && "h-full")}>
       {/* header */}
-      <div className="flex items-start gap-3">
+      <div className={cn("flex items-start gap-3", hero && "hidden")}>
         <Spark size={sheet ? 40 : 44} />
         <div className="min-w-0 flex-1">
           <h3 className="k-display text-[17px] font-semibold tracking-[-0.015em] sm:text-[18px]">{t("dashboard.ai.title", { name: e.botName })}</h3>
@@ -173,7 +175,15 @@ function Panel({ e, chips, variant, onOpenChat, chat, onClose, inputRef }: { e: 
       <AnimatePresence initial={false}>
         {has && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }} className={cn("min-h-0 overflow-hidden", sheet && "flex-1")}>
-            <div ref={scroller} aria-live="polite" className={cn("relative mt-4 space-y-3.5 overflow-y-auto overscroll-contain pe-1", sheet ? "h-full max-h-none" : "max-h-[340px]")}>
+            <div
+              ref={scroller}
+              aria-live="polite"
+              className={cn(
+                "relative mt-4 space-y-3.5 overflow-y-auto overscroll-contain pe-1",
+                sheet ? "h-full max-h-none" : "max-h-[340px]",
+                hero && "mt-0 mb-3 rounded-[24px] border border-white/15 bg-black/55 p-4 text-start backdrop-blur-2xl",
+              )}
+            >
               {e.turns.map((turn) => (
                 <motion.div key={turn.id} data-q={turn.role === "you" || undefined} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
                   <Bubble turn={turn} botName={e.botName} extra={turn.role === "you" && turn.chip ? byKey.get(turn.chip)?.extra : undefined} />
@@ -240,7 +250,12 @@ function Panel({ e, chips, variant, onOpenChat, chat, onClose, inputRef }: { e: 
           ev.preventDefault();
           submit(q);
         }}
-        className={cn("flex items-center gap-2 rounded-[16px] border border-line bg-surface p-1.5 ps-4 shadow-[0_1px_2px_rgba(48,28,64,0.04)] transition-colors focus-within:border-ember/50 focus-within:ring-4 focus-within:ring-ember/10", has ? "mt-3" : "mt-4")}
+        className={cn(
+          "flex items-center gap-2 transition-colors",
+          hero
+            ? "h-[60px] rounded-full border border-white/25 bg-white/14 p-2 ps-6 text-white shadow-[0_24px_70px_-28px_rgba(0,0,0,.75)] backdrop-blur-2xl backdrop-saturate-150 focus-within:border-white/55 focus-within:bg-white/20"
+            : cn("rounded-[16px] border border-line bg-surface p-1.5 ps-4 shadow-[0_1px_2px_rgba(48,28,64,0.04)] focus-within:border-ember/50 focus-within:ring-4 focus-within:ring-ember/10", has ? "mt-3" : "mt-4"),
+        )}
       >
         <input
           ref={inputRef}
@@ -250,29 +265,32 @@ function Panel({ e, chips, variant, onOpenChat, chat, onClose, inputRef }: { e: 
           enterKeyHint="send"
           placeholder={lastYou ? t("dashboard.ai.followUp") : t("dashboard.ai.placeholder")}
           aria-label={t("dashboard.ai.title", { name: e.botName })}
-          className="h-9 min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-fg-3"
+          className={cn("h-9 min-w-0 flex-1 bg-transparent outline-none", hero ? "text-[15.5px] text-white placeholder:text-white/65" : "text-[14px] placeholder:text-fg-3")}
         />
-        <button type="submit" disabled={!q.trim() || e.sending || e.blocked} aria-label={t("common.send")} className="k-accent-btn grid size-9 shrink-0 place-items-center rounded-[12px] transition-opacity disabled:opacity-40">
+        <button type="submit" disabled={!q.trim() || e.sending || e.blocked} aria-label={t("common.send")} className={cn("k-accent-btn grid shrink-0 place-items-center transition-opacity disabled:opacity-40", hero ? "size-11 rounded-full" : "size-9 rounded-[12px]")}>
           <ArrowUp className="size-4" strokeWidth={2.4} />
         </button>
       </form>
 
       {/* suggestions before the first question */}
       {!has && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className={cn("mt-3 flex flex-wrap gap-2", hero && "mt-4 justify-center")}>
           {chips.map((c) => (
             <button
               key={c.key}
               type="button"
               onClick={() => submit(c.question ?? c.label, c.key)}
-              className="rounded-full bg-ember-soft px-3 py-1.5 text-[12.5px] font-semibold text-ember transition-colors hover:bg-[color-mix(in_oklab,var(--k-ember)_18%,transparent)]"
+              className={cn(
+                "rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
+                hero ? "border border-white/20 bg-white/12 text-white backdrop-blur-xl hover:bg-white/22" : "bg-ember-soft text-ember hover:bg-[color-mix(in_oklab,var(--k-ember)_18%,transparent)]",
+              )}
             >
               {c.label}
             </button>
           ))}
         </div>
       )}
-      {has && <p className="mt-2 text-center text-[10.5px] text-fg-3">{t("support.disclaimer", { name: e.botName })}</p>}
+      {has && <p className={cn("mt-2 text-center text-[10.5px]", hero ? "text-white/60" : "text-fg-3")}>{t("support.disclaimer", { name: e.botName })}</p>}
     </div>
   );
 }
@@ -362,23 +380,34 @@ function View({ e, chips, chat }: { e: AiEngine; chips: AiChip[]; chat: boolean 
   );
 }
 
-function LiveAskAi({ chips, chat }: { chips: AiChip[]; chat: boolean }) {
+/** the dashboard hero's bar: the same assistant, on phones too (no sheet) */
+function HeroView({ e, chips, chat }: { e: AiEngine; chips: AiChip[]; chat: boolean }) {
   const t = useT();
-  const e = useLiveAi("Kalks AI", t("support.unavailable"));
-  return <View e={e} chips={chips} chat={chat} />;
+  const input = React.useRef<HTMLInputElement>(null);
+  return (
+    <section aria-label={t("dashboard.ai.title", { name: e.botName })} className="mx-auto w-full max-w-[780px]">
+      <Panel e={e} chips={chips} variant="hero" onOpenChat={openSupportChat} chat={chat} inputRef={input} />
+    </section>
+  );
 }
 
-function DemoAskAi({ chips, answer }: { chips: AiChip[]; answer: (q: string, chip?: string) => string }) {
+function LiveAskAi({ chips, chat, hero }: { chips: AiChip[]; chat: boolean; hero?: boolean }) {
+  const t = useT();
+  const e = useLiveAi("Kalks AI", t("support.unavailable"));
+  return hero ? <HeroView e={e} chips={chips} chat={chat} /> : <View e={e} chips={chips} chat={chat} />;
+}
+
+function DemoAskAi({ chips, answer, hero }: { chips: AiChip[]; answer: (q: string, chip?: string) => string; hero?: boolean }) {
   const t = useT();
   const me = useSession();
   const e = useDemoAi("Kalks AI", answer, { name: SUPPORT_AGENT.name, reply: (q) => `Hi ${me.first_name}, ${SUPPORT_AGENT.name.split(" ")[0]} here from Client Support. ${agentAnswer(q)}` }, t("dashboard.ai.connecting"));
-  return <View e={e} chips={chips} chat />;
+  return hero ? <HeroView e={e} chips={chips} chat /> : <View e={e} chips={chips} chat />;
 }
 
 /** The Overview's AI entry: the real support bot in live builds, canned answers (`demoAnswer`) in demo builds.
  *  `chat` false (the broker switched the support chat off): no way into the chat or to a person from here. */
-export function AskAi({ chips, demoAnswer, chat = true }: { chips: AiChip[]; demoAnswer?: (q: string, chip?: string) => string; chat?: boolean }) {
-  return IS_DEMO ? <DemoAskAi chips={chips} answer={demoAnswer ?? ((q) => botAnswer(q).text)} /> : <LiveAskAi chips={chips} chat={chat} />;
+export function AskAi({ chips, demoAnswer, chat = true, hero }: { chips: AiChip[]; demoAnswer?: (q: string, chip?: string) => string; chat?: boolean; hero?: boolean }) {
+  return IS_DEMO ? <DemoAskAi chips={chips} answer={demoAnswer ?? ((q) => botAnswer(q).text)} hero={hero} /> : <LiveAskAi chips={chips} chat={chat} hero={hero} />;
 }
 
 /** Link used in answers' extras (e.g. "Open account"). */

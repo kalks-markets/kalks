@@ -10,7 +10,7 @@ import { Button, Card, CardHeader, Chip, EmptyState, Field, Icon3D, Input, KeyVa
 import { Trans, useT } from "@kalks/i18n/react";
 import { PasswordInput } from "@/components/accounts/security";
 import { ApiError, modeLabel, serverOf, tradingApi, useAccounts, useGroups, type AccountKind, type EngineAccount, type EngineGroup, type OpenResult } from "./api";
-import { EngineGroupCard, commissionText, groupPhoto, spreadType } from "./group-card";
+import { CardFace, EngineGroupCard, commissionText, faceOf, spreadType } from "./group-card";
 import { FundButton, PasswordRules, SecretField, TradeButton, livePasswordOk } from "./ui";
 import { useFeatures } from "@/components/tenant-config";
 import { useReadOnly } from "@/components/session";
@@ -59,23 +59,18 @@ function KindCard({ kind, selected, onSelect, demoGroup }: { kind: AccountKind; 
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        "relative flex h-full flex-col overflow-hidden rounded-[20px] border p-6 text-start transition-colors duration-200",
-        selected ? (live ? "border-ember/60 bg-surface shadow-[0_0_0_4px_color-mix(in_oklab,var(--k-ember)_12%,transparent)]" : "border-gold/60 bg-surface shadow-[0_0_0_4px_rgba(233,185,73,0.12)]") : "k-card hover:border-[var(--k-border-top)]",
+        "k-card relative flex h-full flex-col overflow-hidden rounded-[24px] p-3 pb-5 text-start transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 [&>:not(:first-child)]:px-3",
+        selected && "!border-ember/70 shadow-[0_0_0_4px_color-mix(in_oklab,var(--k-ember)_18%,transparent)]",
       )}
     >
-      <div className="flex items-start justify-between">
-        <Chip tone={live ? "ember" : "gold"} className="font-semibold tracking-wider">
-          {live ? t("accounts.badge.live") : t("accounts.badge.demo")}
-        </Chip>
-        <span className={cn("grid size-6 place-items-center rounded-full border transition-colors", selected ? (live ? "border-ember bg-ember text-white" : "border-gold bg-gold text-black") : "border-line")}>
-          {selected && <Check className="size-3.5" />}
-        </span>
-      </div>
-      <div className="mt-4">
-        <Icon3D name={live ? "money_bag" : "rocket"} size={64} />
-      </div>
-      <div className="mt-4 text-[22px] font-semibold tracking-tight">{live ? t("accounts.kind.liveTitle") : t("accounts.kind.demoTitle")}</div>
-      <p className="mt-1 text-[13.5px] text-fg-2">{live ? t("accounts.kind.liveText") : t("accounts.kind.demoText")}</p>
+      <CardFace
+        face={live ? "k-face-standard" : "k-face-pro"}
+        name={live ? t("accounts.kind.liveTitle") : t("accounts.kind.demoTitle")}
+        badge={live ? t("accounts.badge.live") : t("accounts.badge.demo")}
+        left={live ? { label: t.dyn("accounts.kind.money", "Money"), value: t.dyn("accounts.kind.real", "Real · USDT") } : { label: t.dyn("accounts.kind.money", "Money"), value: demoGroup ? `$${demoGroup.demoInitialBalance.toLocaleString("en-US")}` : "$10,000" }}
+        selected={selected}
+      />
+      <p className="mt-4 text-[13.5px] text-fg-2">{live ? t("accounts.kind.liveText") : t("accounts.kind.demoText")}</p>
       <ul className="mt-4 space-y-2 text-[13px] text-fg-2">
         {points.map((f) => (
           <li key={f} className="flex items-center gap-2">
@@ -97,16 +92,18 @@ function ProductCard({ product, selected, onSelect }: { product: Product; select
       aria-pressed={selected}
       data-testid={`wizard-product-${product}`}
       className={cn(
-        "relative flex h-full flex-col overflow-hidden rounded-[20px] border p-6 text-start transition-colors duration-200",
-        selected ? "border-ember/60 bg-surface shadow-[0_0_0_4px_color-mix(in_oklab,var(--k-ember)_12%,transparent)]" : "k-card hover:border-[var(--k-border-top)]",
+        "k-card relative flex h-full flex-col overflow-hidden rounded-[24px] p-3 pb-5 text-start transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5",
+        selected && "!border-ember/70 shadow-[0_0_0_4px_color-mix(in_oklab,var(--k-ember)_18%,transparent)]",
       )}
     >
-      <div className="flex items-start justify-between">
-        <span className="grid size-12 place-items-center rounded-[16px] border border-ember/30 bg-ember-soft text-ember [&_svg]:size-6">{options ? <Sigma /> : <CandlestickChart />}</span>
-        <span className={cn("grid size-6 place-items-center rounded-full border transition-colors", selected ? "border-ember bg-ember text-white" : "border-line")}>{selected && <Check className="size-3.5" />}</span>
-      </div>
-      <div className="mt-4 text-[22px] font-semibold tracking-tight">{t(options ? "accounts.product.options" : "accounts.product.cfd")}</div>
-      <p className="mt-1 text-[13.5px] text-fg-2">{t(options ? "accounts.product.optionsText" : "accounts.product.cfdText")}</p>
+      <CardFace
+        face={options ? "k-face-options" : "k-face-standard"}
+        name={t(options ? "accounts.product.options" : "accounts.product.cfd")}
+        badge={options ? t("accounts.product.chipOptions") : "CFD"}
+        left={{ label: t.dyn("accounts.product.markets", "Markets"), value: options ? t.dyn("accounts.product.optionsMarkets", "FX · Gold · Oil") : t.dyn("accounts.product.cfdMarkets", "FX · Metals · Crypto") }}
+        selected={selected}
+      />
+      <p className="mt-4 px-3 text-[13.5px] text-fg-2">{t(options ? "accounts.product.optionsText" : "accounts.product.cfdText")}</p>
     </button>
   );
 }
@@ -152,23 +149,16 @@ function Summary({ cfg, g, step }: { cfg: Cfg; g: EngineGroup; step: number }) {
   const mode = t.dyn(`accounts.mode.${g.mode}`, modeLabel(g.mode));
   return (
     <Card className="overflow-hidden">
-      <div className="relative h-24 overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={groupPhoto(g)} alt="" className="absolute inset-0 size-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--k-surface)] to-black/20" />
-        <div className="absolute bottom-3 start-5 flex items-center gap-2">
-          <Chip tone={cfg.kind === "live" ? "ember" : "gold"} className="font-semibold tracking-wider">
-            {cfg.kind === "live" ? t("accounts.badge.live") : t("accounts.badge.demo")}
-          </Chip>
-          {cfg.product === "options" && (
-            <Chip tone="ember" className="font-semibold tracking-wider">
-              {t("accounts.product.chipOptions")}
-            </Chip>
-          )}
-          <span className="text-[17px] font-semibold text-white">
-            {cfg.product === "options" ? g.name : `${g.name} · ${mode}`}
-          </span>
-        </div>
+      {/* the card being opened, as it will look */}
+      <div className="p-3">
+        <CardFace
+          face={faceOf(g.code, cfg.product === "options")}
+          name={g.name}
+          badge={`${cfg.kind === "live" ? t("accounts.badge.live") : t("accounts.badge.demo")} · ${cfg.product === "options" ? t("accounts.product.chipOptions") : mode}`}
+          left={cfg.kind === "demo" ? { label: t("accounts.label.startBalance"), value: money(cfg.demoBalance, g.cent) } : { label: t("accounts.label.minFirstDeposit"), value: g.minDeposit > 0 ? `$${g.minDeposit.toLocaleString("en-US")}` : t("common.none") }}
+          right={cfg.product === "options" ? undefined : { label: t("accounts.label.maxLeverage"), value: `1:${cfg.leverage}` }}
+          selected
+        />
       </div>
       <div className="px-6 pb-5">
         <KeyValue

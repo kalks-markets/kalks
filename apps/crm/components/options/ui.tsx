@@ -43,6 +43,7 @@ import type { MessageKey } from "@kalks/i18n";
 import { useFormat, useT } from "@kalks/i18n/react";
 import { Markdown } from "@/components/academy/live/markdown";
 import type { Suitability } from "./api";
+import { PageHero } from "@/components/page-hero";
 
 /** The Academy course on options (content/academy/en/phase-9, slug `phase-9`, with a quiz per chapter); demo builds
  *  have the mock Academy. */
@@ -412,7 +413,7 @@ function IntroCard({ ctl, data, onTerms }: { ctl: OptionsController; data: Suita
             </div>
           )}
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0">
+            <div className="min-w-0 md:flex-1">
               <label className={cn("flex items-center gap-3 text-[15px] font-medium text-fg", ctl.readOnly || !d ? "cursor-not-allowed opacity-60" : "cursor-pointer")}>
                 <input
                   type="checkbox"
@@ -437,16 +438,19 @@ function IntroCard({ ctl, data, onTerms }: { ctl: OptionsController; data: Suita
                 )}
               </p>
             </div>
-            <TraderButton
-              ctl={ctl}
-              size="xl"
-              label={t("options.intro.start")}
-              icon={<CandlestickChart />}
-              before={start}
-              disabled={!understood || !d || ctl.readOnly}
-              className="w-full md:w-auto md:shrink-0"
-              testId="options-start"
-            />
+            {/* the button keeps its own width so the tick and the terms line stay on one readable line */}
+            <div className="w-full md:w-auto md:shrink-0">
+              <TraderButton
+                ctl={ctl}
+                size="xl"
+                label={t("options.intro.start")}
+                icon={<CandlestickChart />}
+                before={start}
+                disabled={!understood || !d || ctl.readOnly}
+                className="w-full md:w-auto"
+                testId="options-start"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -631,9 +635,9 @@ export function OptionsPage({ ctl }: { ctl: OptionsController }) {
 
   return (
     <>
-      <PageHeader
+      <PageHero page="options"
         title={t("options.page.title")}
-        subtitle={t("options.page.subtitle")}
+        lead={t("options.page.subtitle")}
         actions={
           <>
             {ctl.demo && (

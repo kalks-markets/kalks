@@ -13,6 +13,8 @@ import { LiveAccountRow, isPropAccount, refillsLeft } from "./ui";
 import { byProduct, optionsModuleOn, productOf, productOrder } from "@/lib/products";
 import { useFeatures } from "@/components/tenant-config";
 import { useReadOnly } from "@/components/session";
+import { PageHero } from "@/components/page-hero";
+import { AccountTile } from "@/components/trading/account-tile";
 
 export function AccountsError({ onRetry, message }: { onRetry: () => void; message?: string }) {
   const tt = useT();
@@ -86,9 +88,11 @@ function Inner() {
 
   return (
     <div className="pb-16">
-      <PageHeader
+      <PageHero
+        page="accounts"
+        overlap
         title={tt("accounts.list.title")}
-        subtitle={tt("accounts.list.subtitle")}
+        lead={tt("accounts.list.subtitle")}
         actions={
           !readOnly && <Link href={`/accounts/new${active === "demo" ? "?type=demo" : ""}`}>
             <Button variant="ember" size="lg">
@@ -187,7 +191,15 @@ function Inner() {
                     split[p].length === 0 ? null : (
                       <React.Fragment key={p}>
                         {both && <div className="k-label pt-1" data-testid={`accounts-section-${p}`}>{tt(p === "options" ? "accounts.product.groupOptions" : "accounts.product.groupCfd")}</div>}
-                        {split[p].map((a) => (active === "archived" ? <ArchivedAccountRow key={a.login} a={a} onChanged={reload} /> : <LiveAccountRow key={a.login} a={a} onChanged={reload} />))}
+                        {active === "archived" ? (
+                          split[p].map((a) => <ArchivedAccountRow key={a.login} a={a} onChanged={reload} />)
+                        ) : (
+                          <div className="grid grid-cols-1 gap-6 pb-2 sm:grid-cols-2 xl:grid-cols-3">
+                            {split[p].map((a) => (
+                              <AccountTile key={a.login} a={a} onChanged={reload} />
+                            ))}
+                          </div>
+                        )}
                       </React.Fragment>
                     ),
                   );

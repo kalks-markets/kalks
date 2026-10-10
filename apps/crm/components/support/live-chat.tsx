@@ -3,7 +3,7 @@
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import { FileText, Loader2, MoreHorizontal, Paperclip, RotateCcw, SendHorizontal, Sparkles, Star, UserRound, X, XCircle } from "lucide-react";
+import { ArrowUp, FileText, Loader2, MoreHorizontal, Paperclip, RotateCcw, SendHorizontal, Sparkles, Star, UserRound, X, XCircle } from "lucide-react";
 import { Avatar, Button, Chip, IconButton, Menu, cn } from "@/components/kit";
 import { useSession } from "@/components/session";
 import { realtime, type Frame } from "@/lib/realtime";
@@ -152,7 +152,7 @@ function Dots() {
   );
 }
 
-export function MessageRow({ m, botName, meName }: { m: Message; botName: string; meName: string }) {
+export function MessageRow({ m, botName, meName, room }: { m: Message; botName: string; meName: string; room?: boolean }) {
   const t = useT();
   if (m.author === "system") {
     if (m.meta.kind === "join")
@@ -173,6 +173,47 @@ export function MessageRow({ m, botName, meName }: { m: Message; botName: string
   }
   const mine = m.author === "client";
   const name = mine ? t("support.you") : m.author === "bot" ? botName : (m.authorName ?? t("support.supportName"));
+  if (room) {
+    if (mine)
+      return (
+        <div className="flex justify-end">
+          <div className="max-w-[78%] text-start">
+            {m.body && (
+              <div className="rounded-[22px] bg-surface-3 px-4 py-2.5 text-[15px] leading-7 text-fg">
+                <Rich text={m.body} />
+              </div>
+            )}
+            {m.attachment && <AttachmentView a={m.attachment} mine />}
+          </div>
+        </div>
+      );
+    return (
+      <div className="flex items-start gap-3">
+        {m.author === "bot" ? <BotAvatar size={30} /> : <Avatar name={m.authorName ?? t("support.agent")} size={30} />}
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2 text-[12px] text-fg-3">
+            <span className="font-semibold text-fg-2">{name}</span>
+            <span className="font-mono">{hhmm(m.createdAt)}</span>
+          </div>
+          {m.body && (
+            <div className="text-[15px] leading-7 text-fg">
+              <Rich text={m.body} />
+            </div>
+          )}
+          {m.attachment && <AttachmentView a={m.attachment} mine={false} />}
+          {m.author === "bot" && m.meta.cites && m.meta.cites.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {m.meta.cites.map((c) => (
+                <span key={c.slug} className="rounded-full border border-line px-2.5 py-0.5 text-[11px] text-fg-3">
+                  {c.title}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={cn("flex items-end gap-2.5", mine && "flex-row-reverse")}>
       {m.author === "bot" && <BotAvatar size={28} />}
@@ -212,6 +253,9 @@ export function MessageRow({ m, botName, meName }: { m: Message; botName: string
 /* Live chat                                                            */
 /* ------------------------------------------------------------------ */
 
+// the glass suggestion chips on the Support photo (same as Home's AI bar)
+const HERO_CHIP = "border border-white/20 bg-white/12 text-[12.5px] font-semibold text-white backdrop-blur-xl hover:bg-white/22";
+
 // suggested first questions (translation keys; the translated text is sent as the message)
 const QUICK = ["support.quick.verify", "support.quick.deposit", "support.quick.withdrawal", "support.quick.stopOut"] as const;
 
@@ -219,7 +263,11 @@ const QUICK = ["support.quick.verify", "support.quick.deposit", "support.quick.w
  * Live support chat: the AI bot answers first (streamed), hands over to a human agent on request or when unsure,
  * agents reply live, attachments (images / PDF), end the chat and rate it. Used by /support and the floating widget.
  */
-export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "page" | "widget"; onClose?: () => void; onUnread?: (n: number) => void }) {
+export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "page" | "widget" | "room" | "hero"; onClose?: () => void; onUnread?: (n: number) => void }) {
+  // "room": a Claude / ChatGPT-style chat room. "hero": the Support page like Home (founder 2026-10-10): one slim glass
+  // bar on the photo, the conversation in a glass panel above it, nothing else.
+  const hero = variant === "hero";
+  const room = variant === "room" || hero;
   const t = useT();
   const me = useSession();
   const widget = variant === "widget";
@@ -399,6 +447,13 @@ export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "p
     }
   };
 
+  // the Support page's sidebar "New chat" button
+  React.useEffect(() => {
+    const on = () => newChat();
+    window.addEventListener("kalks:support-new-chat", on);
+    return () => window.removeEventListener("kalks:support-new-chat", on);
+  });
+
   const agentName = conv?.assigneeName;
   const headerName = status === "assigned" && agentName ? agentName : status === "waiting" ? t("support.header.supportTeam") : botName;
   const headerSub =
@@ -406,10 +461,33 @@ export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "p
   const showGreeting = !conv || msgs.length === 0;
   const canRate = resolved && !conv?.csat && msgs.some((m) => m.author === "agent" || m.author === "bot");
 
+  const menu = (
+    <Menu
+      trigger={
+        <IconButton size="sm" aria-label={t("support.menu.aria")}>
+          <MoreHorizontal />
+        </IconButton>
+      }
+      items={[
+        { label: t("support.menu.talkToPerson"), icon: <UserRound />, onSelect: () => (human ? toast.info(status === "assigned" ? t("support.toast.chattingWith", { name: agentName }) : t("support.toast.inQueue")) : void handover()) },
+        ...(conv && !resolved ? [{ label: t("support.menu.endChat"), icon: <XCircle />, onSelect: () => void endChat() }] : []),
+        "sep" as const,
+        { label: t("support.menu.newChat"), icon: <RotateCcw />, onSelect: newChat },
+      ]}
+    />
+  );
+  const statusChip = (
+    <Chip size="sm" tone={status === "assigned" ? "up" : status === "waiting" ? "warn" : resolved ? "neutral" : "ember"} dot>
+      {status === "assigned" ? t("support.chip.liveAgent") : status === "waiting" ? t("support.status.waiting") : resolved ? t("support.status.resolved") : t("support.status.bot")}
+    </Chip>
+  );
+  const threadOpen = !!home && !showGreeting;
+
   return (
-    <div className={cn("k-card flex flex-col overflow-hidden", widget ? "h-full rounded-[18px]" : "h-[calc(100vh-180px)] min-h-[560px]")} data-testid="support-chat">
+    <div className={cn("flex flex-col", hero ? "mx-auto w-full max-w-[780px] text-start" : cn("overflow-hidden", room ? "h-full min-h-0" : cn("k-card", widget ? "h-full rounded-[18px]" : "h-[calc(100vh-180px)] min-h-[560px]")))} data-testid="support-chat">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-line px-5 py-4">
+      {!hero && (
+      <div className={cn("flex items-center gap-3 border-b border-line", room ? "px-4 py-3 sm:px-6" : "px-5 py-4")}>
         {status === "assigned" && agentName ? (
           <div className="relative flex items-center">
             <BotAvatar size={28} />
@@ -421,36 +499,40 @@ export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "p
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[15px] font-medium">
             <span className="truncate">{headerName}</span>
-            <Chip size="sm" tone={status === "assigned" ? "up" : status === "waiting" ? "warn" : resolved ? "neutral" : "ember"} dot>
-              {status === "assigned" ? t("support.chip.liveAgent") : status === "waiting" ? t("support.status.waiting") : resolved ? t("support.status.resolved") : t("support.status.bot")}
-            </Chip>
+            {statusChip}
           </div>
           <div className="truncate text-[12px] text-fg-3">{headerSub}</div>
         </div>
-        <Menu
-          trigger={
-            <IconButton size="sm" aria-label={t("support.menu.aria")}>
-              <MoreHorizontal />
-            </IconButton>
-          }
-          items={[
-            { label: t("support.menu.talkToPerson"), icon: <UserRound />, onSelect: () => (human ? toast.info(status === "assigned" ? t("support.toast.chattingWith", { name: agentName }) : t("support.toast.inQueue")) : void handover()) },
-            ...(conv && !resolved ? [{ label: t("support.menu.endChat"), icon: <XCircle />, onSelect: () => void endChat() }] : []),
-            "sep" as const,
-            { label: t("support.menu.newChat"), icon: <RotateCcw />, onSelect: newChat },
-          ]}
-        />
+        {menu}
         {widget && onClose && (
           <IconButton size="sm" aria-label={t("support.closeChat")} onClick={onClose}>
             <X />
           </IconButton>
         )}
       </div>
+      )}
+
+      {/* hero: who is answering + the menu, on top of the glass conversation */}
+      {hero && threadOpen && (
+        <div className="mb-2 flex items-center gap-2 px-1">
+          <span className="truncate text-[13px] font-semibold text-white">{headerName}</span>
+          {statusChip}
+          <span className="ms-auto">{menu}</span>
+        </div>
+      )}
 
       {/* Messages */}
-      <div ref={scroller} className="flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5">
-        <div className="mt-auto space-y-4">
-          {!home && !failed && (
+      <div
+        ref={scroller}
+        className={cn(
+          "flex flex-col overflow-y-auto",
+          hero
+            ? cn("mb-3 max-h-[min(56vh,560px)] overscroll-contain rounded-[24px] border border-white/15 bg-black/55 px-4 py-5 backdrop-blur-2xl sm:px-6", !threadOpen && !failed && "hidden")
+            : cn("flex-1", room ? "px-4 py-6 sm:px-8" : "px-4 py-5 sm:px-5"),
+        )}
+      >
+        <div className={cn("mt-auto", hero ? "space-y-6" : room ? "mx-auto w-full max-w-[780px] space-y-7" : "space-y-4")}>
+          {!home && !failed && !hero && (
             <div className="flex justify-center py-10 text-fg-3">
               <Loader2 className="size-5 animate-spin" />
             </div>
@@ -463,7 +545,14 @@ export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "p
               </button>
             </div>
           )}
-          {home && showGreeting && (
+          {home && showGreeting && room && !hero && (
+            <div className="flex flex-col items-center py-10 text-center">
+              <BotAvatar size={52} />
+              <h2 className="k-display mt-5 text-[30px] font-semibold tracking-[-0.025em] sm:text-[36px]">{t.dyn("support.room.title", "How can we help, {name}?", { name: me.first_name })}</h2>
+              <p className="mt-2 max-w-[520px] text-[14.5px] leading-relaxed text-fg-2">{settings?.greeting.replace(/^Hi[^.]*\.\s*/, "") || t("support.header.instant")}</p>
+            </div>
+          )}
+          {home && showGreeting && !room && (
             <div className="flex items-end gap-2.5">
               <BotAvatar size={28} />
               <div className="max-w-[80%]">
@@ -477,11 +566,20 @@ export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "p
           <AnimatePresence initial={false}>
             {msgs.map((m) => (
               <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                <MessageRow m={m} botName={botName} meName={me.name} />
+                <MessageRow m={m} botName={botName} meName={me.name} room={room} />
               </motion.div>
             ))}
           </AnimatePresence>
-          {stream && status === "bot" && (
+          {stream && status === "bot" && room && (
+            <div className="flex items-start gap-3" data-testid="bot-streaming">
+              <BotAvatar size={30} />
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 text-[12px] font-semibold text-fg-2">{botName}</div>
+                <div className="text-[15px] leading-7 text-fg">{stream.text ? <Rich text={stream.text} /> : <Dots />}</div>
+              </div>
+            </div>
+          )}
+          {stream && status === "bot" && !room && (
             <div className="flex items-end gap-2.5" data-testid="bot-streaming">
               <BotAvatar size={28} />
               <div className="max-w-[80%]">
@@ -529,16 +627,17 @@ export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "p
       </div>
 
       {/* Composer */}
-      <div className="border-t border-line px-4 pb-4 pt-3 sm:px-5">
-        {(showGreeting || (status === "bot" && msgs.length < 3)) && (
-          <div className="mb-3 flex gap-1.5 overflow-x-auto pb-0.5">
+      <div className={cn(hero ? "" : room ? "px-4 pb-4 pt-2 sm:px-8" : "border-t border-line px-4 pb-4 pt-3 sm:px-5")}>
+        <div className={cn(room && "mx-auto w-full max-w-[780px]", hero && "flex flex-col")}>
+        {(showGreeting || (status === "bot" && msgs.length < 3 && !hero)) && (
+          <div className={cn("mb-3 flex gap-1.5 overflow-x-auto pb-0.5", room && "flex-wrap justify-center overflow-visible", hero && "order-last mb-0 mt-4 gap-2")}>
             {QUICK.map((q) => (
-              <button key={q} onClick={() => void send(t(q))} disabled={sending || !home} className="shrink-0 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-[12px] text-fg-2 transition-colors hover:border-ember/40 hover:text-fg disabled:opacity-50">
+              <button key={q} onClick={() => void send(t(q))} disabled={sending || !home} className={cn("shrink-0 rounded-full px-3 py-1.5 transition-colors disabled:opacity-50", hero ? HERO_CHIP : "border border-line bg-surface-2 text-[12px] text-fg-2 hover:border-ember/40 hover:text-fg")}>
                 {t(q)}
               </button>
             ))}
             {!human && (
-              <button onClick={() => void handover()} disabled={!home} className="shrink-0 rounded-full border border-line bg-surface-2 px-3 py-1.5 text-[12px] text-fg-2 transition-colors hover:border-ember/40 hover:text-fg">
+              <button onClick={() => void handover()} disabled={!home} className={cn("shrink-0 rounded-full px-3 py-1.5 transition-colors", hero ? HERO_CHIP : "border border-line bg-surface-2 text-[12px] text-fg-2 hover:border-ember/40 hover:text-fg")}>
                 {t("support.menu.talkToPerson")}
               </button>
             )}
@@ -549,10 +648,17 @@ export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "p
             e.preventDefault();
             void send();
           }}
-          className="flex items-center gap-2 rounded-[18px] border border-line bg-surface-2 p-1.5 ps-2 transition-colors focus-within:border-ember/50"
+          className={cn(
+            "flex items-center gap-2 border transition-colors",
+            hero
+              ? "h-[60px] rounded-full border-white/25 bg-white/14 p-2 ps-3 text-white shadow-[0_24px_70px_-28px_rgba(0,0,0,.75)] backdrop-blur-2xl backdrop-saturate-150 focus-within:border-white/55 focus-within:bg-white/20"
+              : room
+                ? "min-h-[60px] rounded-[28px] border-line-2 bg-surface p-2 ps-3 shadow-[0_18px_50px_-30px_rgba(0,0,0,.8)] focus-within:border-ember/50"
+                : "rounded-[18px] border-line bg-surface-2 p-1.5 ps-2 focus-within:border-ember/50",
+          )}
         >
           <input ref={fileRef} type="file" className="hidden" onChange={onFile} accept="image/png,image/jpeg,image/gif,image/webp,application/pdf" />
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading || !home} aria-label={t("support.composer.attach")} className="grid size-9 shrink-0 place-items-center rounded-full text-fg-3 transition-colors hover:bg-surface-3 hover:text-fg disabled:opacity-50">
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading || !home} aria-label={t("support.composer.attach")} className={cn("grid size-9 shrink-0 place-items-center rounded-full transition-colors disabled:opacity-50", hero ? "text-white/75 hover:bg-white/15 hover:text-white" : "text-fg-3 hover:bg-surface-3 hover:text-fg")}>
             {uploading ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4" />}
           </button>
           <input
@@ -561,13 +667,14 @@ export function LiveChat({ variant = "page", onClose, onUnread }: { variant?: "p
             maxLength={4000}
             placeholder={status === "assigned" && agentName ? t("support.composer.messageTo", { name: agentName.split(" ")[0] }) : resolved ? t("support.composer.newChat") : t("support.composer.ask", { name: botName })}
             aria-label={t("support.composer.aria")}
-            className="h-9 min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-fg-3"
+            className={cn("h-9 min-w-0 flex-1 bg-transparent outline-none", hero ? "text-[15.5px] text-white placeholder:text-white/65" : cn("placeholder:text-fg-3", room ? "text-[15.5px]" : "text-[14px]"))}
           />
-          <button type="submit" disabled={!input.trim() || sending || !home} aria-label={t("common.send")} className="k-ember-btn grid size-9 shrink-0 place-items-center rounded-full transition-opacity disabled:opacity-40">
-            {sending ? <Loader2 className="size-4 animate-spin" /> : <SendHorizontal className="size-4 rtl:-scale-x-100" />}
+          <button type="submit" disabled={!input.trim() || sending || !home} aria-label={t("common.send")} className={cn("grid shrink-0 place-items-center rounded-full transition-opacity disabled:opacity-40", hero ? "k-accent-btn size-11" : "k-ember-btn size-9")}>
+            {sending ? <Loader2 className="size-4 animate-spin" /> : hero ? <ArrowUp className="size-4" strokeWidth={2.4} /> : <SendHorizontal className="size-4 rtl:-scale-x-100" />}
           </button>
         </form>
-        <div className="mt-2 text-center text-[10.5px] text-fg-3">{t("support.disclaimer", { name: botName })}</div>
+        {(!hero || threadOpen) && <div className={cn("mt-2 text-center text-[10.5px]", hero ? "text-white/60" : "text-fg-3")}>{t("support.disclaimer", { name: botName })}</div>}
+        </div>
       </div>
     </div>
   );

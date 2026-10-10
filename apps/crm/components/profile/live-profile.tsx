@@ -9,6 +9,7 @@ import { ChangePasswordCard } from "@/components/profile/change-password";
 import { KYC_CHIP, useSession } from "@/components/session";
 import { SUPPORT_EMAIL } from "@/lib/live";
 import { useLocale, useT } from "@kalks/i18n/react";
+import { PageHero } from "@/components/page-hero";
 
 function countryName(code: string, lang = "en") {
   if (!code) return "—";
@@ -53,7 +54,7 @@ export function LiveProfile() {
 
   return (
     <div className="pb-16">
-      <PageHeader title={t("profile.title")} subtitle={t("profile.liveSubtitle")} />
+      <PageHero page="profile" overlap title={t("profile.title")} lead={t("profile.liveSubtitle")} />
 
       <Reveal>
         <Card hot className="overflow-hidden">

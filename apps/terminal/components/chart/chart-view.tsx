@@ -960,7 +960,8 @@ function PositionChipPnl({ p }: { p: TPosition }) {
 
 /* ------------------------------------------------------------------ */
 
-export function OneClickPanel({ symbol, compact, top, left }: { symbol: string; compact?: boolean; top: number; left?: number }) {
+/** Sell / lot / Buy for one market: shared by the toolbar bar and the panel on the chart */
+function useOneClick(symbol: string) {
   const T = useTerminal();
   const t = useT();
   const { bid, ask, dir, delayed } = useQuote(symbol);
@@ -990,6 +991,73 @@ export function OneClickPanel({ symbol, compact, top, left }: { symbol: string; 
     setLot(v.toFixed(2));
     T.setWs({ lot: v });
   };
+  const wheel = (e: React.WheelEvent) => {
+    const v = Math.max(0.01, +(vol + (e.deltaY < 0 ? 0.01 : -0.01)).toFixed(2));
+    setLot(v.toFixed(2));
+    T.setWs({ lot: v });
+  };
+  const title = blocked ?? (open ? (T.guest ? t("trader.guest.title") : undefined) : t("chart.oneClick.marketClosed"));
+  return { T, t, bid, ask, dir, delayed, blocked, spread, lot, setLot, open, go, commitLot, step, wheel, title };
+}
+
+/**
+ * The slim Sell · lot · Buy in the chart's toolbar row (founder 2026-10-10: "buy / sell in the top line, slim, not on
+ * the chart"). It trades the active chart's market; one-click on = straight to market, off = the order ticket.
+ */
+export function OneClickBar({ symbol }: { symbol: string }) {
+  const { T, t, bid, ask, dir, delayed, blocked, spread, lot, setLot, open, go, commitLot, step, wheel, title } = useOneClick(symbol);
+  const zap = T.ws.oneClick && !T.guest;
+  return (
+    <div data-tour="oneclick" className="flex h-7 shrink-0 items-stretch overflow-hidden rounded-[7px] border border-line" title={!open ? t("chart.oneClick.marketClosed") : delayed ? t("desk.side.delayedTip") : undefined}>
+      <button
+        onClick={() => go("sell")}
+        disabled={!open || !!blocked}
+        title={title}
+        aria-label={t(open ? "chart.oneClick.sellAria" : "chart.oneClick.sellClosedAria", { symbol })}
+        className="flex items-center gap-1.5 bg-down/15 ps-2 pe-2.5 transition-colors hover:bg-down/30 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-60"
+      >
+        <span className="flex items-center gap-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-down">
+          {zap && <Zap className="size-3 fill-current" aria-hidden />}
+          {t("common.sell")}
+        </span>
+        <PriceText symbol={symbol} value={bid} dir={dir} className="text-[12.5px]" />
+      </button>
+      <div className="flex items-center border-x border-line bg-panel" title={open && !delayed ? `${t("chart.oneClick.lot")} · ${spread}` : undefined}>
+        <button onClick={() => step(-1)} className="grid h-full w-5 place-items-center text-[13px] leading-none text-fg-3 hover:bg-surface-3 hover:text-fg" aria-label={t("chart.oneClick.decrease")}>
+          −
+        </button>
+        <input
+          aria-label={t("chart.oneClick.lot")}
+          value={lot}
+          onChange={(e) => setLot(e.target.value.replace(/[^0-9.]/g, ""))}
+          onBlur={commitLot}
+          onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+          onWheel={wheel}
+          className="k-num w-[42px] bg-transparent text-center font-mono text-[12px] font-medium text-fg outline-none"
+        />
+        <button onClick={() => step(1)} className="grid h-full w-5 place-items-center text-[13px] leading-none text-fg-3 hover:bg-surface-3 hover:text-fg" aria-label={t("chart.oneClick.increase")}>
+          +
+        </button>
+      </div>
+      <button
+        onClick={() => go("buy")}
+        disabled={!open || !!blocked}
+        title={title}
+        aria-label={t(open ? "chart.oneClick.buyAria" : "chart.oneClick.buyClosedAria", { symbol })}
+        className="flex items-center gap-1.5 bg-up/15 pe-2 ps-2.5 transition-colors hover:bg-up/30 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-60"
+      >
+        <PriceText symbol={symbol} value={ask} dir={dir} className="text-[12.5px]" />
+        <span className="flex items-center gap-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-up">
+          {t("common.buy")}
+          {zap && <Zap className="size-3 fill-current" aria-hidden />}
+        </span>
+      </button>
+    </div>
+  );
+}
+
+export function OneClickPanel({ symbol, compact, top, left }: { symbol: string; compact?: boolean; top: number; left?: number }) {
+  const { T, t, bid, ask, dir, delayed, blocked, spread, lot, setLot, open, go, commitLot, step, wheel } = useOneClick(symbol);
   const [collapsed, setCollapsed] = React.useState(false);
   if (collapsed)
     return (
@@ -1020,11 +1088,7 @@ export function OneClickPanel({ symbol, compact, top, left }: { symbol: string; 
           onChange={(e) => setLot(e.target.value.replace(/[^0-9.]/g, ""))}
           onBlur={commitLot}
           onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-          onWheel={(e) => {
-            const v = Math.max(0.01, +(vol + (e.deltaY < 0 ? 0.01 : -0.01)).toFixed(2));
-            setLot(v.toFixed(2));
-            T.setWs({ lot: v });
-          }}
+          onWheel={wheel}
           className="k-num w-full min-w-0 bg-transparent text-center font-mono text-[12px] font-medium text-fg outline-none"
         />
         <button onClick={() => step(1)} className="grid size-5 shrink-0 place-items-center rounded text-[13px] leading-none text-fg-3 hover:bg-surface-3 hover:text-fg" aria-label={t("chart.oneClick.increase")}>+</button>

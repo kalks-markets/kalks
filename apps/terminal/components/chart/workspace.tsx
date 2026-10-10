@@ -1,8 +1,9 @@
 "use client";
 
 // Chart card (docs/TERMINAL-DESIGN.md §2.2), MT5 web style: ONE slim toolbar row (chart tabs · type · timeframes M1…MN ·
-// New order · zoom · indicators · templates · layout · alert · picture · full chart · full screen), a thin drawing rail
-// on the left and the chart grid. The plot itself carries only the legend, the Buy / Sell box and the small K mark.
+// New order · Sell / lot / Buy · zoom · indicators · templates · layout · alert · picture · full chart · full screen), a
+// thin drawing rail on the left and the chart grid. The plot itself carries only the legend and the small K mark: the
+// Buy / Sell box moved into the toolbar row so it never covers candles (founder 2026-10-10).
 import * as React from "react";
 import { toast } from "@/lib/notify";
 import { AreaChart, BarChart3, Bell, Camera, CandlestickChart, ChevronDown, Crosshair, Expand, FileStack, LayoutPanelLeft, LineChart, Maximize2, Minimize2, Minus, MousePointer2, Plus, Scan, ShoppingCart, Shrink, Spline, Square, Trash2, TrendingUp, X, ZoomIn, ZoomOut } from "lucide-react";
@@ -14,7 +15,7 @@ import { CHART_TYPES, TIMEFRAMES, type ChartType } from "@/lib/trading";
 import { DropMenu } from "@/components/ui/menu";
 import { CountBadge, IconButton, Tip } from "@/components/ui/kit";
 import { useLayoutItems, openActivity, toggleFullChart, toggleFullscreen } from "@/components/shell/commands";
-import { ChartView } from "./chart-view";
+import { ChartView, OneClickBar } from "./chart-view";
 import { chartRegistry } from "./engine";
 import { BUILTIN_TEMPLATES, applyTemplate, deleteTemplate, openIndicatorList, openSaveTemplate, shortList, templateMatches, useUserTemplates } from "./indicators/state";
 
@@ -37,7 +38,7 @@ export function ChartWorkspace() {
         <DrawingBar />
         <div className={cn("grid min-h-0 min-w-0 flex-1 gap-1.5 pb-1.5 pe-1.5", grid)}>
           {slots.map((tab) => (
-            <ChartView key={tab.id} tab={tab} active={tab.id === T.ws.activeId && slots.length > 0} highlight={tab.id === T.ws.activeId && slots.length > 1} onActivate={() => T.ws.activeId !== tab.id && T.activateTab(tab.id)} compact={layout === "4"} />
+            <ChartView key={tab.id} tab={tab} active={tab.id === T.ws.activeId && slots.length > 0} highlight={tab.id === T.ws.activeId && slots.length > 1} onActivate={() => T.ws.activeId !== tab.id && T.activateTab(tab.id)} compact={layout === "4"} hideOneClick />
           ))}
         </div>
       </div>
@@ -167,7 +168,7 @@ function ChartBar() {
         )}
       />
       {/* timeframes: all of them when there is room, a menu otherwise */}
-      <div role="radiogroup" aria-label={t("trader.menu.timeframes")} className="hidden shrink-0 items-center @[860px]:flex">
+      <div role="radiogroup" aria-label={t("trader.menu.timeframes")} className="hidden shrink-0 items-center @[1000px]:flex">
         {TIMEFRAMES.map((tf) => (
           <button
             key={tf}
@@ -180,7 +181,7 @@ function ChartBar() {
           </button>
         ))}
       </div>
-      <span className="@[860px]:hidden">
+      <span className="@[1000px]:hidden">
         <DropMenu
           width={160}
           items={[{ header: t("trader.menu.timeframes") }, ...TIMEFRAMES.map((tf) => ({ label: tf, checked: tab.tf === tf, onSelect: () => T.updateTab(tab.id, { tf, drawings: tab.tf === tf ? tab.drawings : [] }) }))]}
@@ -196,20 +197,29 @@ function ChartBar() {
       <Tip content={t("trader.newOrder")} shortcut="F9" side="bottom">
         <button onClick={() => T.openNewOrder({ symbol: tab.symbol })} disabled={T.readOnly} data-tour="new-order" className="flex h-7 shrink-0 items-center gap-1.5 rounded-[7px] border border-line px-2 text-[12.5px] font-semibold text-fg transition-colors hover:border-ember/50 hover:bg-ember-soft/40 disabled:opacity-45 [&>svg]:size-3.5">
           <ShoppingCart className="text-accent-text" />
-          <span className="hidden @[700px]:inline">{t("trader.newOrder")}</span>
+          <span className="hidden @[1320px]:inline">{t("trader.newOrder")}</span>
         </button>
       </Tip>
+      {/* one-click Sell · lot · Buy for the active chart, slim in the row instead of a box on the candles */}
+      {!T.readOnly && (
+        <span className="ms-1 hidden @[560px]:flex">
+          <OneClickBar symbol={tab.symbol} />
+        </span>
+      )}
       <Sep />
-      <IconButton label={t("desk.ch.zoomIn")} shortcut="+" onClick={() => reg()?.zoom(1)}>
-        <ZoomIn />
-      </IconButton>
-      <IconButton label={t("desk.ch.zoomOut")} shortcut="−" onClick={() => reg()?.zoom(-1)}>
-        <ZoomOut />
-      </IconButton>
-      <IconButton label={t("desk.ch.fit")} onClick={() => reg()?.fit()} className="hidden @[760px]:inline-grid">
-        <Scan />
-      </IconButton>
-      <Sep />
+      {/* with the Sell / Buy bar in the row, the zoom buttons show only on wide charts (wheel and + / − zoom anyway) */}
+      <span className="hidden shrink-0 items-center gap-1 @[1300px]:flex">
+        <IconButton label={t("desk.ch.zoomIn")} shortcut="+" onClick={() => reg()?.zoom(1)}>
+          <ZoomIn />
+        </IconButton>
+        <IconButton label={t("desk.ch.zoomOut")} shortcut="−" onClick={() => reg()?.zoom(-1)}>
+          <ZoomOut />
+        </IconButton>
+        <IconButton label={t("desk.ch.fit")} onClick={() => reg()?.fit()}>
+          <Scan />
+        </IconButton>
+        <Sep />
+      </span>
       <Tip content={t("chart.toolbar.indicatorsTitle")} shortcut="Ctrl+I" side="bottom">
         <button onClick={() => openIndicatorList(tab.id)} aria-haspopup="dialog" aria-label={t("chart.toolbar.indicators")} className={btn()}>
           <Spline />
@@ -217,6 +227,7 @@ function ChartBar() {
           {tab.indicators.length > 0 && <CountBadge n={tab.indicators.length} tone="accent" />}
         </button>
       </Tip>
+      <span className="hidden @[1180px]:contents">
       <DropMenu
         width={292}
         items={[
@@ -237,6 +248,7 @@ function ChartBar() {
           </Tip>
         )}
       />
+      </span>
       <DropMenu
         align="end"
         width={272}
@@ -249,10 +261,10 @@ function ChartBar() {
           </Tip>
         )}
       />
-      <IconButton label={t("desk.ch.alertTip", { symbol: tab.symbol })} onClick={() => openActivity(T, "alerts")} className="hidden @[640px]:inline-grid">
+      <IconButton label={t("desk.ch.alertTip", { symbol: tab.symbol })} onClick={() => openActivity(T, "alerts")} className="hidden @[1100px]:inline-grid">
         <Bell />
       </IconButton>
-      <IconButton label={t("desk.ch.screenshot")} onClick={() => reg()?.screenshot()}>
+      <IconButton label={t("desk.ch.screenshot")} onClick={() => reg()?.screenshot()} className="hidden @[1180px]:inline-grid">
         <Camera />
       </IconButton>
       <div className="ms-auto hidden min-w-0 shrink items-center px-2 font-mono text-[11px] text-fg-3 @[1400px]:flex">{tab.indicators.length > 0 && <span className="truncate">{shortList(tab).join(" · ")}</span>}</div>

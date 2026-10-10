@@ -80,24 +80,27 @@ export function KpiCard({
   /** Colour of the accent bar (defaults from the chip tone; the brand colour otherwise). */
   accent?: string;
 }) {
-  const bar = accent ?? (hot ? "var(--k-ember)" : BAR[chipTone] ?? "var(--k-ember)");
+  // founder 2026-10-10: every page's figures look like the Home balance strip — a label, a big thin number, a small
+  // note; a row of these joins into one glass strip with hairline dividers (app/kx-orange.css, .k-kpi)
+  void accent;
+  void TILE;
+  void BAR;
   return (
-    <div className={cn("k-reveal min-w-0", className)} style={{ "--k-reveal-y": "14px", "--k-reveal-ms": "500ms", ...(delay ? { "--k-reveal-delay": `${delay}s` } : {}) } as React.CSSProperties}>
-      <div className={cn("k-card relative flex h-full flex-col overflow-hidden px-5 pb-5 pt-5 sm:px-6", hot && "k-card-hot")}>
-        <span aria-hidden className="absolute start-0 top-5 h-9 w-1 rounded-e-full" style={{ background: bar }} />
-        <div className="flex min-h-8 items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            {icon && <span className={cn("k-tile size-8 shrink-0 rounded-[10px] [&_svg]:size-4", `k-tile-${hot ? "accent" : TILE[chipTone] ?? "accent"}`)}>{icon}</span>}
-            <span className="truncate text-[14px] font-medium text-fg-2">{label}</span>
-          </div>
+    <div className={cn("k-kpi k-reveal min-w-0", className)} style={{ "--k-reveal-y": "14px", "--k-reveal-ms": "500ms", ...(delay ? { "--k-reveal-delay": `${delay}s` } : {}) } as React.CSSProperties}>
+      <div className={cn("k-card relative flex h-full flex-col px-5 pb-5 pt-5 [container-type:inline-size] sm:px-6", hot && "k-card-hot")}>
+        <div className="flex min-h-6 items-center justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-fg-3">
+            {icon && <span className="shrink-0 text-ember [&_svg]:size-3.5">{icon}</span>}
+            <span className="truncate">{label}</span>
+          </span>
           {href && (
-            <Link href={href} className="-me-1.5 grid size-8 shrink-0 place-items-center rounded-full text-fg-3 transition-colors hover:bg-surface-3 hover:text-fg" aria-label={label}>
-              <MoreHorizontal className="size-[18px]" />
+            <Link href={href} className="-me-1.5 grid size-7 shrink-0 place-items-center rounded-full text-fg-3 transition-colors hover:bg-surface-3 hover:text-fg" aria-label={label}>
+              <ArrowUpRight className="size-4" />
             </Link>
           )}
         </div>
-        <div className="k-display mt-4 min-w-0 truncate text-[26px] font-bold leading-none tracking-[-0.02em] text-fg sm:text-[28px]">{value}</div>
-        {(footer || chip) && <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">{footer ?? <ChangeChip tone={chipTone}>{chip}</ChangeChip>}</div>}
+        <div className="k-num mt-3 min-w-0 whitespace-nowrap text-[clamp(18px,12cqw,28px)] font-light leading-none tracking-[-0.03em] text-fg">{value}</div>
+        {(footer || chip) && <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 text-[12px] text-fg-3">{footer ?? <ChangeChip tone={chipTone}>{chip}</ChangeChip>}</div>}
       </div>
     </div>
   );

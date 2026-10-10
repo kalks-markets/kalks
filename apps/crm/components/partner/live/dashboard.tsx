@@ -73,6 +73,9 @@ import {
   SkeletonGrid,
 } from "./ui";
 import { QrDialog } from "./qr";
+import { PageHero } from "@/components/page-hero";
+import { useSession } from "@/components/session";
+import { VisitingCard } from "@/components/visiting-card";
 
 const DAY = 86400;
 
@@ -369,6 +372,7 @@ function ReferralCard({ d }: { d: Dashboard }) {
   const t = useT();
   const f = useFormat();
   const [qr, setQr] = React.useState(false);
+  const me = useSession();
   const link = referralLink(d.linkBase, d.member.code);
   return (
     <Card className="flex h-full flex-col">
@@ -378,6 +382,27 @@ function ReferralCard({ d }: { d: Dashboard }) {
         icon={<Link2 />}
       />
       <div className="flex flex-1 flex-col gap-4 px-4 pb-5 pt-4 sm:px-6">
+        {/* the partner's visiting card (founder 2026-10-10): name, level, code and link */}
+        <VisitingCard
+          finish="orange"
+          kicker={t.dyn("partner.card.kicker", "Kalks Partner")}
+          name={me.name}
+          title={`${d.member.level?.name ?? t("partner.dash.partnerFallback")} · ${t("partner.dash.since", { date: fmtMonth(d.member.joinedAt) })}`}
+          footer={
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                <div dir="ltr" className="truncate text-start font-mono text-[clamp(10.5px,3.4cqw,13.5px)] font-semibold">
+                  {shortUrl(link)}
+                </div>
+                <div className="mt-[0.6cqw] text-[clamp(7.5px,2.3cqw,9.5px)] font-semibold uppercase tracking-[0.14em] text-white/75">{t("partner.referralLink")}</div>
+              </div>
+              <div className="shrink-0 text-end">
+                <div className="font-mono text-[clamp(12px,4.4cqw,18px)] font-bold tracking-wider">{d.member.code}</div>
+                <div className="mt-[0.6cqw] text-[clamp(7.5px,2.3cqw,9.5px)] font-semibold uppercase tracking-[0.14em] text-white/75">{t("partner.referralCode")}</div>
+              </div>
+            </div>
+          }
+        />
         <div className="flex items-center gap-2 rounded-[14px] border border-ember/30 bg-ember-soft/60 py-1.5 ps-4 pe-1.5">
           <span
             dir="ltr"
@@ -398,17 +423,6 @@ function ReferralCard({ d }: { d: Dashboard }) {
           >
             <QrCode /> QR
           </Button>
-        </div>
-        <div className="flex items-center justify-between rounded-[14px] border border-line bg-surface-2 px-4 py-2.5">
-          <div>
-            <div className="text-[12px] text-fg-3">
-              {t("partner.referralCode")}
-            </div>
-            <div className="font-mono text-[15px] font-semibold tracking-wider">
-              {d.member.code}
-            </div>
-          </div>
-          <CopyButton value={d.member.code} label={t("partner.referralCode")} />
         </div>
         <div>
           <div className="mb-2 text-[12px] text-fg-3">{t("partner.dash.share")}</div>
@@ -912,9 +926,9 @@ export function LivePartnerDashboard() {
 
   return (
     <div className="pb-24">
-      <PageHeader
+      <PageHero page="partner" overlap
         title={TITLE}
-        subtitle={SUBTITLE}
+        lead={SUBTITLE}
         actions={
           <>
             <Link href="/partner/payouts">

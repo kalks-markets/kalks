@@ -6,7 +6,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTheme } from "next-themes";
 import { ChevronRight, LayoutGrid, LogOut, Moon, Settings, Sun } from "lucide-react";
 import { Dialog, LanguageMenu, cn, type NavModule } from "@/components/kit";
 import { useT } from "@kalks/i18n/react";
@@ -47,8 +46,6 @@ export function MobileBar({ modules, onSignOut }: { modules: NavModule[]; onSign
 
 function Drawer({ modules, pathname, onSignOut }: { modules: NavModule[]; pathname: string; onSignOut: () => void }) {
   const t = useT();
-  const { resolvedTheme, setTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
   const [openKey, setOpenKey] = React.useState<string | null>(() => modules.find((m) => isActive(pathname, m))?.key ?? null);
   return (
     <div className="-mx-2 space-y-1 pb-2">
@@ -87,10 +84,6 @@ function Drawer({ modules, pathname, onSignOut }: { modules: NavModule[]; pathna
       })}
       <div className="mt-3 flex items-center gap-2 border-t border-line px-2 pt-4">
         <LanguageMenu />
-        <button type="button" onClick={() => setTheme(dark ? "light" : "dark")} className="k-surface-btn flex h-11 items-center gap-2 rounded-full px-4 text-[13px] font-semibold text-fg">
-          {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          {dark ? t("shell.themeLight") : t("shell.themeDark")}
-        </button>
         <Link href="/profile/preferences" aria-label={t("shell.preferences")} className="k-surface-btn grid size-11 place-items-center rounded-full text-fg-2">
           <Settings className="size-[18px]" />
         </Link>

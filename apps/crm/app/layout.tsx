@@ -2,7 +2,7 @@ import { preconnect } from "react-dom";
 import type { Metadata, Viewport } from "next";
 // subpath imports: a server layout importing the "@kalks/ui" barrel ships every client module of it on every page
 import { BrandProvider } from "@kalks/ui/brand";
-import { KALKS_ICONS, brandCss, isCustomBrand } from "@kalks/ui/brand-vars";
+import { brandCss, isCustomBrand } from "@kalks/ui/brand-vars";
 import { Providers } from "@kalks/ui/providers";
 import { fontVariables } from "@kalks/ui/fonts";
 import { getI18n } from "@kalks/i18n/server";
@@ -16,16 +16,23 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: { default: `${name} — Client Area`, template: `%s · ${name}` },
     description: `Trade Forex, Metals, Indices, Crypto and Stocks with ${name}.`,
-    icons: isCustomBrand(b) ? (b.logo_url ? { icon: b.logo_url } : undefined) : KALKS_ICONS,
+    icons: isCustomBrand(b) ? (b.logo_url ? { icon: b.logo_url } : undefined) : CLIENT_AREA_ICONS,
   };
 }
 
-// the theme follows the device by default (Auto · Light · Dark, Kalks 2); the browser chrome takes the canvas colour
-export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0b0809" },
-    { media: "(prefers-color-scheme: light)", color: "#f6f1ee" },
+// the real Kalks K (the original mark, white on black) for the browser tab and the phone home screen
+const CLIENT_AREA_ICONS = {
+  icon: [
+    { url: "/brand/kalks-icon.svg", type: "image/svg+xml" },
+    { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
+    { url: "/brand/favicon-16.png", sizes: "16x16", type: "image/png" },
   ],
+  apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+};
+
+// the Client Area is dark only (founder 2026-10-10: Vantablack + orange); the browser chrome takes the canvas colour
+export const viewport: Viewport = {
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
 };
@@ -51,7 +58,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
         <BrandProvider brand={brand}>
-          <Providers i18n={{ locale, messages }}>{children}</Providers>
+          <Providers forcedTheme="dark" i18n={{ locale, messages }}>{children}</Providers>
         </BrandProvider>
       </body>
     </html>

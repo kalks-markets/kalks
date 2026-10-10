@@ -14,6 +14,7 @@ import { tr, useFormat, useT } from "@kalks/i18n/react";
 import { OptionTag, TradeSymbolAvatar, fmtContracts, symbolLabel } from "./instrument";
 import { isOptionTrade, positionPremiumsUsd, usdFactorOf } from "./option-deal";
 import { productOrder } from "@/lib/products";
+import { PageHero } from "@/components/page-hero";
 
 /* ------------------------------------------------------------------ */
 /* Account picker (history / ledger / statements)                      */
@@ -463,9 +464,11 @@ export function LivePortfolio() {
 
   return (
     <div className="pb-16">
-      <PageHeader
+      <PageHero
+        page="portfolio"
+        overlap
         title={tx("portfolio.title")}
-        subtitle={tx("portfolio.subtitle")}
+        lead={tx("portfolio.subtitle")}
         actions={
           <>
             <Link href="/portfolio/statements">

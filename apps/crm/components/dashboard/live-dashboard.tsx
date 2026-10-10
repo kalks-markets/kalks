@@ -9,21 +9,24 @@ import {
   ArrowUpFromLine,
   ArrowUpRight,
   Award,
-  BadgeCheck,
   CandlestickChart,
+  ChartSpline,
   Coins,
   Copy,
+  FileText,
   Gift,
+  Globe,
+  GraduationCap,
+  History,
   IdCard,
   Layers,
   LifeBuoy,
-  LineChart,
   Mail,
-  TrendingUp,
+  Trophy,
   UserRound,
   Wallet,
 } from "lucide-react";
-import { Button, Card, CardHeader, Chip, CoinIcon, KpiCard, MarketSessions, Money, PageHeader, Reveal, cn, formatMoney, useQuotes } from "@/components/kit";
+import { Button, Card, CardHeader, Chip, CoinIcon, MarketSessions, Money, Reveal, cn, formatMoney, useQuotes } from "@/components/kit";
 import { INSTRUMENTS, isMarketOpen } from "@kalks/mock";
 import { KYC_CHIP, useReadOnly, useSession, type SessionUser } from "@/components/session";
 import { FeedGuard } from "@/components/feed-guard";
@@ -39,18 +42,24 @@ import { BannerSlot } from "@/components/growth/banner-slot";
 import { LiveCalendarCard, LiveNewsCard, LiveWorldCard } from "@/components/news-live/dashboard";
 import { Trans, useFormat, useT } from "@kalks/i18n/react";
 import { AccountsPanel, type CardAccount } from "@/components/dashboard/home/accounts-panel";
-import { BalancePanel, QuickActions } from "@/components/dashboard/home/balance-panel";
+import { Shortcuts, type Shortcut } from "@/components/dashboard/home/shortcuts";
+import { BalanceStrip } from "@/components/dashboard/home/balance-strip";
 import { ActivityTabs, ChecklistCard, type ListRowItem } from "@/components/dashboard/home/list-cards";
 import { NotificationsPanel, type Prompt } from "@/components/dashboard/home/notifications-panel";
 import { OverviewLayout, SectionTitle } from "@/components/dashboard/home/overview";
 import { RANGE_DAYS, StatisticCard, type StatMode, type StatRange } from "@/components/dashboard/home/statistic-card";
 import type { TrendPoint } from "@/components/dashboard/home/trend-chart";
 import { AiFacts, AiLink, AskAi, type AiChip } from "@/components/ai/ask-ai";
+import { ArcGauge, HeroButton, HeroGlass, MiniBars, MiniLine, PageHero, StatTile } from "@/components/page-hero";
 import { useModules } from "@/components/tenant-config";
 
-function greeting() {
-  const h = new Date().getHours();
-  return h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
+/** the last 7 calendar days ending today, with no P&L yet (accounts without history) */
+function lastWeekDays() {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6 + i);
+    return { day: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, v: 0 };
+  });
 }
 
 export function clientId(id: number) {
@@ -400,18 +409,12 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
   const usdt = wallet?.balances.find((b) => b.currency === "USDT");
   const walletTotal = usdt ? Number(usdt.available) + Number(usdt.locked) : wallet ? 0 : null;
   const rewards = useGrowth<Rewards>("rewards");
-  const activity = useWallet<Page<ActivityItem>>("activity?limit=5", 30000);
-  const cfg = useWallet<WalletConfig>("config");
-  const [hour, setHour] = React.useState<string>("welcome");
-  React.useEffect(() => setHour(greeting()), []);
 
   // Statistics card
   const [mode, setMode] = React.useState<StatMode>("equity");
   const [range, setRange] = React.useState<StatRange>("month");
   const n = RANGE_DAYS[range];
-  const chart = useCurve(2 * n);
   const week = useCurve(14);
-  const series = React.useMemo(() => (chart.curve && chart.curve.length > 1 ? toSeries(chart.curve, n, mode, range) : null), [chart.curve, n, mode, range]);
 
   // today's P&L: today's equity move net of deposits / withdrawals (reports), else the floating P&L of the live accounts
   const wk = week.curve;
@@ -451,46 +454,6 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
     prompts.push({ id: "fund", title: t("dashboard.home.fundTitle"), text: t("dashboard.home.fundText"), icon: <Wallet />, tone: "mint", action: { label: t("dashboard.home.depositNow"), href: "/wallet/deposit" } });
 
   const r = rewards.data;
-  const historyRows: ListRowItem[] | null = activity.data
-    ? activity.data.items.map((x) => {
-        const ic = ACTIVITY_ICON[x.type] ?? ACTIVITY_ICON.other!;
-        const title =
-          x.type === "deposit" ? t("wallet.txType.deposit") : x.type === "withdrawal" ? t("wallet.txType.withdrawal") : x.type === "transfer" ? t("wallet.txType.transfer") : x.kind && KIND_LABEL[x.kind] ? t(KIND_LABEL[x.kind]!) : t("wallet.activity.walletTx");
-        return {
-          key: `${x.type}-${x.id}`,
-          icon: ic.icon,
-          tone: ic.tone,
-          title,
-          sub: `${f.date(x.created_at, { day: "numeric", month: "short" })}${x.network ? ` · ${x.network}` : x.login ? ` · #${x.login}` : ""}`,
-          value: x.amount !== null ? (
-            <span dir="ltr" className={x.direction === "in" ? "text-up" : "text-fg"}>
-              {x.direction === "in" ? "+" : "-"}
-              {fmt(x.amount)}
-            </span>
-          ) : undefined,
-          href: "/wallet/history",
-        };
-      })
-    : activity.error
-      ? []
-      : null;
-  const fundingRows: ListRowItem[] | null = cfg.data
-    ? cfg.data.chains.map((c) => ({
-        key: c.chain,
-        icon: (
-          <span className="relative">
-            <CoinIcon coin="usdt" size={28} />
-            <CoinIcon coin={c.chain === "bsc" ? "bnb" : "trx"} size={13} className="absolute -bottom-0.5 -end-1 ring-2 ring-surface" />
-          </span>
-        ),
-        tone: "neutral" as const,
-        title: `${c.token} · ${c.network}`,
-        sub: t("wallet.deposit.amountHint", { min: fmt(c.min_deposit) }),
-        status: c.deposits_enabled ? { label: t("dashboard.home.connected"), tone: "ember" as const } : { label: t("dashboard.home.networkUnavailable"), tone: "neutral" as const },
-      }))
-    : cfg.error
-      ? []
-      : null;
   const linkedRows: ListRowItem[] = [
     { key: "trader", icon: <CandlestickChart />, tone: "accent", title: "Kalks Trader", sub: t("dashboard.trader.chip"), action: { label: t("common.open"), href: TERMINAL_URL, external: true } },
     ...(on("copy_trading") ? [{ key: "copy", icon: <Copy />, tone: "pink" as const, title: t("shell.nav.copyTrading"), sub: t("shell.nav.social"), action: { label: t("common.open"), href: "/social" } }] : []),
@@ -527,80 +490,128 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
     { key: "openAccount", label: t("dashboard.ai.chip.openAccount"), question: t("dashboard.ai.q.openAccount"), extra: <AiLink href="/accounts/new">{t("dashboard.accounts.open")}</AiLink> },
   ];
 
+  // the hero: daily P&L of the last 7 days (equity move net of deposits / withdrawals), the equity line, total balance
+  const last8 = wk && wk.length > 1 ? wk.slice(-8) : null;
+  const daily = last8 ? last8.slice(1).map((p, i) => ({ day: p.day, v: p.equity - last8[i]!.equity - p.flow })) : null;
+  const weekday = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString(t.locale, { weekday: "narrow" });
+  const equityLine = wk ? wk.map((p) => p.equity) : [];
+  const total = accounts || walletTotal !== null ? totals.equity + (walletTotal ?? 0) : null;
+  const tierProgress = r ? (r.nextTier ? Math.max(0, Math.min(1, (r.points.lifetime - r.tier.minPoints) / Math.max(1, r.nextTier.minPoints - r.tier.minPoints))) : 1) : 0;
+  const pnlNow = today ?? totals.profit;
+  const lead = hasLive
+    ? t.dyn(
+        totals.live.length === 1 ? "dashboard.hero.leadLiveOne" : "dashboard.hero.leadLive",
+        totals.live.length === 1 ? "{positions} open positions on your live account. Every number below is live." : "{positions} open positions across {live} live accounts. Every number below is live.",
+        { positions: totals.positions, live: totals.live.length },
+      ).replace(/^1 open positions/, "1 open position")
+    : t.dyn("dashboard.hero.leadNew", "Open a live account, fund it in USDT and trade forex, gold, oil and crypto from one place.");
+
+  const shortcuts: Shortcut[] = [
+    ...(on("wallet") && !readOnly
+      ? [
+          { key: "deposit", label: t("common.deposit"), href: "/wallet/deposit", icon: <ArrowDownToLine /> },
+          { key: "withdraw", label: t("common.withdraw"), href: "/wallet/withdraw", icon: <ArrowUpFromLine /> },
+          { key: "transfer", label: t("common.transfer"), href: "/wallet/transfer", icon: <ArrowLeftRight className="rtl:-scale-x-100" /> },
+        ]
+      : []),
+    ...(!readOnly ? [{ key: "open", label: t("dashboard.accounts.open"), href: "/accounts/new", icon: <Layers /> }] : []),
+    { key: "trader", label: "Kalks Trader", href: TERMINAL_URL, icon: <CandlestickChart />, external: true },
+    ...(on("markets") ? [{ key: "markets", label: t.dyn("shell.nav.markets", "Markets"), href: "/markets", icon: <Globe /> }] : []),
+    ...(on("options") ? [{ key: "options", label: t.dyn("shell.nav.options", "Options"), href: "/options", icon: <ChartSpline /> }] : []),
+    ...(on("copy_trading") || on("pamm") ? [{ key: "copy", label: t.dyn("shell.nav.copyPamm", "Copy & PAMM"), href: "/social", icon: <Copy /> }] : []),
+    ...(on("prop") ? [{ key: "prop", label: t.dyn("shell.nav.prop", "Prop challenges"), href: "/prop", icon: <Trophy /> }] : []),
+    ...(on("ib") ? [{ key: "ib", label: t("shell.nav.partner"), href: "/partner", icon: <Award /> }] : []),
+    ...(on("rewards") ? [{ key: "rewards", label: t("shell.nav.rewards"), href: "/rewards", icon: <Gift /> }] : []),
+    ...(on("academy") ? [{ key: "academy", label: t.dyn("shell.nav.academy", "Academy"), href: "/academy", icon: <GraduationCap /> }] : []),
+    ...(on("wallet") ? [{ key: "history", label: t("dashboard.home.history"), href: "/wallet/history", icon: <History /> }] : []),
+    { key: "statements", label: t.dyn("portfolio.st.title", "Statements"), href: "/portfolio/statements", icon: <FileText /> },
+    { key: "kyc", label: t.dyn("dashboard.account.identity", "Verification"), href: "/profile/verification", icon: <IdCard /> },
+    { key: "support", label: t("shell.nav.support"), href: "/support", icon: <LifeBuoy /> },
+  ];
+
   return (
     <div className="pb-16">
+      {/* the hero: only the AI bar on the photo (founder 2026-10-10: no greeting, the name is already in the top bar) */}
+      <PageHero
+        page="dashboard"
+        center
+        body={!readOnly && on("ai") ? <AskAi hero chips={aiChips} chat={on("support_chat")} /> : undefined}
+      />
+
+      {/* the money summary, moved down from the hero */}
+      <BalanceStrip
+        cells={[
+          {
+            key: "total", secret: true,
+            big: true,
+            label: t("dashboard.home.totalBalance"),
+            value: total === null ? "—" : <Money value={total} countUp={false} />,
+            sub: t.dyn("dashboard.hero.totalSub", "Live accounts + wallet"),
+            href: "/wallet",
+          },
+          {
+            key: "equity", secret: true,
+            label: t("dashboard.equity.title"),
+            value: accounts ? <Money value={totals.equity} countUp={false} /> : "—",
+            sub: hasLive ? t("dashboard.home.accountsChip", { live: totals.live.length, positions: totals.positions }) : t("dashboard.accounts.openLive.title"),
+            href: "/accounts",
+          },
+          ...(on("wallet")
+            ? [
+                {
+                  key: "wallet", secret: true,
+                  label: t("dashboard.home.walletBalance"),
+                  value: walletTotal !== null ? <Money value={walletTotal} countUp={false} /> : "—",
+                  unit: "USDT",
+                  sub: "TRC20 · BEP20",
+                  href: "/wallet",
+                },
+              ]
+            : []),
+          {
+            key: "pnl", secret: true,
+            label: today !== null ? t("dashboard.home.todayPnl") : t("dashboard.home.floating"),
+            value: accounts ? <Money value={pnlNow} signed tone="auto" countUp={false} /> : "—",
+            extra: <MiniBars values={(daily ?? lastWeekDays()).map((d) => d.v)} labels={(daily ?? lastWeekDays()).map((d) => weekday(d.day))} height={22} />,
+            href: "/portfolio/analytics",
+          },
+          {
+            key: "positions",
+            label: t.dyn("dashboard.hero.openPositions", "Open positions"),
+            value: accounts ? String(totals.positions) : "—",
+            sub: hasLive
+              ? totals.live.length === 1
+                ? t.dyn("dashboard.hero.onLiveOne", "on your live account")
+                : t.dyn("dashboard.hero.acrossLive", "across {count} live accounts", { count: totals.live.length })
+              : undefined,
+            href: "/portfolio",
+          },
+          ...(on("rewards")
+            ? [
+                {
+                  key: "rewards",
+                  label: t("dashboard.home.rewards"),
+                  value: r ? r.points.balance.toLocaleString("en-US") : "—",
+                  unit: t.dyn("dashboard.hero.points", "pts"),
+                  sub: r ? (r.nextTier ? `${r.tier.name} · ${t.dyn("dashboard.hero.toNext", "{points} pts to {tier}", { points: r.nextTier.pointsToGo.toLocaleString("en-US"), tier: r.nextTier.name })}` : r.tier.name) : undefined,
+                  href: "/rewards/loyalty",
+                },
+              ]
+            : []),
+        ]}
+      />
+
       <BannerSlot placement="dashboard" />
-      <OverviewLayout
-        ai={readOnly || !on("ai") ? undefined : <AskAi chips={aiChips} chat={on("support_chat")} />}
-        header={
-          <PageHeader
-            className="mb-0"
-            title={t("shell.nav.overview")}
-            subtitle={
-              <span className="inline-flex flex-wrap items-center gap-2">
-                {t.dyn(`dashboard.greeting.${hour}`, undefined, { name: me.first_name })}
-                {me.kyc_status === "verified" && (
-                  <Chip size="sm" tone="up">
-                    <BadgeCheck className="size-3.5" /> {t("common.verified")}
-                  </Chip>
-                )}
-              </span>
-            }
-          />
-        }
-        kpis={
-          <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:w-[78%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
-            <KpiCard
-              label={t("dashboard.equity.title")}
-              icon={<TrendingUp />}
-              value={accounts ? <Money value={totals.equity} countUp={false} /> : "—"}
-              chip={hasLive ? t("dashboard.home.accountsChip", { live: totals.live.length, positions: totals.positions }) : t("dashboard.accounts.openLive.title")}
-              chipTone="neutral"
-              href="/accounts"
-            />
-            <KpiCard
-              label={today !== null ? t("dashboard.home.todayPnl") : t("dashboard.home.floating")}
-              icon={<LineChart />}
-              value={accounts ? <Money value={today ?? totals.profit} signed tone="auto" countUp={false} /> : "—"}
-              chip={todayPct !== null ? t("dashboard.home.todayPct", { pct: `${todayPct >= 0 ? "+" : ""}${todayPct.toFixed(2)}` }) : undefined}
-              chipTone={(today ?? totals.profit) >= 0 ? "up" : "down"}
-              accent={(today ?? totals.profit) >= 0 ? "var(--k-up)" : "var(--k-down)"}
-              href="/portfolio/analytics"
-              delay={0.05}
-            />
-            {on("wallet") && (
-            <KpiCard
-              label={t("dashboard.home.walletBalance")}
-              icon={<Wallet />}
-              value={walletTotal !== null ? <Money value={walletTotal} countUp={false} /> : "—"}
-              accent="var(--k-info)"
-              footer={
-                <div className="flex items-center gap-2">
-                  <CoinIcon coin="usdt" size={20} />
-                  <span className="text-[12px] font-semibold text-fg-3">USDT · TRC20 · BEP20</span>
-                </div>
-              }
-              href="/wallet"
-              delay={0.1}
-            />
-            )}
-            {on("rewards") && (
-            <KpiCard
-              label={t("dashboard.home.rewards")}
-              icon={<Award />}
-              value={r ? <Money value={r.points.balance * r.pointValue} countUp={false} /> : "—"}
-              accent="var(--k-gold)"
-              chipTone="gold"
-              chip={r ? t("dashboard.home.points", { points: r.points.balance.toLocaleString("en-US") }) : t("shell.nav.loyalty")}
-              href="/rewards/loyalty"
-              delay={0.15}
-            />
-            )}
-          </div>
-        }
-        statistic={<StatisticCard mode={mode} onMode={setMode} range={range} onRange={setRange} points={series?.points ?? (chart.loading ? null : [])} compare={series?.compare} loading={chart.loading} />}
-        checklist={<ChecklistCard title={t("dashboard.steps.title")} subtitle={t("dashboard.steps.subtitle")} rows={checklist} done={done} total={list.length} />}
-        accounts={
+
+      {/* Home, kept short (founder 2026-10-10): Ask Kalks AI with the shortcuts under it, your accounts beside them */}
+      <div className="mt-8 grid grid-cols-1 items-start gap-6 xl:grid-cols-12">
+        <div className="flex min-w-0 flex-col gap-6 xl:col-span-7">
+          <section>
+            <h2 className="k-display mb-3 text-[18px] font-semibold tracking-[-0.015em]">{t.dyn("dashboard.home.shortcuts", "Shortcuts")}</h2>
+            <Shortcuts items={shortcuts} />
+          </section>
+        </div>
+        <div className="min-w-0 xl:col-span-5">
           <AccountsPanel
             accounts={cards}
             loading={!acc.data && !acc.error}
@@ -623,94 +634,8 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
                   }
             }
           />
-        }
-        activity={
-          <ActivityTabs
-            tabs={[
-              ...(on("wallet")
-                ? [
-                    { key: "history", label: t("dashboard.home.history"), rows: historyRows, empty: t("wallet.recent.emptyText"), more: { label: t("common.viewAll"), href: "/wallet/history" } },
-                    { key: "funding", label: t("dashboard.home.funding"), rows: fundingRows, empty: t("wallet.recent.emptyText") },
-                  ]
-                : []),
-              { key: "linked", label: t("dashboard.home.linked"), rows: linkedRows, empty: "" },
-            ]}
-          />
-        }
-        balance={
-          <BalancePanel
-            total={accounts || walletTotal !== null ? totals.equity + (walletTotal ?? 0) : null}
-            loading={!accounts && !acc.error}
-            chip={todayPct !== null ? <span dir="ltr">{`${todayPct >= 0 ? "+" : ""}${todayPct.toFixed(2)}%`}</span> : undefined}
-            chipTone={todayPct !== null && todayPct < 0 ? "down" : "up"}
-            sub={t("dashboard.home.totalBalanceSub")}
-            readOnly={readOnly}
-          />
-        }
-        quick={
-          <QuickActions
-            title={t("dashboard.home.quickActions")}
-            items={[
-              ...(on("wallet") ? [{ key: "transfer", label: t("common.transfer"), href: "/wallet/transfer", icon: <ArrowLeftRight className="rtl:-scale-x-100" />, tone: "lavender" as const }] : []),
-              { key: "trader", label: "Kalks Trader", href: TERMINAL_URL, icon: <CandlestickChart />, tone: "accent", external: true },
-              ...(on("copy_trading") ? [{ key: "copy", label: t("shell.nav.copyTrading"), href: "/social", icon: <Copy />, tone: "pink" as const }] : []),
-              { key: "support", label: t("shell.nav.support"), href: "/support", icon: <LifeBuoy />, tone: "amber" },
-            ]}
-          />
-        }
-        notifications={<NotificationsPanel prompts={prompts} />}
-      />
-
-      {(on("markets") || on("calendar") || on("news")) && <SectionTitle>{t("dashboard.home.marketsTitle")}</SectionTitle>}
-      {on("markets") && (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-          <Reveal delay={0.05} className="xl:col-span-4">
-            <FeedGuard title={t("dashboard.movers.title")} minHeight={320}>
-              {movers}
-            </FeedGuard>
-          </Reveal>
-          <Reveal delay={0.1} className="xl:col-span-8">
-            <FeedGuard title={t("dashboard.heatmap.title")} minHeight={320}>
-              <HeatmapCard />
-            </FeedGuard>
-          </Reveal>
         </div>
-      )}
-      {(on("calendar") || on("news")) && (
-        <div className={cn("grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3", on("markets") && "mt-5")}>
-          {on("calendar") && (
-            <Reveal delay={0.05}>
-              <LiveCalendarCard />
-            </Reveal>
-          )}
-          {on("news") && (
-            <>
-              <Reveal delay={0.1}>
-                <LiveNewsCard />
-              </Reveal>
-              <Reveal delay={0.15} className="md:col-span-2 xl:col-span-1">
-                <LiveWorldCard />
-              </Reveal>
-            </>
-          )}
-        </div>
-      )}
-
-      <SectionTitle>{t("dashboard.home.moreTitle")}</SectionTitle>
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <Reveal>
-          <TraderBanner />
-        </Reveal>
-        <Reveal delay={0.05}>
-          <AccountCard />
-        </Reveal>
-        <Reveal delay={0.1} className="md:col-span-2 xl:col-span-1">
-          <SessionsCard />
-        </Reveal>
       </div>
-      <Reveal delay={0.05} className="mt-5 block">
-        <SupportCard />
-      </Reveal>
     </div>
   );
 }

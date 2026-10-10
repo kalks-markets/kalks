@@ -49,9 +49,9 @@ function DirToaster() {
 }
 
 /** Theme (Auto by default: follows the device), language, tooltips and toasts. */
-export function Providers({ children, defaultTheme = "system", i18n }: { children: React.ReactNode; defaultTheme?: ThemeChoice; i18n?: I18nInit }) {
+export function Providers({ children, defaultTheme = "system", forcedTheme, i18n }: { children: React.ReactNode; defaultTheme?: ThemeChoice; forcedTheme?: "light" | "dark"; i18n?: I18nInit }) {
   return (
-    <KalksThemeProvider defaultTheme={defaultTheme}>
+    <KalksThemeProvider defaultTheme={defaultTheme} forcedTheme={forcedTheme}>
       <I18n init={i18n}>
         <TooltipProvider>
           {children}

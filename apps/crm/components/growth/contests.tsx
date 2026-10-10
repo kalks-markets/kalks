@@ -37,6 +37,7 @@ import {
   type Standing,
 } from "./api";
 import { CardEmpty, GrowthStatus, LiveAccountPicker, PageFallback, RankBadge, SectionTitle } from "./ui";
+import { PageHero } from "@/components/page-hero";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -811,9 +812,9 @@ export function LiveContestsPage() {
 
   return (
     <div className="pb-16">
-      <PageHeader
+      <PageHero page="rewards" overlap
         title={title}
-        subtitle={subtitle}
+        lead={subtitle}
         actions={
           <a href="#my-results">
             <Button variant="surface">

@@ -10,6 +10,7 @@ import { toUsd, useAccounts } from "@/components/trading/api";
 import { CHAIN_LABEL, fmt, usdtAvailable, useWallet, walletApi, type ActivityItem, type Notification, type Overview, type Page } from "./api";
 import { ActivityRow, Confirmations, DEPOSIT_STATUS, HashLink, KycNotice, StatusTag, WITHDRAWAL_STATUS, WalletUnavailable } from "./ui";
 import { isPropAccount } from "@/components/trading/ui";
+import { PageHero } from "@/components/page-hero";
 
 function BalanceCard({ o, loading }: { o: Overview | null; loading: boolean }) {
   const t = useT();
@@ -222,9 +223,11 @@ export function LiveWalletPage() {
 
   return (
     <div className="pb-16">
-      <PageHeader
+      <PageHero
+        page="wallet"
+        overlap
         title={t("wallet.wallet")}
-        subtitle={t("wallet.page.subtitle")}
+        lead={t("wallet.page.subtitle")}
         actions={
           <>
             <Link href="/wallet/history">

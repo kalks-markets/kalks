@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Award, Clock, Download, GraduationCap, Lock, PlayCircle, ShieldCheck } from "lucide-react";
 import { Button, Card, Chip, Progress, Reveal, Segmented, cn } from "@/components/kit";
 import { useT } from "@kalks/i18n/react";
-import { LEVEL_TONE, coverOf, fmtDay, fmtMin, isElective, levelLabel, pct, trackLabel, trackShort, tracksOf, useAcademy, type Catalog, type PhaseT, type SectionT, type TrackKey } from "./api";
+import { LEVEL_TONE, fmtDay, fmtMin, isElective, levelLabel, pct, trackLabel, trackShort, tracksOf, useAcademy, type Catalog, type PhaseT, type SectionT, type TrackKey } from "./api";
 import { AcademyUnavailable, BackLink, PageSkeleton, RISK_NOTE, StatusDot, TrackIcon, trackBadge } from "./shared";
 
 function SectionCard({ s, phase }: { s: SectionT; phase: PhaseT }) {
@@ -185,9 +185,6 @@ export function LivePhase({ slug }: { slug: string }) {
       <BackLink href="/academy">{t("academy.title")}</BackLink>
       <Reveal>
         <Card className="relative overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={coverOf(p.order)} alt="" className="absolute inset-0 size-full object-cover opacity-40" />
-          <div className="absolute inset-0 bg-gradient-to-r from-bg rtl:bg-gradient-to-l via-bg/90 to-bg/40" />
           <div className="relative flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2">

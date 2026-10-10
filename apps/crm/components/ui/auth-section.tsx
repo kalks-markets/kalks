@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { FlutedGlass } from "@paper-design/shaders-react";
 import { motion } from "motion/react";
 import { useT } from "@kalks/i18n/react";
-import { Delta, LanguageMenu, Logo, PriceText, SymbolAvatar, ThemeToggle, useBrand, useQuote } from "@/components/kit";
+import { Delta, LanguageMenu, Logo, PriceText, SymbolAvatar, useBrand, useQuote } from "@/components/kit";
 
 /**
  * Split auth layout (adapted from "auth-section-3"): the form card on the left,
@@ -22,7 +22,6 @@ export function AuthSection({ children }: { children: ReactNode }) {
             <Logo height={20} className="lg:invisible" />
             <div className="flex items-center gap-2">
               <LanguageMenu />
-              <ThemeToggle />
             </div>
           </header>
           <div className="relative flex flex-1 items-center justify-center px-6 py-10 lg:px-14 lg:py-14 xl:px-20">
@@ -123,12 +122,11 @@ function BrandPanel() {
                 <div className="size-2 rounded-full bg-white/35" />
                 <div className="size-2 rounded-full bg-white/25" />
                 <div className="size-2 rounded-full bg-white/15" />
-                <span className="ml-4 font-mono text-[9px] tracking-wider text-white/40">app.kalks.com/dashboard</span>
+                <span className="ml-4 font-mono text-[9px] tracking-wider text-white/40">app.kalkstrade.com</span>
               </div>
+              {/* the current Client Area home (2026-10-10 screenshot; the old Kalks 2 dashboard image is retired) */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/app/dashboard-dark.jpg" alt={t("auth.brand.previewAlt")} className="h-auto w-full object-cover object-top opacity-95 light:hidden" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/app/dashboard-light.jpg" alt={t("auth.brand.previewAlt")} className="hidden h-auto w-full object-cover object-top light:block" />
+              <img src="/shots/client-area-home.webp" alt={t("auth.brand.previewAlt")} width={1600} height={974} className="h-auto w-full object-cover object-top opacity-95" />
             </motion.div>
           </div>
         )}

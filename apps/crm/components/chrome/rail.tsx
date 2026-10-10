@@ -9,7 +9,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { ChevronsLeft, ChevronsRight, LogOut, Settings } from "lucide-react";
-import { LogoMark, Tooltip, cn, useBrand, type NavModule } from "@/components/kit";
+import { Logo, LogoMark, Tooltip, cn, useBrand, type NavModule } from "@/components/kit";
 import { useLocale, useT } from "@kalks/i18n/react";
 import { isActive } from "./nav-utils";
 
@@ -93,8 +93,9 @@ export function Rail({ modules, expanded, onToggle, onSignOut }: { modules: NavM
 
   return (
     <aside className={cn("k-rail fixed inset-y-0 start-0 z-40 hidden flex-col py-4 transition-[width] duration-300 lg:flex", expanded ? "w-[248px] px-4" : "w-[84px] items-center px-0")}>
-      <Link href="/" className={cn("flex shrink-0 items-center gap-3", expanded ? "px-1" : "")} aria-label={t("shell.nav.dashboard")}>
-        <BrandAvatar size={46} />
+      <Link href="/" className={cn("flex h-[46px] shrink-0 items-center gap-3", expanded ? "px-1" : "")} aria-label={t("shell.nav.dashboard")}>
+        {/* open rail: the full Kalks wordmark (a broker: its logo or name); slim rail: the round K */}
+        {expanded ? <Logo height={26} className="text-white" /> : <BrandAvatar size={46} />}
       </Link>
       <span className={cn("mt-4 block h-px shrink-0 bg-line", expanded ? "mx-1" : "w-10")} />
       <nav ref={navRef} className={cn("mt-3 flex min-h-0 flex-1 flex-col gap-[3px] overflow-y-auto [scrollbar-width:none]", expanded ? "-mx-4 px-4" : "w-full items-center")} style={fade ? { maskImage: fade, WebkitMaskImage: fade } : undefined}>

@@ -4,23 +4,40 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Award, BookOpen, CheckCircle2, Clock, Flame, GraduationCap, Library, PlayCircle, Search, Target } from "lucide-react";
-import { Button, Card, CardHeader, Chip, PageHeader, Progress, Reveal, cn } from "@/components/kit";
+import { Button, Card, CardHeader, Chip, Progress, Reveal, cn } from "@/components/kit";
 import type { T } from "@kalks/i18n";
 import { useFormat, useT } from "@kalks/i18n/react";
-import { LEVEL_TONE, coverOf, fmtDay, fmtMin, isElective, levelLabel, pct, trackCount, trackTallies, useAcademy, type Catalog, type PhaseT } from "./api";
+import { LEVEL_TONE, fmtDay, fmtMin, isElective, levelLabel, pct, trackCount, trackTallies, useAcademy, type Catalog, type PhaseT } from "./api";
 import { AcademyUnavailable, PageSkeleton, PracticeButton, RISK_NOTE, Segments } from "./shared";
+import { PageHero } from "@/components/page-hero";
+import { useSession } from "@/components/session";
+import { BookCover, CertificateCard } from "./book";
+import { BookReader } from "./book-reader";
 
-function ContinueHero({ cat }: { cat: Catalog }) {
+/** Opens a phase's book in the reader; `origin` is the shelf book it flies out of. */
+type OpenBook = (slug: string, origin: HTMLElement | null) => void;
+
+/** A plain click opens the book; modified clicks (new tab, etc.) keep following the link to the phase page. */
+const plainClick = (e: React.MouseEvent) => !(e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey);
+
+function ContinueHero({ cat, onOpen }: { cat: Catalog; onOpen: OpenBook }) {
   const t = useT();
   const c = cat.me.continue;
   const phase = c ? cat.phases.find((p) => p.slug === c.phase.slug) : cat.phases[0];
   if (!phase) return null;
   const allDone = !c;
   return (
-    <Card className="relative h-full overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={coverOf(phase.order)} alt="" className="absolute inset-0 size-full object-cover opacity-45" />
-      <div className="absolute inset-0 bg-gradient-to-r from-bg rtl:bg-gradient-to-l via-bg/90 to-bg/30" />
+    <Card className="relative grid h-full overflow-hidden sm:grid-cols-[minmax(0,1fr)_auto]">
+      {/* the book you're reading, open on the desk */}
+      <button
+        type="button"
+        onClick={(e) => onOpen(phase.slug, e.currentTarget.querySelector("[data-book-root]"))}
+        aria-label={t.dyn("academy.reader.openBook", "Open the book: {title}", { title: phase.title })}
+        className="group order-last hidden w-[190px] self-center pe-8 sm:block lg:w-[210px]"
+        data-testid="hero-book"
+      >
+        <BookCover p={phase} />
+      </button>
       <div className="relative flex h-full flex-col p-6 sm:p-7">
         <div className="flex flex-wrap items-center gap-2">
           <Chip tone="ember" dot>
@@ -142,40 +159,30 @@ function phaseState(p: PhaseT, t: T): { label: string; tone: "up" | "ember" | "n
   return { label: t("academy.state.notStarted"), tone: "neutral" };
 }
 
-function PhaseCard({ p }: { p: PhaseT }) {
+/** a phase as a book on the shelf: the cover, then what's inside and how far you've read */
+function PhaseCard({ p, onOpen }: { p: PhaseT; onOpen: OpenBook }) {
   const t = useT();
   const s = phaseState(p, t);
   const tracks = trackTallies(p.sections);
   const done = p.progress.done === p.progress.total && p.progress.total > 0;
   return (
-    <Link href={`/academy/phase/${p.slug}`} className="group block h-full" data-testid={`phase-card-${p.slug}`}>
-      <Card className="flex h-full flex-col overflow-hidden transition-colors group-hover:border-[var(--k-border-top)]">
-        <div className="relative h-36 overflow-hidden rounded-t-[20px]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={coverOf(p.order)} alt="" className="size-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />
-          <div className="absolute start-3.5 top-3.5 flex gap-1.5">
-            <Chip size="sm" tone={LEVEL_TONE[p.level]} className="bg-black/60">
-              {levelLabel(p.level)}
-            </Chip>
-            {isElective(p) && (
-              <Chip size="sm" className="bg-black/60">
-                {t("academy.elective")}
-              </Chip>
-            )}
-          </div>
-          <div className="absolute end-3.5 top-3.5">
-            <Chip size="sm" tone={s.tone} dot className="bg-black/60">
-              {s.label}
-            </Chip>
-          </div>
-          <div className="k-num absolute bottom-2 start-4 text-[44px] font-semibold leading-none tracking-tight text-white/90">{String(p.order).padStart(2, "0")}</div>
+    <Link
+      href={`/academy/phase/${p.slug}`}
+      className="group block h-full"
+      data-testid={`phase-card-${p.slug}`}
+      onClick={(e) => {
+        if (!plainClick(e)) return;
+        e.preventDefault();
+        onOpen(p.slug, e.currentTarget.querySelector("[data-book-root]"));
+      }}
+    >
+      <Card className="flex h-full flex-col rounded-[26px] p-5 transition-colors group-hover:border-[var(--k-border-top)]">
+        <div className="mx-auto w-[82%]">
+          <BookCover p={p} />
         </div>
-        <div className="flex flex-1 flex-col px-5 pb-5 pt-3">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-fg-3">{t("academy.phaseN", { n: p.order })}</div>
-          <div className="mt-0.5 text-[15.5px] font-medium leading-snug tracking-tight">{p.title}</div>
-          <p className="mt-1 line-clamp-2 text-[12.5px] text-fg-3">{p.summary}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-fg-3">
+        <div className="mt-5 flex flex-1 flex-col">
+          <p className="line-clamp-2 text-[12.5px] leading-relaxed text-fg-3">{p.summary}</p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-fg-3">
             {tracks.map((x) => (
               <span key={x.track} className="inline-flex items-center gap-1">
                 <BookOpen className="size-3.5" /> <span className="k-num">{trackCount(t, x.track, x.total)}</span>
@@ -187,7 +194,9 @@ function PhaseCard({ p }: { p: PhaseT }) {
           </div>
           <div className="mt-auto pt-4">
             <div className="mb-1.5 flex items-center justify-between text-[11.5px]">
-              <span className="text-fg-3">{p.certificate ? t("academy.phaseCard.certificate", { date: fmtDay(p.certificate.issued_at) }) : p.exam ? t("academy.phaseCard.finalExam", { count: p.exam.questions }) : ""}</span>
+              <span className={cn("font-medium", s.tone === "up" ? "text-up" : s.tone === "gold" ? "text-gold" : s.tone === "ember" ? "text-ember" : "text-fg-3")}>
+                {p.certificate ? t("academy.phaseCard.certificate", { date: fmtDay(p.certificate.issued_at) }) : s.label}
+              </span>
               <span className={cn("k-num", done ? "text-up" : p.progress.done ? "text-fg-2" : "text-fg-3")}>
                 {p.progress.done}/{p.progress.total}
               </span>
@@ -232,13 +241,24 @@ function GlossaryTeaser() {
 
 function CertificatesCard({ cat }: { cat: Catalog }) {
   const t = useT();
-  const certs = cat.phases.filter((p) => p.certificate);
+  const me = useSession();
+  // newest first: the latest one is shown as the paper certificate
+  const certs = cat.phases.filter((p) => p.certificate).sort((a, b) => b.certificate!.issued_at.localeCompare(a.certificate!.issued_at));
   const ready = cat.phases.find((p) => !p.certificate && p.exam?.unlocked);
+  const top = certs[0];
+  const latest = top
+    ? { code: top.certificate!.code, phase_order: top.order, phase_title: top.title, score_pct: top.exam?.best_pct ?? 0, issued_at: top.certificate!.issued_at, learner_name: me.name }
+    : null;
   return (
     <Card className="flex h-full flex-col">
       <CardHeader title={t("academy.certs.title")} subtitle={t("academy.certs.subtitle")} icon={<Award />} action={<Link href="/academy/progress" className="text-[12.5px] text-fg-3 hover:text-fg">{t("common.viewAll")}</Link>} />
       <div className="flex-1 space-y-2 px-4 pb-5 pt-4 sm:px-6">
-        {certs.slice(0, 3).map((p) => (
+        {latest && (
+          <Link href="/academy/progress" className="mb-3 block transition-transform hover:-translate-y-0.5">
+            <CertificateCard c={latest} />
+          </Link>
+        )}
+        {certs.slice(latest ? 1 : 0, 3).map((p) => (
           <Link key={p.slug} href="/academy/progress" className="k-row flex items-center gap-3 px-3 py-2.5">
             <span className="grid size-8 place-items-center rounded-full border border-up/30 bg-up-soft text-up">
               <CheckCircle2 className="size-4" />
@@ -277,9 +297,6 @@ function PracticeCard() {
   const t = useT();
   return (
     <Card className="relative h-full overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/photos/trader.jpg" alt="" className="absolute inset-0 size-full object-cover opacity-30" />
-      <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/85 to-bg/40" />
       <div className="relative flex h-full flex-col p-6">
         <Chip tone="gold" className="self-start">
           {t("academy.practiceCard.chip")}
@@ -297,6 +314,21 @@ function PracticeCard() {
 export function LiveAcademyHome() {
   const t = useT();
   const { data, error, reload } = useAcademy<Catalog>("catalog");
+  // the open book: from a click on the shelf, or ?book=<phase> (a shared link, or Back/Forward to an open book)
+  const [book, setBook] = React.useState<{ slug: string; origin: HTMLElement | null; fromUrl: boolean } | null>(null);
+  const openBook = React.useCallback<OpenBook>((slug, origin) => setBook({ slug, origin, fromUrl: false }), []);
+  const hasData = !!data;
+  React.useEffect(() => {
+    if (!hasData) return;
+    const fromUrl = () => {
+      const slug = new URLSearchParams(window.location.search).get("book");
+      if (slug) setBook((b) => b ?? { slug, origin: null, fromUrl: true });
+    };
+    fromUrl();
+    window.addEventListener("popstate", fromUrl);
+    return () => window.removeEventListener("popstate", fromUrl);
+  }, [hasData]);
+  const bookPhase = book && data ? data.phases.find((p) => p.slug === book.slug) : undefined;
   if (error) return <AcademyUnavailable error={error} onRetry={reload} />;
   if (!data) return <PageSkeleton />;
   const chapters = data.me.chapters_total;
@@ -305,9 +337,9 @@ export function LiveAcademyHome() {
   const electives = data.phases.filter(isElective);
   return (
     <div className="pb-16">
-      <PageHeader
+      <PageHero page="academy" overlap
         title={t("academy.title")}
-        subtitle={t("academy.home.subtitle", { count: chapters })}
+        lead={t("academy.home.subtitle", { count: chapters })}
         actions={
           <>
             <Link href="/academy/glossary">
@@ -326,7 +358,7 @@ export function LiveAcademyHome() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <Reveal className="xl:col-span-8">
-          <ContinueHero cat={data} />
+          <ContinueHero cat={data} onOpen={openBook} />
         </Reveal>
         <Reveal delay={0.05} className="xl:col-span-4">
           <StatsCard cat={data} />
@@ -342,7 +374,7 @@ export function LiveAcademyHome() {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="phase-grid">
           {core.map((p) => (
-            <PhaseCard key={p.slug} p={p} />
+            <PhaseCard key={p.slug} p={p} onOpen={openBook} />
           ))}
         </div>
         {electives.length > 0 && (
@@ -353,7 +385,7 @@ export function LiveAcademyHome() {
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="elective-grid">
               {electives.map((p) => (
-                <PhaseCard key={p.slug} p={p} />
+                <PhaseCard key={p.slug} p={p} onOpen={openBook} />
               ))}
             </div>
           </>
@@ -373,6 +405,20 @@ export function LiveAcademyHome() {
       </div>
 
       <p className="mt-8 max-w-3xl text-[11.5px] leading-relaxed text-fg-3">{t(RISK_NOTE)}</p>
+
+      {book && bookPhase && (
+        <BookReader
+          key={book.slug}
+          cat={data}
+          phase={bookPhase}
+          origin={book.origin}
+          fromUrl={book.fromUrl}
+          onClosed={() => {
+            setBook(null);
+            reload(); // progress, the ribbon and "Continue" reflect what was read
+          }}
+        />
+      )}
     </div>
   );
 }

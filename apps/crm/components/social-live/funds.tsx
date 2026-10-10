@@ -3,12 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight, CalendarClock, Coins, Crown, LayoutGrid, Lock, Rows3, ShieldAlert, Snowflake, TrendingUp, Users, Wallet } from "lucide-react";
-import { Avatar, Button, Card, CardHeader, Chip, DataTable, Dialog, EmptyState, EquityChart, KeyValue, KpiCard, PageHeader, Segmented, cn, type Column, type SeriesPoint } from "@/components/kit";
+import { Button, Card, CardHeader, Chip, DataTable, Dialog, EmptyState, EquityChart, KeyValue, KpiCard, PageHeader, Segmented, cn, type Column, type SeriesPoint } from "@/components/kit";
 import { useFormat, useT } from "@kalks/i18n/react";
 import { fmtDate, serverTime } from "@/components/trading/api";
 import { PERIOD_LABEL, compactUsd, nav4, pct, usd, useSocial, type FeePeriod, type FundDetail, type FundView } from "./api";
 import { BlockSkeleton, InfoBox, MasterIdentity, SocialError, Tile } from "./bits";
 import { InvestDialog } from "./invest-dialog";
+import { VisitingCard } from "@/components/visiting-card";
 
 type Rollover = FundDetail["rollovers"][number];
 
@@ -126,63 +127,57 @@ const EXPLAIN = [
   { icon: <Snowflake />, t: "social.drawdownFreeze", s: "social.funds.explain.freezeS" },
 ] as const;
 
+/** a fund as a visiting card (ivory, founder 2026-10-10), its terms underneath */
 function FundCard({ f, onInvest, onOpen }: { f: FundView; onInvest: () => void; onOpen: () => void }) {
   const t = useT();
   const fmt = useFormat();
   return (
-    <div className="k-card flex h-full flex-col overflow-hidden transition-colors hover:border-[var(--k-border-top)]">
-      <div className="px-5 pt-5">
-        <div className="flex items-start justify-between gap-3">
-          <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-3 text-start">
-            <Avatar name={f.master.nickname} size={44} />
-            <span className="min-w-0">
-              <span className="block truncate text-[15px] font-medium">{f.name}</span>
-              <span className="block truncate text-[12px] text-fg-3">{t("social.byName", { name: f.master.nickname })}</span>
-            </span>
-          </button>
-          <FundStatusChip status={f.status} />
-        </div>
-        <div className="mt-4 flex items-end justify-between gap-3">
-          <div>
-            <div className="text-[12px] text-fg-3">{t("social.navPerUnit")}</div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="k-num text-[26px] font-semibold leading-none tracking-tight">{nav4(f.nav)}</span>
-              <span className={cn("k-num text-[12px]", f.return1m >= 0 ? "text-up" : "text-down")}>{pct(f.return1m)} 1M</span>
-            </div>
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-[12px]">
-          {[
-            [t("social.aum"), compactUsd(f.aum)],
-            [t("social.investors"), fmt.number(f.investors, 0)],
-            [t("social.returnAll"), <span key="r" className={f.returnAll >= 0 ? "text-up" : "text-down"}>{pct(f.returnAll, 1)}</span>],
-            [t("social.drawdown"), <span key="d" className="text-down">{f.drawdownPct > 0 ? `-${f.drawdownPct.toFixed(1)}%` : "0.0%"}</span>],
-            [t("social.funds.perfFeeShort"), `${f.perfFeePct}% HWM`],
-            [t("social.min"), usd(f.minInvestment, 0)],
-          ].map(([k, v], i) => (
-            <div key={i} className="k-row min-w-0 px-2.5 py-2">
-              <div className="text-fg-3">{k}</div>
-              <div className="k-num mt-0.5 truncate font-medium">{v}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <Chip size="sm" tone="ember">
-            <CalendarClock className="size-3" /> {PERIOD_LABEL[f.period]} · {serverTime(f.nextRolloverAt, false)}
-          </Chip>
-          {f.lockInDays > 0 ? (
-            <Chip size="sm" tone="warn">
-              <Lock className="size-3" /> {t("social.funds.lockInDays", { d: f.lockInDays })}
-            </Chip>
-          ) : (
-            <Chip size="sm">{t("social.funds.noLockIn")}</Chip>
-          )}
-          <Chip size="sm">
-            <Snowflake className="size-3" /> {t("social.funds.freezeChip", { dd: f.maxDdPct })}
-          </Chip>
-        </div>
+    <div className="flex h-full flex-col">
+      <button type="button" onClick={onOpen} className="block text-start transition-transform hover:-translate-y-0.5">
+        <VisitingCard
+          finish="ivory"
+          kicker="PAMM"
+          name={f.name}
+          title={t("social.byName", { name: f.master.nickname })}
+          stats={[
+            { label: t("social.navPerUnit"), value: nav4(f.nav) },
+            { label: "1M", value: pct(f.return1m, 1), tone: f.return1m > 0 ? "up" : f.return1m < 0 ? "down" : undefined },
+            { label: t("social.aum"), value: compactUsd(f.aum) },
+            { label: t("social.drawdown"), value: f.drawdownPct > 0 ? `-${f.drawdownPct.toFixed(1)}%` : "0.0%", tone: f.drawdownPct > 0 ? "down" : undefined },
+          ]}
+        />
+      </button>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[12px] text-fg-3">
+        <FundStatusChip status={f.status} />
+        <span>
+          {t("social.investors")} <span className="k-num font-medium text-fg">{fmt.number(f.investors, 0)}</span>
+        </span>
+        <span>
+          {t("social.returnAll")} <span className={cn("k-num font-medium", f.returnAll >= 0 ? "text-up" : "text-down")}>{pct(f.returnAll, 1)}</span>
+        </span>
+        <span>
+          {t("social.funds.perfFeeShort")} <span className="k-num font-medium text-fg">{f.perfFeePct}% HWM</span>
+        </span>
+        <span>
+          {t("social.min")} <span className="k-num font-medium text-fg">{usd(f.minInvestment, 0)}</span>
+        </span>
       </div>
-      <div className="mt-auto grid grid-cols-2 gap-2 px-5 pb-5 pt-4">
+      <div className="mt-2.5 flex flex-wrap gap-1.5 px-1">
+        <Chip size="sm" tone="ember">
+          <CalendarClock className="size-3" /> {PERIOD_LABEL[f.period]} · {serverTime(f.nextRolloverAt, false)}
+        </Chip>
+        {f.lockInDays > 0 ? (
+          <Chip size="sm" tone="warn">
+            <Lock className="size-3" /> {t("social.funds.lockInDays", { d: f.lockInDays })}
+          </Chip>
+        ) : (
+          <Chip size="sm">{t("social.funds.noLockIn")}</Chip>
+        )}
+        <Chip size="sm">
+          <Snowflake className="size-3" /> {t("social.funds.freezeChip", { dd: f.maxDdPct })}
+        </Chip>
+      </div>
+      <div className="mt-auto grid grid-cols-2 gap-2 pt-4">
         <Button size="sm" variant="surface" className="w-full" onClick={onOpen}>
           {t("common.details")} <ArrowUpRight className="rtl:-scale-x-100" />
         </Button>
@@ -326,7 +321,7 @@ export function LivePammPage() {
                 />
               </Card>
             ) : view === "cards" ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-x-5 gap-y-8 md:grid-cols-2 xl:grid-cols-3">
                 {funds.map((f) => (
                   <FundCard key={f.id} f={f} onInvest={() => setInvest(f.id)} onOpen={() => setOpen(f.id)} />
                 ))}

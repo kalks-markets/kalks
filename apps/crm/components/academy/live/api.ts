@@ -191,24 +191,6 @@ export const isElective = (p: { elective?: boolean }) => p.elective === true;
 /** Translated level label (levels are English enums from the service). */
 export const levelLabel = (l: Level) => (typeof l === "string" && l ? tr.dyn(`academy.level.${l.toLowerCase()}`, l) : "");
 
-/** Cover photo per phase (by order); phase 9 (Kalks FX Options) gets a live price screen. */
-export const PHASE_COVER = [
-  "/assets/photos/finance.jpg",
-  "/assets/photos/trading-screen.jpg",
-  "/assets/photos/charts.jpg",
-  "/assets/photos/nyc.jpg",
-  "/assets/photos/analytics.jpg",
-  "/assets/photos/dashboard.jpg",
-  "/assets/photos/gold.jpg",
-  "/assets/photos/skyscrapers.jpg",
-  "/assets/photos/stock-market.jpg",
-];
-export const coverOf = (order: number) => {
-  const n = PHASE_COVER.length;
-  const i = Number.isFinite(order) ? (((Math.trunc(order) - 1) % n) + n) % n : 0;
-  return PHASE_COVER[i]!;
-};
-
 // evaluated at render time, so they follow the current language
 export const fmtMin = (m: number) => (m >= 60 ? (m % 60 ? tr("academy.duration.hoursMin", { h: Math.floor(m / 60), m: m % 60 }) : tr("academy.duration.hours", { h: Math.floor(m / 60) })) : tr("academy.duration.min", { count: m }));
 export const fmtDay = (iso: string) => createFormatter(tr.locale).date(iso);

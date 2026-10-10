@@ -10,6 +10,7 @@ import { useNewsApi, type Brief, type Feed, type NewsItem, type NewsMap, type Se
 import { COUNTRY_NAME, Flag, SENT, SentimentChip, SymbolPill, ago, categoryLabel, countryName, coverFor, heatOf, useNow } from "./shared";
 import { tr, useFormat, useT } from "@kalks/i18n/react";
 import { TERMINAL_URL } from "@/lib/live";
+import { PageHero } from "@/components/page-hero";
 
 const CATS = ["all", "macro", "forex", "metals", "indices", "energies", "crypto", "stocks"] as const;
 type Cat = (typeof CATS)[number];
@@ -324,9 +325,9 @@ export function LiveNewsPage() {
 
   return (
     <div className="pb-24">
-      <PageHeader
+      <PageHero page="news"
         title={t("news.page.title")}
-        subtitle={total !== null ? t("news.page.subtitleCount", { count: total }) : t("news.page.subtitle")}
+        lead={total !== null ? t("news.page.subtitleCount", { count: total }) : t("news.page.subtitle")}
         actions={
           <div className="flex items-center gap-2">
             <Chip tone="up">{t("news.page.positive", { count: pos })}</Chip>

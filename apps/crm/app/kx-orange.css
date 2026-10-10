@@ -1,0 +1,439 @@
+/* ==========================================================================================================
+   Client Area colours (founder 2026-10-10): orange & white. Kalks Trader and the Back Office keep the shared
+   Kalks 2 palette. This only re-points the shared tokens for the Client Area:
+   - the primary family (`red` in tokens.ts) becomes orange, the highlight family (`yellow`) a warm amber;
+   - light surfaces become clean white / neutral grey (no pink tint); dark keeps its blacks with orange accents.
+   A white-label broker's brand <style> (brandCss, `html:root`) is more specific and still wins.
+   ========================================================================================================== */
+
+:root {
+  --k-red: #f2600c;
+  --k-on-red: #ffffff;
+  --k-red-edge-light: #a63f04;
+  --k-red-edge-dark: #8a3404;
+  --k-red-tx-light: #c44b05;
+  --k-red-tx-dark: #ff8a4c;
+  --k-red-soft-light: #ffeadb;
+  --k-red-soft-dark: rgba(242, 96, 12, 0.18);
+  --k-red-pastel-light: #ffd8c0;
+  --k-red-pastel-dark: #3a1a08;
+  --k-yellow: #ffa040;
+  --k-on-yellow: #1a1006;
+  --k-yellow-edge-light: #b8690f;
+  --k-yellow-edge-dark: #9a560a;
+  --k-yellow-tx-light: #9a4f00;
+  --k-yellow-tx-dark: #ffb366;
+  --k-yellow-soft-light: #fff0de;
+  --k-yellow-soft-dark: rgba(255, 160, 64, 0.14);
+  --k-neon-red: #ff6a1a;
+  --k-neon-yellow: #ffb35c;
+  --k-sell: #e0182f;
+}
+
+/* light: white and neutral greys (explicit light, or Auto on a light OS) */
+:root[data-theme="light"],
+.light {
+  --k-page: #efeff1;
+  --k-bg: #f6f6f7;
+  --k-bg-2: #ededef;
+  --k-surface: #ffffff;
+  --k-surface-2: #fafafa;
+  --k-surface-3: #f1f1f3;
+  --k-surface-4: #e7e7ea;
+  --k-border: rgba(18, 18, 22, 0.08);
+  --k-border-2: rgba(18, 18, 22, 0.14);
+  --k-fg: #0a0a0b;
+  --k-fg-2: #55555d;
+  --k-fg-3: #6c6c74;
+  --k-ink: #000000;
+  --k-ink-edge: #3a3a3d;
+  --k-white-edge: #d4d4d8;
+  --k-focus: #141416;
+  --k-focus-halo: #ffb35c;
+  --k-accent-line: #141416;
+  --k-accent-fill: #ffb35c;
+  --k-shadow-card: 0 1px 2px rgba(18, 18, 22, 0.04), 0 12px 32px -14px rgba(18, 18, 22, 0.14);
+  --k-shadow-pop: 0 30px 80px -24px rgba(18, 18, 22, 0.3);
+  --k-bloom-a: rgba(255, 196, 160, 0.55);
+  --k-bloom-b: rgba(255, 226, 196, 0.55);
+  --k-grid: rgba(18, 18, 22, 0.055);
+  --k-axis: #6c6c74;
+  --k-ma: #f2600c;
+  --k-draw: #55555d;
+  --k-tog-on: #141416;
+  --k-seg-edge: #dadade;
+  --k-puck-edge: #cfcfd4;
+  --k-tabbar: #141416;
+  --k-tab-ic: #a1a1aa;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not(.dark) {
+    --k-page: #efeff1;
+    --k-bg: #f6f6f7;
+    --k-bg-2: #ededef;
+    --k-surface: #ffffff;
+    --k-surface-2: #fafafa;
+    --k-surface-3: #f1f1f3;
+    --k-surface-4: #e7e7ea;
+    --k-border: rgba(18, 18, 22, 0.08);
+    --k-border-2: rgba(18, 18, 22, 0.14);
+    --k-fg: #0a0a0b;
+    --k-fg-2: #55555d;
+    --k-fg-3: #6c6c74;
+    --k-ink: #000000;
+  --k-ink-edge: #3a3a3d;
+    --k-white-edge: #d4d4d8;
+    --k-focus: #141416;
+    --k-focus-halo: #ffb35c;
+    --k-accent-line: #141416;
+    --k-accent-fill: #ffb35c;
+    --k-shadow-card: 0 1px 2px rgba(18, 18, 22, 0.04), 0 12px 32px -14px rgba(18, 18, 22, 0.14);
+    --k-shadow-pop: 0 30px 80px -24px rgba(18, 18, 22, 0.3);
+    --k-bloom-a: rgba(255, 196, 160, 0.55);
+    --k-bloom-b: rgba(255, 226, 196, 0.55);
+    --k-grid: rgba(18, 18, 22, 0.055);
+    --k-axis: #6c6c74;
+    --k-ma: #f2600c;
+    --k-draw: #55555d;
+    --k-tog-on: #141416;
+    --k-seg-edge: #dadade;
+    --k-puck-edge: #cfcfd4;
+    --k-tabbar: #141416;
+    --k-tab-ic: #a1a1aa;
+  }
+}
+
+/* dark: Vantablack (founder 2026-10-10): pure #000 grounds, neutral greys, orange accents */
+:root[data-theme="dark"],
+.dark {
+  color-scheme: dark;
+  --k-page: #000000;
+  --k-bg: #000000;
+  --k-bg-2: #030303;
+  --k-surface: #0a0a0b;
+  --k-surface-2: #0f0f11;
+  --k-surface-3: #161618;
+  --k-surface-4: #1f1f22;
+  --k-border: rgba(255, 255, 255, 0.07);
+  --k-border-2: rgba(255, 255, 255, 0.12);
+  --k-fg: #f5f5f6;
+  --k-fg-2: #b3b3ba;
+  --k-fg-3: #8b8b93;
+  --k-ink: #f5f5f6;
+  --k-ink-edge: #7a7a80;
+  --k-ink-fg: #000000;
+  --k-white-edge: #8e8e94;
+  --k-glass: rgba(10, 10, 11, 0.56);
+  --k-glass-strong: rgba(6, 6, 7, 0.74);
+  --k-glass-line: rgba(255, 255, 255, 0.08);
+  --k-focus: #ffb35c;
+  --k-focus-halo: rgba(255, 179, 92, 0.18);
+  --k-accent-line: #ffa040;
+  --k-accent-fill: #ffa040;
+  --k-bloom-a: rgba(242, 96, 12, 0.22);
+  --k-bloom-b: rgba(255, 160, 64, 0.06);
+  --k-chart-bg: #000000;
+  --k-grid: rgba(255, 255, 255, 0.05);
+  --k-axis: #8b8b93;
+  --k-ma: #ffa040;
+  --k-draw: #b3b3ba;
+  --k-tog-on: #f2600c;
+  --k-puck-edge: #85858b;
+  --k-tabbar: #0a0a0b;
+  --k-tab-ic: #8b8b93;
+  --k-tab-on: #f2600c;
+  --k-tab-on-ic: #000000;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(.light) {
+  color-scheme: dark;
+  --k-page: #000000;
+  --k-bg: #000000;
+  --k-bg-2: #030303;
+  --k-surface: #0a0a0b;
+  --k-surface-2: #0f0f11;
+  --k-surface-3: #161618;
+  --k-surface-4: #1f1f22;
+  --k-border: rgba(255, 255, 255, 0.07);
+  --k-border-2: rgba(255, 255, 255, 0.12);
+  --k-fg: #f5f5f6;
+  --k-fg-2: #b3b3ba;
+  --k-fg-3: #8b8b93;
+  --k-ink: #f5f5f6;
+  --k-ink-edge: #7a7a80;
+  --k-ink-fg: #000000;
+  --k-white-edge: #8e8e94;
+  --k-glass: rgba(10, 10, 11, 0.56);
+  --k-glass-strong: rgba(6, 6, 7, 0.74);
+  --k-glass-line: rgba(255, 255, 255, 0.08);
+  --k-focus: #ffb35c;
+  --k-focus-halo: rgba(255, 179, 92, 0.18);
+  --k-accent-line: #ffa040;
+  --k-accent-fill: #ffa040;
+  --k-bloom-a: rgba(242, 96, 12, 0.22);
+  --k-bloom-b: rgba(255, 160, 64, 0.06);
+  --k-chart-bg: #000000;
+  --k-grid: rgba(255, 255, 255, 0.05);
+  --k-axis: #8b8b93;
+  --k-ma: #ffa040;
+  --k-draw: #b3b3ba;
+  --k-tog-on: #f2600c;
+  --k-puck-edge: #85858b;
+  --k-tabbar: #0a0a0b;
+  --k-tab-ic: #8b8b93;
+  --k-tab-on: #f2600c;
+  --k-tab-on-ic: #000000;
+  }
+}
+
+/* ----------------------------------------------------------------------------------------------------------
+   Page heroes (components/page-hero.tsx): while a hero photo sits under the top bar, the bar's own tokens turn
+   white-on-glass, so the logo, page pills and buttons read on the photo. Off again once the hero scrolls away.
+   ---------------------------------------------------------------------------------------------------------- */
+html[data-hero="on"] [data-shell-header] {
+  color-scheme: dark;
+  color: #ffffff;
+  --k-fg: #ffffff;
+  --k-fg-2: rgba(255, 255, 255, 0.86);
+  --k-fg-3: rgba(255, 255, 255, 0.72);
+  --k-surface: rgba(255, 255, 255, 0.14);
+  --k-surface-2: rgba(255, 255, 255, 0.16);
+  --k-surface-3: rgba(255, 255, 255, 0.2);
+  --k-surface-4: rgba(255, 255, 255, 0.26);
+  --k-border: rgba(255, 255, 255, 0.22);
+  --k-border-2: rgba(255, 255, 255, 0.32);
+  --k-glass: rgba(255, 255, 255, 0.14);
+  --k-glass-strong: rgba(255, 255, 255, 0.2);
+  --k-glass-line: rgba(255, 255, 255, 0.28);
+  --k-white-edge: rgba(255, 255, 255, 0.2);
+  --k-seg-edge: rgba(255, 255, 255, 0.2);
+  /* the active page pill and its underline: white on the photo */
+  --k-ember: #ffffff;
+  --k-ember-2: #ffffff;
+  --k-ember-tx: #ffffff;
+  --k-ember-soft: rgba(255, 255, 255, 0.18);
+  --k-on-ember: #141416;
+}
+html[data-hero="on"] .k-topbar[data-scrolled] {
+  background: rgba(10, 10, 12, 0.22);
+  box-shadow: none;
+}
+
+/* ----------------------------------------------------------------------------------------------------------
+   Photo pages (<html data-photo>, set by PageHero): the page's photo, blurred, fills the backdrop, and cards,
+   the rail and the phone bar become frosted glass that takes its colour. Menus and dialogs stay solid.
+   ---------------------------------------------------------------------------------------------------------- */
+/* light: no blurred photo (it turned muddy pink); a clean tint of the photo's own colour instead, white glass */
+:root[data-photo]:not([data-theme="dark"]):not(.dark) {
+  --k-backdrop-bg:
+    radial-gradient(70% 55% at 92% -12%, rgb(var(--k-photo-rgb) / 0.2), transparent 70%),
+    radial-gradient(55% 45% at -6% 106%, rgb(var(--k-photo-rgb) / 0.12), transparent 70%),
+    linear-gradient(180deg, color-mix(in oklab, rgb(var(--k-photo-rgb)) 7%, #ffffff) 0%, #f6f6f7 75%);
+  --k-backdrop-filter: none;
+  --k-backdrop-transform: none;
+  --k-photo-wash: transparent;
+  --k-glass-card: rgba(255, 255, 255, 0.74);
+  --k-glass-card-line: rgba(255, 255, 255, 0.95);
+  --k-glass-card-shadow: 0 1px 2px rgba(18, 18, 22, 0.04), 0 18px 44px -26px rgb(var(--k-photo-rgb) / 0.3);
+  --k-glass-tile: rgba(255, 255, 255, 0.88);
+  --k-surface-2: rgba(255, 255, 255, 0.62);
+  --k-surface-3: color-mix(in oklab, rgb(var(--k-photo-rgb)) 6%, rgba(255, 255, 255, 0.7));
+  --k-surface-4: color-mix(in oklab, rgb(var(--k-photo-rgb)) 10%, rgba(255, 255, 255, 0.75));
+}
+/* dark: the photo itself, blurred, under black glass */
+:root[data-photo][data-theme="dark"],
+:root[data-photo].dark {
+  --k-backdrop-bg: var(--k-page-photo) center / cover no-repeat, #000000;
+  --k-backdrop-filter: blur(70px) saturate(1.35);
+  --k-backdrop-transform: scale(1.25);
+  --k-photo-wash: rgba(0, 0, 0, 0.62);
+  --k-glass-card: rgba(8, 8, 9, 0.5);
+  --k-glass-card-line: rgba(255, 255, 255, 0.08);
+  --k-glass-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 24px 48px -28px rgba(0, 0, 0, 0.8);
+  --k-glass-tile: rgba(6, 6, 7, 0.56);
+  --k-surface-2: rgba(255, 255, 255, 0.04);
+  --k-surface-3: rgba(255, 255, 255, 0.07);
+  --k-surface-4: rgba(255, 255, 255, 0.1);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-photo]:not([data-theme="light"]):not(.light) {
+    --k-backdrop-bg: var(--k-page-photo) center / cover no-repeat, #000000;
+    --k-backdrop-filter: blur(70px) saturate(1.35);
+    --k-backdrop-transform: scale(1.25);
+    --k-photo-wash: rgba(0, 0, 0, 0.62);
+    --k-glass-card: rgba(8, 8, 9, 0.5);
+    --k-glass-card-line: rgba(255, 255, 255, 0.08);
+    --k-glass-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 24px 48px -28px rgba(0, 0, 0, 0.8);
+    --k-glass-tile: rgba(6, 6, 7, 0.56);
+    --k-surface-2: rgba(255, 255, 255, 0.04);
+    --k-surface-3: rgba(255, 255, 255, 0.07);
+    --k-surface-4: rgba(255, 255, 255, 0.1);
+  }
+}
+
+html[data-photo] .k-backdrop {
+  background: var(--k-backdrop-bg);
+  filter: var(--k-backdrop-filter);
+  transform: var(--k-backdrop-transform);
+}
+html[data-photo] .k-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  background: var(--k-photo-wash);
+}
+html[data-photo] :is(.k-card, .k-glass, .k-hot-card, .k-card-hot) {
+  background: var(--k-glass-card);
+  border-color: var(--k-glass-card-line);
+  box-shadow: var(--k-glass-card-shadow);
+  -webkit-backdrop-filter: blur(26px) saturate(170%);
+  backdrop-filter: blur(26px) saturate(170%);
+}
+html[data-photo] :is(.k-rail, .k-mobilebar) {
+  background: var(--k-glass-card);
+  border-color: var(--k-glass-card-line);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
+}
+/* cards that sit on the sharp photo are more solid, so they read like the reference's light cards */
+.k-page-hero.k-overlap + * {
+  --k-glass-card: var(--k-glass-tile);
+}
+/* the hero's stat tiles: frosted over the sharp photo */
+.k-hero-tile {
+  background: var(--k-glass-tile, color-mix(in oklab, var(--k-surface) 92%, transparent));
+  border: 1px solid var(--k-glass-card-line, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+}
+
+/* inner main pages: the block after the hero rises onto the photo, like the dashboard's tiles */
+.k-page-hero.k-overlap + * {
+  position: relative;
+  z-index: 1;
+  margin-top: -200px;
+  margin-inline: 12px;
+}
+@media (min-width: 1024px) {
+  .k-page-hero.k-overlap + * {
+    margin-top: -220px;
+    margin-inline: 16px;
+  }
+}
+
+/* ----------------------------------------------------------------------------------------------------------
+   Menus, pop-ups (profile, notifications, language) and toasts: dark glass with an orange hairline accent.
+   ---------------------------------------------------------------------------------------------------------- */
+[data-radix-popper-content-wrapper] > :first-child {
+  background: rgba(14, 14, 16, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 80px -24px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(242, 96, 12, 0.08) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  backdrop-filter: blur(26px) saturate(160%);
+}
+[data-sonner-toaster] {
+  --normal-bg: rgba(14, 14, 16, 0.84);
+  --normal-border: rgba(255, 255, 255, 0.1);
+  --normal-text: #f5f5f6;
+  --success-bg: rgba(14, 14, 16, 0.84);
+  --success-border: rgba(255, 255, 255, 0.1);
+  --success-text: #f5f5f6;
+  --error-bg: rgba(30, 8, 10, 0.86);
+  --error-border: rgba(255, 77, 94, 0.3);
+  --error-text: #ffd7db;
+}
+[data-sonner-toast] {
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+[data-sonner-toast] [data-icon] {
+  color: var(--k-red);
+}
+
+/* the real Kalks logo (founder 2026-10-10): the original monochrome wordmark and K, no red face or yellow edge */
+svg[aria-label="Kalks"] {
+  --k-red: currentColor;
+  --k-yellow: transparent;
+}
+.k-brand-disc {
+  background: #000000;
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+/* every page shows its section photo: the scrolled top bar is glass over it, never a black band */
+html[data-photo] .k-topbar[data-scrolled] {
+  background: rgba(8, 8, 9, 0.38);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* debit-card accounts: live = Kalks orange (shared k-acct-live), demo = deep black, prop = gold */
+.k-acct-demo {
+  background: linear-gradient(150deg, #2a2a2e, #101012 55%, #000000);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 50px -26px rgba(0, 0, 0, 0.9);
+}
+.k-acct-prop {
+  background: linear-gradient(150deg, #f3c870, #c8892b 50%, #7a4a12);
+  box-shadow: 0 24px 50px -26px rgba(122, 74, 18, 0.9);
+}
+
+/* ----------------------------------------------------------------------------------------------------------
+   Figures on every page as one inline strip (founder 2026-10-10: "like the Home balance strip"): a row of KpiCards
+   (.k-kpi) becomes one glass panel with hairline dividers instead of separate boxes.
+   ---------------------------------------------------------------------------------------------------------- */
+.grid:has(> .k-kpi) {
+  gap: 0 !important;
+  overflow: hidden;
+  border-radius: 26px;
+  background: var(--k-glass-card, var(--k-surface));
+  border: 1px solid var(--k-glass-card-line, var(--k-border));
+  box-shadow: var(--k-glass-card-shadow, var(--k-shadow-card));
+  -webkit-backdrop-filter: blur(26px) saturate(170%);
+  backdrop-filter: blur(26px) saturate(170%);
+}
+.grid:has(> .k-kpi) > .k-kpi > .k-card {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.grid:has(> .k-kpi) > .k-kpi + .k-kpi {
+  box-shadow: inset 0 1px 0 var(--k-border);
+}
+@media (min-width: 640px) {
+  .grid:has(> .k-kpi) > .k-kpi + .k-kpi,
+  [class*="sm:grid"]:has(> .k-kpi) > .k-kpi + .k-kpi {
+    box-shadow: inset 1px 0 0 var(--k-border);
+  }
+  [class*="sm:grid"]:has(> .k-kpi) {
+    gap: 0 !important;
+    overflow: hidden;
+    border-radius: 26px;
+    background: var(--k-glass-card, var(--k-surface));
+    border: 1px solid var(--k-glass-card-line, var(--k-border));
+    box-shadow: var(--k-glass-card-shadow, var(--k-shadow-card));
+    -webkit-backdrop-filter: blur(26px) saturate(170%);
+    backdrop-filter: blur(26px) saturate(170%);
+  }
+  [class*="sm:grid"]:has(> .k-kpi) > .k-kpi > .k-card {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* debit-card finishes for account types and the open-account choices (components/trading/group-card.tsx CardFace) */
+.k-face { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 22px 44px -26px rgba(0, 0, 0, 0.85); }
+.k-face-standard { background: linear-gradient(150deg, #ff8a3d, #f2600c 48%, #a63f04); }
+.k-face-cent { background: linear-gradient(150deg, #e09a6a, #a8582c 50%, #5a2a12); }
+.k-face-pro { background: linear-gradient(150deg, #2c2c31, #111113 55%, #000000); }
+.k-face-graphite { background: linear-gradient(150deg, #5a5a62, #2c2c31 50%, #131315); }
+.k-face-ecn { background: linear-gradient(150deg, #ff6a45, #c8321b 50%, #5c1206); }
+.k-face-vip { background: linear-gradient(150deg, #f3c870, #c8892b 50%, #6e420f); }
+.k-face-options { background: linear-gradient(150deg, #7a46b0, #3b1d62 52%, #14081f); }

@@ -13,9 +13,9 @@ import { Segmented } from "../components/navigation";
 export type ThemeChoice = "system" | "light" | "dark";
 
 /** The one theme configuration of every Kalks app. */
-export function KalksThemeProvider({ children, defaultTheme = "system" }: { children: React.ReactNode; defaultTheme?: ThemeChoice }) {
+export function KalksThemeProvider({ children, defaultTheme = "system", forcedTheme }: { children: React.ReactNode; defaultTheme?: ThemeChoice; forcedTheme?: "light" | "dark" }) {
   return (
-    <ThemeProvider attribute={["class", "data-theme"]} defaultTheme={defaultTheme} enableSystem themes={["light", "dark"]} disableTransitionOnChange>
+    <ThemeProvider attribute={["class", "data-theme"]} defaultTheme={defaultTheme} forcedTheme={forcedTheme} enableSystem themes={["light", "dark"]} disableTransitionOnChange>
       {children}
     </ThemeProvider>
   );

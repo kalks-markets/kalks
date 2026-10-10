@@ -12,6 +12,7 @@ import { NewsError, newsApi, useNewsApi, type CalDetail, type CalEvent, type Cal
 import { ActualValue, Flag, ImpactBars, countdown, gmt, localTime, useNow } from "./shared";
 import { tr, useFormat, useT } from "@kalks/i18n/react";
 import { TERMINAL_URL } from "@/lib/live";
+import { PageHero } from "@/components/page-hero";
 type Formatter = ReturnType<typeof useFormat>;
 
 const CCYS = ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD", "CNY"] as const;
@@ -210,9 +211,9 @@ export function LiveCalendarPage() {
 
   return (
     <div className="pb-24">
-      <PageHeader
+      <PageHero page="news"
         title={t("news.cal.title")}
-        subtitle={data ? t("news.cal.subtitleWeek", { week: weekLabel, zone: zone === "server" ? t("news.cal.zoneServer", { tz: gmt(offset) }) : t("news.cal.zoneLocal") }) : t("news.cal.subtitle")}
+        lead={data ? t("news.cal.subtitleWeek", { week: weekLabel, zone: zone === "server" ? t("news.cal.zoneServer", { tz: gmt(offset) }) : t("news.cal.zoneLocal") }) : t("news.cal.subtitle")}
         actions={
           <div className="flex items-center gap-2">
             <Segmented size="sm" value={zone} onChange={setZone} options={[{ value: "server", label: t("news.cal.server", { tz: gmt(offset) }) }, { value: "local", label: t("news.cal.myTime") }]} />

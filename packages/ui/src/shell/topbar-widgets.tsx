@@ -126,7 +126,7 @@ export interface CommandItem {
   keywords?: string;
 }
 
-export function CommandPalette({ items, placeholder }: { items: CommandItem[]; placeholder?: string }) {
+export function CommandPalette({ items, placeholder, compact }: { items: CommandItem[]; placeholder?: string; compact?: boolean }) {
   const t = useT();
   const [open, setOpen] = React.useState(false);
   const router = useRouter();
@@ -143,12 +143,12 @@ export function CommandPalette({ items, placeholder }: { items: CommandItem[]; p
   const groups = Array.from(new Set(items.map((i) => i.group)));
   return (
     <>
-      <button onClick={() => setOpen(true)} className="hidden h-10 items-center gap-2 rounded-full border border-line bg-surface/70 pl-3.5 pr-2 text-sm text-fg-3 shadow-[inset_0_1px_0_var(--k-border-top)] hover:text-fg-2 md:flex">
+      <button onClick={() => setOpen(true)} className={cn("hidden h-10 items-center gap-2 rounded-full border border-line bg-surface/70 pl-3.5 pr-2 text-sm text-fg-3 shadow-[inset_0_1px_0_var(--k-border-top)] hover:text-fg-2", !compact && "md:flex")}>
         <Search className="size-4" />
         <span className="w-28 text-start">{t("shell.search")}</span>
         <Kbd>⌘K</Kbd>
       </button>
-      <IconButton className="md:hidden" aria-label={t("shell.search")} onClick={() => setOpen(true)}>
+      <IconButton className={compact ? undefined : "md:hidden"} aria-label={t("shell.search")} title={t("shell.search")} onClick={() => setOpen(true)}>
         <Search />
       </IconButton>
       <DialogPrimitive.Root open={open} onOpenChange={setOpen}>

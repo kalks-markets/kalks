@@ -7,8 +7,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowDownToLine, ArrowUpRight, Eye, IdCard, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
-import { Avatar, Button, Chip, CommandPalette, LanguageMenu, MarketBoundary, ThemeToggle, TooltipProvider, cn } from "@/components/kit";
+import { ArrowDownToLine, ArrowUpRight, CandlestickChart, Eye, IdCard, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { Avatar, Button, Chip, CommandPalette, LanguageMenu, MarketBoundary, TooltipProvider, cn } from "@/components/kit";
 import { IS_DEMO } from "@kalks/mock";
 import { useT } from "@kalks/i18n/react";
 import { CRM_COMMANDS, NAV, localizeCommands, localizeNav } from "@/lib/nav";
@@ -25,6 +25,7 @@ import { BrandAvatar, Rail, useRailExpanded } from "./rail";
 import { ProfilePill, SubNav, type MenuItem } from "./topbar";
 import { MobileBar } from "./mobile-nav";
 import { isActive } from "./nav-utils";
+import { usePagePhoto } from "@/components/page-hero";
 
 const ACCOUNT_MENU_DEMO = [
   { label: "shell.profile", icon: <UserRound />, href: "/profile" },
@@ -42,6 +43,19 @@ const ACCOUNT_MENU_LIVE = [
 ] as const;
 
 /** True once the page has scrolled (the sticky top area then gets its frosted backdrop). */
+/** true while the window is at least `px` wide (false on the server and the first render) */
+function useMinWidth(px: number) {
+  const [ok, setOk] = React.useState(false);
+  React.useEffect(() => {
+    const m = window.matchMedia(`(min-width: ${px}px)`);
+    const on = () => setOk(m.matches);
+    on();
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, [px]);
+  return ok;
+}
+
 function useScrolled() {
   const [s, setS] = React.useState(false);
   React.useEffect(() => {
@@ -68,6 +82,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const subs = current?.sub && current.sub.length > 1 ? current.sub : null;
   const [expanded, setExpanded] = useRailExpanded();
   const scrolled = useScrolled();
+  // the top bar squeezes into small icon boxes when the rail is open or the window is narrower than 1440 px
+  const roomy = useMinWidth(1440);
+  usePagePhoto(pathname);
+  const compact = expanded || !roomy;
   const signOut = () => void logout();
 
   const commands = localizeCommands(CRM_COMMANDS, t)
@@ -107,6 +125,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <ArrowDownToLine /> {t("shell.deposit")}
       </Button>
     </Link>
+  ) : compact ? (
+    <a href={TERMINAL_URL} target="_blank" rel="noopener" aria-label={t("shell.kalksTrader")} title={t("shell.kalksTrader")} className="k-icb hidden md:inline-grid">
+      <CandlestickChart />
+    </a>
   ) : (
     <a href={TERMINAL_URL} target="_blank" rel="noopener" className="hidden md:block">
       <Button variant="ink">
@@ -122,25 +144,24 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <div className="k-backdrop" aria-hidden />
           <Rail modules={modules} expanded={expanded} onToggle={() => setExpanded(!expanded)} onSignOut={signOut} />
           <div className={cn("relative transition-[padding] duration-300", expanded ? "lg:ps-[248px]" : "lg:ps-[84px]")}>
-            <header data-scrolled={scrolled || undefined} className="k-topbar sticky top-0 z-30">
+            <header data-shell-header data-scrolled={scrolled || undefined} className="k-topbar sticky top-0 z-30">
               <div className="mx-auto flex h-[68px] max-w-[1640px] items-center gap-3 px-4 sm:px-6 lg:h-[76px] lg:px-8">
                 <Link href="/" className="lg:hidden" aria-label={t("shell.nav.dashboard")}>
                   <BrandAvatar size={40} />
                 </Link>
                 <div className="k-display min-w-0 flex-1 truncate text-[17px] font-bold tracking-[-0.01em] lg:hidden">{current?.label}</div>
-                <div className="hidden min-w-0 flex-1 lg:flex">{subs ? <SubNav fit items={subs} className="-ms-2.5" /> : <span className="k-display truncate text-[17px] font-bold tracking-[-0.01em]">{current?.label}</span>}</div>
+                <div className="hidden min-w-0 flex-1 lg:flex">{subs ? <SubNav fit iconOnly={compact} items={subs} className={compact ? "" : "-ms-2.5"} /> : <span className="k-display truncate text-[17px] font-bold tracking-[-0.01em]">{current?.label}</span>}</div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <CommandPalette items={commands} />
+                  <CommandPalette items={commands} compact={compact} />
                   <span className="hidden sm:contents">
                     <LanguageMenu />
-                    <ThemeToggle />
                   </span>
                   {!viewer && <NotificationsBell />}
                   {cta}
-                  <span className="hidden xl:block">
+                  <span className={compact ? "hidden" : "hidden xl:block"}>
                     <ProfilePill name={me.name} email={viewer ? viewer.label : me.email} verified={verified} header={menuHeader} items={menuItems} label={t("shell.accountMenu")} />
                   </span>
-                  <span className="xl:hidden">
+                  <span className={compact ? undefined : "xl:hidden"}>
                     <ProfilePill compact name={me.name} email={me.email} verified={verified} header={menuHeader} items={menuItems} label={t("shell.accountMenu")} />
                   </span>
                 </div>

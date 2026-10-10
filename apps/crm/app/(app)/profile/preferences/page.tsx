@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Bell, ChevronRight, Clock, Languages, MonitorSmartphone, Moon, Sun, Mail } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Bell, ChevronRight, Clock, Languages, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardHeader, Flag, LANGUAGES, PageHeader, Reveal, Segmented, Toggle, cn } from "@/components/kit";
 import { useLocale, useT } from "@kalks/i18n/react";
@@ -21,9 +20,6 @@ const NOTIFS = [
 ] as const;
 
 export default function PreferencesPage() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
   const t = useT();
   const { locale, setLocale } = useLocale();
   const [tz, setTz] = React.useState<"server" | "local">("server");
@@ -32,29 +28,6 @@ export default function PreferencesPage() {
     <div>
       <PageHeader title={t("profile.prefs.title")} subtitle={IS_DEMO ? t("profile.prefs.subtitle") : t("profile.prefs.subtitleLive")} />
       <div className={cn("grid grid-cols-1 gap-4", IS_DEMO ? "xl:grid-cols-3" : "lg:grid-cols-2")}>
-        <Reveal>
-          <Card className="h-full">
-            <CardHeader title={t("profile.prefs.appearance")} icon={<MonitorSmartphone />} />
-            <div className="grid grid-cols-2 gap-3 p-6">
-              {(["dark", "light"] as const).map((th) => (
-                <button key={th} onClick={() => setTheme(th)} className={cn("overflow-hidden rounded-[16px] border text-start transition-colors", mounted && resolvedTheme === th ? "border-ember/60 ring-4 ring-ember/10" : "border-line hover:border-fg-3")}>
-                  <div className={cn("h-24 p-3", th === "dark" ? "bg-[#07070a]" : "bg-[#f6f4f1]")}>
-                    <div className={cn("h-3 w-16 rounded-full", th === "dark" ? "bg-white/15" : "bg-black/10")} />
-                    <div className="mt-2 flex gap-1.5">
-                      <div className={cn("h-10 flex-1 rounded-lg", th === "dark" ? "bg-[#111114]" : "bg-white")} />
-                      <div className="h-10 w-8 rounded-lg bg-[var(--k-ember)]" />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium">
-                    {th === "dark" ? <Moon className="size-4" /> : <Sun className="size-4" />}
-                    {th === "dark" ? t("profile.prefs.dark") : t("profile.prefs.light")}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Card>
-        </Reveal>
-
         {IS_DEMO && <Reveal delay={0.05}>
           <Card className="h-full">
             <CardHeader title={t("profile.prefs.timeDisplay")} icon={<Clock />} />
