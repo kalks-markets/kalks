@@ -1,7 +1,7 @@
 // The signed-out welcome page (/login), in the Client Area's look since 2026-10-10 (web apps/crm/app/(auth): the
 // photo heroes, dark, orange buttons): Home's photo full-bleed at the top (the KALKS letters behind the figure),
 // fading into black, the white Kalks logo and the language over it; then, on black, the headline, the legal line, the
-// orange Log in (opens the sign-in sheet), Open account (sign-up) and "Try the demo". A white-label broker gets the
+// orange Log in (opens the sign-in sheet) and Open account (sign-up). A white-label broker gets the
 // same page on its own colour with its name as the headline, without the photo or the demo. The route keeps its
 // `next` (the router sends a fresh session there).
 import 'dart:async';
@@ -62,12 +62,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _tryDemo() {
-    KHaptics.success();
-    unawaited(ref.read(authProvider.notifier).enterDemo());
-    // the router takes the demo client to the Dashboard
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -80,7 +74,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final bg = kalks ? Colors.black : k.ember;
     final onDark = kalks || ThemeData.estimateBrightnessForColor(bg) == Brightness.dark;
     final ink = onDark ? Colors.white : const Color(0xFF0C0C0F);
-    final demo = kalks && t.has('auth.demo.tryCta');
     const white = Colors.white;
 
     return Scaffold(
@@ -192,22 +185,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             border: kalks ? white.withValues(alpha: 0.22) : null,
                             onTap: () => context.go('/register'),
                           ),
-                          if (demo) ...[
-                            const SizedBox(height: 6),
-                            KPressable(
-                              onTap: _tryDemo,
-                              semanticLabel: t('auth.demo.tryCta'),
-                              child: SizedBox(
-                                height: 44,
-                                child: Center(
-                                  child: Text(
-                                    t('auth.demo.tryCta'),
-                                    style: context.text.headline.copyWith(fontSize: 15, fontWeight: FontWeight.w600, color: k.ember2),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),

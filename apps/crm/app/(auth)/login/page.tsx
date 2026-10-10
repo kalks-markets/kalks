@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button, Field, Input } from "@/components/kit";
 import { IS_DEMO } from "@kalks/mock/mode";
 import { useT, Trans } from "@kalks/i18n/react";
-import { DemoEntry, DevCodeHint, FormError, GOOGLE_LOGIN, GoogleButton, useGoogleError, OrDivider, OtpInput, ResendLink, TryDemo } from "@/components/auth";
+import { DemoEntry, DevCodeHint, FormError, GOOGLE_LOGIN, GoogleButton, useGoogleError, OrDivider, OtpInput, ResendLink } from "@/components/auth";
 import { authPost, nextPath, type ApiError, type OtpChallenge } from "@/lib/auth-client";
 
 export default function LoginPage() {
@@ -103,7 +103,6 @@ export default function LoginPage() {
           <p className="mt-6 text-center text-[13.5px] text-fg-3">
             <Trans k="auth.login.newToKalks" tags={{ link: (c) => <Link href="/register" className="font-medium text-fg hover:text-ember">{c}</Link> }} />
           </p>
-          {!IS_DEMO && <TryDemo />}
         </motion.div>
       ) : (
         <motion.div key="otp" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>

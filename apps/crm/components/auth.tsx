@@ -199,27 +199,6 @@ export function ResendLink({ seconds, onResend }: { seconds: number; onResend: (
 }
 
 /** Demo builds only: skip sign-in and browse the Client Area as the sample client. */
-/** Public demo of the Client Area (sample data, no sign-up). Kalks' own showcase, so white-label brokers don't get it. */
-const DEMO_URL = process.env.NEXT_PUBLIC_DEMO_URL || "https://demo.kalkstrade.com";
-
-/** On the live sign-in and sign-up pages: try the full platform in the demo first, without an account. */
-export function TryDemo() {
-  const t = useT();
-  const brand = useBrand();
-  if (brand) return null;
-  return (
-    <div className="mt-6 rounded-[18px] border border-ember/30 bg-ember-soft px-5 py-4">
-      <div className="text-[14px] font-medium text-fg">{t("auth.demo.tryTitle")}</div>
-      <p className="mt-1 text-[13px] text-fg-2">{t("auth.demo.tryBody")}</p>
-      <a href={DEMO_URL} className="mt-3 block">
-        <Button type="button" variant="outline" size="lg" className="w-full">
-          {t("auth.demo.tryCta")} <ArrowRight className="rtl:-scale-x-100" />
-        </Button>
-      </a>
-    </div>
-  );
-}
-
 export function DemoEntry() {
   const t = useT();
   return (

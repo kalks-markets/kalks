@@ -35,13 +35,13 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets('the welcome page: headline, Log in, Open account and Try the demo over the picture', (tester) async {
+  testWidgets('the welcome page: headline, Log in and Open account over the picture (no demo button)', (tester) async {
     await pumpApp(tester);
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.text(headline), findsOneWidget);
     expect(find.text('Log in'), findsOneWidget);
     expect(find.text('Open account'), findsOneWidget);
-    expect(find.text('Try the demo'), findsOneWidget);
+    expect(find.text('Try the demo'), findsNothing);
     expect(find.textContaining('Client Agreement'), findsOneWidget);
     expect(welcomePhoto, findsOneWidget);
     // the form lives in the sheet, not on the page

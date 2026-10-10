@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../core/auth/auth_controller.dart';
 import '../../core/config/app_config.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
@@ -196,50 +195,6 @@ class PasswordStrength extends StatelessWidget {
               ),
               Text(value.isEmpty ? '' : labels[s], style: context.text.caption.copyWith(color: s >= 4 ? k.up : k.fg3)),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// "Try the demo" (web TryDemo): Kalks' own sample-data demo, without an account. The web links to
-/// demo.kalkstrade.com; the app opens its own demo in place (AuthController.enterDemo), never the browser.
-/// Hidden for white-label brokers.
-class TryDemoCard extends ConsumerWidget {
-  const TryDemoCard({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (!ref.watch(configProvider).tenantDefault) return const SizedBox.shrink();
-    final t = context.t;
-    final k = context.k;
-    if (!t.has('auth.demo.tryTitle')) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(top: 22),
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      decoration: BoxDecoration(
-        color: k.emberSoft,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: k.ember.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(t('auth.demo.tryTitle'), style: context.text.headline.copyWith(fontSize: 14, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 4),
-          Text(t('auth.demo.tryBody'), style: context.text.footnote.copyWith(color: k.fg2, fontSize: 13)),
-          const SizedBox(height: 12),
-          KButton(
-            label: t('auth.demo.tryCta'),
-            variant: KButtonVariant.outline,
-            expand: true,
-            trailingIcon: Directionality.of(context) == TextDirection.rtl ? LucideIcons.arrowLeft : LucideIcons.arrowRight,
-            onPressed: () {
-              KHaptics.success();
-              ref.read(authProvider.notifier).enterDemo();
-              // the router takes the demo client to the Dashboard
-            },
           ),
         ],
       ),

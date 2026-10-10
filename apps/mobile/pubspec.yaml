@@ -3,7 +3,7 @@ description: "Kalks: the Client Area and Kalks Trader as one native app (Android
 publish_to: 'none'
 
 # versionName+versionCode (sent as X-Kalks-App-Version, compared with config.minAppVersion)
-version: 1.0.0+4
+version: 1.0.0+5
 
 environment:
   sdk: ^3.13.5

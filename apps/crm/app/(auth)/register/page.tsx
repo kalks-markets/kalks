@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button, Field, Input, Stepper, Flag, Icon3D, Illustration } from "@/components/kit";
 import { IS_DEMO } from "@kalks/mock/mode";
 import { useT, Trans } from "@kalks/i18n/react";
-import { DemoEntry, DevCodeHint, FormError, GOOGLE_LOGIN, GoogleButton, useGoogleError, OrDivider, OtpInput, PasswordStrength, ResendLink, TryDemo } from "@/components/auth";
+import { DemoEntry, DevCodeHint, FormError, GOOGLE_LOGIN, GoogleButton, useGoogleError, OrDivider, OtpInput, PasswordStrength, ResendLink } from "@/components/auth";
 import { authPost, type ApiError, type OtpChallenge } from "@/lib/auth-client";
 import { COUNTRIES, maxDob } from "@/lib/countries";
 
@@ -176,7 +176,6 @@ export default function RegisterPage() {
             <p className="mt-5 text-center text-[13.5px] text-fg-3">
               <Trans k="auth.register.haveAccount" tags={{ link: (c) => <Link href="/login" className="font-medium text-fg hover:text-ember">{c}</Link> }} />
             </p>
-            {!IS_DEMO && <TryDemo />}
           </motion.div>
         )}
         {step === 1 && (
