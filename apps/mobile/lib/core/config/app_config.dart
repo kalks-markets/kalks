@@ -65,7 +65,9 @@ class AppConfig {
   bool moduleOn(String key) => modules[key] != false;
   bool flag(String key, {bool fallback = false}) => flags[key] ?? fallback;
 
-  KBrand get brand => KBrand(primary: primary ?? kEmber, accent: accent ?? kGold);
+  /// The colours the app is drawn in: the stock Kalks orange for Kalks itself (like the web's brandCss, which skips the
+  /// default brand), the broker's own for a white-label broker.
+  KBrand get brand => tenantDefault ? const KBrand() : KBrand(primary: primary ?? kEmber, accent: accent ?? kGold);
 
   /// The production defaults (used before the first answer and offline without a cached copy).
   static final AppConfig fallback = AppConfig.fromJson(const {

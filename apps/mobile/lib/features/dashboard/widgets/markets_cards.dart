@@ -513,22 +513,21 @@ String newsAgoText(T t, DateTime at, [DateTime? now]) {
   return d == 1 ? t('news.ago.yesterday') : t('news.ago.days', {'count': d});
 }
 
-const Map<String, List<String>> _covers = {
-  'macro': ['finance', 'skyscrapers', 'london', 'nyc'],
-  'forex': ['money', 'charts'],
-  'metals': ['gold'],
-  'indices': ['stock-market', 'trading-screen'],
-  'energies': ['dubai', 'skyline'],
-  'crypto': ['bitcoin', 'crypto-coins', 'crypto'],
-  'stocks': ['analytics', 'stock-market'],
-  'markets': ['dashboard', 'trader', 'singapore'],
+/// A cover per category from the founder's own solid-colour photos (web news-live/shared.tsx COVER, 2026-10-10).
+const Map<String, KHeroPhoto> _covers = {
+  'macro': KHeroPhoto.news,
+  'forex': KHeroPhoto.markets,
+  'metals': KHeroPhoto.rewards,
+  'indices': KHeroPhoto.portfolio,
+  'energies': KHeroPhoto.profile,
+  'crypto': KHeroPhoto.copy,
+  'stocks': KHeroPhoto.accounts,
+  'markets': KHeroPhoto.wallet,
 };
 
-/// The web's own photo for a story (by category; publisher images are never copied).
-String newsCover(DashNews n) {
-  final list = _covers[n.category] ?? _covers['markets']!;
-  return 'assets/photos/${list[n.id % list.length]}.jpg';
-}
+/// The photo of a story (by category; publisher images are never copied).
+KHeroPhoto newsCoverPhoto(DashNews n) => _covers[n.category] ?? KHeroPhoto.wallet;
+String newsCover(DashNews n) => newsCoverPhoto(n).asset;
 
 class _Cover extends StatelessWidget {
   const _Cover(this.n);
@@ -544,6 +543,7 @@ class _Cover extends StatelessWidget {
         width: 56,
         height: 56,
         fit: BoxFit.cover,
+        alignment: newsCoverPhoto(n).focus,
         opacity: const AlwaysStoppedAnimation(0.9),
         errorBuilder: (_, _, _) => Container(
           width: 56,
@@ -913,8 +913,8 @@ class _WorldMapState extends State<WorldMap> with SingleTickerProviderStateMixin
               dot: k.fg3.withValues(alpha: 0.55),
               surface: k.surface,
               fg: k.fg,
-              ember: const Color(0xFFFF5A1F),
-              up: const Color(0xFF22C55E),
+              ember: kEmber,
+              up: k.up,
               down: const Color(0xFFF04438),
               countStyle: context.text.mono(10, weight: FontWeight.w700, color: k.fg),
             ),

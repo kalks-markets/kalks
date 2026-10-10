@@ -87,25 +87,33 @@ class _AcademyPhaseScreenState extends ConsumerState<AcademyPhaseScreen> {
           padding: EdgeInsets.zero,
           child: Stack(
             children: [
-              Positioned.fill(child: PhaseCover(asset: coverOf(p.order), opacity: 0.4)),
-              const Positioned.fill(child: CoverWash()),
+              Positioned.fill(child: FinishWash(finish: bookFinish(p))),
               Padding(
                 padding: const EdgeInsets.all(22),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // core phases count among themselves ("Phase 3 of 8"); an elective stands alone
-                        KChip(
-                          label: p.elective ? t('academy.phaseN', {'n': p.order}) : t('academy.phase.ofTotal', {'n': p.order, 'total': coreCount}),
-                          tone: KChipTone.ember,
+                        Expanded(
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              // core phases count among themselves ("Phase 3 of 8"); an elective stands alone
+                              KChip(
+                                label: p.elective ? t('academy.phaseN', {'n': p.order}) : t('academy.phase.ofTotal', {'n': p.order, 'total': coreCount}),
+                                tone: KChipTone.ember,
+                              ),
+                              KChip(label: levelLabel(t, p.level), tone: levelTone(p.level)),
+                              if (p.elective) KChip(label: t('academy.elective')),
+                              if (p.certificate != null) KChip(label: t('academy.state.certified'), tone: KChipTone.up, dot: true),
+                            ],
+                          ),
                         ),
-                        KChip(label: levelLabel(t, p.level), tone: levelTone(p.level)),
-                        if (p.elective) KChip(label: t('academy.elective')),
-                        if (p.certificate != null) KChip(label: t('academy.state.certified'), tone: KChipTone.up, dot: true),
+                        const SizedBox(width: 14),
+                        SizedBox(width: 92, child: PhaseBook(p: p)),
                       ],
                     ),
                     const SizedBox(height: 16),

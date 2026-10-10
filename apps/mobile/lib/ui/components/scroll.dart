@@ -3,12 +3,13 @@ import 'package:flutter/cupertino.dart';
 import '../tokens.dart';
 import 'haptics.dart';
 
-/// A full-bleed picture at the top of a page (the Dashboard's robot): it runs under the status bar, moves at 40 % of
-/// the scroll (parallax, stretched over a pull-down) and the page's content sits in a rounded "sheet" with a grabber
-/// that slides up over it. The shell gives such a page no top padding and swaps its header for floating controls
-/// while the picture shows (app_shell.dart).
+/// A full-bleed picture at the top of a page (a section's photo hero, page_hero.dart): it runs under the status bar,
+/// moves at 40 % of the scroll (parallax, stretched over a pull-down) and the page's content sits in a rounded "sheet"
+/// with a grabber that slides up over it. The picture ends under the sheet's top corners (it fades out there), so the
+/// sheet can be dark glass over the page's backdrop. The shell gives such a page no top padding and swaps its header
+/// for floating controls while the picture shows (app_shell.dart).
 class KPageHero {
-  const KPageHero({required this.height, required this.picture, this.child, this.top, this.overlap = 28, this.radius = 32});
+  const KPageHero({required this.height, required this.picture, this.child, this.top, this.overlap = 28, this.radius = 32, this.sheetColor});
 
   /// The picture's height from the top of the screen; the sheet's edge sits [overlap] above it.
   final double height;
@@ -27,6 +28,9 @@ class KPageHero {
 
   /// The sheet's top corners.
   final double radius;
+
+  /// The sheet's fill (default: the page background at 62 %, glass over the backdrop).
+  final Color? sheetColor;
 
   /// Where the picture is scrolled fully under the sheet (the shell's collapse point counts from here).
   double get sheetTop => height - overlap;
@@ -139,12 +143,25 @@ class _HeroScrollState extends State<_HeroScroll> {
             valueListenable: _offset,
             child: hero.picture,
             builder: (context, y, picture) {
-              // fully under the sheet: nothing to draw
-              if (y >= hero.sheetTop) return const SizedBox.shrink();
+              // the picture ends under the sheet's corners: fully under the sheet, nothing to draw
+              final visible = hero.sheetTop - y + hero.radius;
+              if (visible <= 0) return const SizedBox.shrink();
               final pull = y < 0 ? -y : 0.0;
-              return Transform.translate(
-                offset: Offset(0, y > 0 ? -0.4 * y : 0),
-                child: SizedBox(height: hero.height + 40 + pull, child: picture),
+              final fade = hero.radius * 1.4;
+              return SizedBox(
+                height: visible,
+                child: ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (r) => LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: const [Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+                    stops: [0, ((r.height - fade) / r.height).clamp(0.0, 1.0), 1],
+                  ).createShader(r),
+                  child: Stack(
+                    children: [Positioned(top: y > 0 ? -0.4 * y : 0, left: 0, right: 0, height: hero.height + 40 + pull, child: picture!)],
+                  ),
+                ),
               );
             },
           ),
@@ -163,8 +180,9 @@ class _HeroScrollState extends State<_HeroScroll> {
               ),
               DecoratedSliver(
                 decoration: BoxDecoration(
-                  color: k.bg,
+                  color: hero.sheetColor ?? k.bg.withValues(alpha: 0.62),
                   borderRadius: BorderRadius.vertical(top: radius),
+                  border: Border(top: BorderSide(color: k.lineTop, width: 0.6)),
                 ),
                 sliver: SliverMainAxisGroup(
                   slivers: [

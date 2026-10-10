@@ -8,7 +8,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/app_info.dart';
 import '../core/auth/auth_controller.dart';
 import '../core/config/app_config.dart';
-import '../core/theme_controller.dart';
 import '../env.dart';
 import '../features/common/pickers.dart';
 import '../i18n/i18n.dart';
@@ -34,7 +33,6 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     final nav = navFor(cfg, me).where((m) => !kPrimaryModules.contains(m.key)).toList();
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final locale = localeInfo(ref.watch(localeProvider));
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final info = ref.watch(appInfoProvider);
 
     // modules in the web's sections (main, grow, build, learn, account), one grouped card per section
@@ -112,21 +110,6 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               title: t('shell.language'),
               value: locale.name,
               onTap: () => showLanguageSheet(context, ref),
-            ),
-            KListRow(
-              leading: Icon(dark ? LucideIcons.moon : LucideIcons.sun, size: 19),
-              title: t('profile.prefs.appearance'),
-              trailing: SizedBox(
-                width: 150,
-                child: KSegmented<ThemeMode>(
-                  plain: true,
-                  height: 32,
-                  values: const [ThemeMode.light, ThemeMode.dark],
-                  labels: [t('shell.themeLight'), t('shell.themeDark')],
-                  selected: dark ? ThemeMode.dark : ThemeMode.light,
-                  onChanged: (m) => ref.read(themeModeProvider.notifier).set(m),
-                ),
-              ),
             ),
             KListRow(leading: const Icon(LucideIcons.settings, size: 19), title: t('shell.preferences'), onTap: () => context.go('/profile/preferences')),
           ],

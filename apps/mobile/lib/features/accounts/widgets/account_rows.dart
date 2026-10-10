@@ -1,6 +1,7 @@
-// Account rows of My accounts (web components/trading/ui.tsx LiveAccountRow, archive.tsx ArchivedAccountRow), in
-// the web's phone layout: badges and the title, balance / equity / margin level, the actions (⋯, Fund or Refill,
-// Trade), then the positions line.
+// Accounts of My accounts. A live / demo / prop account is a debit card (founder 2026-10-10: "all account cards like
+// the debit card", web components/trading/account-tile.tsx AccountTile): the card opens the account; under it its
+// tags, login, positions line and the actions (Trade, Fund or Refill, ⋯). Archived accounts keep their row (web
+// archive.tsx ArchivedAccountRow).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,8 @@ import '../../../core/models/account.dart';
 import '../../../core/models/trading.dart';
 import '../../../i18n/i18n.dart';
 import '../../../ui/ui.dart';
+import '../../common/hide_money.dart';
+import '../../dashboard/widgets/accounts_panel.dart' show AccountCardVisual;
 import '../account_actions.dart';
 import '../accounts_data.dart';
 import 'account_bits.dart';
@@ -81,7 +84,6 @@ class LiveAccountRow extends ConsumerWidget {
     final readOnly = ref.watch(meProvider)?.readOnly ?? false;
     final flavor = accountFlavor(a);
     final copying = flavor == 'copy' ? copyingName(a) : null;
-    final cur = a.cent ? 'USC' : a.currency;
     final title = '${a.groupName} · ${t.dyn('accounts.mode.${a.mode}', fallback: a.mode)}';
     final footer = <Widget>[
       if (copying != null)
@@ -115,104 +117,87 @@ class LiveAccountRow extends ConsumerWidget {
           style: context.text.caption.copyWith(color: k.fg3, fontWeight: FontWeight.w400),
         ),
     ];
-    return _RowFrame(
-      label: '$title #${a.login}',
-      onTap: () => context.push('/accounts/${a.login}'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final hidden = ref.watch(hideBalancesProvider);
+    final tags = <Widget>[
+      FlavorChip(account: a),
+      if (a.cent) const KChip(label: 'USC', tone: KChipTone.gold, small: true),
+      DefaultStar(account: a),
+      StatusBadge(account: a),
+      if (a.closureStatus == 'pending') KChip(label: t('accounts.close.pendingChip'), tone: KChipTone.info, small: true),
+      if (a.dormant) KChip(label: t('accounts.dormant.chip'), tone: KChipTone.warn, small: true),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        KPressable(
+          onTap: () => context.push('/accounts/${a.login}'),
+          pressedScale: 0.985,
+          pressedOpacity: 0.92,
+          semanticLabel: '$title #${a.login}',
+          child: AccountCardVisual(account: a, hidden: hidden),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    KindBadge(account: a),
-                    if (a.isOptions) ProductChip(account: a),
-                    FlavorChip(account: a),
-                    Text(title, style: context.text.headline.copyWith(fontWeight: FontWeight.w500)),
-                    LoginCopy(login: a.login),
-                    if (a.name.isNotEmpty)
-                      Text(
-                        '“${a.name}”',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.label.copyWith(color: k.fg3),
-                      ),
-                    if (a.cent) const KChip(label: 'USC', tone: KChipTone.gold, small: true),
-                    DefaultStar(account: a),
-                    StatusBadge(account: a),
-                    if (a.closureStatus == 'pending') KChip(label: t('accounts.close.pendingChip'), tone: KChipTone.info, small: true),
-                    if (a.dormant) KChip(label: t('accounts.dormant.chip'), tone: KChipTone.warn, small: true),
-                  ],
+              // live / demo / prop and OPTIONS are on the card itself
+              LoginCopy(login: a.login),
+              if (a.name.isNotEmpty)
+                Text(
+                  '“${a.name}”',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.label.copyWith(color: k.fg3),
                 ),
-              ),
-              const SizedBox(width: 8),
-              KChip(label: levLabel(a.leverage), small: true),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: _Figure(
-                  label: t('common.balance'),
-                  child: KMoney(a.balance, currency: cur, style: context.text.figure.copyWith(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _Figure(
-                  label: t('common.equity'),
-                  child: KMoney(a.equity, currency: cur, style: context.text.figure.copyWith(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              _Figure(
-                label: t('accounts.label.marginLevel'),
-                child: Text(
-                  fmtLevel(a.marginLevel),
-                  textDirection: TextDirection.ltr,
-                  style: context.text.figure.copyWith(fontSize: 16, color: levelColor(context, a.marginLevel)),
-                ),
+              ...tags,
+              Text(
+                '${t('accounts.label.marginLevel')} ${fmtLevel(a.marginLevel)}',
+                style: context.text.caption.copyWith(color: levelColor(context, a.marginLevel), fontWeight: FontWeight.w500),
               ),
             ],
           ),
-          if (!readOnly) ...[
-            const SizedBox(height: 14),
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Wrap(spacing: 12, runSpacing: 4, children: footer),
+        ),
+        if (!readOnly) ...[
+          const SizedBox(height: 12),
+          if (flavor == 'copy')
+            Row(
               children: [
-                AccountMenuButton(account: a, onChanged: onChanged, size: 36),
-                if (a.live && !a.prop)
-                  FundButton(account: a, size: KButtonSize.sm)
-                else if (!a.live)
-                  RefillButton(account: a, onDone: onChanged, size: KButtonSize.sm),
-                if (flavor == 'copy') ...[
-                  KButton(
+                Expanded(
+                  child: KButton(
                     label: t('accounts.copy.manage'),
                     icon: LucideIcons.users,
                     variant: KButtonVariant.surface,
-                    size: KButtonSize.sm,
+                    expand: true,
                     onPressed: () => context.go('/social/copy'),
                   ),
-                  TradeButton(account: a, size: KButtonSize.sm, variant: KButtonVariant.surface, label: t('accounts.copy.watchPnl')),
-                ] else
-                  TradeButton(account: a, size: KButtonSize.sm),
+                ),
+                const SizedBox(width: 8),
+                TradeButton(account: a, variant: KButtonVariant.surface, label: t('accounts.copy.watchPnl')),
+                const SizedBox(width: 4),
+                AccountMenuButton(account: a, onChanged: onChanged),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(child: TradeButton(account: a, expand: true)),
+                if (a.live ? !a.prop : true) const SizedBox(width: 8),
+                if (a.live && !a.prop) FundButton(account: a) else if (!a.live) RefillButton(account: a, onDone: onChanged),
+                const SizedBox(width: 4),
+                AccountMenuButton(account: a, onChanged: onChanged),
               ],
             ),
-          ],
-          const SizedBox(height: 10),
-          Wrap(spacing: 12, runSpacing: 4, children: footer),
         ],
-      ),
+      ],
     );
   }
 }

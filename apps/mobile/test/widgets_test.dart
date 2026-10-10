@@ -77,10 +77,10 @@ void main() {
       for (final sub in ['Overview', 'Markets', 'News', 'Calendar']) {
         expect(find.text(sub), findsWidgets);
       }
-      // the dashboard's sections, in the web's phone order
+      // Home's sections, in the web's phone order
       final page = find.descendant(of: find.byType(DashboardScreen), matching: find.byType(Scrollable)).first;
       var lastY = double.negativeInfinity;
-      for (final s in ['Total balance', 'Total equity', 'Your accounts', 'Quick actions', 'Notifications']) {
+      for (final s in ['TOTAL BALANCE', 'TOTAL EQUITY', 'Shortcuts', 'Your accounts']) {
         // jump down (no fling) until the section is built and on screen, then measure after a frame
         final pos = tester.state<ScrollableState>(page).position;
         for (var i = 0; i < 40 && find.text(s).hitTestable().evaluate().isEmpty; i++) {

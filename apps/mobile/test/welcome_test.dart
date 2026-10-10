@@ -17,7 +17,7 @@ import 'helpers/test_app.dart';
 
 void main() {
   const headline = 'Options on forex, made simple.';
-  final welcomePhoto = find.byWidgetPredicate((w) => w is Image && w.image is AssetImage && (w.image as AssetImage).assetName == 'assets/photos/welcome.jpg');
+  final welcomePhoto = find.byWidgetPredicate((w) => w is Image && w.image is AssetImage && (w.image as AssetImage).assetName == 'assets/heroes/dashboard.jpg');
 
   Future<void> openSignIn(WidgetTester tester) async {
     await tester.tap(find.text('Log in'));

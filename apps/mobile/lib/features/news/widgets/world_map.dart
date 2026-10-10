@@ -192,11 +192,7 @@ class _MapPainter extends CustomPainter {
     // the glow breathes 18 -> 30 -> 18 over 3 s
     final glow = 18 + 12 * (1 - (2 * pulse - 1).abs());
     for (final p in pins) {
-      canvas.drawCircle(
-        p.at,
-        glow,
-        Paint()..shader = ui.Gradient.radial(p.at, glow, [const Color(0xFFFF5A1F).withValues(alpha: 0.55), const Color(0xFFFF5A1F).withValues(alpha: 0)]),
-      );
+      canvas.drawCircle(p.at, glow, Paint()..shader = ui.Gradient.radial(p.at, glow, [kEmber.withValues(alpha: 0.55), kEmber.withValues(alpha: 0)]));
       canvas.drawCircle(p.at, 11, Paint()..color = surface);
       canvas.drawCircle(
         p.at,

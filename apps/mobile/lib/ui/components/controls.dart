@@ -274,7 +274,7 @@ class KPillNav extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final on = i == current;
-          final fg = on ? k.bg : k.fg;
+          final fg = on ? k.onEmber : k.fg;
           return KPressable(
             onTap: () => onSelect(i),
             pressedScale: 1,
@@ -282,14 +282,14 @@ class KPillNav extends StatelessWidget {
               height: 38,
               padding: const EdgeInsets.symmetric(horizontal: 15),
               decoration: BoxDecoration(
-                color: on ? k.fg : Colors.transparent,
+                color: on ? k.ember : Colors.transparent,
                 borderRadius: BorderRadius.circular(19),
                 border: on ? null : Border.all(color: k.line),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (icons != null) ...[Icon(icons![i], size: 15, color: on ? k.bg : k.fg2), const SizedBox(width: 6)],
+                  if (icons != null) ...[Icon(icons![i], size: 15, color: on ? k.onEmber : k.fg2), const SizedBox(width: 6)],
                   Text(
                     labels[i],
                     style: context.text.label.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600, color: fg),

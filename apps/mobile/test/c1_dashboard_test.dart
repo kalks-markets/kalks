@@ -1,5 +1,6 @@
 // Dashboard (agent C1): the web's rules for the statistics series, the getting-started steps, the market clock, the
-// movers, the calendar rows and the news map; and the page itself on the sample API, in the web's phone order.
+// movers, the calendar rows and the news map; and Home itself on the sample API, in the web's phone order (since
+// 2026-10-10: the balance strip, the shortcuts and the accounts under the photo).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -11,7 +12,6 @@ import 'package:kalks/core/models/wallet.dart';
 import 'package:kalks/data/client_data.dart';
 import 'package:kalks/features/dashboard/dashboard_data.dart';
 import 'package:kalks/features/dashboard/dashboard_screen.dart';
-import 'package:kalks/features/dashboard/widgets/list_cards.dart';
 import 'package:kalks/features/dashboard/widgets/markets_cards.dart';
 import 'package:kalks/features/dashboard/widgets/more_cards.dart';
 import 'package:kalks/features/dashboard/widgets/statistic_card.dart';
@@ -20,20 +20,6 @@ import 'package:kalks/i18n/i18n.dart';
 import 'package:kalks/preview/preview_data.dart';
 
 import 'helpers/test_app.dart';
-
-/// Brings `f` into the upper part of the page (clear of the header, the floating chat button and the tab bar).
-Future<void> _center(WidgetTester tester, Finder f) async {
-  // stop the fling of the drags before (a scrolling list ignores taps), then bring the top of `f` to a third of the
-  // screen, clear of the header, the floating chat button and the tab bar
-  final position = Scrollable.of(tester.element(f.first)).position;
-  position.jumpTo(position.pixels);
-  await tester.pump();
-  final top = tester.getRect(f.first).top;
-  position.jumpTo((position.pixels + top - tester.view.physicalSize.height / tester.view.devicePixelRatio / 3).clamp(0, position.maxScrollExtent));
-  for (var i = 0; i < 3; i++) {
-    await tester.pump(const Duration(milliseconds: 300));
-  }
-}
 
 T _t() => T('en', const {}, const {});
 
@@ -202,31 +188,15 @@ void main() {
   });
 
   group('page', () {
-    testWidgets('every section, in the web\'s phone order', (tester) async {
+    testWidgets('Home in the web\'s phone order: the strip, the shortcuts, the accounts', (tester) async {
       await pumpApp(tester, signedIn: true);
       expect(find.byType(DashboardScreen), findsOneWidget);
       final page = find.descendant(of: find.byType(DashboardScreen), matching: find.byType(Scrollable)).first;
       var lastY = double.negativeInfinity;
-      for (final s in [
-        'Overview',
-        'Total balance',
-        'Total equity',
-        'Your accounts',
-        'Quick actions',
-        'Statistics',
-        'Notifications',
-        'History',
-        'Getting started',
-        'Top movers',
-        'Economic calendar',
-        'Market news',
-        'Markets & news around the world',
-        'More for you',
-        'Launch Kalks Trader',
-        'Your account',
-        'Market clock',
-        'Need help?',
-      ]) {
+      // two cells to a row: the strip's rows, then the sections under it
+      expect(find.text('WALLET BALANCE'), findsOneWidget);
+      expect(find.text('OPEN POSITIONS'), findsOneWidget);
+      for (final s in ['TOTAL BALANCE', 'TOTAL EQUITY', "TODAY'S P&L", 'REWARDS', 'Shortcuts', 'Your accounts']) {
         for (var i = 0; i < 80 && find.text(s).hitTestable().evaluate().isEmpty; i++) {
           await tester.drag(page, const Offset(0, -250));
           await tester.pump(const Duration(milliseconds: 50));
@@ -235,62 +205,6 @@ void main() {
         expect(y, greaterThan(lastY), reason: s);
         lastY = y;
       }
-      await unmount(tester);
-    });
-
-    testWidgets('getting started shows every step done for the sample client', (tester) async {
-      await pumpApp(tester, signedIn: true);
-      final page = find.descendant(of: find.byType(DashboardScreen), matching: find.byType(Scrollable)).first;
-      await tester.scrollUntilVisible(find.text('Getting started'), 300, scrollable: page);
-      expect(find.text('5 of 5'), findsOneWidget);
-      expect(find.text('Fund your wallet'), findsOneWidget);
-      await unmount(tester);
-    });
-
-    testWidgets('activity tabs switch between history, funding and linked', (tester) async {
-      await pumpApp(tester, signedIn: true);
-      final page = find.descendant(of: find.byType(DashboardScreen), matching: find.byType(Scrollable)).first;
-      await tester.scrollUntilVisible(find.byType(ActivityTabs), 300, scrollable: page);
-      await _center(tester, find.byType(ActivityTabs));
-      // history: the wallet's latest rows and View all
-      expect(find.descendant(of: find.byType(ActivityTabs), matching: find.byType(ItemRow)), findsWidgets);
-      expect(find.text('View all'), findsOneWidget);
-      await tester.tap(find.descendant(of: find.byType(ActivityTabs), matching: find.text('Funding')));
-      await settle(tester, frames: 4);
-      expect(find.text('USDT · TRC20'), findsOneWidget);
-      expect(find.text('Connected'), findsWidgets);
-      await tester.tap(find.descendant(of: find.byType(ActivityTabs), matching: find.text('Linked')));
-      await settle(tester, frames: 4);
-      expect(find.text('Kalks Trader'), findsWidgets);
-      expect(find.text('Gold'), findsOneWidget);
-      await unmount(tester);
-    });
-
-    testWidgets('statistics switches mode and range', (tester) async {
-      await pumpApp(tester, signedIn: true);
-      final page = find.descendant(of: find.byType(DashboardScreen), matching: find.byType(Scrollable)).first;
-      await tester.scrollUntilVisible(find.byType(StatisticCard), 300, scrollable: page);
-      await _center(tester, find.byType(StatisticCard));
-      expect(find.byType(TrendChart), findsOneWidget);
-      expect(find.textContaining('(+'), findsOneWidget); // equity: the change with its percent
-      await tester.tap(find.text('P&L'));
-      await settle(tester, frames: 3);
-      expect(find.textContaining('(+'), findsNothing); // P&L: no percent
-      await tester.tap(find.text('Weekly'));
-      await settle(tester, frames: 4);
-      expect(find.byType(TrendChart), findsOneWidget);
-      await unmount(tester);
-    });
-
-    testWidgets('the news card opens the story sheet', (tester) async {
-      await pumpApp(tester, signedIn: true);
-      final page = find.descendant(of: find.byType(DashboardScreen), matching: find.byType(Scrollable)).first;
-      await tester.scrollUntilVisible(find.byType(NewsCard), 300, scrollable: page);
-      await _center(tester, find.text('Gold climbs to a two-week high as the dollar slips'));
-      await tester.tap(find.text('Gold climbs to a two-week high as the dollar slips'));
-      await settle(tester, frames: 6);
-      expect(find.text('Copy link'), findsOneWidget);
-      expect(find.text('Trade XAUUSD'), findsOneWidget);
       await unmount(tester);
     });
   });

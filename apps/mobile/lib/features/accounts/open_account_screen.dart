@@ -630,7 +630,9 @@ class _OpenAccountScreenState extends ConsumerState<OpenAccountScreen> {
             value: _agree,
             onChanged: (v) => setState(() => _agree = v),
             child: Text(
-              _kind == AccountKind.live ? t(_product == 'options' ? 'accounts.wizard.agreeLiveOptions' : 'accounts.wizard.agreeLive') : t('accounts.wizard.agreeDemo'),
+              _kind == AccountKind.live
+                  ? t(_product == 'options' ? 'accounts.wizard.agreeLiveOptions' : 'accounts.wizard.agreeLive')
+                  : t('accounts.wizard.agreeDemo'),
               style: context.text.callout.copyWith(color: k.fg2),
             ),
           ),
@@ -703,7 +705,8 @@ class _StepCard extends StatelessWidget {
   );
 }
 
-/// CFD account / Options account choice card (the Product step; the Live / Demo card's look).
+/// CFD account / Options account choice (web open-account.tsx ProductCard): the product as a card face (orange CFD,
+/// plum Options) with its markets, the white tick while chosen, the short text under it.
 class _ProductCard extends StatelessWidget {
   const _ProductCard({required this.product, required this.selected, required this.onSelect});
   final String product;
@@ -715,56 +718,59 @@ class _ProductCard extends StatelessWidget {
     final t = context.t;
     final k = context.k;
     final options = product == 'options';
-    final tone = options ? k.info : k.ember;
     final title = options ? t('accounts.product.options') : t('accounts.product.cfd');
     return KPressable(
       key: ValueKey('wizard-product-$product'),
       onTap: onSelect,
       pressedScale: 0.99,
       semanticLabel: title,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: selected ? k.surface : k.cardBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? tone.withValues(alpha: 0.6) : k.cardBorder),
-          boxShadow: selected ? [BoxShadow(color: tone.withValues(alpha: 0.12), spreadRadius: 4)] : k.shadowCard,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                KChip(label: options ? t('accounts.product.chipOptions') : t('trader.opt.mode.cfd'), tone: options ? KChipTone.info : KChipTone.ember),
-                const Spacer(),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: selected ? tone : null,
-                    border: Border.all(color: selected ? tone : k.line),
-                  ),
-                  child: selected ? const Icon(LucideIcons.check, size: 14, color: Colors.white) : null,
-                ),
-              ],
+      child: _ChoiceFrame(
+        selected: selected,
+        children: [
+          KCardFace(
+            finish: options ? KCardFinish.options : KCardFinish.standard,
+            name: title,
+            badge: options ? t('accounts.product.chipOptions') : 'CFD',
+            left: (
+              t.dyn('accounts.product.markets', fallback: 'Markets'),
+              options
+                  ? t.dyn('accounts.product.optionsMarkets', fallback: 'FX · Gold · Oil')
+                  : t.dyn('accounts.product.cfdMarkets', fallback: 'FX · Metals · Crypto'),
             ),
-            const SizedBox(height: 16),
-            KIconTile(icon: options ? LucideIcons.layers2 : LucideIcons.candlestickChart, tone: options ? KTone.sky : KTone.accent, size: 56),
-            const SizedBox(height: 16),
-            Text(title, style: context.text.title1.copyWith(fontSize: 21)),
-            const SizedBox(height: 4),
-            Text(options ? t('accounts.product.optionsText') : t('accounts.product.cfdText'), style: context.text.callout.copyWith(color: k.fg2)),
-          ],
-        ),
+            selected: selected,
+          ),
+          const SizedBox(height: 14),
+          Text(options ? t('accounts.product.optionsText') : t('accounts.product.cfdText'), style: context.text.callout.copyWith(color: k.fg2)),
+        ],
       ),
     );
   }
 }
 
-/// Live / Demo choice card (web KindCard; the 3D emoji become an icon tile).
+/// A choice's frame (web k-card + the selected ember ring).
+class _ChoiceFrame extends StatelessWidget {
+  const _ChoiceFrame({required this.selected, required this.children});
+  final bool selected;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
+      decoration: BoxDecoration(
+        color: k.cardBg,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: selected ? k.ember.withValues(alpha: 0.7) : k.cardBorder),
+        boxShadow: selected ? [BoxShadow(color: k.ember.withValues(alpha: 0.18), spreadRadius: 4)] : null,
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+    );
+  }
+}
+
+/// Live / Demo choice (web KindCard): a card face (orange live, black demo) with its money, the text and the points.
 class _KindCard extends StatelessWidget {
   const _KindCard({required this.kind, required this.selected, required this.onSelect, this.demoGroup});
   final AccountKind kind;
@@ -778,10 +784,11 @@ class _KindCard extends StatelessWidget {
     final k = context.k;
     final live = kind == AccountKind.live;
     final tone = live ? k.ember : k.gold;
+    final demoMoney = demoGroup != null ? '\$${Fmt.number(demoGroup!.demoInitialBalance, 0)}' : r'$10,000';
     final points = live
         ? [t('accounts.kind.live.point1'), t('accounts.kind.live.point2'), t('accounts.kind.live.point3')]
         : [
-            t('accounts.kind.demo.virtualFunds', {'amount': demoGroup != null ? '\$${Fmt.number(demoGroup!.demoInitialBalance, 0)}' : r'$10,000'}),
+            t('accounts.kind.demo.virtualFunds', {'amount': demoMoney}),
             t('accounts.kind.demo.refill', {'count': demoGroup?.demoRefillsPerDay ?? 3}),
             t('accounts.kind.demo.expires', {'days': demoGroup?.demoExpiryDays ?? 10}),
           ];
@@ -789,61 +796,37 @@ class _KindCard extends StatelessWidget {
       onTap: onSelect,
       pressedScale: 0.99,
       semanticLabel: live ? t('accounts.kind.liveTitle') : t('accounts.kind.demoTitle'),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: selected ? k.surface : k.cardBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? tone.withValues(alpha: 0.6) : k.cardBorder),
-          boxShadow: selected ? [BoxShadow(color: tone.withValues(alpha: 0.12), spreadRadius: 4)] : k.shadowCard,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                KChip(label: live ? t('accounts.badge.live') : t('accounts.badge.demo'), tone: live ? KChipTone.ember : KChipTone.gold),
-                const Spacer(),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: selected ? tone : null,
-                    border: Border.all(color: selected ? tone : k.line),
+      child: _ChoiceFrame(
+        selected: selected,
+        children: [
+          KCardFace(
+            finish: live ? KCardFinish.standard : KCardFinish.pro,
+            name: live ? t('accounts.kind.liveTitle') : t('accounts.kind.demoTitle'),
+            badge: live ? t('accounts.badge.live') : t('accounts.badge.demo'),
+            left: (t.dyn('accounts.kind.money', fallback: 'Money'), live ? t.dyn('accounts.kind.real', fallback: 'Real · USDT') : demoMoney),
+            selected: selected,
+          ),
+          const SizedBox(height: 14),
+          Text(live ? t('accounts.kind.liveText') : t('accounts.kind.demoText'), style: context.text.callout.copyWith(color: k.fg2)),
+          const SizedBox(height: 12),
+          for (final p in points)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(LucideIcons.check, size: 14, color: tone),
                   ),
-                  child: selected ? Icon(LucideIcons.check, size: 14, color: live ? Colors.white : Colors.black) : null,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            KIconTile(icon: live ? LucideIcons.handCoins : LucideIcons.rocket, tone: live ? KTone.accent : KTone.amber, size: 56),
-            const SizedBox(height: 16),
-            Text(live ? t('accounts.kind.liveTitle') : t('accounts.kind.demoTitle'), style: context.text.title1.copyWith(fontSize: 21)),
-            const SizedBox(height: 4),
-            Text(live ? t('accounts.kind.liveText') : t('accounts.kind.demoText'), style: context.text.callout.copyWith(color: k.fg2)),
-            const SizedBox(height: 14),
-            for (final p in points)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 7),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Icon(LucideIcons.check, size: 14, color: tone),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(p, style: context.text.footnote.copyWith(color: k.fg2, fontSize: 13)),
-                    ),
-                  ],
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(p, style: context.text.footnote.copyWith(color: k.fg2, fontSize: 13)),
+                  ),
+                ],
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

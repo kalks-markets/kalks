@@ -25,6 +25,7 @@ import '../../core/models/account.dart';
 import '../../core/notifications/notifications.dart';
 import '../../data/client_data.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import '../markets/instruments.dart';
 import 'widgets/markdown_text.dart';
@@ -187,6 +188,7 @@ class _OptionsScreenState extends ConsumerState<OptionsScreen> {
     final noAccount = accounts != null && accounts.isEmpty;
     final tradeLabel = noAccount ? t('options.account.open') : t('options.trade.cta');
 
+    final hero = pageHero(context, ref, path: '/options', title: t('options.page.title'), lead: t('options.page.subtitle'));
     return KPageScroll(
       onRefresh: () async {
         ref
@@ -194,11 +196,13 @@ class _OptionsScreenState extends ConsumerState<OptionsScreen> {
           ..invalidate(accountsProvider);
         await ref.read(suitabilityProvider.future).then((_) {}, onError: (Object _) {});
       },
+      hero: hero,
+      padding: EdgeInsets.fromLTRB(KSpace.page, hero == null ? 12 : 18, KSpace.page, 24),
       children: [
-        // 1. header
-        KPageHeader(title: t('options.page.title'), subtitle: Text(t('options.page.subtitle'))),
+        // 1. header (on the photo, or the page header for a white-label broker)
+        if (hero == null) KPageHeader(title: t('options.page.title'), subtitle: Text(t('options.page.subtitle'))),
         if (eligible) ...[
-          const SizedBox(height: 10),
+          if (hero == null) const SizedBox(height: 10),
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: KChip(label: t('options.page.statusReady'), tone: KChipTone.up, dot: true),

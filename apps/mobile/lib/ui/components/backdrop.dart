@@ -1,15 +1,34 @@
 import 'package:flutter/material.dart';
 
 import '../tokens.dart';
+import 'page_hero.dart';
 
-/// The pastel washes behind every Client Area page (web .k-backdrop): five soft radial gradients mixed from the
-/// brand colour over the page background. The terminal gets its subtle ember glow (.t-backdrop) instead.
+/// The ground behind every Client Area page. Dark (the Client Area since 2026-10-10): with a section [photo], that
+/// photo blurred under a black wash (web html[data-photo] .k-backdrop: blur 70 px, saturate 1.35, 62 % black), so the
+/// glass cards take its colour; without one, Vantablack with a soft orange bloom (web --k-bloom-a / -b). The light
+/// theme keeps its pastel washes; the terminal gets its subtle ember glow (.t-backdrop).
 class KBackdrop extends StatelessWidget {
-  const KBackdrop({super.key});
+  const KBackdrop({super.key, this.photo});
+
+  /// The section's photo (KHeroPhoto), drawn from its tiny pre-blurred copy.
+  final KHeroPhoto? photo;
 
   @override
   Widget build(BuildContext context) {
     final k = context.k;
+    final p = photo;
+    if (p != null && k.dark && !k.trader) {
+      return RepaintBoundary(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Colors.black),
+            Image.asset(p.blurred, fit: BoxFit.cover, excludeFromSemantics: true, gaplessPlayback: true),
+            const ColoredBox(color: Color(0xA8000000)),
+          ],
+        ),
+      );
+    }
     return RepaintBoundary(
       child: CustomPaint(painter: _WashPainter(k), size: Size.infinite),
     );
@@ -39,6 +58,12 @@ class _WashPainter extends CustomPainter {
     if (k.trader) {
       _wash(canvas, size, 1.4, 0.6, 0.12, -0.12, k.wash1, 0.62);
       _wash(canvas, size, 1.0, 0.7, 1.0, 0.0, k.wash2, 0.6);
+      return;
+    }
+    if (k.dark) {
+      // Vantablack with the orange bloom at the top end and a faint amber one at the bottom start
+      _wash(canvas, size, 0.9, 0.5, 0.95, -0.1, k.wash1, 0.7);
+      _wash(canvas, size, 0.8, 0.45, -0.05, 1.05, k.wash2, 0.7);
       return;
     }
     _wash(canvas, size, 0.55, 0.48, 0.06, -0.06, k.wash1, 0.70);

@@ -1,26 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../preview/preview_data.dart';
 import 'prefs.dart';
 
-/// The Client Area theme (light by default, like the web) and Kalks Trader's (dark by default).
+/// The Client Area theme: dark only since 2026-10-10 (the web forces dark: apps/crm/app/layout.tsx forcedTheme), so
+/// there is nothing to switch any more; an old `kalks.theme` preference is ignored. Kalks Trader keeps its own theme.
 class ThemeController extends Notifier<ThemeMode> {
   @override
-  ThemeMode build() {
-    final forced = previewTheme;
-    if (forced == 'dark') return ThemeMode.dark;
-    if (forced == 'light') return ThemeMode.light;
-    return ref.read(prefsProvider).themeMode;
-  }
-
-  Future<void> set(ThemeMode m) async {
-    state = m;
-    await ref.read(prefsProvider).setThemeMode(m);
-  }
-
-  /// The web's toggle: light <-> dark.
-  Future<void> toggle(Brightness current) => set(current == Brightness.dark ? ThemeMode.light : ThemeMode.dark);
+  ThemeMode build() => ThemeMode.dark;
 }
 
 final themeModeProvider = NotifierProvider<ThemeController, ThemeMode>(ThemeController.new);

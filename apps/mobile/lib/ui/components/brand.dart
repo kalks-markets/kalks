@@ -5,7 +5,8 @@ import '../illustrations.g.dart';
 import '../tokens.dart';
 import '../typography.dart';
 
-/// The Kalks "K" mark (assets/brand/kalks-mark.svg) in any colour.
+/// The Kalks "K" mark (assets/brand/kalks-mark.svg) in any colour; the real monochrome logo takes the text colour by
+/// default (web svg[aria-label="Kalks"]: currentColor).
 class KLogoMark extends StatelessWidget {
   const KLogoMark({super.key, this.size = 24, this.color});
   final double size;
@@ -16,7 +17,7 @@ class KLogoMark extends StatelessWidget {
     'assets/brand/kalks-mark.svg',
     width: size,
     height: size * 541 / 653,
-    colorFilter: ColorFilter.mode(color ?? context.k.ember, BlendMode.srcIn),
+    colorFilter: ColorFilter.mode(color ?? context.k.fg, BlendMode.srcIn),
     semanticsLabel: 'Kalks',
   );
 }
@@ -36,8 +37,8 @@ class KLogo extends StatelessWidget {
   );
 }
 
-/// The brand disc in the header (web BrandAvatar): the white K on a radial ember disc; a white-label broker without
-/// a logo gets its first letter instead.
+/// The brand disc in the header (web BrandAvatar + .k-brand-disc): the white K on a black disc with a faint ring (the
+/// real monochrome logo, 2026-10-10); a white-label broker without a logo gets its first letter on its colour.
 class KBrandAvatar extends StatelessWidget {
   const KBrandAvatar({super.key, this.size = 40, this.letter});
   final double size;
@@ -48,26 +49,38 @@ class KBrandAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final k = context.k;
+    final broker = letter != null;
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          center: const Alignment(-0.4, -0.5),
-          radius: 0.9,
-          colors: [Color.lerp(k.ember, Colors.white, 0.38)!, k.ember],
-          stops: const [0, 0.62],
-        ),
-        boxShadow: [BoxShadow(color: k.ember.withValues(alpha: 0.55), offset: const Offset(0, 10), blurRadius: 22, spreadRadius: -10)],
+        color: broker ? null : Colors.black,
+        gradient: broker
+            ? RadialGradient(
+                center: const Alignment(-0.4, -0.5),
+                radius: 0.9,
+                colors: [Color.lerp(k.ember, Colors.white, 0.38)!, k.ember],
+                stops: const [0, 0.62],
+              )
+            : null,
+        border: broker ? null : Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: broker ? k.ember.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.5),
+            offset: const Offset(0, 10),
+            blurRadius: 22,
+            spreadRadius: -10,
+          ),
+        ],
       ),
-      child: letter != null
+      child: broker
           ? Text(
               letter!,
               style: context.text.headline.copyWith(color: Colors.white, fontSize: size * 0.45, fontWeight: FontWeight.w700, height: 1),
             )
-          : KLogoMark(size: size * 0.46, color: Colors.white),
+          : KLogoMark(size: size * 0.5, color: Colors.white),
     );
   }
 }

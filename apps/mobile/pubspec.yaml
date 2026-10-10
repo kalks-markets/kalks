@@ -3,7 +3,7 @@ description: "Kalks: the Client Area and Kalks Trader as one native app (Android
 publish_to: 'none'
 
 # versionName+versionCode (sent as X-Kalks-App-Version, compared with config.minAppVersion)
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: ^3.13.5
@@ -70,8 +70,10 @@ flutter:
     - assets/flags/
     # Kalks Trader's chart page: lightweight-charts 5.2.1 (offline, Apache 2.0) + its bridge (agent D)
     - assets/chart/
-    # news story covers (the web's own photo library, apps/crm/public/assets/photos, 720 px)
-    - assets/photos/
+    # the section photos (the founder's portraits, native size; web apps/crm/public/heroes) and their blurred
+    # backdrops (node apps/mobile/tool/heroes.mjs)
+    - assets/heroes/
+    - assets/heroes/blur/
 
   fonts:
     # Client Area text (the web's --font-display), OFL: assets/fonts/PlusJakartaSans-OFL.txt
@@ -116,23 +118,23 @@ flutter_launcher_icons:
   ios: false
   image_path: assets/brand/icon.png
   min_sdk_android: 24
-  adaptive_icon_background: "#07070A"
+  adaptive_icon_background: "#000000"
   adaptive_icon_foreground: assets/brand/adaptive-icon.png
   adaptive_icon_monochrome: assets/brand/adaptive-icon-monochrome.png
   web:
     generate: true
     image_path: assets/brand/icon.png
-    background_color: "#07070A"
-    theme_color: "#FF5A1F"
+    background_color: "#000000"
+    theme_color: "#F2600C"
 
-# dart run flutter_native_splash:create  (the ember mark on the canvas colour, like the icon)
+# dart run flutter_native_splash:create  (the white K on black, like the icon)
 flutter_native_splash:
-  color: "#07070A"
+  color: "#000000"
   image: assets/brand/splash.png
   android: true
   ios: false
   web: false
   android_12:
     image: assets/brand/splash-android12.png
-    color: "#07070A"
+    color: "#000000"
   fullscreen: false

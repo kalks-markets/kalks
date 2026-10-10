@@ -297,52 +297,32 @@ class _FundCard extends StatelessWidget {
     final lf = LocaleFormat(t.locale);
     final rtl = Directionality.of(context) == TextDirection.rtl;
     return KCard(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: KPressable(
-                  pressedScale: 1,
-                  onTap: onOpen,
-                  child: Row(
-                    children: [
-                      KAvatar(name: f.masterName, size: 44),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.text.headline),
-                            Text(
-                              t('social.byName', {'name': f.masterName}),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.text.footnote.copyWith(color: k.fg3),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              FundStatusChip(status: f.status),
-            ],
+          // a fund as a visiting card (web funds.tsx FundCard: ivory, founder 2026-10-10)
+          KPressable(
+            pressedScale: 0.99,
+            semanticLabel: f.name,
+            onTap: onOpen,
+            child: KVisitingCard(
+              finish: KVisitingFinish.ivory,
+              kicker: 'PAMM',
+              name: f.name,
+              title: t('social.byName', {'name': f.masterName}),
+              stats: [
+                (label: t('social.navPerUnit'), value: nav4(f.nav), tone: null),
+                (label: '1M', value: pct(f.return1m, 1), tone: f.return1m > 0 ? 'up' : (f.return1m < 0 ? 'down' : null)),
+                (label: t('social.aum'), value: compactUsd(f.aum), tone: null),
+                (label: t('social.drawdown'), value: ddText(f.drawdownPct), tone: f.drawdownPct > 0 ? 'down' : null),
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
-          Text(t('social.navPerUnit'), style: context.text.footnote.copyWith(color: k.fg3)),
-          const SizedBox(height: 4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Num(nav4(f.nav), style: context.text.moneyL.copyWith(fontSize: 26)),
-              const SizedBox(width: 8),
-              Num('${pct(f.return1m)} 1M', color: f.return1m >= 0 ? k.up : k.down, style: context.text.footnote),
-            ],
+          const SizedBox(height: 12),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FundStatusChip(status: f.status),
           ),
           const SizedBox(height: 14),
           TileGrid(
@@ -400,7 +380,6 @@ class _FundCard extends StatelessWidget {
                   child: KButton(
                     label: t('social.invest'),
                     icon: LucideIcons.wallet,
-                    variant: KButtonVariant.ink,
                     size: KButtonSize.sm,
                     expand: true,
                     onPressed: f.status != 'active' ? null : onInvest,

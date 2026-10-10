@@ -5,7 +5,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kalks/features/dashboard/dashboard_hero.dart';
 import 'package:kalks/features/dashboard/dashboard_screen.dart';
 import 'package:kalks/features/markets/markets_screen.dart';
 import 'package:kalks/features/portfolio/ledger_screen.dart';
@@ -47,6 +46,14 @@ Future<void> _swipe(WidgetTester tester, double dx, {double y = 130}) async {
   await settle(tester, frames: 6);
 }
 
+/// Taps a page pill in the sheet of a photo page (scrolled into view first: the row scrolls sideways).
+Future<void> _tapPill(WidgetTester tester, String label) async {
+  final pill = find.descendant(of: find.byType(KPillNav), matching: find.text(label));
+  await tester.dragUntilVisible(pill, find.descendant(of: find.byType(KPillNav), matching: find.byType(Scrollable)).first, const Offset(-60, 0));
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.tap(pill);
+}
+
 /// Taps a tab of the header's row (scrolled into view first: the row scrolls sideways).
 Future<void> _tapTab(WidgetTester tester, String row, String label, {double step = -60}) async {
   final tab = find.descendant(of: _tabs(row), matching: find.text(label));
@@ -61,7 +68,8 @@ void main() {
     expect(find.byType(ModulePager), findsOneWidget);
     expect(find.byType(WalletScreen), findsOneWidget);
     expect(find.byType(DepositScreen), findsNothing);
-    expect(tester.widget<KSubNav>(_tabs('Deposit')).current, 0);
+    // the overview opens on the wallet's photo: its pages as pills in the sheet
+    expect(tester.widget<KPillNav>(find.byType(KPillNav)).current, 0);
 
     await _swipe(tester, -320, y: 250);
     expect(_path(c), '/wallet/deposit');
@@ -79,7 +87,7 @@ void main() {
 
   testWidgets('tapping the History tab slides there without building the pages between', (tester) async {
     final c = await _open(tester, '/wallet');
-    await _tapTab(tester, 'History', 'History');
+    await _tapPill(tester, 'History');
     await tester.pump();
     expect(_path(c), '/wallet/history');
     // mid-slide (the slide starts after the frame of the route change): the overview leaving, History coming in
@@ -143,13 +151,13 @@ void main() {
     await tester.pump();
     expect(_path(c), '/markets');
     expect(find.byType(MarketsScreen), findsOneWidget);
-    expect(find.byType(DashboardHeroPicture), findsOneWidget);
+    expect(find.byType(KHeroPicture), findsOneWidget);
     expect(MediaQuery.of(tester.element(find.byType(MarketsScreen))).padding.top, _headerH);
     await finger.up();
     await settle(tester, frames: 6);
     // settled on Markets: the plain header with the module's tabs, the page below it, no picture
     expect(find.byKey(kShellHeroControls), findsNothing);
-    expect(find.byType(DashboardHeroPicture), findsNothing);
+    expect(find.byType(KHeroPicture), findsNothing);
     expect(tester.widget<KSubNav>(_tabs('Markets')).current, 1);
     final header = find.descendant(of: find.byType(MarketsScreen), matching: find.byType(KPageHeader));
     expect(tester.getTopLeft(header).dy, greaterThanOrEqualTo(_headerH));
@@ -158,7 +166,7 @@ void main() {
     // back onto the picture: the hero returns with the controls (the sheet is at the top)
     await _swipe(tester, 320);
     expect(_path(c), '/');
-    expect(find.byType(DashboardHeroPicture), findsOneWidget);
+    expect(find.byType(KHeroPicture), findsOneWidget);
     expect(find.byKey(kShellHeroControls), findsOneWidget);
     expect(find.byKey(kShellHeroHeader), findsNothing);
     expect(MediaQuery.of(tester.element(find.byType(DashboardScreen))).padding.top, 0);

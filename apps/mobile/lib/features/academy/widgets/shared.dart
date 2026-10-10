@@ -274,23 +274,51 @@ class RiskNote extends StatelessWidget {
   );
 }
 
-/// A phase cover photo (the web's PHASE_COVER), or a tinted wash when the photo is missing.
-class PhaseCover extends StatelessWidget {
-  const PhaseCover({super.key, required this.asset, this.opacity = 1});
-  final String asset;
-  final double opacity;
+/// A phase as its hardcover book (web BookCover): the finish per level, the number, the title, a ribbon while
+/// reading and the gold seal once certified.
+class PhaseBook extends StatelessWidget {
+  const PhaseBook({super.key, required this.p});
+  final AcademyPhase p;
 
   @override
   Widget build(BuildContext context) {
-    final k = context.k;
-    final fallback = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [k.emberSoft, k.surface3]),
-      ),
+    final t = context.t;
+    final done = p.certificate != null;
+    return KBookCover(
+      finish: bookFinish(p),
+      series: t.dyn('academy.book.series', fallback: 'Kalks Academy'),
+      kicker: p.elective ? t('academy.elective') : t('academy.phaseN', {'n': p.order}),
+      number: p.order,
+      title: p.title,
+      level: levelLabel(t, p.level),
+      minutes: fmtMin(t, p.minutes),
+      reading: !done && p.done > 0,
+      done: done,
     );
-    return Opacity(
-      opacity: opacity,
-      child: Image.asset(asset, fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorBuilder: (_, _, _) => fallback),
+  }
+}
+
+/// A soft glow of a book's finish over a card (instead of a photo): the finish colour from the top end, fading out.
+class FinishWash extends StatelessWidget {
+  const FinishWash({super.key, required this.finish, this.strength = 0.34});
+  final KCardFinish finish;
+  final double strength;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = cardFinishGradient(finish, context.k.ember).colors[1];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: AlignmentDirectional.topEnd.resolve(Directionality.of(context)),
+          radius: 1.25,
+          colors: [
+            c.withValues(alpha: strength),
+            c.withValues(alpha: 0),
+          ],
+          stops: const [0, 0.75],
+        ),
+      ),
     );
   }
 }
@@ -362,35 +390,41 @@ class PracticeButton extends ConsumerWidget {
 
 /// The certificate image (A4 landscape SVG on the web's dark plate); tap to see it full size.
 class CertificateImage extends ConsumerWidget {
-  const CertificateImage({super.key, required this.code, this.semanticLabel, this.radius = 12});
+  const CertificateImage({super.key, required this.code, this.semanticLabel, this.radius = 12, this.face});
   final String code;
   final String? semanticLabel;
   final double radius;
+
+  /// Drawn instead of the certificate's picture (the paper certificate, KCertificateCard); a tap still opens the
+  /// real one.
+  final Widget? face;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final k = context.k;
     final svg = ref.watch(certificateSvgProvider(code));
-    final plate = AspectRatio(
-      aspectRatio: 1600 / 1131,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0B0B0E),
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(color: k.line),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: switch (svg) {
-          AsyncData(:final value) => SvgPicture.string(
-            value,
-            semanticsLabel: semanticLabel,
-            errorBuilder: (_, _, _) => const Center(child: Icon(LucideIcons.award, color: Color(0xFF8B8B96))),
+    final plate =
+        face ??
+        AspectRatio(
+          aspectRatio: 1600 / 1131,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B0B0E),
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: k.line),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: switch (svg) {
+              AsyncData(:final value) => SvgPicture.string(
+                value,
+                semanticsLabel: semanticLabel,
+                errorBuilder: (_, _, _) => const Center(child: Icon(LucideIcons.award, color: Color(0xFF8B8B96))),
+              ),
+              AsyncError() => const Center(child: Icon(LucideIcons.award, color: Color(0xFF8B8B96))),
+              _ => const Center(child: CupertinoActivityIndicator(color: Color(0xFF8B8B96))),
+            },
           ),
-          AsyncError() => const Center(child: Icon(LucideIcons.award, color: Color(0xFF8B8B96))),
-          _ => const Center(child: CupertinoActivityIndicator(color: Color(0xFF8B8B96))),
-        },
-      ),
-    );
+        );
     return KPressable(
       pressedOpacity: 0.85,
       semanticLabel: semanticLabel,

@@ -11,6 +11,7 @@ import '../../core/api/api_providers.dart';
 import '../../core/auth/auth_controller.dart';
 import '../../core/format/format.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import 'developer_api.dart';
 import 'widgets/algo_widgets.dart';
@@ -78,25 +79,42 @@ class _DeveloperKeysScreenState extends ConsumerState<DeveloperKeysScreen> {
     final f = LocaleFormat(t.locale);
     final kpiWidth = (MediaQuery.sizeOf(context).width - 2 * KSpace.page) * 0.78;
 
+    final hero = pageHero(
+      context,
+      ref,
+      path: '/developer',
+      title: t('developer.keys.pageTitle'),
+      lead: t('developer.keys.pageSubtitle'),
+      actions: [
+        KHeroButton(label: t('developer.docs.title'), icon: LucideIcons.bookOpen, onPressed: () => context.go('/developer/docs')),
+        if (!readOnly)
+          KHeroButton(label: t('developer.keys.create'), icon: LucideIcons.plus, primary: true, onPressed: accounts.isEmpty ? null : () => _create(accounts)),
+      ],
+    );
+
     return KPageScroll(
       onRefresh: _refresh,
+      hero: hero,
+      padding: EdgeInsets.fromLTRB(KSpace.page, hero == null ? 12 : 18, KSpace.page, 24),
       children: [
-        KPageHeader(title: t('developer.keys.pageTitle'), subtitle: Text(t('developer.keys.pageSubtitle'))),
-        const SizedBox(height: 14),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            KButton(
-              label: t('developer.docs.title'),
-              icon: LucideIcons.bookOpen,
-              variant: KButtonVariant.surface,
-              onPressed: () => context.go('/developer/docs'),
-            ),
-            if (!readOnly) KButton(label: t('developer.keys.create'), icon: LucideIcons.plus, onPressed: accounts.isEmpty ? null : () => _create(accounts)),
-          ],
-        ),
-        const SizedBox(height: 20),
+        if (hero == null) ...[
+          KPageHeader(title: t('developer.keys.pageTitle'), subtitle: Text(t('developer.keys.pageSubtitle'))),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              KButton(
+                label: t('developer.docs.title'),
+                icon: LucideIcons.bookOpen,
+                variant: KButtonVariant.surface,
+                onPressed: () => context.go('/developer/docs'),
+              ),
+              if (!readOnly) KButton(label: t('developer.keys.create'), icon: LucideIcons.plus, onPressed: accounts.isEmpty ? null : () => _create(accounts)),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
         // KPIs
         SizedBox(
           height: 186,

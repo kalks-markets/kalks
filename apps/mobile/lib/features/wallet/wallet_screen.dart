@@ -1,5 +1,6 @@
 // Wallet › Overview: port of apps/crm/components/wallet-live/wallet-page.tsx (LiveWalletPage) in the phone order:
-//   header (Wallet + History / Deposit USDT)
+//   the photo hero (Wallet, the short line, History / Deposit USDT; page_hero.dart), or the header for a white-label
+//   broker
 //   balance card (available, in progress, total)
 //   quick actions (Deposit / Withdraw / Transfer)                      hidden for view-only and read-only sessions
 //   KYC notice                                                         idem
@@ -19,6 +20,7 @@ import '../../core/format/format.dart';
 import '../../core/models/account.dart';
 import '../../core/models/user.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import 'wallet_api.dart';
 import 'widgets/wallet_ui.dart';
@@ -49,23 +51,33 @@ class WalletScreen extends ConsumerWidget {
     final act = ref.watch(walletActivityPageProvider(kRecentActivity));
     final overview = o.value;
 
+    final hero = pageHero(
+      context,
+      ref,
+      path: '/wallet',
+      title: t('wallet.wallet'),
+      lead: t('wallet.page.subtitle'),
+      actions: [
+        KHeroButton(label: t('wallet.history'), icon: LucideIcons.history, onPressed: () => context.go('/wallet/history')),
+        if (!readOnly)
+          KHeroButton(label: t('wallet.depositUsdt'), icon: LucideIcons.arrowDownToLine, primary: true, onPressed: () => context.go('/wallet/deposit')),
+      ],
+    );
+
     return KPageScroll(
       onRefresh: () => _refresh(ref),
+      hero: hero,
+      padding: const EdgeInsets.fromLTRB(KSpace.page, 18, KSpace.page, 24),
       children: [
-        WalletHeader(
-          title: t('wallet.wallet'),
-          subtitle: t('wallet.page.subtitle'),
-          actions: [
-            KButton(label: t('wallet.history'), icon: LucideIcons.history, variant: KButtonVariant.surface, onPressed: () => context.go('/wallet/history')),
-            if (!readOnly)
-              KButton(
-                label: t('wallet.depositUsdt'),
-                icon: LucideIcons.arrowDownToLine,
-                variant: KButtonVariant.ink,
-                onPressed: () => context.go('/wallet/deposit'),
-              ),
-          ],
-        ),
+        if (hero == null)
+          WalletHeader(
+            title: t('wallet.wallet'),
+            subtitle: t('wallet.page.subtitle'),
+            actions: [
+              KButton(label: t('wallet.history'), icon: LucideIcons.history, variant: KButtonVariant.surface, onPressed: () => context.go('/wallet/history')),
+              if (!readOnly) KButton(label: t('wallet.depositUsdt'), icon: LucideIcons.arrowDownToLine, onPressed: () => context.go('/wallet/deposit')),
+            ],
+          ),
         if (o.hasError && overview == null)
           WalletUnavailable(onRetry: () => ref.invalidate(walletOverviewEveryProvider(10000)), message: unavailableMessage(o.error, t))
         else ...[
@@ -124,7 +136,7 @@ class _BalanceCard extends StatelessWidget {
                           ],
                         ),
                         textDirection: TextDirection.ltr,
-                        style: context.text.moneyXL.copyWith(fontWeight: FontWeight.w600),
+                        style: context.text.moneyXL.copyWith(fontWeight: FontWeight.w300, fontSize: 38, letterSpacing: -1.2),
                       ),
                     ),
             ),
@@ -204,10 +216,10 @@ class _QuickActions extends StatelessWidget {
                   height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: items[i].$5 ? k.ink : k.surface2,
+                    color: items[i].$5 ? k.ember : k.surface2,
                     border: items[i].$5 ? null : Border.all(color: k.line),
                   ),
-                  child: Icon(items[i].$4, size: 18, color: items[i].$5 ? k.inkFg : k.fg2),
+                  child: Icon(items[i].$4, size: 18, color: items[i].$5 ? k.onEmber : k.fg2),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

@@ -16,6 +16,7 @@ import '../../core/format/format.dart';
 import '../../core/models/account.dart';
 import '../../core/models/trading.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import '../accounts/widgets/account_bits.dart' show ProductChip, ProductSection, byProduct;
 import 'portfolio_data.dart';
@@ -46,22 +47,38 @@ class PortfolioScreen extends ConsumerWidget {
     final totals = AccountTotals(accounts);
     Widget skeleton() => const KSkeleton(width: 130, height: 28);
 
+    final hero = pageHero(
+      context,
+      ref,
+      path: '/portfolio',
+      title: t('portfolio.title'),
+      lead: t('portfolio.subtitle'),
+      actions: [
+        KHeroButton(label: t('portfolio.st.title'), icon: LucideIcons.fileText, onPressed: () => context.go('/portfolio/statements')),
+        if (!readOnly) KHeroButton(label: t('portfolio.openAccount'), icon: LucideIcons.plus, primary: true, onPressed: () => context.go('/accounts/new')),
+      ],
+    );
+
     return KPageScroll(
       onRefresh: () => _refresh(ref),
+      hero: hero,
+      padding: EdgeInsets.fromLTRB(KSpace.page, hero == null ? 12 : 18, KSpace.page, 24),
       children: [
-        KPageHeader(title: t('portfolio.title'), subtitle: Text(t('portfolio.subtitle'))),
-        PageActions(
-          children: [
-            KButton(
-              label: t('portfolio.st.title'),
-              icon: LucideIcons.fileText,
-              variant: KButtonVariant.surface,
-              onPressed: () => context.go('/portfolio/statements'),
-            ),
-            if (!readOnly) KButton(label: t('portfolio.openAccount'), icon: LucideIcons.plus, onPressed: () => context.go('/accounts/new')),
-          ],
-        ),
-        const SizedBox(height: 18),
+        if (hero == null) ...[
+          KPageHeader(title: t('portfolio.title'), subtitle: Text(t('portfolio.subtitle'))),
+          PageActions(
+            children: [
+              KButton(
+                label: t('portfolio.st.title'),
+                icon: LucideIcons.fileText,
+                variant: KButtonVariant.surface,
+                onPressed: () => context.go('/portfolio/statements'),
+              ),
+              if (!readOnly) KButton(label: t('portfolio.openAccount'), icon: LucideIcons.plus, onPressed: () => context.go('/accounts/new')),
+            ],
+          ),
+          const SizedBox(height: 18),
+        ],
         if (acc.hasError && !acc.hasValue)
           AccountsError(onRetry: () => ref.invalidate(portfolioAccountsProvider))
         else ...[

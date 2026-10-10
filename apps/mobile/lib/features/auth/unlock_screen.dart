@@ -1,10 +1,12 @@
 // Biometric unlock of a stored session (cold start, or back from the background after a minute). The system
-// prompt opens at once; "Sign in with password" forgets the stored session.
+// prompt opens at once; "Sign in with password" forgets the stored session. In the sign-in pages' look (2026-10-10):
+// Home's photo at the top fading into black, the brand disc, the orange Unlock.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
 
@@ -45,17 +47,43 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
     final t = context.t;
     final k = context.k;
     final user = ref.watch(authProvider).user;
+    final kalks = ref.watch(configProvider.select((c) => c.tenantDefault));
+    final w = MediaQuery.sizeOf(context).width;
     return Scaffold(
-      backgroundColor: k.bg,
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          const Positioned.fill(child: KBackdrop()),
+          if (kalks)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: w * 1240 / 1080,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(KHeroPhoto.dashboard.asset, fit: BoxFit.cover, alignment: Alignment.topCenter, excludeFromSemantics: true),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x80000000), Color(0x00000000), Color(0x00000000), Color(0xFF000000)],
+                        stops: [0, 0.2, 0.55, 0.9],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            const Positioned.fill(child: KBackdrop()),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Column(
                 children: [
-                  const Spacer(flex: 3),
+                  Spacer(flex: kalks ? 6 : 3),
                   const KBrandAvatar(size: 72),
                   const SizedBox(height: 22),
                   Text(t('app.unlock.title'), textAlign: TextAlign.center, style: context.text.largeTitle.copyWith(fontSize: 26)),

@@ -10,6 +10,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/format/format.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import 'partner_api.dart';
 import 'widgets/partner_widgets.dart';
@@ -71,8 +72,10 @@ class PartnerDashboardScreen extends ConsumerWidget {
     final pf = PartnerFmt(t);
     final async = ref.watch(partnerDashboardProvider);
     final d = async.value;
+    final hero = pageHero(context, ref, path: '/partner', title: t('partner.dash.title'), lead: t('partner.dash.subtitle'));
     if (d == null) {
       return PartnerPageFallback(
+        hero: hero,
         title: t('partner.dash.title'),
         subtitle: t('partner.dash.subtitle'),
         error: async.hasError ? async.error : null,
@@ -94,9 +97,10 @@ class PartnerDashboardScreen extends ConsumerWidget {
         ref.invalidate(partnerDashboardProvider);
         await ref.read(partnerDashboardProvider.future).then((_) {}, onError: (Object _) {});
       },
+      hero: hero,
+      padding: EdgeInsets.fromLTRB(KSpace.page, hero == null ? 12 : 18, KSpace.page, 24),
       children: [
-        KPageHeader(title: t('partner.dash.title'), subtitle: Text(t('partner.dash.subtitle'))),
-        const SizedBox(height: 14),
+        if (hero == null) ...[KPageHeader(title: t('partner.dash.title'), subtitle: Text(t('partner.dash.subtitle'))), const SizedBox(height: 14)],
         Row(
           children: [
             KButton(
@@ -578,6 +582,54 @@ class _ReferralCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           KCardHeader(title: t('partner.dash.referralTitle'), subtitle: t('partner.dash.referralSubtitle'), icon: LucideIcons.link2),
+          const SizedBox(height: 16),
+          // the partner's visiting card (web partner/live/dashboard.tsx, founder 2026-10-10): name, level, link, code
+          KVisitingCard(
+            finish: KVisitingFinish.orange,
+            kicker: t.dyn('partner.card.kicker', fallback: 'Kalks Partner'),
+            name: d.name,
+            title: '${d.level?.name ?? t('partner.dash.partnerFallback')} · ${t('partner.dash.since', {'date': PartnerFmt(t).month(d.joinedAt)})}',
+            footer: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        shortUrl(link),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textDirection: TextDirection.ltr,
+                        style: context.text.mono(12.5, weight: FontWeight.w600, color: Colors.white),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        t('partner.referralLink').toUpperCase(),
+                        style: context.text.micro.copyWith(color: Colors.white.withValues(alpha: 0.75), fontSize: 9, letterSpacing: 1.2),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      d.code,
+                      textDirection: TextDirection.ltr,
+                      style: context.text.mono(16, weight: FontWeight.w700, color: Colors.white).copyWith(letterSpacing: 1.4),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      t('partner.referralCode').toUpperCase(),
+                      style: context.text.micro.copyWith(color: Colors.white.withValues(alpha: 0.75), fontSize: 9, letterSpacing: 1.2),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsetsDirectional.fromSTEB(14, 4, 6, 4),

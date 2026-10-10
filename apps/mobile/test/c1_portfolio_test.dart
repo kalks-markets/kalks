@@ -370,7 +370,8 @@ void main() {
       final c = await _open(tester, '/portfolio');
       _route(c);
       await settle(tester);
-      await tester.tap(_button('Statements').first);
+      // on the section's photo since 2026-10-10
+      await tester.tap(find.widgetWithText(KHeroButton, 'Statements').first);
       await settle(tester);
       expect(find.byType(StatementsScreen), findsOneWidget);
       await unmount(tester);

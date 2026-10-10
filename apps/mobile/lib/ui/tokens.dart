@@ -2,18 +2,21 @@
 // - packages/ui/src/styles.css                 (the Kalks base palette, light and dark)
 // - apps/crm/app/globals.css                   (Client Area: pastel light by default, washes mixed from the brand)
 // - apps/terminal/app/globals.css              (Kalks Trader: dark by default, frosted panels)
-// Every tint is mixed from the tenant brand colour (`ember`, #FF5A1F for Kalks; config.tenant.primary for brokers)
+// Every tint is mixed from the tenant brand colour (`ember`, Kalks orange #F2600C; config.tenant.primary for brokers)
 // with the same color-mix(in oklab) maths as the web, so a blue brand gets blue-tinted pastels automatically.
 import 'package:flutter/material.dart';
 
 import 'color_mix.dart';
 
-/// The Kalks brand defaults (web --k-ember, --k-gold).
-const Color kEmber = Color(0xFFFF5A1F);
-const Color kGold = Color(0xFFE9B949);
+/// The Kalks brand defaults: Kalks orange and its amber (web apps/crm/app/kx-orange.css --k-red / --k-yellow).
+const Color kEmber = Color(0xFFF2600C);
+const Color kGold = Color(0xFFFFA040);
 
-/// The near-black canvas of the icon and splash.
-const Color kCanvas = Color(0xFF07070A);
+/// The lighter orange (web --k-neon-red / the hover face).
+const Color kEmberLight = Color(0xFFFF7A2E);
+
+/// The Vantablack canvas of the Client Area, the icon and the splash (founder 2026-10-10).
+const Color kCanvas = Color(0xFF000000);
 
 Color _rgba(int r, int g, int b, double a) => Color.fromRGBO(r, g, b, a);
 Color _alpha(Color c, double a) => c.withValues(alpha: a);
@@ -186,61 +189,67 @@ class KTokens extends ThemeExtension<KTokens> {
     );
   }
 
+  /// The Client Area (founder 2026-10-10, web apps/crm/app/kx-orange.css): dark only, Vantablack grounds, neutral
+  /// greys, Kalks orange accents; rising / buy blue and falling / sell red, as in Kalks Trader. Cards are dark glass
+  /// over the section's blurred photo (KBackdrop).
   factory KTokens.clientDark({Color ember = kEmber, Color gold = kGold}) {
-    const surface = Color(0xFF17161D);
-    const surface3 = Color(0xFF27252F);
+    const surface = Color(0xFF0A0A0B);
+    const surface3 = Color(0xFF161618);
+    final stock = ember == kEmber;
     return KTokens(
       brightness: Brightness.dark,
       trader: false,
-      bg: mixOklab(ember, const Color(0xFF0B0A0F), 0.04),
+      bg: const Color(0xFF000000),
       surface: surface,
-      surface2: const Color(0xFF1D1C24),
+      surface2: const Color(0xFF0F0F11),
       surface3: surface3,
       line: _rgba(255, 255, 255, 0.075),
-      lineTop: _rgba(255, 255, 255, 0.08),
-      fg: const Color(0xFFF6F4F9),
-      fg2: const Color(0xFFACA8B8),
-      fg3: const Color(0xFF706B7D),
+      lineTop: _rgba(255, 255, 255, 0.12),
+      fg: const Color(0xFFF5F5F6),
+      fg2: const Color(0xFFB3B3BA),
+      fg3: const Color(0xFF8B8B93),
       ember: ember,
-      ember2: ember == kEmber ? const Color(0xFFFF8A3D) : mixOklab(ember, const Color(0xFFFFFFFF), 0.78),
-      emberSoft: _alpha(ember, 0.16),
+      ember2: stock ? const Color(0xFFFF8A4C) : mixOklab(ember, const Color(0xFFFFFFFF), 0.78),
+      emberSoft: _alpha(ember, 0.18),
       onEmber: const Color(0xFFFFFFFF),
       gold: gold,
-      goldSoft: _alpha(gold, 0.12),
-      up: const Color(0xFF22C55E),
-      upSoft: _rgba(34, 197, 94, 0.12),
-      down: const Color(0xFFF04438),
-      downSoft: _rgba(240, 68, 56, 0.12),
-      warn: const Color(0xFFF59E0B),
-      warnSoft: _rgba(245, 158, 11, 0.12),
-      info: const Color(0xFF38BDF8),
-      infoSoft: _rgba(56, 189, 248, 0.12),
-      cardBg: _rgba(27, 25, 34, 0.86),
-      cardBorder: _rgba(255, 255, 255, 0.06),
-      ink: const Color(0xFFF6F4F9),
-      inkFg: const Color(0xFF141218),
-      wash1: _alpha(ember, 0.34),
-      wash2: mixOklab(ember, _rgba(150, 40, 120, 0.45), 0.20),
-      wash3: mixOklab(ember, _rgba(80, 60, 190, 0.4), 0.12),
-      bar: _alpha(surface, 0.9),
-      sheet: _alpha(surface, 0.94),
-      scrim: _rgba(0, 0, 0, 0.55),
-      buyFill: const Color(0xFF15803D),
-      sellFill: const Color(0xFFDC2626),
-      shadowCard: [BoxShadow(color: _rgba(0, 0, 0, 0.75), offset: const Offset(0, 24), blurRadius: 60, spreadRadius: -32)],
+      goldSoft: _alpha(gold, 0.14),
+      // blue = up / buy / profit, red = down / sell / loss (web tokens.ts: "everywhere, Client Area included")
+      up: const Color(0xFF4C8DFF),
+      upSoft: _rgba(47, 123, 255, 0.15),
+      down: const Color(0xFFF5424F),
+      downSoft: _rgba(242, 54, 69, 0.15),
+      warn: const Color(0xFFFFB347),
+      warnSoft: _rgba(255, 179, 71, 0.13),
+      info: const Color(0xFF5B97FF),
+      infoSoft: _rgba(47, 123, 255, 0.15),
+      cardBg: _rgba(10, 10, 11, 0.66),
+      cardBorder: _rgba(255, 255, 255, 0.08),
+      ink: const Color(0xFFF5F5F6),
+      inkFg: const Color(0xFF000000),
+      // the blooms behind pages without a photo (web --k-bloom-a / -b)
+      wash1: _alpha(ember, 0.22),
+      wash2: _alpha(gold, 0.06),
+      wash3: _rgba(0, 0, 0, 0),
+      bar: _rgba(8, 8, 9, 0.8),
+      sheet: _rgba(14, 14, 16, 0.97),
+      scrim: _rgba(0, 0, 0, 0.6),
+      buyFill: const Color(0xFF1F62EA),
+      sellFill: const Color(0xFFE0182F),
+      shadowCard: [BoxShadow(color: _rgba(0, 0, 0, 0.8), offset: const Offset(0, 24), blurRadius: 48, spreadRadius: -28)],
       shadowPop: [
         BoxShadow(color: _rgba(0, 0, 0, 0.3), offset: const Offset(0, 2), blurRadius: 6),
-        BoxShadow(color: _rgba(0, 0, 0, 0.8), offset: const Offset(0, 30), blurRadius: 70, spreadRadius: -24),
+        BoxShadow(color: _rgba(0, 0, 0, 0.85), offset: const Offset(0, 30), blurRadius: 80, spreadRadius: -24),
       ],
       tiles: {
-        KTone.accent: (_alpha(ember, 0.20), ember),
-        KTone.amber: (_rgba(245, 190, 60, 0.15), const Color(0xFFF4C55A)),
+        KTone.accent: (_alpha(ember, 0.18), stock ? const Color(0xFFFF8A4C) : ember),
+        KTone.amber: (_rgba(255, 160, 64, 0.15), const Color(0xFFFFB366)),
         KTone.coral: (_rgba(255, 120, 95, 0.15), const Color(0xFFFF9A85)),
         KTone.pink: (_rgba(240, 100, 170, 0.15), const Color(0xFFF58CC4)),
         KTone.lavender: (_rgba(140, 120, 255, 0.17), const Color(0xFFB3A6FF)),
         KTone.mint: (_rgba(40, 200, 120, 0.15), const Color(0xFF5FDC9C)),
         KTone.sky: (_rgba(80, 160, 255, 0.15), const Color(0xFF8CC2FF)),
-        KTone.neutral: (surface3, const Color(0xFFACA8B8)),
+        KTone.neutral: (surface3, const Color(0xFFB3B3BA)),
       },
       cardRadius: 24,
       rowRadius: 16,

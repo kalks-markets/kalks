@@ -8,8 +8,10 @@ import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
 import '../common/pickers.dart';
 
-/// The sign-in pages' frame (web AuthSection on phones): the logo with language and theme at the top, the form in the
-/// middle (max 460 wide), the risk warning at the bottom, over the pastel washes.
+/// The sign-in pages' frame (web AuthSection on phones, 2026-10-10): Home's photo full-bleed at the top, fading into
+/// black, the white Kalks logo and the language over it; the form on a black sheet that rises over the photo's foot
+/// and scrolls over it (max 460 wide), the risk warning at the end. A white-label broker gets its name over the plain
+/// dark backdrop instead of the photo.
 class AuthScaffold extends ConsumerWidget {
   const AuthScaffold({super.key, required this.child});
   final Widget child;
@@ -18,31 +20,72 @@ class AuthScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cfg = ref.watch(configProvider);
     final k = context.k;
+    final mq = MediaQuery.of(context);
+    final kalks = cfg.tenantDefault;
+    // the photo band: the KALKS letters and the figure, then the sheet
+    final photoH = (mq.size.width * 1240 / 1080).clamp(280.0, mq.size.height * 0.62);
+    final sheetTop = kalks ? (photoH * 0.62).clamp(190.0, 340.0) : mq.padding.top + 64;
     return Scaffold(
-      backgroundColor: k.bg,
+      backgroundColor: Colors.black,
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
-          const Positioned.fill(child: KBackdrop()),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
-                  child: Row(
-                    children: [
-                      if (cfg.tenantDefault) const KLogo(height: 20) else Text(cfg.tenantName, style: context.text.title2),
-                      const Spacer(),
-                      const LanguageButton(),
-                      const SizedBox(width: 4),
-                      const ThemeToggleButton(),
-                    ],
+          if (kalks)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: photoH,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(KHeroPhoto.dashboard.asset, fit: BoxFit.cover, alignment: Alignment.topCenter, excludeFromSemantics: true),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x80000000), Color(0x00000000), Color(0x00000000), Color(0xFF000000)],
+                        stops: [0, 0.22, 0.62, 1],
+                      ),
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
+                ],
+              ),
+            )
+          else
+            const Positioned.fill(child: KBackdrop()),
+          // the logo and the language over the photo, then the sheet; both scroll over the photo
+          Positioned.fill(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: sheetTop,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(20, mq.padding.top + 10, 12, 0),
+                        child: Row(
+                          children: [
+                            if (kalks) const KLogo(color: Colors.white) else Text(cfg.tenantName, style: context.text.title2),
+                            const Spacer(),
+                            LanguageButton(glass: kalks),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    constraints: BoxConstraints(minHeight: mq.size.height - sheetTop),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.94),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                      border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 0.6)),
+                    ),
+                    padding: EdgeInsets.fromLTRB(20, 28, 20, 20 + mq.padding.bottom),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 460),
@@ -60,8 +103,8 @@ class AuthScaffold extends ConsumerWidget {
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

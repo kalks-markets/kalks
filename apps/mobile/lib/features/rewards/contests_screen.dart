@@ -9,6 +9,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../data/client_data.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import 'rewards_api.dart';
 import 'widgets/contest_widgets.dart';
@@ -65,8 +66,10 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen> {
     final title = t('rewards.contests.title');
     final subtitle = t('rewards.contests.subtitle');
     final list = ref.watch(contestsProvider);
+    final hero = pageHero(context, ref, path: '/rewards', title: title, lead: subtitle);
     if (!list.hasValue) {
       return GrowthFallback(
+        hero: hero,
         title: title,
         subtitle: subtitle,
         error: list.hasError ? list.error : null,
@@ -91,9 +94,10 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen> {
     return KPageScroll(
       controller: _scroll,
       onRefresh: () => _refresh(fid),
+      hero: hero,
+      padding: EdgeInsets.fromLTRB(KSpace.page, hero == null ? 12 : 18, KSpace.page, 24),
       children: [
-        KPageHeader(title: title, subtitle: Text(subtitle)),
-        const SizedBox(height: 12),
+        if (hero == null) ...[KPageHeader(title: title, subtitle: Text(subtitle)), const SizedBox(height: 12)],
         Row(
           children: [
             KButton(

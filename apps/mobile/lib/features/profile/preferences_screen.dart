@@ -1,6 +1,7 @@
 // Profile & Security › Preferences: port of the web page's live branch (apps/crm/app/(app)/profile/preferences/
-// page.tsx, `!IS_DEMO`): Appearance (dark / light), Language (the 22 locales), the Notifications link card. The app
-// adds its own device preference at the end: biometric unlock (shown where the phone supports it).
+// page.tsx, `!IS_DEMO`): Language (the 22 locales), the Notifications link card (dark only since 2026-10-10: no
+// Appearance switch, like the web). The app adds its own device preference at the end: biometric unlock (shown where
+// the phone supports it).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -10,7 +11,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/biometrics.dart';
 import '../../core/prefs.dart';
-import '../../core/theme_controller.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
 import 'widgets/profile_ui.dart';
@@ -29,80 +29,7 @@ class PreferencesScreen extends ConsumerWidget {
     final t = context.t;
     final k = context.k;
     final locale = ref.watch(localeProvider);
-    final dark = k.dark;
     final bio = ref.watch(biometricAvailableProvider).value ?? false;
-
-    Widget themeTile(bool isDark) {
-      final on = dark == isDark;
-      final canvas = isDark ? const Color(0xFF07070A) : const Color(0xFFF6F4F1);
-      final bar = isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.1);
-      final panel = isDark ? const Color(0xFF111114) : Colors.white;
-      return Expanded(
-        child: KPressable(
-          semanticLabel: isDark ? t('profile.prefs.dark') : t('profile.prefs.light'),
-          onTap: () => ref.read(themeModeProvider.notifier).set(isDark ? ThemeMode.dark : ThemeMode.light),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: on ? k.ember.withValues(alpha: 0.6) : k.line),
-              boxShadow: on ? [BoxShadow(color: k.ember.withValues(alpha: 0.1), spreadRadius: 4)] : null,
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    height: 96,
-                    color: canvas,
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 12,
-                          decoration: BoxDecoration(color: bar, borderRadius: BorderRadius.circular(6)),
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(8)),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                width: 32,
-                                decoration: BoxDecoration(color: k.ember, borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    color: k.cardBg,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: Row(
-                      children: [
-                        Icon(isDark ? LucideIcons.moon : LucideIcons.sun, size: 16, color: k.fg),
-                        const SizedBox(width: 8),
-                        Text(isDark ? t('profile.prefs.dark') : t('profile.prefs.light'), style: context.text.label.copyWith(fontSize: 14, color: k.fg)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
 
     Widget language(LocaleInfo l) {
       final on = l.code == locale;
@@ -152,18 +79,6 @@ class PreferencesScreen extends ConsumerWidget {
     return KPageScroll(
       children: [
         PPageHeader(title: t('profile.prefs.title'), subtitle: t('profile.prefs.subtitleLive')),
-        // appearance
-        KCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              PCardHeader(title: t('profile.prefs.appearance'), icon: LucideIcons.monitorSmartphone),
-              const SizedBox(height: 18),
-              Row(children: [themeTile(true), const SizedBox(width: 12), themeTile(false)]),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
         // language
         KCard(
           child: Column(

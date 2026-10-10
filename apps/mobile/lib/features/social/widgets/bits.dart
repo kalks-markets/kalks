@@ -1000,7 +1000,7 @@ class SheetLead extends StatelessWidget {
 
 /// The web's chart palette (packages/ui CHART_COLORS).
 const List<Color> kChartColors = [
-  Color(0xFFFF5A1F),
+  kEmber,
   Color(0xFFE9B949),
   Color(0xFF22C55E),
   Color(0xFF38BDF8),

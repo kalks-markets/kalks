@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../core/theme_controller.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
 
@@ -43,24 +42,10 @@ Future<void> showLanguageSheet(BuildContext context, WidgetRef ref) => showKShee
   ),
 );
 
-/// Sun / moon toggle (web ThemeToggle).
-class ThemeToggleButton extends ConsumerWidget {
-  const ThemeToggleButton({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dark = context.k.dark;
-    return KIconButton(
-      icon: dark ? LucideIcons.sun : LucideIcons.moon,
-      semanticLabel: context.t('shell.toggleTheme'),
-      onPressed: () => ref.read(themeModeProvider.notifier).toggle(Theme.of(context).brightness),
-    );
-  }
-}
-
-/// Globe button opening the language list.
+/// Globe button opening the language list; `glass` over a photo (white on glass).
 class LanguageButton extends ConsumerWidget {
-  const LanguageButton({super.key});
+  const LanguageButton({super.key, this.glass = false});
+  final bool glass;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -72,16 +57,19 @@ class LanguageButton extends ConsumerWidget {
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: context.k.surface2,
+          color: glass ? Colors.white.withValues(alpha: 0.14) : context.k.surface2,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: context.k.line),
+          border: Border.all(color: glass ? Colors.white.withValues(alpha: 0.24) : context.k.line),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             KFlag(info.flag, size: 18),
             const SizedBox(width: 6),
-            Text(info.code.toUpperCase(), style: context.text.caption.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              info.code.toUpperCase(),
+              style: context.text.caption.copyWith(fontWeight: FontWeight.w700, color: glass ? Colors.white : null),
+            ),
           ],
         ),
       ),

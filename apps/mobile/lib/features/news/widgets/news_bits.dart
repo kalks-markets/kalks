@@ -67,22 +67,22 @@ String countdownText(T t, Duration left) {
   return d > 0 ? t('news.countdown.days', {'d': d, 'time': time}) : time;
 }
 
-/// The web's own photo library per category (publisher images are never copied).
-const Map<String, List<String>> _covers = {
-  'macro': ['finance', 'skyscrapers', 'london', 'nyc'],
-  'forex': ['money', 'charts'],
-  'metals': ['gold'],
-  'indices': ['stock-market', 'trading-screen'],
-  'energies': ['dubai', 'skyline'],
-  'crypto': ['bitcoin', 'crypto-coins', 'crypto'],
-  'stocks': ['analytics', 'stock-market'],
-  'markets': ['dashboard', 'trader', 'singapore'],
+/// A cover per category from the founder's own solid-colour photos (web news-live/shared.tsx COVER, 2026-10-10: the
+/// old stock library is retired; publisher images are never copied).
+const Map<String, KHeroPhoto> _covers = {
+  'macro': KHeroPhoto.news,
+  'forex': KHeroPhoto.markets,
+  'metals': KHeroPhoto.rewards,
+  'indices': KHeroPhoto.portfolio,
+  'energies': KHeroPhoto.profile,
+  'crypto': KHeroPhoto.copy,
+  'stocks': KHeroPhoto.accounts,
+  'markets': KHeroPhoto.wallet,
 };
 
-String coverFor(NewsItem n) {
-  final list = _covers[n.category] ?? _covers['markets']!;
-  return 'assets/photos/${list[n.id % list.length]}.jpg';
-}
+KHeroPhoto coverPhotoFor(NewsItem n) => _covers[n.category] ?? KHeroPhoto.wallet;
+
+String coverFor(NewsItem n) => coverPhotoFor(n).asset;
 
 KChipTone sentimentTone(Sentiment s) => switch (s) {
   Sentiment.bullish => KChipTone.up,

@@ -1,5 +1,6 @@
-// An account type (engine group) as a card with its photo and commercial terms (web components/trading/group-card.tsx
-// EngineGroupCard): the Account types list and the open-account wizard's Type step.
+// An account type (engine group) as a debit-card face with its commercial terms (web components/trading/group-card.tsx
+// EngineGroupCard + CardFace, founder 2026-10-10: "every account card styled like a debit card"): the Account types
+// list and the open-account wizard's Type step.
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -8,21 +9,6 @@ import '../../../core/models/trading.dart';
 import '../../../i18n/i18n.dart';
 import '../../../ui/ui.dart';
 import '../accounts_data.dart';
-
-const Map<String, String> _photo = {
-  'standard': 'finance',
-  'pro': 'trading-screen',
-  'pro-netting': 'charts',
-  'ecn': 'analytics',
-  'cent': 'money',
-  'vip': 'skyscrapers',
-  'prop': 'trader',
-  'options-standard': 'charts',
-  'options-pro': 'analytics',
-};
-
-/// The group's photo (web groupPhoto).
-String groupPhoto(String code) => 'assets/photos/${_photo[code] ?? 'stock-market'}.jpg';
 
 /// Pricing model from the group's commercial terms (web spreadType).
 String spreadType(EngineGroup g, T t) => g.commissionPerLot > 0 ? t('accounts.pricing.rawPlusCommission') : t('accounts.pricing.allIn');
@@ -69,79 +55,17 @@ class EngineGroupCard extends StatelessWidget {
     final k = context.k;
     final g = group;
     final full = used != null && used! >= g.maxAccountsPerUser;
-    const white = Colors.white;
-    final header = SizedBox(
-      height: compact ? 80 : 112,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            groupPhoto(g.code),
-            fit: BoxFit.cover,
-            excludeFromSemantics: true,
-            errorBuilder: (_, _, _) => ColoredBox(color: k.surface3),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [k.surface, Colors.black.withValues(alpha: 0.4), Colors.black.withValues(alpha: 0.1)],
-                stops: const [0, 0.5, 1],
-              ),
-            ),
-          ),
-          PositionedDirectional(
-            start: 16,
-            end: 16,
-            bottom: 12,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        g.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.title1.copyWith(
-                          color: white,
-                          fontSize: 19,
-                          shadows: [Shadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 8)],
-                        ),
-                      ),
-                      Text.rich(
-                        TextSpan(
-                          text: t.dyn('accounts.mode.${g.mode}', fallback: modeLabel(g.mode)).toUpperCase(),
-                          children: [
-                            if (g.cent)
-                              TextSpan(
-                                text: ' · ${t('accounts.groupCard.uscCentAlt')}',
-                                style: TextStyle(color: k.gold),
-                              ),
-                            // an Options account type
-                            if (g.isOptions) TextSpan(text: ' · ${t('accounts.product.chipOptions')}'),
-                          ],
-                        ),
-                        style: context.text.micro.copyWith(color: white.withValues(alpha: 0.8), letterSpacing: 0.8),
-                      ),
-                    ],
-                  ),
-                ),
-                if (selected)
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(color: k.ember, shape: BoxShape.circle),
-                    child: Icon(LucideIcons.check, size: 16, color: k.onEmber),
-                  ),
-              ],
-            ),
-          ),
-        ],
+    final mode = g.isOptions ? t('accounts.product.chipOptions') : t.dyn('accounts.mode.${g.mode}', fallback: modeLabel(g.mode));
+    final minDep = g.minDeposit > 0 ? '\$${Fmt.number(g.minDeposit, 0)}' : t('common.none');
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+      child: KCardFace(
+        finish: finishOfGroup(g.code, options: g.isOptions),
+        name: g.name,
+        badge: g.cent ? '$mode · USC' : mode,
+        left: (t('accounts.label.minDeposit'), minDep),
+        right: g.isOptions ? (t('accounts.label.stopOut'), pctLabel(g.stopOutPct)) : (t('accounts.label.maxLeverage'), levLabel(maxLeverage(g))),
+        selected: selected,
       ),
     );
     final body = Padding(
@@ -158,7 +82,7 @@ class EngineGroupCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _Spec(label: t('accounts.label.minDeposit'), value: g.minDeposit > 0 ? '\$${Fmt.number(g.minDeposit, 0)}' : t('common.none')),
+                child: _Spec(label: t('accounts.label.minDeposit'), value: minDep),
               ),
             ],
           ),
@@ -184,7 +108,7 @@ class EngineGroupCard extends StatelessWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: Icon(LucideIcons.check, size: 12, color: k.gold),
+                      child: Icon(LucideIcons.check, size: 12, color: k.ember),
                     ),
                     const SizedBox(width: 8),
                     Expanded(

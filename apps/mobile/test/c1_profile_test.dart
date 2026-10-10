@@ -735,7 +735,9 @@ void main() {
       await _expectOrder(tester, [t('profile.notifications.channels'), 'Security', t.dyn('profile.notifications.cat.marketing', fallback: 'News and offers')]);
       c.read(routerProvider).go('/profile/preferences');
       await settle(tester);
-      await _expectOrder(tester, [t('profile.prefs.appearance'), t('common.language'), t('profile.notifCard.title')]);
+      // dark only since 2026-10-10: no Appearance card
+      expect(find.text(t('profile.prefs.appearance')), findsNothing);
+      await _expectOrder(tester, [t('common.language'), t('profile.notifCard.title')]);
       await unmount(tester);
     });
 
@@ -865,13 +867,11 @@ void main() {
       await unmount(tester);
     });
 
-    testWidgets('preferences: the theme and the language switch at once', (tester) async {
+    testWidgets('preferences: dark only (no theme switch); the language switches at once', (tester) async {
       final c = await _open(tester, '/profile/preferences');
-      expect(c.read(themeModeProvider), ThemeMode.light);
-      await _tapIn(tester, find.text(t('profile.prefs.dark')));
       expect(c.read(themeModeProvider), ThemeMode.dark);
-      await _tapIn(tester, find.text(t('profile.prefs.light')));
-      expect(c.read(themeModeProvider), ThemeMode.light);
+      expect(find.text(t('profile.prefs.dark')), findsNothing);
+      expect(find.text(t('profile.prefs.light')), findsNothing);
       await _tapIn(tester, find.byKey(const ValueKey('lang-de')));
       await settle(tester);
       expect(c.read(localeProvider), 'de');

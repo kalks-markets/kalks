@@ -104,10 +104,8 @@ void main() {
       }),
     );
     expect(find.byType(DashboardScreen), findsOneWidget);
-    // the picture keeps its headline; no way into options; Overview alone, so no pills
-    expect(find.text('Trade like a sovereign.'), findsOneWidget);
-    expect(find.text('KALKS FX OPTIONS'), findsNothing);
-    expect(find.text('Start trading options'), findsNothing);
+    // the photo keeps no AI bar (ai off); Overview alone, so no pills
+    expect(find.byType(KHeroPicture), findsOneWidget);
     expect(find.byType(KPillNav), findsNothing);
     expect(find.byKey(const ValueKey('ask-ai-pill')), findsNothing);
 
@@ -115,20 +113,14 @@ void main() {
     const gone = [
       'Deposit',
       'Withdraw',
-      'Transfer funds',
-      'Wallet balance',
-      'Rewards',
       'Transfer',
-      'Copy trading',
+      'WALLET BALANCE',
+      'REWARDS',
+      'Partner (IB)',
+      'Contests & Rewards',
+      'Options',
       'History',
-      'Funding',
-      'Fund your wallet',
       'Fund account',
-      'Top movers',
-      'Market heatmap',
-      'Economic calendar',
-      'Market news',
-      'Markets & news around the world',
     ];
     final page = find.descendant(of: find.byType(DashboardScreen), matching: find.byType(Scrollable)).first;
     void check() {
@@ -139,15 +131,13 @@ void main() {
     }
 
     check();
-    for (final s in ['Total balance', 'Total equity', 'Your accounts', 'Quick actions', 'Linked', 'Getting started', 'More for you', 'Need help?']) {
+    for (final s in ['TOTAL BALANCE', 'TOTAL EQUITY', 'Shortcuts', 'Open account', 'Kalks Trader', 'Statements', 'Support', 'Your accounts']) {
       for (var i = 0; i < 80 && find.text(s).hitTestable().evaluate().isEmpty; i++) {
         await tester.drag(page, const Offset(0, -250));
         await tester.pump(const Duration(milliseconds: 50));
         check();
       }
       expect(find.text(s), findsWidgets, reason: s);
-      // the steps without "Fund your wallet"
-      if (s == 'Getting started') expect(find.text('4 of 4'), findsOneWidget);
     }
     await unmount(tester);
   });

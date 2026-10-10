@@ -2,7 +2,7 @@
 // slides between them and a tab tap slides the pager; both keep the web's path in the URL, so links and deep links
 // stay what they are. The router gives every sub-route of a module the same page under one key (router.dart
 // _moduleRoutes), so the Navigator keeps this widget's State and its PageController while the path moves between the
-// pages; every page visited stays alive with its scroll and data. The Dashboard's Overview keeps its picture (no top
+// pages; every page visited stays alive with its scroll and data. A section's first page keeps its photo (no top
 // padding) while its neighbours lay out under the header; the shell follows the slide through
 // modulePagerOffsetProvider and the page in front's scroll through ModulePageScrollNotification (chrome.dart).
 import 'package:flutter/foundation.dart';
@@ -15,10 +15,10 @@ import '../core/auth/auth_controller.dart';
 import '../core/config/app_config.dart';
 import '../core/models/user.dart';
 import '../features/common/stub_screen.dart';
-import '../features/dashboard/dashboard_hero.dart';
 import '../ui/ui.dart';
 import 'chrome.dart';
 import 'nav.dart';
+import 'page_hero.dart';
 
 /// A module's screens by web path (the router's registries, `_c1Screens` / `_c2Screens`).
 typedef ModuleScreens = Map<String, Widget Function(GoRouterState)>;
@@ -282,8 +282,8 @@ class _ModulePagerState extends ConsumerState<ModulePager> {
             pager: _controller,
             onScroll: (m) => _onPageScroll(href, m),
             child: MediaQuery(
-              // the picture page runs under the status bar; every other page sits under the header
-              data: mq.copyWith(padding: mq.padding.copyWith(top: dashboardHeroAt(href, cfg) ? 0 : headerH)),
+              // a photo page runs under the status bar; every other page sits under the header
+              data: mq.copyWith(padding: mq.padding.copyWith(top: pageHeroAt(href, cfg) ? 0 : headerH)),
               child: moduleScreen(widget.screens, href, _states[href] ?? _plainState(href)),
             ),
           );

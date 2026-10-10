@@ -455,7 +455,9 @@ class _FeaturedCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            Positioned.fill(child: Image.asset(coverFor(n), fit: BoxFit.cover)),
+            Positioned.fill(
+              child: Image.asset(coverFor(n), fit: BoxFit.cover, alignment: coverPhotoFor(n).focus),
+            ),
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -533,7 +535,10 @@ class _StoryCard extends ConsumerWidget {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: Opacity(opacity: 0.8, child: Image.asset(coverFor(n), fit: BoxFit.cover)),
+                  child: Opacity(
+                    opacity: 0.85,
+                    child: Image.asset(coverFor(n), fit: BoxFit.cover, alignment: coverPhotoFor(n).focus),
+                  ),
                 ),
                 Positioned.fill(
                   child: DecoratedBox(

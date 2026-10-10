@@ -3,7 +3,8 @@
 // tickets' starting distance (max(10 pips, 2 x spread), TP twice that) from the close price, a drag places it where
 // the finger lifts, held on the side of the price the trade server accepts; the new line shows at once and the handle
 // goes while it exists. Native chart surface (no WebView in tests): the same commands and events as the chart page.
-// Also: Kalks Trader's blue = up / buy / profit (the trader tokens and the chart palette), the Client Area keeps green.
+// Also: blue = up / buy / profit in Kalks Trader (the trader tokens and the chart palette) and, since 2026-10-10, in the
+// Client Area too.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -90,7 +91,7 @@ class _BarsFeed extends FixedFeed {
 Finder handle(String id) => find.byKey(ValueKey('chart-handle-$id'));
 
 void main() {
-  test('Kalks Trader is blue for up / buy / profit, the Client Area keeps green', () {
+  test('blue for up / buy / profit: Kalks Trader and (since 2026-10-10) the Client Area', () {
     final dark = chartPalette(KTokens.traderDark()), light = chartPalette(KTokens.traderLight());
     expect(dark.up, '#2f7bff');
     expect(light.up, '#1f5fe0');
@@ -98,8 +99,8 @@ void main() {
     expect(KTokens.traderDark().buyFill, const Color(0xFF1F5FE0));
     expect(KTokens.traderLight().buyFill, const Color(0xFF1F5FE0));
     expect(KTokens.traderDark().sellFill, const Color(0xFFDC2626));
-    expect(KTokens.clientDark().up, const Color(0xFF22C55E));
-    expect(KTokens.clientLight().buyFill, const Color(0xFF15803D));
+    expect(KTokens.clientDark().up, const Color(0xFF4C8DFF));
+    expect(KTokens.clientDark().buyFill, const Color(0xFF1F62EA));
   });
 
   group('TerminalChart', () {

@@ -203,8 +203,9 @@ void main() {
       expect(find.text('What will this account trade?'), findsWidgets);
       expect(find.byKey(const ValueKey('wizard-product-cfd')), findsOneWidget);
       expect(find.byKey(const ValueKey('wizard-product-options')), findsOneWidget);
-      expect(find.text('CFD account'), findsWidgets);
-      expect(find.text('Options account'), findsWidgets);
+      // the products as card faces (their names in caps)
+      expect(find.text('CFD ACCOUNT'), findsWidgets);
+      expect(find.text('OPTIONS ACCOUNT'), findsWidgets);
 
       // CFD (the default): Live / Demo, then the CFD types only
       await _continue(tester);

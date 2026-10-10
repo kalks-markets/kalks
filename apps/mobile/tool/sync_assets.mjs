@@ -1,18 +1,20 @@
 // Copies the shared Kalks assets into the Flutter app and draws its brand images. Run from the repo root after the
 // repo's `pnpm install` (sharp, geist and flag-icons come from the root node_modules):
 //
-//   node apps/mobile/tool/sync_assets.mjs
+//   node apps/mobile/tool/sync_assets.mjs            (everything)
+//   node apps/mobile/tool/sync_assets.mjs --brand    (the brand images only)
 //   cd apps/mobile && dart run flutter_launcher_icons && dart run flutter_native_splash:create
 //
 // Writes (everything below apps/mobile, rewritten on every run):
 // - assets/brand/: the logos (kalks-logo.svg, kalks-mark.svg, kalks_logo_black.png, kalks_logo_white.png) and the
-//   images drawn from the Kalks mark (ember #FF5A1F on the canvas #07070A, flat fills), after the old Expo app's
-//   recipe (git show df273f4^:apps/mobile/scripts/brand-assets.mjs):
+//   images drawn from the Kalks mark: the real monochrome logo since 2026-10-10, a white K on black (the Client
+//   Area's apps/crm/public/brand/kalks-icon.svg), after the old Expo app's recipe (git show
+//   df273f4^:apps/mobile/scripts/brand-assets.mjs):
 //     icon.png                     1024 px, opaque: the launcher icon (legacy Android, web)
-//     adaptive-icon.png            1024 px, transparent: the adaptive icon's foreground (background is #07070A)
+//     adaptive-icon.png            1024 px, transparent: the adaptive icon's foreground (background is #000000)
 //     adaptive-icon-monochrome.png 1024 px, white on transparent: Android 13 themed icons
-//     splash.png                   600 px wide ember mark: the launch screen before Android 12 (xxxhdpi)
-//     splash-android12.png         1152 px, the mark inside the 768 px circle Android 12+ shows
+//     splash.png                   600 px wide white mark: the launch screen before Android 12 (xxxhdpi)
+//     splash-android12.png         1152 px, the white mark inside the 768 px circle Android 12+ shows
 // - android/app/src/main/res/drawable-*dpi/ic_stat_kalks.png: the status-bar notification icon (white mark on
 //   transparent, 24 dp)
 // - assets/coins/*.svg, assets/stocks/*.svg, assets/people/*.jpg: copies of the repo assets/
@@ -29,8 +31,10 @@ const root = join(app, "..", "..");
 const require = createRequire(join(root, "package.json"));
 const sharp = require("sharp");
 
-const BG = "#07070A";
-const EMBER = "#FF5A1F";
+// the Client Area's icon (apps/crm/public/brand/kalks-icon.svg): the white K on black, flat fills
+const BG = "#000000";
+const MARK = "#FFFFFF";
+const brandOnly = process.argv.includes("--brand");
 
 const out = (...p) => join(app, ...p);
 const fresh = (dir) => {
@@ -57,15 +61,15 @@ async function onSquare(size, bg, markColor, markScale) {
 }
 const CLEAR = { r: 0, g: 0, b: 0, alpha: 0 };
 
-// launcher icon: opaque, the mark on the canvas colour
-await sharp(await (await onSquare(1024, BG, EMBER, 0.56)).toBuffer()).removeAlpha().png().toFile(join(brandDir, "icon.png"));
-// adaptive icon foreground: the mark alone (inside the 66 % safe zone), on the #07070A background layer
-await (await onSquare(1024, CLEAR, EMBER, 0.42)).toFile(join(brandDir, "adaptive-icon.png"));
+// launcher icon: opaque, the white mark on black (the web icon's proportions: the K 60 % of the square)
+await sharp(await (await onSquare(1024, BG, MARK, 0.6)).toBuffer()).removeAlpha().png().toFile(join(brandDir, "icon.png"));
+// adaptive icon foreground: the mark alone (inside the 66 % safe zone), on the #000000 background layer
+await (await onSquare(1024, CLEAR, MARK, 0.42)).toFile(join(brandDir, "adaptive-icon.png"));
 await (await onSquare(1024, CLEAR, "#FFFFFF", 0.42)).toFile(join(brandDir, "adaptive-icon-monochrome.png"));
-// launch screen: the ember mark on the canvas colour
-await sharp(colored(EMBER), { density: 600 }).resize({ width: 600 }).png().toFile(join(brandDir, "splash.png"));
+// launch screen: the white mark on black
+await sharp(colored(MARK), { density: 600 }).resize({ width: 600 }).png().toFile(join(brandDir, "splash.png"));
 // Android 12+: a 1152 px icon whose visible part is the centre 768 px circle
-await (await onSquare(1152, CLEAR, EMBER, 0.4)).toFile(join(brandDir, "splash-android12.png"));
+await (await onSquare(1152, CLEAR, MARK, 0.4)).toFile(join(brandDir, "splash-android12.png"));
 
 // status-bar notification icon: white mark on transparent, 24 dp per density
 const DENSITIES = { mdpi: 24, hdpi: 36, xhdpi: 48, xxhdpi: 72, xxxhdpi: 96 };
@@ -73,6 +77,10 @@ for (const [d, px] of Object.entries(DENSITIES)) {
   const dir = out("android", "app", "src", "main", "res", `drawable-${d}`);
   mkdirSync(dir, { recursive: true });
   await (await onSquare(px, CLEAR, "#FFFFFF", 0.8)).toFile(join(dir, "ic_stat_kalks.png"));
+}
+if (brandOnly) {
+  console.log("brand images written");
+  process.exit(0);
 }
 
 /* ---------------- shared pictures ---------------- */

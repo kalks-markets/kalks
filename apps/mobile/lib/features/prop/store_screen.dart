@@ -9,6 +9,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import 'prop_api.dart';
 import 'widgets/checkout_sheet.dart';
@@ -40,16 +41,35 @@ class _PropStoreScreenState extends ConsumerState<PropStoreScreen> {
     final mine = ref.watch(propChallengesProvider(0)).value;
     final count = mine?.where((c) => c.status == 'active' || c.status == 'funded').length ?? 0;
 
+    final hero = pageHero(
+      context,
+      ref,
+      path: '/prop',
+      title: t('prop.store.title'),
+      lead: t('prop.store.subtitle'),
+      actions: [
+        KHeroButton(
+          label: count > 0 ? '${t('prop.myChallenges')} · $count' : t('prop.myChallenges'),
+          icon: LucideIcons.trophy,
+          onPressed: () => context.go('/prop/mine'),
+        ),
+      ],
+    );
+
     return KPageScroll(
       onRefresh: _refresh,
+      hero: hero,
+      padding: EdgeInsets.fromLTRB(KSpace.page, hero == null ? 12 : 18, KSpace.page, 24),
       children: [
-        KPageHeader(title: t('prop.store.title'), subtitle: Text(t('prop.store.subtitle'))),
-        const SizedBox(height: 14),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: PropHeaderButton(label: t('prop.myChallenges'), icon: LucideIcons.trophy, count: count, onTap: () => context.go('/prop/mine')),
-        ),
-        const SizedBox(height: 20),
+        if (hero == null) ...[
+          KPageHeader(title: t('prop.store.title'), subtitle: Text(t('prop.store.subtitle'))),
+          const SizedBox(height: 14),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: PropHeaderButton(label: t('prop.myChallenges'), icon: LucideIcons.trophy, count: count, onTap: () => context.go('/prop/mine')),
+          ),
+          const SizedBox(height: 20),
+        ],
         KAsync<List<Plan>>(
           value: plans,
           onRetry: () => ref.invalidate(propPlansProvider),

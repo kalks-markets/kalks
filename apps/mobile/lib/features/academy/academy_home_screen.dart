@@ -9,6 +9,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/format/format.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import 'academy_api.dart';
 import 'widgets/shared.dart';
@@ -20,11 +21,24 @@ class AcademyHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.t;
     final cat = ref.watch(academyCatalogProvider);
+    final hero = pageHero(
+      context,
+      ref,
+      path: '/academy',
+      title: t('academy.title'),
+      lead: cat.hasValue ? t('academy.home.subtitle', {'count': cat.requireValue.me.chaptersTotal}) : null,
+      actions: [
+        KHeroButton(label: t('academy.home.glossary'), icon: LucideIcons.library, onPressed: () => context.go('/academy/glossary')),
+        KHeroButton(label: t('academy.home.myProgress'), icon: LucideIcons.award, onPressed: () => context.go('/academy/progress')),
+      ],
+    );
     return KPageScroll(
       onRefresh: () async {
         ref.invalidate(academyCatalogProvider);
         await ref.read(academyCatalogProvider.future).then((_) {}, onError: (Object _) {});
       },
+      hero: hero,
+      padding: EdgeInsets.fromLTRB(KSpace.page, hero == null ? 12 : 18, KSpace.page, 24),
       children: [
         KAsync(
           value: cat,
@@ -36,29 +50,31 @@ class AcademyHomeScreen extends ConsumerWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                KPageHeader(title: t('academy.title'), subtitle: Text(t('academy.home.subtitle', {'count': data.me.chaptersTotal}))),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    KButton(
-                      label: t('academy.home.glossary'),
-                      icon: LucideIcons.library,
-                      variant: KButtonVariant.surface,
-                      size: KButtonSize.sm,
-                      onPressed: () => context.go('/academy/glossary'),
-                    ),
-                    KButton(
-                      label: t('academy.home.myProgress'),
-                      icon: LucideIcons.award,
-                      variant: KButtonVariant.surface,
-                      size: KButtonSize.sm,
-                      onPressed: () => context.go('/academy/progress'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+                if (hero == null) ...[
+                  KPageHeader(title: t('academy.title'), subtitle: Text(t('academy.home.subtitle', {'count': data.me.chaptersTotal}))),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      KButton(
+                        label: t('academy.home.glossary'),
+                        icon: LucideIcons.library,
+                        variant: KButtonVariant.surface,
+                        size: KButtonSize.sm,
+                        onPressed: () => context.go('/academy/glossary'),
+                      ),
+                      KButton(
+                        label: t('academy.home.myProgress'),
+                        icon: LucideIcons.award,
+                        variant: KButtonVariant.surface,
+                        size: KButtonSize.sm,
+                        onPressed: () => context.go('/academy/progress'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 _ContinueHero(cat: data),
                 const SizedBox(height: 16),
                 _StatsCard(me: data.me),
@@ -127,20 +143,28 @@ class _ContinueHero extends StatelessWidget {
       padding: EdgeInsets.zero,
       child: Stack(
         children: [
-          Positioned.fill(child: PhaseCover(asset: coverOf(phase.order), opacity: 0.45)),
-          const Positioned.fill(child: CoverWash()),
+          Positioned.fill(child: FinishWash(finish: bookFinish(phase))),
           Padding(
             padding: const EdgeInsets.all(22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    KChip(label: chip, tone: KChipTone.ember, dot: true),
-                    KChip(label: levelLabel(t, phase.level), tone: levelTone(phase.level)),
-                    KChip(label: t('academy.phaseN', {'n': phase.order})),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          KChip(label: chip, tone: KChipTone.ember, dot: true),
+                          KChip(label: levelLabel(t, phase.level), tone: levelTone(phase.level)),
+                          KChip(label: t('academy.phaseN', {'n': phase.order})),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    SizedBox(width: 96, child: PhaseBook(p: phase)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -360,57 +384,31 @@ class _PhaseCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 144,
-            child: Stack(
-              children: [
-                Positioned.fill(child: PhaseCover(asset: coverOf(p.order))),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [k.cardBg, k.cardBg.withValues(alpha: 0.3), k.cardBg.withValues(alpha: 0)],
-                        stops: const [0, 0.45, 1],
+          Stack(
+            children: [
+              Positioned.fill(child: FinishWash(finish: bookFinish(p), strength: 0.26)),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(width: 120, child: PhaseBook(p: p)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          KChip(label: s.label, tone: s.tone, dot: true, small: true),
+                          KChip(label: levelLabel(t, p.level), tone: levelTone(p.level), small: true),
+                          if (p.elective) KChip(label: t('academy.elective'), small: true),
+                        ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                PositionedDirectional(
-                  start: 14,
-                  top: 14,
-                  end: 120,
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      _DarkChip(label: levelLabel(t, p.level), tone: levelTone(p.level)),
-                      if (p.elective) _DarkChip(label: t('academy.elective')),
-                    ],
-                  ),
-                ),
-                PositionedDirectional(
-                  end: 14,
-                  top: 14,
-                  child: _DarkChip(label: s.label, tone: s.tone, dot: true),
-                ),
-                PositionedDirectional(
-                  start: 16,
-                  bottom: 6,
-                  child: Text(
-                    p.order.toString().padLeft(2, '0'),
-                    textDirection: TextDirection.ltr,
-                    style: context.text.moneyXL.copyWith(
-                      fontSize: 44,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.92),
-                      shadows: const [Shadow(color: Color(0x66000000), blurRadius: 12)],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -451,42 +449,6 @@ class _PhaseCard extends StatelessWidget {
                 AcademyProgress(pctOf(p.done, p.total), up: done),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The chips over a cover photo (web `bg-black/60`): a dark plate with the tone's text colour.
-class _DarkChip extends StatelessWidget {
-  const _DarkChip({required this.label, this.tone = KChipTone.neutral, this.dot = false});
-  final String label;
-  final KChipTone tone;
-  final bool dot;
-
-  @override
-  Widget build(BuildContext context) {
-    final (_, fg, _) = context.k.chip(tone);
-    final color = tone == KChipTone.neutral ? Colors.white.withValues(alpha: 0.9) : Color.lerp(fg, Colors.white, 0.25)!;
-    return Container(
-      height: 22,
-      padding: const EdgeInsets.symmetric(horizontal: 9),
-      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(11)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (dot) ...[
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 5),
-          ],
-          Text(
-            label,
-            style: context.text.micro.copyWith(color: color, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -718,8 +680,7 @@ class _PracticeCard extends StatelessWidget {
       padding: EdgeInsets.zero,
       child: Stack(
         children: [
-          const Positioned.fill(child: PhaseCover(asset: 'assets/photos/trader.jpg', opacity: 0.3)),
-          const Positioned.fill(child: CoverWash(vertical: true, strength: 0.85)),
+          const Positioned.fill(child: FinishWash(finish: KCardFinish.standard, strength: 0.3)),
           Padding(
             padding: const EdgeInsets.all(22),
             child: Column(

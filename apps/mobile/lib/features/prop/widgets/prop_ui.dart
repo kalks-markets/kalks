@@ -813,7 +813,7 @@ class CertificateArt extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(height: 6, color: const Color(0xFFFF5A1F)),
+                  Container(height: 6, color: kEmber),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 56),

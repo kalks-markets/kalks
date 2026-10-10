@@ -15,6 +15,7 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/user.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import 'widgets/change_password_card.dart';
 import 'widgets/profile_ui.dart';
@@ -129,10 +130,13 @@ class ProfileScreen extends ConsumerWidget {
       (t('profile.field.registered'), Text(fmtDay(t.locale, me.createdAt))),
     ];
 
+    final hero = pageHero(context, ref, path: '/profile', title: t('profile.title'), lead: t('profile.liveSubtitle'));
     return KPageScroll(
       onRefresh: () => ref.read(authProvider.notifier).refreshMe(),
+      hero: hero,
+      padding: EdgeInsets.fromLTRB(KSpace.page, hero == null ? 12 : 18, KSpace.page, 24),
       children: [
-        PPageHeader(title: t('profile.title'), subtitle: t('profile.liveSubtitle')),
+        if (hero == null) PPageHeader(title: t('profile.title'), subtitle: t('profile.liveSubtitle')),
         // 2 identity
         KCard(
           hot: true,

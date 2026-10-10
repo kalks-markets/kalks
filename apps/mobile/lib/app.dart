@@ -7,12 +7,12 @@ import 'core/auth/auth_controller.dart';
 import 'core/config/app_config.dart';
 import 'core/lifecycle.dart';
 import 'core/notifications/notifications.dart';
-import 'core/theme_controller.dart';
 import 'i18n/i18n.dart';
 import 'router/router.dart';
 import 'ui/ui.dart';
 
-/// The app: one MaterialApp for the Client Area (pastel light by default) with Kalks Trader on its own themed route.
+/// The app: one MaterialApp for the Client Area (dark only, black + Kalks orange, like the web since 2026-10-10) with
+/// Kalks Trader on its own themed route.
 class KalksApp extends ConsumerStatefulWidget {
   const KalksApp({super.key});
 
@@ -49,7 +49,6 @@ class _KalksAppState extends ConsumerState<KalksApp> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     final bundle = ref.watch(i18nProvider);
     final t = bundle.t;
-    final mode = ref.watch(themeModeProvider);
     final brand = ref.watch(configProvider.select((c) => c.brand));
     final router = ref.watch(routerProvider);
     final banners = ref.watch(bannerProvider);
@@ -57,9 +56,9 @@ class _KalksAppState extends ConsumerState<KalksApp> with WidgetsBindingObserver
       title: 'Kalks',
       debugShowCheckedModeBanner: false,
       routerConfig: router,
-      theme: KTheme.client(Brightness.light, brand: brand),
+      theme: KTheme.client(Brightness.dark, brand: brand),
       darkTheme: KTheme.client(Brightness.dark, brand: brand),
-      themeMode: mode,
+      themeMode: ThemeMode.dark,
       locale: Locale(bundle.locale),
       supportedLocales: [for (final l in kLocales) Locale(l.code)],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,

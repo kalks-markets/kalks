@@ -31,7 +31,9 @@ void main() {
     // no email, password or code: straight to the Dashboard of the sample client
     expect(c.read(authProvider), isA<AuthSignedIn>());
     expect(find.byType(DashboardScreen), findsOneWidget);
-    expect(find.textContaining('Arjun'), findsWidgets);
+    // the sample client's money on Home (no greeting since 2026-10-10: the name is in the header's avatar)
+    expect(find.text('TOTAL BALANCE'), findsOneWidget);
+    expect(find.text('AM'), findsWidgets);
     // the demo strip over the header
     expect(find.text('Demo · Sample data'), findsOneWidget);
     expect(find.text('Exit demo'), findsOneWidget);

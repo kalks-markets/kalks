@@ -7,7 +7,7 @@
 // `chat` false (the broker switched the live chat off, module `support_chat`; web AskAi chat={false}): no way into
 // the chat or to a person from here (no chat button, no Continue in chat, no Talk to a person).
 // CONTRACT used by the Dashboard — keep these names and parameters:
-//   AskAi(chips:, chat:)              the pill at the top of the dashboard (opens the phone sheet)
+//   AskAi(chips:, chat:, hero:)       the pill (or, `hero`, the glass bar on Home's photo) that opens the phone sheet
 //   AiChip(key:, label:, question:, extra:)   a suggestion; `extra` shows under the question it asked
 //   AiFacts(title:, rows:)            the client's own figures under an answer
 //   AiLink(href:, label:)             a link to a Client Area page under an answer
@@ -153,13 +153,17 @@ class AiLink extends StatelessWidget {
   }
 }
 
-/// The Dashboard's AI entry on phones: a compact pill that opens the Ask Kalks AI sheet.
+/// The Dashboard's AI entry on phones: a compact pill that opens the Ask Kalks AI sheet; on Home's photo (`hero`), the
+/// slim glass bar with the suggestions under it (web AskAi hero, "like the Claude / ChatGPT home").
 class AskAi extends ConsumerStatefulWidget {
-  const AskAi({super.key, required this.chips, this.chat = true});
+  const AskAi({super.key, required this.chips, this.chat = true, this.hero = false});
   final List<AiChip> chips;
 
   /// The live chat is on: the sheet offers the way into it and to a person.
   final bool chat;
+
+  /// The glass bar over a photo, white text, the suggestions as glass pills.
+  final bool hero;
 
   @override
   ConsumerState<AskAi> createState() => _AskAiState();
@@ -207,9 +211,11 @@ class _AskAiState extends ConsumerState<AskAi> {
     if (mounted) openSupportChat(context);
   }
 
-  Future<void> _open() async {
+  Future<void> _open({AiChip? ask}) async {
     final e = _e;
     if (e == null) return;
+    // a suggestion on the photo asks at once; the sheet opens on its answer
+    if (ask != null) e.ask(ask.question ?? ask.label, chip: ask.key);
     await showKSheet<void>(
       context,
       builder: (ctx) => _AskAiSheet(e: e, chips: _chips, chat: widget.chat, onOpenChat: () => _openChat(ctx), onClose: () => Navigator.of(ctx).pop()),
@@ -226,6 +232,7 @@ class _AskAiState extends ConsumerState<AskAi> {
       listenable: e,
       builder: (context, _) {
         final label = t('dashboard.ai.title', {'name': e.botName});
+        if (widget.hero) return _hero(context, e, label);
         return KPressable(
           key: const ValueKey('ask-ai-pill'),
           onTap: _open,
@@ -292,6 +299,95 @@ class _AskAiState extends ConsumerState<AskAi> {
           ),
         );
       },
+    );
+  }
+
+  /// The glass bar on Home's photo: the spark, "Ask Kalks AI anything…" (or the last turn), the orange send disc; the
+  /// suggestions under it as glass pills that ask at once.
+  Widget _hero(BuildContext context, AskAiEngine e, String label) {
+    final t = context.t;
+    final k = context.k;
+    final hint = e.turns.isNotEmpty ? e.turns.last.text.replaceAll('**', '').replaceAll(RegExp(r'\s+'), ' ') : t('support.composer.ask', {'name': e.botName});
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        KPressable(
+          key: const ValueKey('ask-ai-pill'),
+          onTap: _open,
+          pressedScale: 0.99,
+          semanticLabel: label,
+          child: Container(
+            height: 54,
+            padding: const EdgeInsetsDirectional.fromSTEB(8, 6, 6, 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(27),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+              boxShadow: const [BoxShadow(color: Color(0x66000000), offset: Offset(0, 18), blurRadius: 40, spreadRadius: -18)],
+            ),
+            child: Row(
+              children: [
+                const AiSpark(size: 36),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    hint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.body.copyWith(color: Colors.white.withValues(alpha: 0.72), fontSize: 15),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: k.ember,
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: k.ember.withValues(alpha: 0.6), offset: const Offset(0, 8), blurRadius: 22, spreadRadius: -10)],
+                  ),
+                  child: Icon(LucideIcons.arrowUp, size: 19, color: k.onEmber),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (widget.chips.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 32,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.chips.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final c = widget.chips[i];
+                return KPressable(
+                  key: ValueKey('ask-ai-chip-${c.key}'),
+                  onTap: () => _open(ask: c),
+                  semanticLabel: c.label,
+                  child: Container(
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 13),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      c.label,
+                      style: context.text.label.copyWith(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

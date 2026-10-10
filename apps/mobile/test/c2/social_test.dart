@@ -49,10 +49,11 @@ void main() {
     expect(find.text('Discover masters'), findsWidgets);
     expect(find.text('Leaderboard'), findsOneWidget);
     final page = _page(DiscoverScreen);
-    await _scrollTo(tester, find.text('AlphaWave'), page);
+    // the board as visiting cards: the names in caps
+    await _scrollTo(tester, find.text('ALPHAWAVE'), page);
     // invite-only masters stay off the leaderboard
-    expect(find.text('Private Alpha'), findsNothing);
-    await tester.tap(find.text('AlphaWave'));
+    expect(find.text('PRIVATE ALPHA'), findsNothing);
+    await tester.tap(find.text('ALPHAWAVE'));
     await settle(tester);
 
     expect(find.byType(MasterProfileScreen), findsOneWidget);
@@ -117,7 +118,7 @@ void main() {
     expect(find.text('PAMM funds'), findsWidgets);
     final page = _page(PammScreen);
     // sorted by AUM: Nordic Swing first
-    await _scrollTo(tester, find.text('Nordic Swing Fund'), page);
+    await _scrollTo(tester, find.text('NORDIC SWING FUND'), page);
     await _scrollTo(tester, find.text('Invest').first, page);
     await tester.tap(find.text('Invest').first);
     await settle(tester);

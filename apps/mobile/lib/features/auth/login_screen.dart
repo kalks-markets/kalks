@@ -1,7 +1,9 @@
-// The signed-out welcome page (/login): the founder's picture full-bleed under the status bar, the headline over the
-// figure's head, and at the bottom the legal line, the two black pills (Log in opens the sign-in sheet, Open account
-// goes to sign-up) and "Try the demo". A white-label broker gets the same page on its own colour with its name as
-// the headline, without the picture or the demo. The route keeps its `next` (the router sends a fresh session there).
+// The signed-out welcome page (/login), in the Client Area's look since 2026-10-10 (web apps/crm/app/(auth): the
+// photo heroes, dark, orange buttons): Home's photo full-bleed at the top (the KALKS letters behind the figure),
+// fading into black, the white Kalks logo and the language over it; then, on black, the headline, the legal line, the
+// orange Log in (opens the sign-in sheet), Open account (sign-up) and "Try the demo". A white-label broker gets the
+// same page on its own colour with its name as the headline, without the photo or the demo. The route keeps its
+// `next` (the router sends a fresh session there).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -17,13 +19,11 @@ import '../../ui/ui.dart';
 import '../common/pickers.dart';
 import 'sign_in_sheet.dart';
 
-/// The picture's own amber (assets/photos/welcome.jpg: brighter in the middle, a little deeper at the sides); the page
-/// is this colour above the picture, which starts under the headline.
-const Color _amber = Color(0xFFEF9B00);
-const LinearGradient _amberFill = LinearGradient(colors: [Color(0xFFEB9800), Color(0xFFF29E00), Color(0xFFEB9800)]);
+/// The sign-in pages' photo (web AuthSection AUTH_PHOTO: Home's).
+const KHeroPhoto kAuthPhoto = KHeroPhoto.dashboard;
 
-/// The headline, the pills and the demo link in the picture's near-black.
-const Color _inkOnPhoto = Color(0xFF0C0C0F);
+/// The photo's own size (assets/heroes/dashboard.jpg), to lay it full width.
+const double _photoAspect = 1080 / 1240;
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -75,120 +75,144 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final cfg = ref.watch(configProvider);
     final kalks = cfg.tenantDefault;
     final mq = MediaQuery.of(context);
-    final h = mq.size.height;
-    // the broker's colour may be dark: then the texts and pills swap to white
-    final bg = kalks ? _amber : k.ember;
-    final onDark = !kalks && ThemeData.estimateBrightnessForColor(bg) == Brightness.dark;
-    final ink = onDark ? Colors.white : _inkOnPhoto;
-    final inkFg = onDark ? _inkOnPhoto : Colors.white;
+    final w = mq.size.width;
+    // a white-label broker: its colour, which may be light (then dark texts and pills)
+    final bg = kalks ? Colors.black : k.ember;
+    final onDark = kalks || ThemeData.estimateBrightnessForColor(bg) == Brightness.dark;
+    final ink = onDark ? Colors.white : const Color(0xFF0C0C0F);
     final demo = kalks && t.has('auth.demo.tryCta');
+    const white = Colors.white;
 
     return Scaffold(
       backgroundColor: bg,
       resizeToAvoidBottomInset: false,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
-        // dark status-bar icons over the bright picture
         value: KTheme.overlay(onDark ? Brightness.dark : Brightness.light),
         child: Stack(
           fit: StackFit.expand,
           children: [
             if (kalks) ...[
-              const DecoratedBox(decoration: BoxDecoration(gradient: _amberFill)),
-              // the picture starts under the headline (its figure's head is right at its top), its top edge fading
-              // into the same amber
+              // the photo full width from the very top; its foot is already black
               Positioned(
+                top: 0,
                 left: 0,
                 right: 0,
-                top: h * 0.34,
-                bottom: 0,
-                child: ShaderMask(
-                  shaderCallback: (r) => LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: const [Color(0x00FFFFFF), Color(0xFFFFFFFF)],
-                    stops: [0, (36 / r.height).clamp(0.0, 1.0)],
-                  ).createShader(r),
-                  blendMode: BlendMode.dstIn,
-                  child: Image.asset('assets/photos/welcome.jpg', fit: BoxFit.cover, alignment: Alignment.topCenter, filterQuality: FilterQuality.high),
+                height: w / _photoAspect,
+                child: Image.asset(kAuthPhoto.asset, fit: BoxFit.cover, alignment: Alignment.topCenter, excludeFromSemantics: true),
+              ),
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 140,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x99000000), Color(0x00000000)]),
+                    ),
+                  ),
                 ),
               ),
             ],
-            // a soft dark gradient behind the legal line and the buttons only
+            // the logo and the language over the photo
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: h * 0.42,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.black.withValues(alpha: 0), Colors.black.withValues(alpha: 0.22), Colors.black.withValues(alpha: 0.6)],
-                      stops: const [0, 0.45, 1],
+              top: mq.padding.top + 10,
+              left: 20,
+              right: 12,
+              child: Row(
+                children: [
+                  if (kalks) const KLogo(color: white),
+                  const Spacer(),
+                  LanguageButton(glass: onDark),
+                ],
+              ),
+            ),
+            // the headline in the space between the photo and the actions; the legal line and the buttons at the foot
+            Positioned.fill(
+              top: kalks ? (w / _photoAspect * 0.66).clamp(0.0, mq.size.height * 0.42) : mq.padding.top + 64,
+              child: LayoutBuilder(
+                builder: (context, c) => SingleChildScrollView(
+                  reverse: true,
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, mq.padding.bottom + 16),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: c.maxHeight - mq.padding.bottom - 16),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Spacer(),
+                          Text(
+                            kalks ? t('app.welcome.title') : cfg.tenantName,
+                            key: const ValueKey('welcome-title'),
+                            textAlign: TextAlign.center,
+                            style: context.text.largeTitle.copyWith(fontSize: 36, fontWeight: FontWeight.w800, height: 1.02, letterSpacing: -1.1, color: ink),
+                          ),
+                          if (kalks) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              t('auth.brand.body'),
+                              textAlign: TextAlign.center,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.text.callout.copyWith(color: white.withValues(alpha: 0.66), height: 1.45),
+                            ),
+                          ],
+
+                          const Spacer(),
+                          const SizedBox(height: 22),
+                          KRichText(
+                            t('auth.register.terms'),
+                            textAlign: TextAlign.center,
+                            style: context.text.footnote.copyWith(color: ink.withValues(alpha: 0.62), height: 1.4),
+                            tags: {
+                              'agreement': KTag(
+                                style: TextStyle(color: ink, fontWeight: FontWeight.w600),
+                              ),
+                              'risk': KTag(
+                                style: TextStyle(color: ink, fontWeight: FontWeight.w600),
+                              ),
+                              'privacy': KTag(
+                                style: TextStyle(color: ink, fontWeight: FontWeight.w600),
+                              ),
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          _Pill(
+                            label: t('trader.guest.logIn'),
+                            bg: kalks ? k.ember : ink,
+                            fg: kalks ? k.onEmber : bg,
+                            glow: kalks ? k.ember : null,
+                            onTap: _openSignIn,
+                          ),
+                          const SizedBox(height: 12),
+                          _Pill(
+                            label: t('trader.guest.openAccount'),
+                            bg: kalks ? white.withValues(alpha: 0.1) : ink,
+                            fg: kalks ? white : bg,
+                            border: kalks ? white.withValues(alpha: 0.22) : null,
+                            onTap: () => context.go('/register'),
+                          ),
+                          if (demo) ...[
+                            const SizedBox(height: 6),
+                            KPressable(
+                              onTap: _tryDemo,
+                              semanticLabel: t('auth.demo.tryCta'),
+                              child: SizedBox(
+                                height: 44,
+                                child: Center(
+                                  child: Text(
+                                    t('auth.demo.tryCta'),
+                                    style: context.text.headline.copyWith(fontSize: 15, fontWeight: FontWeight.w600, color: k.ember2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              left: 24,
-              right: 24,
-              top: h * 0.26,
-              child: Text(
-                kalks ? t('app.welcome.title') : cfg.tenantName,
-                key: const ValueKey('welcome-title'),
-                textAlign: TextAlign.center,
-                style: context.text.largeTitle.copyWith(fontSize: 42, fontWeight: FontWeight.w800, height: 1.0, letterSpacing: -1, color: ink),
-              ),
-            ),
-            PositionedDirectional(top: mq.padding.top + 8, end: 12, child: const LanguageButton()),
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: mq.padding.bottom + 16,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  KRichText(
-                    t('auth.register.terms'),
-                    textAlign: TextAlign.center,
-                    style: context.text.footnote.copyWith(color: Colors.white.withValues(alpha: 0.85), height: 1.4),
-                    tags: const {
-                      'agreement': KTag(
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                      ),
-                      'risk': KTag(
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                      ),
-                      'privacy': KTag(
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                      ),
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  _Pill(label: t('trader.guest.logIn'), bg: ink, fg: inkFg, onTap: _openSignIn),
-                  const SizedBox(height: 12),
-                  _Pill(label: t('trader.guest.openAccount'), bg: ink, fg: inkFg, onTap: () => context.go('/register')),
-                  if (demo) ...[
-                    const SizedBox(height: 6),
-                    KPressable(
-                      onTap: _tryDemo,
-                      semanticLabel: t('auth.demo.tryCta'),
-                      child: SizedBox(
-                        height: 44,
-                        child: Center(
-                          child: Text(
-                            t('auth.demo.tryCta'),
-                            style: context.text.headline.copyWith(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
               ),
             ),
           ],
@@ -200,9 +224,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
 /// The welcome page's 52 pt pill (taller than the app's compact buttons: the page has nothing else to press).
 class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.bg, required this.fg, required this.onTap});
+  const _Pill({required this.label, required this.bg, required this.fg, required this.onTap, this.border, this.glow});
   final String label;
   final Color bg, fg;
+  final Color? border, glow;
   final VoidCallback onTap;
 
   @override
@@ -215,7 +240,8 @@ class _Pill extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: fg.withValues(alpha: 0.12)),
+        border: Border.all(color: border ?? fg.withValues(alpha: 0.12)),
+        boxShadow: glow == null ? null : [BoxShadow(color: glow!.withValues(alpha: 0.55), offset: const Offset(0, 14), blurRadius: 34, spreadRadius: -14)],
       ),
       child: Text(
         label,

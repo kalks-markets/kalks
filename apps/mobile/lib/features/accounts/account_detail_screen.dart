@@ -19,6 +19,8 @@ import '../../core/models/account.dart';
 import '../../core/models/trading.dart';
 import '../../i18n/i18n.dart';
 import '../../ui/ui.dart';
+import '../common/hide_money.dart';
+import '../dashboard/widgets/accounts_panel.dart' show AccountCardVisual;
 import '../portfolio/widgets/activity_panels.dart';
 import '../portfolio/widgets/analytics_panel.dart';
 import 'account_actions.dart';
@@ -234,12 +236,15 @@ class _HeaderCard extends ConsumerWidget {
         ),
       ],
     );
+    final hidden = ref.watch(hideBalancesProvider);
     return KCard(
       padding: const EdgeInsets.all(20),
       hot: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // the account as its debit card (founder 2026-10-10)
+          if (!a.archived) ...[AccountCardVisual(account: a, hidden: hidden), const SizedBox(height: 18)],
           Wrap(
             spacing: 8,
             runSpacing: 6,

@@ -255,7 +255,30 @@ class _CertificateTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CertificateImage(code: c.code, semanticLabel: t('academy.cert.alt', {'n': c.phaseOrder}), radius: 0),
+          // the paper certificate (web CertificateCard); a tap opens the real one
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+            child: CertificateImage(
+              code: c.code,
+              semanticLabel: t('academy.cert.alt', {'n': c.phaseOrder}),
+              radius: 0,
+              face: KCertificateCard(
+                series: t.dyn('academy.book.series', fallback: 'Kalks Academy'),
+                heading: t.dyn('academy.cert.face.title', fallback: 'Certificate of Completion'),
+                certifies: t.dyn('academy.cert.face.certifies', fallback: 'This certifies that'),
+                name: c.learnerName,
+                text: t.dyn(
+                  'academy.cert.face.completed',
+                  fallback: 'has completed Phase {n}: {title}, with an exam score of {pct}%',
+                  vars: {'n': c.phaseOrder, 'title': c.phaseTitle, 'pct': c.scorePct},
+                ),
+                date: fmtDay(t, c.issuedAt),
+                dateLabel: t.dyn('academy.cert.face.issued', fallback: 'Date issued'),
+                code: c.code,
+                codeLabel: t.dyn('academy.cert.face.id', fallback: 'Certificate ID'),
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(18),
             child: Column(

@@ -11,6 +11,7 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/config/app_config.dart';
 import '../../core/format/format.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
 import 'social_api.dart';
 import 'widgets/bits.dart';
@@ -189,24 +190,43 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     final found = s.isEmpty ? rows : rows.where((m) => '${m.nickname} ${m.strategy}'.toLowerCase().contains(s)).toList();
     final anyHouse = rows.any((m) => m.house);
 
+    final hero = pageHero(
+      context,
+      ref,
+      path: '/social',
+      title: t('social.lb.title'),
+      lead: t('social.lb.subtitle'),
+      actions: [
+        KHeroButton(label: t('social.mySubscriptions'), icon: LucideIcons.repeat, onPressed: () => context.go('/social/copy')),
+        KHeroButton(label: t('social.becomeMaster'), icon: LucideIcons.crown, primary: true, onPressed: () => context.go('/social/master')),
+      ],
+    );
     final page = KPageScroll(
       onRefresh: () async {
         ref.invalidate(provider);
         await ref.read(provider.future).then((_) {}, onError: (Object _) {});
       },
-      padding: EdgeInsets.fromLTRB(KSpace.page, 12, KSpace.page, _picked.isNotEmpty ? 96 : 24),
+      hero: hero,
+      padding: EdgeInsets.fromLTRB(KSpace.page, hero == null ? 12 : 18, KSpace.page, _picked.isNotEmpty ? 96 : 24),
       children: [
-        KPageHeader(title: t('social.lb.title'), subtitle: Text(t('social.lb.subtitle'))),
-        const SizedBox(height: 14),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            KButton(label: t('social.mySubscriptions'), icon: LucideIcons.repeat, variant: KButtonVariant.surface, onPressed: () => context.go('/social/copy')),
-            KButton(label: t('social.becomeMaster'), icon: LucideIcons.crown, onPressed: () => context.go('/social/master')),
-          ],
-        ),
-        const SizedBox(height: 18),
+        if (hero == null) ...[
+          KPageHeader(title: t('social.lb.title'), subtitle: Text(t('social.lb.subtitle'))),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              KButton(
+                label: t('social.mySubscriptions'),
+                icon: LucideIcons.repeat,
+                variant: KButtonVariant.surface,
+                onPressed: () => context.go('/social/copy'),
+              ),
+              KButton(label: t('social.becomeMaster'), icon: LucideIcons.crown, onPressed: () => context.go('/social/master')),
+            ],
+          ),
+          const SizedBox(height: 18),
+        ],
         // hero
         KCard(
           child: Column(
@@ -348,7 +368,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                       ),
                     ),
                   for (var i = 0; i < found.length && i < _shown; i++) ...[
-                    if (i > 0) const KDivider(),
                     _MasterRow(
                       m: found[i],
                       rank: rows.indexOf(found[i]) + 1,
@@ -479,153 +498,92 @@ class _MasterRow extends StatelessWidget {
     final r = _retOf(m, period);
     final canInvest = m.fund != null && m.program != 'copy' && m.fund!.status == 'active';
     final canCopy = m.program != 'pamm' && !m.frozen;
-    return KPressable(
-      pressedScale: 0.99,
-      onTap: () => context.push('/social/masters/${m.id}'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    // the board as visiting cards (web leaderboard.tsx, founder 2026-10-10): black for copy masters, ivory for PAMM
+    final ivory = m.program == 'pamm';
+    final program = m.program == 'pamm' ? 'PAMM' : (m.program == 'both' && m.fund != null ? '${t('social.program.copy')} · PAMM' : t('social.program.copy'));
+    final risk = m.stats.riskScore.round().clamp(1, 10);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          KPressable(
+            pressedScale: 0.99,
+            semanticLabel: m.nickname,
+            onTap: () => context.push('/social/masters/${m.id}'),
+            child: KVisitingCard(
+              finish: ivory ? KVisitingFinish.ivory : KVisitingFinish.black,
+              kicker: '#$rank · $program',
+              name: m.nickname,
+              title: m.strategy,
+              badges: [if (m.house) t('social.house.badge'), if (m.program != 'pamm' && m.acceptingNew == false) t('social.lb.closedChip')],
+              // pick up to three to compare
+              corner: KPressable(
+                minSize: 36,
+                semanticLabel: picked ? t('social.compare.remove', {'name': m.nickname}) : t('social.compare.add'),
+                onTap: onPick,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: picked ? k.ember : (ivory ? Colors.black.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1)),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: picked ? k.ember : (ivory ? Colors.black.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.25))),
+                  ),
+                  child: picked ? Icon(LucideIcons.check, size: 15, color: k.onEmber) : null,
+                ),
+              ),
+              stats: [
+                (label: t('social.lb.col.return', {'period': t(_periodKey[period]!)}), value: pct(r, 1), tone: r > 0 ? 'up' : (r < 0 ? 'down' : null)),
+                (label: t('social.maxDd'), value: ddText(m.stats.maxDd), tone: m.stats.maxDd > 0 ? 'down' : null),
+                (label: t('social.followers'), value: '${m.stats.followers}', tone: null),
+                (label: t('social.risk'), value: '$risk/10', tone: null),
+              ],
+            ),
+          ),
+          if (m.house) ...[const SizedBox(height: 8), const HouseBadge()],
+          if (!readOnly && (canCopy || canInvest)) ...[
+            const SizedBox(height: 10),
             Row(
               children: [
-                KPressable(
-                  minSize: 36,
-                  semanticLabel: picked ? t('social.compare.remove', {'name': m.nickname}) : t('social.compare.add'),
-                  onTap: onPick,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: picked ? k.ember : k.surface2,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: picked ? k.ember : k.line),
-                    ),
-                    child: picked ? Icon(LucideIcons.check, size: 13, color: k.onEmber) : null,
-                  ),
-                ),
-                SizedBox(
-                  width: 26,
-                  child: Num('$rank', color: rank <= 3 && sort == 'return' ? k.gold : k.fg3, style: context.text.mono(12)),
-                ),
-                Expanded(
-                  child: MasterIdentity(
-                    nickname: m.nickname,
-                    size: 36,
-                    // the house disclosure is long: on its own line under the strategy, so it never squeezes it
-                    sub: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                m.strategy,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: context.text.footnote.copyWith(color: k.fg3, fontSize: 12),
-                              ),
-                            ),
-                            if (m.program == 'both' && m.fund != null) ...[
-                              const SizedBox(width: 5),
-                              const KChip(label: 'PAMM', tone: KChipTone.gold, small: true),
-                            ],
-                            if (m.program == 'pamm') ...[const SizedBox(width: 5), KChip(label: t('social.lb.pammOnly'), tone: KChipTone.gold, small: true)],
-                            if (m.program != 'pamm' && m.acceptingNew == false) ...[
-                              const SizedBox(width: 5),
-                              KChip(label: t('social.lb.closedChip'), tone: KChipTone.warn, small: true),
-                            ],
-                          ],
-                        ),
-                        if (m.house) ...[const SizedBox(height: 4), const HouseBadge()],
-                      ],
+                if (canCopy)
+                  Expanded(
+                    child: KButton(
+                      label: t('social.program.copy'),
+                      icon: LucideIcons.repeat,
+                      size: KButtonSize.sm,
+                      expand: true,
+                      variant: m.acceptingNew == false ? KButtonVariant.surface : KButtonVariant.ember,
+                      onPressed: m.acceptingNew == false ? null : () => showFollowSheet(context, master: m),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Num(pct(r, 1), color: toneColor(context, r), style: context.text.figure),
-                    Text(
-                      t('social.lb.col.return', {'period': t(_periodKey[period]!)}),
-                      style: context.text.caption.copyWith(color: k.fg3, fontWeight: FontWeight.w400, fontSize: 10.5),
+                if (canCopy && canInvest) const SizedBox(width: 8),
+                if (canInvest)
+                  Expanded(
+                    child: KButton(
+                      label: t('social.invest'),
+                      icon: LucideIcons.wallet,
+                      variant: KButtonVariant.surface,
+                      size: KButtonSize.sm,
+                      expand: true,
+                      onPressed: () => showInvestSheet(context, fundId: m.fund!.id),
                     ),
-                  ],
+                  ),
+                const SizedBox(width: 4),
+                KButton(
+                  label: t('common.details'),
+                  variant: KButtonVariant.ghost,
+                  size: KButtonSize.sm,
+                  onPressed: () => context.push('/social/masters/${m.id}'),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsetsDirectional.only(start: 46),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 10,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _Fig(label: t('social.maxDd'), value: ddText(m.stats.maxDd), color: m.stats.maxDd > 0 ? k.down : k.fg2),
-                        _Fig(label: t('social.aum'), value: compactUsd(m.stats.aum)),
-                        RiskBadge(risk: m.stats.riskScore),
-                      ],
-                    ),
-                  ),
-                  if (!readOnly) ...[
-                    if (canInvest) ...[
-                      const SizedBox(width: 6),
-                      KButton(
-                        label: t('social.invest'),
-                        variant: KButtonVariant.surface,
-                        size: KButtonSize.sm,
-                        onPressed: () => showInvestSheet(context, fundId: m.fund!.id),
-                      ),
-                    ],
-                    if (canCopy) ...[
-                      const SizedBox(width: 6),
-                      KButton(
-                        label: t('social.program.copy'),
-                        variant: KButtonVariant.outline,
-                        size: KButtonSize.sm,
-                        onPressed: m.acceptingNew == false ? null : () => showFollowSheet(context, master: m),
-                      ),
-                    ],
-                  ],
-                ],
-              ),
-            ),
           ],
-        ),
+        ],
       ),
     );
   }
-}
-
-class _Fig extends StatelessWidget {
-  const _Fig({required this.label, required this.value, this.color});
-  final String label;
-  final String value;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) => Text.rich(
-    TextSpan(
-      children: [
-        TextSpan(
-          text: '$label ',
-          style: TextStyle(color: context.k.fg3, fontWeight: FontWeight.w400),
-        ),
-        TextSpan(
-          text: value,
-          style: TextStyle(color: color ?? context.k.fg, fontWeight: FontWeight.w600, fontFeatures: kTabular),
-        ),
-      ],
-    ),
-    style: context.text.footnote.copyWith(fontSize: 12),
-  );
 }
 
 class _CompareBar extends StatelessWidget {

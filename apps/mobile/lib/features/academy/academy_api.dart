@@ -624,22 +624,16 @@ List<TrackTally> trackTallies(Iterable<AcademySection> sections) {
 /// Distinct tracks across sections, in display order.
 List<String> tracksOf(Iterable<AcademySection> sections) => [for (final x in trackTallies(sections)) x.track];
 
-/// Cover photo per phase (by order), the web's PHASE_COVER.
-const List<String> _covers = [
-  'assets/photos/finance.jpg',
-  'assets/photos/trading-screen.jpg',
-  'assets/photos/charts.jpg',
-  'assets/photos/nyc.jpg',
-  'assets/photos/analytics.jpg',
-  'assets/photos/dashboard.jpg',
-  'assets/photos/gold.jpg',
-  'assets/photos/skyscrapers.jpg',
-  'assets/photos/stock-market.jpg',
-];
-
-String coverOf(int order) {
-  final n = _covers.length;
-  return _covers[(((order - 1) % n) + n) % n];
+/// The finish of a phase's book (web academy/live/book.tsx FINISH, the account cards' finishes): Beginner orange,
+/// Intermediate copper, Advanced black, Professional gold; electives plum.
+KCardFinish bookFinish(AcademyPhase p) {
+  if (p.elective) return KCardFinish.options;
+  return switch (p.level) {
+    'Intermediate' => KCardFinish.cent,
+    'Advanced' => KCardFinish.pro,
+    'Professional' => KCardFinish.vip,
+    _ => KCardFinish.standard,
+  };
 }
 
 /// "45 min", "2h", "2h 15m".

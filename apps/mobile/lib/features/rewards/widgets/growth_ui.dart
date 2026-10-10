@@ -703,9 +703,13 @@ class GrowthFallback extends StatelessWidget {
     this.heights = const [300, 150, 150],
     this.banner = true,
     this.leading,
+    this.hero,
   });
   final String title, subtitle;
   final Widget? leading;
+
+  /// The page's photo hero (the section's first page): the title is on the photo, not in the page.
+  final KPageHero? hero;
   final Object? error;
   final VoidCallback onRetry;
   final List<double> heights;
@@ -716,10 +720,10 @@ class GrowthFallback extends StatelessWidget {
     final t = context.t;
     return KPageScroll(
       onRefresh: () async => onRetry(),
+      hero: hero,
       children: [
         ?leading,
-        KPageHeader(title: title, subtitle: Text(subtitle)),
-        const SizedBox(height: 20),
+        if (hero == null) ...[KPageHeader(title: title, subtitle: Text(subtitle)), const SizedBox(height: 20)] else const SizedBox(height: 6),
         if (banner) const BannerSlot(placement: 'rewards'),
         if (error != null)
           KCard(

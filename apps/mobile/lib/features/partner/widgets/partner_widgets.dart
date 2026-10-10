@@ -103,10 +103,21 @@ class PartnerLoadProblem extends StatelessWidget {
 
 /// A page while its first load is in flight or failed (web PageFallback): the header, then the skeleton or the problem.
 class PartnerPageFallback extends StatelessWidget {
-  const PartnerPageFallback({super.key, required this.title, required this.subtitle, this.error, required this.onRetry, this.skeleton = const [180, 150, 260]});
+  const PartnerPageFallback({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    this.error,
+    required this.onRetry,
+    this.skeleton = const [180, 150, 260],
+    this.hero,
+  });
   final String title, subtitle;
   final Object? error;
   final VoidCallback onRetry;
+
+  /// The page's photo hero (the section's first page): the title is on the photo, not in the page.
+  final KPageHero? hero;
 
   /// Heights of the skeleton cards.
   final List<double> skeleton;
@@ -114,9 +125,9 @@ class PartnerPageFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) => KPageScroll(
     onRefresh: () async => onRetry(),
+    hero: hero,
     children: [
-      KPageHeader(title: title, subtitle: Text(subtitle)),
-      const SizedBox(height: 20),
+      if (hero == null) ...[KPageHeader(title: title, subtitle: Text(subtitle)), const SizedBox(height: 20)] else const SizedBox(height: 6),
       if (error != null)
         PartnerLoadProblem(error: error!, onRetry: onRetry)
       else

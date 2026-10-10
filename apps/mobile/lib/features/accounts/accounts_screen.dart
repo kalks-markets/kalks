@@ -1,10 +1,12 @@
 // Accounts › My accounts. Port of the phone web page /accounts (apps/crm/components/trading/accounts-page.tsx
 // LiveAccountsPage), in its phone order:
-//   1 header (Trading accounts) + Open account
-//   2 KPI cards: live equity, free margin, accounts, demo accounts (stacked on phones)
-//   3 My accounts: Live / Demo / Archived (?tab=), the account rows (by product, CFD accounts then Options accounts,
-//     once the client holds an Options account), "Open a new … account"
-//   4 Account types (the broker's groups -> /accounts/new?group=; Options types only while the module is on)
+//   1 the photo hero (Trading accounts, the short line, Open account), page_hero.dart; a white-label broker gets the
+//     page header instead
+//   2 the figures as one glass strip (web .k-kpi row): live equity, free margin, accounts, demo accounts
+//   3 My accounts: Live / Demo / Archived (?tab=), each account as a debit card with its actions (by product, CFD
+//     accounts then Options accounts, once the client holds an Options account), "Open a new … account"
+//   4 Account types as card faces (the broker's groups -> /accounts/new?group=; Options types only while the module
+//     is on)
 // `GET trading/accounts` every 5 s (web useAccounts), `GET trading/groups` once.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,7 +20,9 @@ import '../../core/format/format.dart';
 import '../../core/models/account.dart';
 import '../../data/client_data.dart';
 import '../../i18n/i18n.dart';
+import '../../shell/page_hero.dart';
 import '../../ui/ui.dart';
+import '../dashboard/widgets/balance_strip.dart';
 import 'accounts_data.dart';
 import 'widgets/account_bits.dart';
 import 'widgets/account_rows.dart';
@@ -87,7 +91,6 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
       _ => totals.live,
     };
     final refills = totals.demo.fold<int>(0, (s, a) => s + refillsLeft(a));
-    Widget skeletonValue() => const KSkeleton(width: 128, height: 30);
 
     // 3. My accounts
     Widget accountsCard;
@@ -118,7 +121,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
             const SizedBox(height: 14),
             KSegmented<String>(values: tabs, labels: [for (final v in tabs) label(v)], selected: tab, onChanged: (v) => setState(() => _tab = v)),
             const SizedBox(height: 14),
-            if (loading) ...[const KSkeleton(height: 138, radius: 18), const SizedBox(height: 12), const KSkeleton(height: 138, radius: 18)],
+            if (loading) ...[const AspectRatio(aspectRatio: 1.586, child: KSkeleton(radius: 22)), const SizedBox(height: 12)],
             if (!loading && list.isEmpty)
               tab == 'archived'
                   ? KEmptyState(compact: true, art: KIllustrationName.welcome, title: t('accounts.archived.none'), text: t('accounts.archived.noneText'))
@@ -136,7 +139,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   ArchivedAccountRow(key: ValueKey('arch-${a.login}'), account: a, onChanged: _reload)
                 else
                   LiveAccountRow(key: ValueKey('row-${a.login}'), account: a, onChanged: _reload),
-                const SizedBox(height: 12),
+                SizedBox(height: tab == 'archived' ? 12 : 26),
               ],
             ],
             if (!readOnly && tab != 'archived') _OpenNewLink(demo: tab == 'demo'),
@@ -145,71 +148,70 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
       );
     }
 
+    final openHref = '/accounts/new${tab == 'demo' ? '?type=demo' : ''}';
+    final hero = pageHero(
+      context,
+      ref,
+      path: '/accounts',
+      title: t('accounts.list.title'),
+      lead: t('accounts.list.subtitle'),
+      actions: [
+        if (!readOnly) KHeroButton(label: t('accounts.list.openAccount'), icon: LucideIcons.plus, primary: true, onPressed: () => context.go(openHref)),
+      ],
+    );
+    Widget skeleton() => const KSkeleton(width: 110, height: 26);
+
     return KPageScroll(
       onRefresh: _refresh,
+      hero: hero,
+      padding: const EdgeInsets.fromLTRB(KSpace.page, 18, KSpace.page, 24),
       children: [
-        // 1. header
-        KPageHeader(title: t('accounts.list.title'), subtitle: Text(t('accounts.list.subtitle'))),
-        if (!readOnly) ...[
-          const SizedBox(height: 16),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: KButton(
-              label: t('accounts.list.openAccount'),
-              icon: LucideIcons.plus,
-              size: KButtonSize.lg,
-              onPressed: () => context.go('/accounts/new${tab == 'demo' ? '?type=demo' : ''}'),
+        // 1. header (no photo: a white-label broker)
+        if (hero == null) ...[
+          KPageHeader(title: t('accounts.list.title'), subtitle: Text(t('accounts.list.subtitle'))),
+          if (!readOnly) ...[
+            const SizedBox(height: 16),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: KButton(label: t('accounts.list.openAccount'), icon: LucideIcons.plus, size: KButtonSize.lg, onPressed: () => context.go(openHref)),
             ),
-          ),
+          ],
+          const SizedBox(height: 20),
         ],
-        const SizedBox(height: 20),
-        // 2. KPIs
-        KKpiCard(
-          label: t('accounts.kpi.liveEquity'),
-          icon: LucideIcons.trendingUp,
-          value: loading ? skeletonValue() : KMoney(totals.equity, style: context.text.moneyL),
-          chip: KChip(
-            label: totals.live.isNotEmpty ? t('accounts.kpi.balanceChip', {'amount': '\$${Fmt.number(totals.balance)}'}) : t('accounts.empty.noLive'),
-            small: true,
-          ),
-          onTap: () => context.go('/portfolio'),
-        ),
-        const SizedBox(height: 12),
-        KKpiCard(
-          label: t('accounts.label.freeMargin'),
-          icon: LucideIcons.shieldCheck,
-          value: loading ? skeletonValue() : KMoney(totals.freeMargin, style: context.text.moneyL),
-          chip: KChip(
-            label: totals.equity > 0
-                ? t('accounts.kpi.ofEquity', {'pct': (totals.freeMargin / totals.equity * 100).toStringAsFixed(1)})
-                : t('accounts.kpi.liveUsd'),
-            small: true,
-          ),
-        ),
-        const SizedBox(height: 12),
-        KKpiCard(
-          label: t('common.accounts'),
-          icon: LucideIcons.layers,
-          value: Text(loading ? '—' : '${active.length}', style: context.text.moneyL),
-          footer: Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              KChip(label: t('accounts.kpi.liveCount', {'count': totals.live.length}), tone: KChipTone.ember, small: true),
-              KChip(label: t('accounts.kpi.demoCount', {'count': totals.demo.length}), tone: KChipTone.gold, small: true),
-              KChip(label: t('accounts.kpi.openPositions', {'count': totals.positions}), small: true),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        KKpiCard(
-          label: t('accounts.kpi.demoAccounts'),
-          icon: LucideIcons.flaskConical,
-          value: Text(loading ? '—' : '${totals.demo.length}', style: context.text.moneyL),
-          footer: Text(
-            totals.demo.isNotEmpty ? t('accounts.kpi.refillsLeftToday', {'count': refills}) : t('accounts.kpi.practise'),
-            style: context.text.caption.copyWith(color: k.fg2, fontWeight: FontWeight.w400),
-          ),
+        // 2. the figures
+        BalanceStrip(
+          cells: [
+            StripCell(
+              key: 'liveEquity',
+              secret: true,
+              label: t('accounts.kpi.liveEquity'),
+              value: (s) => loading ? skeleton() : KMoney(totals.equity, style: s),
+              sub: totals.live.isNotEmpty ? t('accounts.kpi.balanceChip', {'amount': '\$${Fmt.number(totals.balance)}'}) : t('accounts.empty.noLive'),
+              href: '/portfolio',
+            ),
+            StripCell(
+              key: 'freeMargin',
+              secret: true,
+              label: t('accounts.label.freeMargin'),
+              value: (s) => loading ? skeleton() : KMoney(totals.freeMargin, style: s),
+              sub: totals.equity > 0
+                  ? t('accounts.kpi.ofEquity', {'pct': (totals.freeMargin / totals.equity * 100).toStringAsFixed(1)})
+                  : t('accounts.kpi.liveUsd'),
+            ),
+            StripCell(
+              key: 'accounts',
+              label: t('common.accounts'),
+              value: (s) => Text(loading ? '—' : '${active.length}', style: s),
+              sub:
+                  '${t('accounts.kpi.liveCount', {'count': totals.live.length})} · ${t('accounts.kpi.demoCount', {'count': totals.demo.length})} · ${t('accounts.kpi.openPositions', {'count': totals.positions})}',
+            ),
+            StripCell(
+              key: 'demoAccounts',
+              label: t('accounts.kpi.demoAccounts'),
+              value: (s) => Text(loading ? '—' : '${totals.demo.length}', style: s),
+              sub: totals.demo.isNotEmpty ? t('accounts.kpi.refillsLeftToday', {'count': refills}) : t('accounts.kpi.practise'),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         // 3. My accounts
