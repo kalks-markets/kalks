@@ -46,7 +46,6 @@ pub const MODULES: &[ModuleDef] = &[
     ModuleDef { key: "content", label: "Content & Academy", description: "Academy, news, legal, templates" },
     ModuleDef { key: "marketing", label: "Marketing & rewards", description: "Bonuses, contests, promo codes, notifications" },
     ModuleDef { key: "support", label: "Support desk", description: "Tickets, canned replies, knowledge base" },
-    ModuleDef { key: "circle", label: "Kalks Circle", description: "Community moderation, rules, announcements, chat access" },
     ModuleDef { key: "reports", label: "Analytics & reports", description: "Broker P&L, funnels, regulatory reports" },
     ModuleDef { key: "audit", label: "Audit & sessions", description: "Audit log, live sessions" },
     ModuleDef { key: "security", label: "Security", description: "IP allow-list for the Back Office" },
@@ -110,11 +109,6 @@ pub const PERMS: &[PermDef] = &[
     PermDef { key: "notifications.write", module: "marketing", action: "create", label: "Send client notifications" },
     PermDef { key: "support.read", module: "support", action: "view", label: "View tickets" },
     PermDef { key: "support.write", module: "support", action: "edit", label: "Reply, assign, close tickets" },
-    PermDef { key: "circle.read", module: "circle", action: "view", label: "View the Circle moderation queue, reports and members" },
-    PermDef { key: "circle.moderate", module: "circle", action: "edit", label: "Remove content, warn, ban and shadow-hide members, resolve reports" },
-    PermDef { key: "circle.content", module: "circle", action: "create", label: "Feature posts and creators, announcements, topics, team / mentor badges" },
-    PermDef { key: "circle.admin", module: "circle", action: "approve", label: "Keyword and link rules, Circle settings, legal chat requests, audit" },
-    PermDef { key: "circle.chat_access", module: "circle", action: "export", label: "Open a reported chat or a legal request (time-limited, audited)" },
     PermDef { key: "reports.read", module: "reports", action: "view", label: "View reports" },
     PermDef { key: "reports.export", module: "reports", action: "export", label: "Export reports" },
     PermDef { key: "audit.read", module: "audit", action: "view", label: "View audit log" },
@@ -240,16 +234,16 @@ pub fn preset_perms(key: &str) -> Option<Vec<&'static str>> {
         "compliance" => vec![
             "stats.read", "clients.read", "clients.export", "clients.restrict", "clients.block", "clients.impersonate", "kyc.read", "kyc.review", "audit.read", "audit.export", "sessions.read", "spreads.read",
             "dealing.read", "accounts.read", "accounts.close", "accounts.close.approve", "finance.read", "partners.read", "social.read", "social.approve", "prop.read", "algo.read",
-            "content.read", "marketing.read", "support.read", "reports.read", "circle.read", "circle.moderate", "circle.chat_access",
+            "content.read", "marketing.read", "support.read", "reports.read",
         ],
         "support" => vec![
             "stats.read", "clients.read", "dealing.read", "accounts.read", "partners.read", "social.read", "prop.read", "algo.read", "content.read",
-            "marketing.read", "support.read", "support.write", "circle.read", "circle.moderate",
+            "marketing.read", "support.read", "support.write",
         ],
         "sales" => vec!["stats.read", "clients.read", "partners.read", "content.read", "marketing.read", "support.read", "reports.read"],
         "partner_manager" => vec!["stats.read", "clients.read", "partners.read", "partners.write", "partners.export", "content.read", "marketing.read", "reports.read"],
-        "marketing" => vec!["stats.read", "content.read", "content.write", "marketing.read", "marketing.write", "notifications.write", "reports.read", "circle.read", "circle.content"],
-        "viewer" => vec!["stats.read", "spreads.read", "dealing.read", "accounts.read", "partners.read", "social.read", "prop.read", "algo.read", "content.read", "marketing.read", "circle.read"],
+        "marketing" => vec!["stats.read", "content.read", "content.write", "marketing.read", "marketing.write", "notifications.write", "reports.read"],
+        "viewer" => vec!["stats.read", "spreads.read", "dealing.read", "accounts.read", "partners.read", "social.read", "prop.read", "algo.read", "content.read", "marketing.read"],
         "options_risk" => vec![
             "stats.read", "clients.read", "dealing.read", "accounts.read", "options.read", "options.config", "options.dealing", "options.settle",
         ],
@@ -455,7 +449,6 @@ mod tests {
             "social.read", "social.write", "social.approve", "prop.read", "prop.write", "prop.approve", "algo.read", "algo.write", "algo.settings",
             "content.read", "content.write", "support.read", "support.write", "notifications.write", "marketing.read", "marketing.write",
             "options.read", "options.config", "options.dealing", "options.settle",
-            "circle.read", "circle.moderate", "circle.content", "circle.admin", "circle.chat_access",
         ] {
             assert!(perm(k).is_some(), "missing {k}");
         }
@@ -483,11 +476,6 @@ mod tests {
             assert!(has(r, "accounts.close") && has(r, "accounts.close.approve"), "{r}");
         }
         assert!(!has("dealer", "accounts.close.approve") && !has("support", "accounts.close") && !has("finance", "accounts.close"));
-        // Kalks Circle: compliance opens reported chats, support moderates, marketing features, only admins set rules
-        assert!(has("compliance", "circle.chat_access") && has("compliance", "circle.moderate") && !has("compliance", "circle.admin"));
-        assert!(has("support", "circle.moderate") && !has("support", "circle.chat_access"));
-        assert!(has("marketing", "circle.content") && !has("marketing", "circle.moderate"));
-        assert!(has("admin", "circle.admin") && has("viewer", "circle.read") && !has("viewer", "circle.moderate"));
     }
 
     #[test]

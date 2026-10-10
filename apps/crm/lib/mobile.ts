@@ -30,7 +30,7 @@ const DEVICE_RE = /^[A-Za-z0-9_-]{16,128}$/;
 const VERSION_RE = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:[-+][0-9A-Za-z.+-]{1,32})?$/;
 
 /** Existing cookie BFF families the app uses through a rewrite (first path segment under /api). */
-export const REWRITE_FAMILIES = ["trading", "wallet", "news", "notifications", "kyc", "security", "support", "status", "growth", "partner", "social", "prop", "academy", "reports", "algo", "suitability", "circle"] as const;
+export const REWRITE_FAMILIES = ["trading", "wallet", "news", "notifications", "kyc", "security", "support", "status", "growth", "partner", "social", "prop", "academy", "reports", "algo", "suitability"] as const;
 const REWRITES = new Set<string>(REWRITE_FAMILIES);
 /** Cookie auth routes that answer without a session in the body: served through a rewrite as well. */
 const AUTH_REWRITES = new Set(["heartbeat", "impersonation", "marketing"]);
@@ -168,9 +168,7 @@ export type ServiceUrls = {
   /** market-data REST (candles, quotes, symbols) and its quote stream (no auth; `?group=<spreadGroup>`). */
   marketData: { http: string; ws: string };
   /** WebSocket streams that need a one-time ticket: `<url>?ticket=<ticket>`. */
-  streams: { engine: string; options: string; support: string; circle: string };
-  /** Direct resumable uploads (Kalks Circle videos): `PUT <url>/<id>?token=` with `Upload-Offset`. */
-  uploads: { circle: string };
+  streams: { engine: string; options: string; support: string };
 };
 
 /**
@@ -188,8 +186,6 @@ export function serviceUrls(origin: URL, opts: { tradeUrl?: string | null } = {}
   const tradingUrl = trim(env.TRADING_URL || "http://127.0.0.1:8090");
   const optionsUrl = trim(env.OPTIONS_URL || "http://127.0.0.1:8104");
   const supportUrl = trim(env.SUPPORT_URL || "http://127.0.0.1:8100");
-  const circleUrl = trim(env.CIRCLE_URL || "http://127.0.0.1:8105");
-  const appLocal = isLoopbackHost(new URL(app).host);
   const termHost = new URL(terminal).host;
   const local = isLoopbackHost(termHost);
   return {
@@ -199,10 +195,8 @@ export function serviceUrls(origin: URL, opts: { tradeUrl?: string | null } = {}
     streams: {
       engine: env.MOBILE_ENGINE_STREAM_URL || (local ? `${toWs(tradingUrl)}/v1/terminal/stream` : `${toWs(new URL(terminal).origin)}/engine/stream`),
       options: env.MOBILE_OPTIONS_STREAM_URL || (local ? `${toWs(optionsUrl)}/v1/options/stream` : `${toWs(new URL(terminal).origin)}/options/stream`),
-      support: env.MOBILE_SUPPORT_STREAM_URL || env.SUPPORT_STREAM_URL || (appLocal ? `${toWs(supportUrl)}/v1/stream` : `${toWs(new URL(app).origin)}/support/stream`),
-      circle: env.MOBILE_CIRCLE_STREAM_URL || env.CIRCLE_STREAM_URL || (appLocal ? `${toWs(circleUrl)}/v1/stream` : `${toWs(new URL(app).origin)}/circle/stream`),
+      support: env.MOBILE_SUPPORT_STREAM_URL || env.SUPPORT_STREAM_URL || (isLoopbackHost(new URL(app).host) ? `${toWs(supportUrl)}/v1/stream` : `${toWs(new URL(app).origin)}/support/stream`),
     },
-    uploads: { circle: env.MOBILE_CIRCLE_UPLOAD_URL || (appLocal ? `${circleUrl}/v1/upload` : `${new URL(app).origin}/circle/upload`) },
   };
 }
 

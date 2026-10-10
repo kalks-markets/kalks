@@ -158,6 +158,5 @@ const shell = {
   "module.markets": "Markets",
   "module.ai": "Kalks AI",
   "module.support_chat": "Support chat",
-  "module.circle": "Kalks Circle",
 };
 export default shell;

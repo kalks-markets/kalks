@@ -1,7 +1,7 @@
 //! Per-tenant runtime configuration (D112, D146): module toggles, feature flags and maintenance mode.
 //!
 //! * Modules (copy trading, PAMM, MAM, prop, IB, algo, public API, academy, wallet, rewards, options, news,
-//!   calendar, markets, AI, support chat, Kalks Circle) are switched per tenant by the Platform Owner only. Off = hidden in the
+//!   calendar, markets, AI, support chat) are switched per tenant by the Platform Owner only. Off = hidden in the
 //!   Client Area, Kalks Trader, the app and the Back Office nav of the tenant's staff; the BFFs and the services
 //!   refuse its client calls with 403 `module_disabled` (they read the effective map from
 //!   `/v1/internal/tenants/{slug}`, internal.rs, or `tenant_features` directly).
@@ -52,7 +52,6 @@ pub const BUILTIN_FEATURES: &[FeatureDef] = &[
     FeatureDef { key: "ai", kind: "module", name: "AI assistants", description: "Ask Kalks AI and AI Trader.", default_enabled: true },
     FeatureDef { key: "mam", kind: "module", name: "MAM", description: "Multi-account managers and the accounts they manage.", default_enabled: true },
     FeatureDef { key: "support_chat", kind: "module", name: "Support chat", description: "Live chat with the support bot and team. Email support stays.", default_enabled: true },
-    FeatureDef { key: "circle", kind: "module", name: "Kalks Circle", description: "The trader community: profiles, posts, stories, chat, rooms and video.", default_enabled: true },
     FeatureDef { key: "client_registration", kind: "flag", name: "New client sign-ups", description: "Visitors can open an account. Off: existing clients can still sign in.", default_enabled: true },
     FeatureDef { key: "google_login", kind: "flag", name: "Continue with Google", description: "Clients can sign in and sign up with Google.", default_enabled: true },
     FeatureDef { key: "trade_sharing", kind: "flag", name: "Trade share links", description: "Clients can publish read-only links to their trades.", default_enabled: true },

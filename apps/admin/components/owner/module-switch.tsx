@@ -25,7 +25,6 @@ export const MODULE_LOSES: Record<string, string> = {
   markets: "The Markets page, movers and heat map on the dashboard.",
   ai: "Ask Kalks AI on the dashboard and AI Trader in Kalks Trader and the app.",
   support_chat: "The live support chat with the bot and agents (the Support page keeps email).",
-  circle: "Kalks Circle for this broker's clients: feed, profiles, stories, chat and rooms (their content stays; the shared community keeps running).",
 };
 
 type Pending = { tenantId: number; tenantName: string; key: string; name: string; value: boolean | null; effective: boolean };
