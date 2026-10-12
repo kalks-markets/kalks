@@ -529,6 +529,13 @@
           askLine = main.createPriceLine({ price: 0, color: pal.up, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "", axisLabelColor: pal.up, axisLabelTextColor: "#fff" });
           bid = 0;
           ask = 0;
+          if (gl.raf) cancelAnimationFrame(gl.raf);
+          gl.bid = 0;
+          gl.ask = 0;
+          gl.close = NaN;
+          gl.bar = null;
+          gl.raf = 0;
+          gl.at = 0;
           data = [];
           layer = KI
             ? KI.createIndicatorLayer({ chart, bars: () => data, step, digits, palette: pal, alive: () => a.v, onChange: scheduleLegend })
@@ -551,10 +558,67 @@
           legend();
         }
 
+        /* Glide (founder 2026-10-12): the bid / ask lines, their axis labels and the forming candle's close slide to each
+           new price over ~0.1 s instead of jumping, so the market reads as live. Only the drawing glides: bid, ask and
+           data stay the real prices (stops, handles, legend and indicators use them). Reduced motion: snap. */
+        const REDUCE = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+        const TAU = 90;
+        const gl = { bid: 0, ask: 0, close: NaN, bar: null, raf: 0, at: 0 };
+        function glideBar() {
+          const b = gl.bar;
+          if (!b || !data.length || b.time !== data[data.length - 1].time) return;
+          const cl = Number.isFinite(gl.close) ? gl.close : b.close;
+          main.update(mainPoint({ time: b.time, open: b.open, high: Math.max(b.high, cl), low: Math.min(b.low, cl), close: cl, volume: b.volume }));
+        }
+        function glideFrame(now) {
+          gl.raf = 0;
+          if (!bidLine) return;
+          const dt = gl.at ? Math.min(64, now - gl.at) : 16;
+          gl.at = now;
+          const k = 1 - Math.exp(-dt / TAU);
+          const eps = 0.05 / pow();
+          let moving = false;
+          const ease = (cur, to) => {
+            const next = cur + (to - cur) * k;
+            if (Math.abs(to - next) <= eps) return to;
+            moving = true;
+            return next;
+          };
+          const pb = gl.bid, pa = gl.ask;
+          gl.bid = ease(gl.bid, bid);
+          gl.ask = ease(gl.ask, ask);
+          if (gl.bid !== pb) bidLine.applyOptions({ price: gl.bid });
+          if (gl.ask !== pa) askLine.applyOptions({ price: gl.ask });
+          if (gl.bar && Number.isFinite(gl.close) && gl.close !== gl.bar.close) {
+            gl.close = ease(gl.close, gl.bar.close);
+            glideBar();
+          }
+          if (moving) gl.raf = requestAnimationFrame(glideFrame);
+          else gl.at = 0;
+        }
+        function glideKick() {
+          // the first price of a chart, reduced motion or a hidden page: no slide, draw it where it is
+          if (REDUCE || document.hidden || !(gl.bid > 0) || !(gl.ask > 0)) {
+            gl.bid = bid;
+            gl.ask = ask;
+            if (bidLine) {
+              bidLine.applyOptions({ price: gl.bid });
+              askLine.applyOptions({ price: gl.ask });
+            }
+            if (gl.bar) gl.close = gl.bar.close;
+            glideBar();
+            return;
+          }
+          if (!gl.raf) gl.raf = requestAnimationFrame(glideFrame);
+        }
+
         function drawAll() {
           main.setData(data.map(mainPoint));
           vol.setData(data.map(volPoint));
           if (layer) layer.reset();
+          // a full redraw puts the newest bar at its real close; the glide continues from there
+          gl.bar = data.length ? data[data.length - 1] : null;
+          gl.close = gl.bar ? gl.bar.close : NaN;
         }
 
         function setBars(bars) {
@@ -595,7 +659,12 @@
           if (b.time < last.time) return;
           if (b.time > last.time) data.push(b);
           else data[data.length - 1] = b;
-          main.update(mainPoint(b));
+          // a new bar starts from its open; the same bar glides on from where its close is drawn now
+          const same = gl.bar && gl.bar.time === b.time;
+          gl.close = same && Number.isFinite(gl.close) ? gl.close : b.open;
+          gl.bar = b;
+          glideBar();
+          glideKick();
           vol.update(volPoint(b));
           if (layer) layer.update();
           if (hover < 0) scheduleLegend();
@@ -604,10 +673,9 @@
 
         function setQuote(b, a) {
           if (!bidLine) return;
-          if (b !== bid) bidLine.applyOptions({ price: b });
-          if (a !== ask) askLine.applyOptions({ price: a });
           bid = b;
           ask = a;
+          glideKick();
         }
 
         function setIndicators(list) {

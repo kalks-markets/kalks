@@ -306,8 +306,64 @@ export function useChartEngine(
       legendRef.current(legendAt(i));
     });
 
+    /* ---- glide (founder 2026-10-12): the bid / ask lines, their axis labels and the forming candle's close slide to
+       each new price over ~0.1 s instead of jumping, so the market reads as live. Only the drawing glides: the data,
+       the indicators, the legend and every order use the real prices at once. Reduced motion or a hidden tab: snap. ---- */
+    const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const eps = 0.05 / 10 ** inst.digits;
+    const TAU = 90; // ms: about 95% of the way in a quarter of a second
+    const g = { bid: snap.bid, ask: snap.ask, tBid: snap.bid, tAsk: snap.ask, close: NaN, bar: null as Candle | null, raf: 0, at: 0 };
+    const drawBar = () => {
+      const b = g.bar;
+      // only the newest bar glides (a reload may have replaced the data under it)
+      if (!b || b.time !== data[data.length - 1]?.time) return;
+      const cl = Number.isFinite(g.close) ? g.close : b.close;
+      main.update(mainPoint({ ...b, close: cl, high: Math.max(b.high, cl), low: Math.min(b.low, cl) }));
+    };
+    const step1 = (now: number) => {
+      g.raf = 0;
+      const dt = g.at ? Math.min(64, now - g.at) : 16;
+      g.at = now;
+      const k = 1 - Math.exp(-dt / TAU);
+      let moving = false;
+      const ease = (cur: number, to: number) => {
+        const next = cur + (to - cur) * k;
+        if (Math.abs(to - next) <= eps) return to;
+        moving = true;
+        return next;
+      };
+      const pb = g.bid, pa = g.ask;
+      g.bid = ease(g.bid, g.tBid);
+      g.ask = ease(g.ask, g.tAsk);
+      if (g.bid !== pb) bidLine.applyOptions({ price: g.bid });
+      if (g.ask !== pa) askLine.applyOptions({ price: g.ask });
+      if (g.bar && Number.isFinite(g.close) && g.close !== g.bar.close) {
+        g.close = ease(g.close, g.bar.close);
+        drawBar();
+      }
+      if (moving && alive.current) g.raf = requestAnimationFrame(step1);
+      else g.at = 0;
+    };
+    const kick = () => {
+      if (reduce || (typeof document !== "undefined" && document.hidden)) {
+        g.bid = g.tBid;
+        g.ask = g.tAsk;
+        bidLine.applyOptions({ price: g.bid });
+        askLine.applyOptions({ price: g.ask });
+        if (g.bar) g.close = g.bar.close;
+        drawBar();
+        return;
+      }
+      if (!g.raf) g.raf = requestAnimationFrame(step1);
+    };
+
     const redraw = (last: Candle) => {
-      main.update(mainPoint(last));
+      // a new bar starts from its open; the same bar glides on from where its close is drawn now
+      const same = g.bar && g.bar.time === last.time;
+      g.close = same && Number.isFinite(g.close) ? g.close : last.open;
+      g.bar = last;
+      drawBar();
+      kick();
       vol.update({ time: t(last.time), value: last.volume, color: volColor(last) });
       indicators.update();
       if (hovering < 0) legendRef.current(legendAt(data.length - 1));
@@ -328,8 +384,9 @@ export function useChartEngine(
       });
     }
     const unsubQuotes = priceFeed().subscribe([symbol], (q) => {
-      bidLine.applyOptions({ price: q.bid });
-      askLine.applyOptions({ price: q.ask });
+      g.tBid = q.bid;
+      g.tAsk = q.ask;
+      kick();
       if (live) return;
       // simulator: build the forming bar from bid ticks (bucketed in DST-aware server time)
       const tt = Math.floor(toChartTime(Math.floor(q.time / 1000)) / step) * step;
@@ -346,6 +403,8 @@ export function useChartEngine(
     const unsub = () => {
       unsubBars();
       unsubQuotes();
+      cancelAnimationFrame(g.raf);
+      g.raf = 0;
     };
 
     /* ---- scroll back: load older bars from the database when the left edge comes into view ---- */
@@ -368,6 +427,7 @@ export function useChartEngine(
         main.setData(data.map(mainPoint));
         vol.setData(data.map((d) => ({ time: t(d.time), value: d.volume, color: volColor(d) })));
         indicators.reset();
+        drawBar(); // keep the newest bar at its gliding close
       });
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
@@ -404,6 +464,8 @@ export function useChartEngine(
         main.setData(data.map(mainPoint));
         vol.setData(data.map((d) => ({ time: t(d.time), value: d.volume, color: volColor(d) })));
         indicators.reset();
+        g.bar = data[data.length - 1]!;
+        g.close = g.bar.close;
         if (hovering < 0) legendRef.current(legendAt(data.length - 1));
       });
     };
