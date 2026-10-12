@@ -630,7 +630,10 @@
           chart.timeScale().scrollToRealTime();
           requestAnimationFrame(() => {
             if (!chart) return;
-            chart.timeScale().applyOptions({ barSpacing: 7, rightOffset: 8 });
+            // the opening zoom (same as Kalks Trader's defaultZoom): about 16 candles on a phone, so the price scale is
+            // tight and every pip of the bid / ask lines shows
+            const w = chart.timeScale().width();
+            chart.timeScale().applyOptions(w < 600 ? { barSpacing: Math.max(10, Math.min(28, w / 22)), rightOffset: 6 } : { barSpacing: Math.max(8, Math.min(24, w / 70)), rightOffset: 10 });
             chart.timeScale().scrollToRealTime();
             schedulePlace();
           });

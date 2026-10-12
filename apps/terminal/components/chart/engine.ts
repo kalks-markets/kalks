@@ -265,10 +265,10 @@ export function useChartEngine(
     const indicators = createIndicatorLayer({ chart, bars: () => data, step, digits: inst.digits, palette: c, alive: () => alive.current, onChange:() => indReady && legendRef.current(legendAt(hovering >= 0 ? hovering : data.length - 1)) });
     indicators.sync(indRef.current);
 
-    // viewport: default bar spacing anchored at the latest bar (re-applied once the container is measured)
+    // viewport: the opening zoom anchored at the latest bar (re-applied once the container is measured)
     chart.timeScale().scrollToRealTime();
     const raf = requestAnimationFrame(() => {
-      chart.timeScale().applyOptions({ barSpacing: 7, rightOffset: 12 });
+      chart.timeScale().applyOptions(defaultZoom(chart.timeScale().width()));
       chart.timeScale().scrollToRealTime();
     });
 
@@ -537,6 +537,17 @@ export function useChartEngine(
   }, [engine, indKey]);
 
   return engine;
+}
+
+/**
+ * The opening zoom (founder 2026-10-12, from a phone reference: "the side price shows big numbers, not pip
+ * movement"): few enough candles that the price scale is tight and every pip of the bid / ask lines shows. About 16
+ * candles on a phone and about 60 on a desktop chart, with room on the right for the lines and their labels.
+ */
+export function defaultZoom(width: number): { barSpacing: number; rightOffset: number } {
+  if (!(width > 0)) return { barSpacing: 12, rightOffset: 8 };
+  if (width < 600) return { barSpacing: Math.max(10, Math.min(28, width / 22)), rightOffset: 6 };
+  return { barSpacing: Math.max(8, Math.min(24, width / 70)), rightOffset: 10 };
 }
 
 /** Imperative handles to each mounted chart, used by the toolbar (zoom, screenshot…). */

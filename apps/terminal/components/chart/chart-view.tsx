@@ -11,7 +11,7 @@ import { usePositionProfit, useTerminal, type Anchor, type ChartTab, type Drawin
 import { CHART_TYPES, TIMEFRAMES, accMoney, contractSpec, fmtPrice, fmtVol, pipSize, profitAt, roundPrice, type TPosition } from "@/lib/trading";
 import { useContextMenu, type MenuItem } from "@/components/ui/menu";
 import { INDICATOR_CATEGORIES, INDICATOR_LIST } from "@/lib/indicators";
-import { chartRegistry, useChartEngine, type LegendData } from "./engine";
+import { chartRegistry, defaultZoom, useChartEngine, type LegendData } from "./engine";
 import { IndicatorLegendRow } from "./indicators/legend";
 import { clampStop, defaultStop, lineHandles, type StopKind } from "./trade-handles";
 import { addIndicator, openIndicatorList, openIndicatorSettings, removeIndicator, toggleIndicator } from "./indicators/state";
@@ -169,7 +169,7 @@ export function ChartView({ tab, active, onActivate, compact, hideOneClick, high
       },
       fit: () => {
         if (!engine.alive.current) return;
-        engine.chart.timeScale().applyOptions({ barSpacing: 7, rightOffset: 12 });
+        engine.chart.timeScale().applyOptions(defaultZoom(engine.chart.timeScale().width()));
         engine.chart.timeScale().scrollToRealTime();
         engine.chart.priceScale("right").applyOptions({ autoScale: true });
       },
