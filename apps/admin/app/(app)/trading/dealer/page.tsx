@@ -11,6 +11,7 @@ import { MarginMonitor } from "@/components/trading-desk/monitor";
 import { AuditTrail } from "@/components/trading-desk/audit";
 import { DeskStatusChip } from "@/components/trading-desk/status";
 import { useCan } from "@/components/staff-session";
+import { RiskMonitor } from "@/components/trading-desk/risk-monitor";
 
 type Tab = "accounts" | "symbols" | "margin" | "audit";
 const TABS: Tab[] = ["accounts", "symbols", "margin", "audit"];
@@ -48,7 +49,7 @@ export default function DealerDeskPage() {
     <div className="pb-10">
       <PageHeader
         title="Dealer desk"
-        subtitle={<span className="inline-flex flex-wrap items-center gap-2">Account and symbol controls, margin monitor and the dealing audit trail — all reason-coded. <DeskStatusChip /></span>}
+        subtitle={<span className="inline-flex flex-wrap items-center gap-2">Risk alerts, account and symbol controls, margin monitor and the dealing audit trail — all reason-coded. <DeskStatusChip /></span>}
         actions={
           canDeal && (
           <>
@@ -80,6 +81,9 @@ export default function DealerDeskPage() {
           <TenantDelayCard />
         </Reveal>
       </div>
+      <Reveal delay={0.11} className="mt-4">
+        <RiskMonitor />
+      </Reveal>
       <Reveal delay={0.12} className="mt-4">
         <Card className="px-4 py-5 sm:px-6">
           <Tabs

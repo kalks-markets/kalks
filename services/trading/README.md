@@ -101,6 +101,7 @@ Database `kalks_trading` (`migrations/0001_trading.sql`). Every table has `tenan
 | `ledger_accounts` | projection | running balance per ledger account (`acct:<login>:balance|credit|bonus`, `house:<name>:<ccy>`) |
 | `audit_log` | append-only | dealing and account-ops audit (staff, action, tickets, before/after, reason code, note, flags) |
 | `groups`, `tenant_policies`, `symbol_controls`, `routing_rules` | config | edited through the dealing/admin API, every change audited |
+| `risk_limits`, `risk_settings`, `client_scores`, `routing_suggestions`, `risk_alerts` | risk desk | limits and routing mode (audited), score history, the suggestion queue, alerts (migration `20261023141700_risk_desk.sql`) |
 | `rollovers` | ops | swap rollovers done per day (catch-up after downtime) |
 | `terminal_sessions`, `sso_tokens` | auth | HMAC-SHA256 hashes of opaque tokens only |
 
@@ -146,7 +147,8 @@ Ids: logins are 8 digits (live 10 000 001+, demo 50 000 001+). Order and positio
 | Sessions | Orders and closes are rejected with `market_closed` outside the session: crypto 24/7; FX, metals, indices and energies closed Saturday and Sunday server time; US stocks 09:30–16:00 New York. Same rules as market-data |
 | Stale feed | Quotes older than `TRADING_MAX_QUOTE_AGE_SECS` are not tradable (`stale_price`) |
 | Controls | Account status `active` / `close_only` / `read_only` / `disabled` / `expired`. Dealer controls: trading disabled, close-only, max lot, execution delay (≤ 500 ms, only if the tenant allows it), markup pips. Symbol controls: `halt` / `close-only` per group or all (D115, D140). SL/TP, stop-out and expiry still run on halted symbols |
-| Routing | Dealer override → first matching enabled rule (fields Login, Group, Symbol, Lot size; others do not match yet) → account default → group route. Book transfer moves a whole ticket or splits the moved volume into a child ticket with `parentTicket` |
+| Routing | Dealer override → first matching enabled rule (Login, Group, Symbol, Lot size, Risk score, Risk category, Avg hold time, Win rate, Equity, Country, News window; a `pct` below 100 splits deterministically by ticket) → account default → group route. In the tenant's `recommend` routing mode (default at launch) rules only label the ticket and queue routing suggestions; dealer quick routes always apply ([docs/RISK-DESK.md](../../docs/RISK-DESK.md)). Book transfer moves a whole ticket or splits the moved volume into a child ticket with `parentTicket` |
+| Risk limits | Per-symbol B-book net exposure caps, per-group max lot / max positions per client, news windows (margin multiplier on new exposure, no new pending orders), house daily loss alert. Mode `alert` (default) or `enforce`: `exposure_limit`, `group_max_lot`, `group_max_positions`, `news_window`. Closing and reducing are never refused ([docs/RISK-DESK.md](../../docs/RISK-DESK.md)) |
 | Demo | Initial balance (group default or chosen, 100–1 000 000). A refill tops the balance back to the initial amount, at most N per server day. The account expires after `expiry_days` with no terminal login (D8) |
 | Leverage | From the group list. Clients can change it only when no positions are open (D15); staff can change it any time |
 | Product | Every account trades ONE product, its group's `product`: a **CFD account** opens CFD positions and orders only, an **Options account** option positions and orders only (house prices and the order book). Anything else is refused with `product_mismatch`, for dealers too; closing, SL / TP and stop-out never are. See [CFD and Options accounts](#cfd-and-options-accounts) |
@@ -331,6 +333,7 @@ X-Kalks-Staff-Role: dealer             (gateway staff role)
 | `PUT /v1/dealing/routing/quick` | `{login | group, book:"A"|"B"|null}` | `null` (adds or removes `RQ-L<login>` / `RQ-G<group>` rules ahead of the rule set) |
 | `GET /v1/dealing/audit?staff=&action=&ticket=&login=&from=&to=&limit=&before=` | – | `AuditEntry[]`, newest first; `before` = id cursor |
 | `POST /v1/dealing/stream-ticket` | – | `{ticket, expiresIn:30}` |
+| `GET /v1/dealing/exposure`, `/v1/dealing/risk/*`, `/v1/dealing/routing/suggestions*` | | the risk desk: exposure, limits and settings, alerts, client scores, news windows, routing suggestions; see [docs/RISK-DESK.md](../../docs/RISK-DESK.md) |
 
 Shapes follow `apps/admin/lib/trading-desk/types.ts`:
 
@@ -889,7 +892,7 @@ The terminal stream sends these frames:
 | `{type:"hb", t}` | every 5 s |
 | `{type:"resync", skipped}` | the client fell behind; reload `GET /v1/terminal/state` |
 
-The dealing stream sends `snapshot` (`positions` as DeskPosition[], `orders` as DeskOrder[]), `position` / `order` deltas in desk shapes, `deal` (DeskDeal), `audit` (AuditEntry), and `{type:"pnl", items:[{ticket, price, profit}]}` every second.
+The dealing stream sends `snapshot` (`positions` as DeskPosition[], `orders` as DeskOrder[]), `position` / `order` deltas in desk shapes, `deal` (DeskDeal), `audit` (AuditEntry), and `{type:"pnl", items:[{ticket, price, profit}]}` every second, plus the risk desk's `{type:"exposure", exposure}` every 5 s and `{type:"risk_alert", alert}` (docs/RISK-DESK.md).
 
 ## How the apps integrate
 
@@ -930,6 +933,8 @@ The dealing stream sends `snapshot` (`positions` as DeskPosition[], `orders` as 
 | `EODHD_API_KEY` | – | corporate-actions import (EODHD All-in-One); empty = import idle, manual entry only |
 | `EODHD_URL` | `https://eodhd.com/api` | |
 | `MARKET_DATA_URL` / `MARKET_DATA_ADMIN_TOKEN` | `http://127.0.0.1:8081` / – | the Infoway adjustment-factor cross-check of corporate actions |
+| `NEWS_URL` / `NEWS_INTERNAL_TOKEN` | `http://127.0.0.1:8103` / – | economic calendar: news windows and the score's news factor (risk desk) |
+| `TRADING_TELEGRAM_BOT_TOKEN` / `TRADING_TELEGRAM_CHAT_ID` | – / – | red / amber risk alerts to Telegram; empty = off |
 | `RUST_LOG` | `info,sqlx=warn` | |
 
 The config is logged at start with every secret and the DB password redacted.
@@ -977,6 +982,7 @@ cargo test -p trading
   - `tests/book_mm_e2e.rs` (`--ignored`, the **real** market-data, options service and PostgreSQL): enable / novation through the Back Office handlers (plan counts, four-eyes refusal for the same staff member, a pending house order cancelled, the client's house position moved to the book, the MM mirror position and the house premium, reconcile clean, a second enable changes nothing); the market maker quoting the real chain (coverage, bid < model < ask, ephemeral quotes in the quote journal), a client taking its ask at the quoted price (no last look, MM fee 0, taker fee); a call-spread RFQ answered by the MM (worst-side hold), a limit below the ask refused, the accept filling both legs at once (one `fills` outbox item per account, hold released, legs sum to the net, second accept refused); a liquidation (book first inside the band against a resting offer, printed `liquidation`, the rest to the backstop); a four-eyes bust (both sides reversed with `bust:` keys, positions back, reconcile clean); the monitors, halt / resume and MM pause / resume; reserves 0, clearing 0, ledger, account replay and journal replay.
   - `tests/book_load.rs` (`--ignored`, `--release`, real services): the full-chain MM at 4 Hz plus 200 clients (passive limits inside the MM spread, marketable IOCs, cancels, reduce-only closes) for `LOAD_SECS`; targets actor batch p99 < 5 ms and outbox lag p99 < 50 ms; then everything cancelled, reserves 0, clearing 0, ledger and replays identical.
 - **CFD / Options account split.** `src/engine/tests_options.rs` (product gates both ways, pre-split positions still close, group moves within the product, no CFD offsets on an Options account, no `product` in any event), `src/engine/tests_book.rs` (`book_orders_need_an_options_account`: a CFD account never enters the book, the market maker's account is exempt, nothing reserved), `tests/lifecycle.rs` (the limit per (kind, product): full CFD groups, an Options account still opens; `product` on the account list; a CFD account's type change offers CFD groups only and refuses an Options group; the product of a group with accounts is locked and an update without `product` keeps it), `tests/tenants.rs` (the migration's products and seeded Options groups, copied to a new broker). The option integration tests open their accounts in `options-standard` (cent: an `options-cent` group the test adds).
+- **Risk desk.** `src/risk/*` (exposure maths, limits parsing, score factors on synthetic histories, news windows, Telegram rate limit), `src/rules.rs` (every routing condition, the deterministic split), `src/engine/tests_risk.rs` (exposure cap alert vs enforce, increase refused / reduce and close allowed, pending refused at trigger, group limits, news window actions, recommend vs execute routing, NBP on every gap / stop-out path) and `tests/risk.rs` (PostgreSQL, BTCUSD so any weekday: the exposure endpoint, limits saved / audited / enforced, scores from real trades with history, suggestions approved through `transfer_book` and rejected, alerts escalated and acknowledged).
 - **Integration test** (`tests/replay.rs`). This runs against a throw-away database `kalks_trading_test_<pid>` on the local Postgres; it is skipped when Postgres is unreachable. It runs trades, reversal, pending fills, a partial close, a book split, swaps, a demo refill, credit and manual adjustments (a repeated adjustment key books once) through the shards. It then checks that `replay_all` from the `events` table equals the live state. It also checks the database guarantees: a reused ledger idempotency key is refused, an unbalanced transaction cannot commit, and `events` / `ledger_postings` are append-only.
 
 ## Known gaps
@@ -1009,11 +1015,11 @@ cargo test -p trading
   - Mass-quote replacement reserves the new quotes before the replaced ones are released (briefly double-reserved).
   - Load targets (actor p99 < 5 ms, outbox lag < 50 ms with a full-chain MM at 4 Hz) are not measured yet.
 - **A-book.** A-book routing is recorded and the LP adapter is called, but the only adapter is `NullLp` (not connected), so every trade is executed internally.
-- **Routing conditions.** Rules on risk score, hold time, win rate, news window, country or equity never match yet.
+- **Risk desk.** See the known gaps in [docs/RISK-DESK.md](../../docs/RISK-DESK.md).
 - **Swaps.** Swaps are in points only (no percentage or money mode). There is no admin fee for swap-free groups (D19 optional fee). There is no holiday calendar, and sessions do not cover NSE/MCX.
 - **Snapshots.** Replay reads the whole event table on start; periodic snapshots are the next step for large books.
 - **Tick cost.** A tick clones the account state for every account holding that symbol. That is fine at current scale; a read-only pre-check would avoid the clone.
 - **Bonus rules.** Bonus is a separate sub-ledger that counts toward equity. Lot-based bonus release (D29) is not implemented, and credit is not removed on stop-out.
-- **Excluded features.** Prop-firm rules, the public API key auth (the source tag is recorded), FIX, dynamic margin schedules (weekend or news), exposure limits, and price-freeze / spike filter hooks (D116) are not included.
+- **Excluded features.** Prop-firm rules, the public API key auth (the source tag is recorded), FIX, dynamic margin schedules for weekends, and price-freeze / spike filter hooks (D116) are not included.
 - **Demo expiry.** A demo account expires by inactivity (last terminal login). The admin can also set `expired` or `active` directly.
 - **Scaling.** Commands are served before ticks. This is correct for a single engine instance, but there is no multi-instance leader election yet: run exactly one engine per database.

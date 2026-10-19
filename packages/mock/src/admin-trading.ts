@@ -188,7 +188,8 @@ export const ADMIN_ACCOUNTS: AdminAccountRow[] = CLIENTS.filter((c) => c.logins.
 /* ------------------------------------------------------------------ */
 
 export interface RoutingCondition {
-  field: "Risk score" | "Avg hold time" | "Lot size" | "Symbol" | "Group" | "Win rate (30d)" | "Equity" | "Country" | "News window" | "Login";
+  /** Risk score: engine client score 0-100; Risk category: toxic, likely_profitable, neutral, likely_losing */
+  field: "Risk score" | "Risk category" | "Avg hold time" | "Lot size" | "Symbol" | "Group" | "Win rate (30d)" | "Equity" | "Country" | "News window" | "Login";
   op: "≥" | "≤" | "<" | ">" | "=" | "in" | "is";
   value: string;
 }

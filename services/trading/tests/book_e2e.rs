@@ -152,6 +152,7 @@ async fn order_book_end_to_end_against_the_real_services() {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     let hub = Hub::start(shared, 2, Default::default());
     // the REAL market-data feed: group quotes and raw mids

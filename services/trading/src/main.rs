@@ -91,6 +91,7 @@ async fn main() -> anyhow::Result<()> {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     let hub = Hub::start(shared, cfg.shards, states);
     feed::spawn(hub.clone(), cfg.market_data_ws.clone(), specs.symbols());
@@ -163,6 +164,8 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(housekeeping(hub.clone(), pool.clone(), st.limiter.clone()));
     // account jobs (api/lifecycle.rs): expired-demo auto-archive, dormancy flag + auto-archive, retention anonymiser
     tokio::spawn(api::lifecycle::account_jobs(st.clone()));
+    // risk desk (src/risk): exposure index + alerts, news windows, client scores, routing suggestions
+    trading::risk::spawn(st.clone());
 
     let app = api::router(st);
     // TCP_NODELAY: a fill publishes several small frames back to back (position, deal, account); Nagle would hold

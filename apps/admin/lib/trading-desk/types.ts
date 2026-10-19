@@ -156,7 +156,10 @@ export type AuditAction =
   | "account.leverage"
   | "account.rejected"
   | "group.create"
-  | "group.update";
+  | "group.update"
+  // risk desk (trading engine)
+  | "risk.limits"
+  | "risk.settings";
 
 export interface AuditEntry {
   readonly id: string;

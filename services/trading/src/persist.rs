@@ -90,6 +90,7 @@ pub async fn load_tenant(pool: &PgPool, tenant_id: i64) -> anyhow::Result<Tenant
         let v: sqlx::types::Json<Vec<RoutingRule>> = r.get("rules");
         cfg.routing_rules = v.0;
     }
+    cfg.risk = crate::risk::limits::load(pool, tenant_id).await?;
     Ok(cfg)
 }
 

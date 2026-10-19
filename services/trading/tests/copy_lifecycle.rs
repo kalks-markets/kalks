@@ -161,6 +161,7 @@ async fn following_lifecycle_end_to_end() {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     let hub = Hub::start(shared, 4, Default::default());
     set_btc(&quotes, "80000", "80020");

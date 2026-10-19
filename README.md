@@ -116,4 +116,5 @@ docs/           Conventions, integrations list, website content PDF
 
 - `docs/CONVENTIONS.md`: how pages and components are built
 - `docs/INTEGRATIONS.md`: every key and credential the Super Admin needs to go live
+- `docs/RISK-DESK.md`: dealer risk desk (exposure, risk limits, client scores, routing suggestions, alerts)
 - `docs/Kalks-Website-Content.pdf`: full website copy and build spec for kalkstrade.com

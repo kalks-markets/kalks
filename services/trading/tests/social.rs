@@ -145,6 +145,7 @@ async fn copy_and_pamm_end_to_end_with_replay() {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     let hub = Hub::start(shared, 4, Default::default());
     set_btc(&quotes, "80000", "80020");

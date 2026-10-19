@@ -12,9 +12,15 @@
  * | permission       | what it allows                                                             | roles                                              |
  * |------------------|----------------------------------------------------------------------------|----------------------------------------------------|
  * | dealing.read     | positions, orders, deals, controls, routing, dealing audit, live stream    | every staff role except marketing, partner_manager |
+ * |                  | risk desk: server exposure with limit usage, risk limits, open alerts,     |                                                    |
+ * |                  | client scores, news windows, routing suggestions                           |                                                    |
  * | dealing.write    | dealer trades, modify / close / transfer / void / reopen, symbol & account | platform_owner, super_admin, admin, dealer,        |
  * |                  | controls, routing rules and quick routes                                   | risk_manager                                       |
+ * |                  | risk desk: edit risk limits (exposure caps, daily loss, group max lot /    |                                                    |
+ * |                  | positions, news window), acknowledge alerts, recompute client scores,      |                                                    |
+ * |                  | approve / reject routing suggestions                                       |                                                    |
  * | dealing.policy   | tenant policy (execution-delay switch and cap, margin call / stop-out)     | platform_owner, super_admin, admin                 |
+ * |                  | and the routing mode (recommend: rules only label and suggest; execute)    |                                                    |
  * | accounts.read    | trading account list / detail, history, ledger, groups (read)              | same as dealing.read                               |
  * | accounts.write   | account status, group change, leverage                                     | same as dealing.write                              |
  * | finance.adjust   | add / deduct funds (Balance & credit, wallet service) and account bonus     | platform_owner, super_admin, admin, finance        |

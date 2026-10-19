@@ -108,6 +108,7 @@ async fn replay_rebuilds_identical_state_and_ledger_holds() {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     let _ = AtomicI64::new(0);
     let hub = Hub::start(shared, 4, Default::default());

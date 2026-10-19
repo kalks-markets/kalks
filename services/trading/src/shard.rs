@@ -284,6 +284,8 @@ pub struct Shared {
     pub books: Arc<crate::book::Books>,
     /// Corporate actions due and not yet applied everywhere (src/corporate.rs).
     pub corp: crate::engine::corporate::CorpDue,
+    /// Risk desk: exposure index, client scores, news windows, limit observations (src/risk).
+    pub risk: Arc<crate::risk::RiskCtx>,
 }
 
 /* ------------------------------------------------------------------ */
@@ -600,6 +602,7 @@ impl Shard {
             restrictions: Some(&self.sh.restrictions),
             options: self.sh.options.as_ref(),
             corp: Some(&self.sh.corp),
+            risk: Some(&self.sh.risk),
         }
     }
 

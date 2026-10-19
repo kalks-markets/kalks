@@ -170,6 +170,11 @@ export function upsertAccounts(list: LiveAccount[]) {
   void loadNames(list.map((a) => a.userId));
 }
 
+/** Loads client names (gateway) for user ids not known yet, e.g. logins listed by the risk desk. */
+export function ensureClientNames(ids: string[]) {
+  void loadNames(ids.filter((id) => /^\d{1,18}$/.test(id)));
+}
+
 let namesInFlight = new Set<string>();
 async function loadNames(ids: string[]) {
   const missing = Array.from(new Set(ids)).filter((id) => !snap.names.has(id) && !namesInFlight.has(id));

@@ -101,6 +101,7 @@ async fn boot(pool: &sqlx::PgPool, states: std::collections::HashMap<i64, tradin
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     Hub::start(shared, 2, states)
 }

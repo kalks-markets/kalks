@@ -6,7 +6,8 @@ use serde_json::json;
 use super::{Env, Reject, Tx, pnl, total_margin};
 use crate::model::{AccountKind, Book, Deal, DealEntry, DealReason, Expiry, Mode, Order, OrderStatus, OrderType, Position, RouteEvent, Side, Source, Status, Trailing, TxnKind, acct_code, house_code};
 use crate::money::{D, ZERO, r2, rdp};
-use crate::rules::{ControlMode, Product, RouteCtx, resolve_route};
+use crate::risk::{LimitMode, RoutingMode};
+use crate::rules::{ControlMode, Product, RouteCtx, RouteFacts, match_rule};
 use crate::specs::{Spec, end_of_server_day};
 use crate::state::{AccountState, Event};
 
@@ -222,15 +223,156 @@ fn round_opt(spec: &Spec, v: Option<D>) -> Option<D> {
     v.filter(|x| !x.is_zero()).map(|x| spec.round_price(x))
 }
 
-/// Routing decision (D2/D140): dealer override → rules → account default → group route.
-pub fn route_for(env: &Env, st: &AccountState, symbol: &str, volume: D, over: Option<Book>) -> (Book, String) {
+/// Routing decision (D2/D140): dealer override → rules → account default → group route. `id` is the ticket the
+/// decision is for (a rule's percentage split is deterministic on it).
+///
+/// In the tenant's `recommend` routing mode (the launch setting, 100 % B-book) a matching rule only labels the ticket
+/// and the risk desk queues a routing suggestion (src/risk/routing.rs): the trade keeps the account / group book.
+/// The dealer's own quick routes (`RQ-…` rules) always apply.
+pub fn route_for(env: &Env, st: &AccountState, symbol: &str, volume: D, over: Option<Book>, id: i64) -> (Book, String) {
     if let Some(b) = over {
         return (b, "Dealer override".into());
     }
     let fallback = st.account.route_override.unwrap_or(env.group.route);
-    let ctx = RouteCtx { login: st.account.login, group: &st.account.group, symbol, volume };
-    let (book, rule) = resolve_route(&env.tenant.routing_rules, &ctx, fallback);
-    (book, rule.unwrap_or_else(|| if st.account.route_override.is_some() { "Account route".into() } else { "Default route".into() }))
+    let base = if st.account.route_override.is_some() { "Account route" } else { "Default route" };
+    let lite = env.risk.and_then(|r| r.score(st.account.login));
+    let facts = route_facts(env, st, symbol, lite.as_ref());
+    let ctx = RouteCtx { login: st.account.login, group: &st.account.group, symbol, volume, id, facts };
+    match match_rule(&env.tenant.routing_rules, &ctx) {
+        Some((r, book)) if env.tenant.risk.settings.routing_mode == RoutingMode::Execute || r.id.starts_with("RQ-") => (book, format!("Rule {} · {}", r.id, r.name)),
+        Some((r, book)) if book != fallback => (fallback, format!("{base} · rule {} recommends {}-book (recommend only)", r.id, book.as_str())),
+        Some((r, _)) => (fallback, format!("{base} · rule {}", r.id)),
+        None => (fallback, base.into()),
+    }
+}
+
+/// What the risk desk knows for the routing conditions (score, category, hold time, win rate, country from the
+/// latest client score; equity and the news window computed now, only when a rule asks for them).
+pub fn route_facts<'a>(env: &Env, st: &AccountState, symbol: &str, lite: Option<&'a crate::risk::ScoreLite>) -> RouteFacts<'a> {
+    let needs = |f: &str| env.tenant.routing_rules.iter().any(|r| r.enabled && r.conditions.iter().any(|c| c.field == f));
+    let equity_usd = if needs("Equity") { Some(super::metrics(env, st).equity / st.account.usd_factor()) } else { None };
+    let (news_minutes, news_active) = match (env.risk, env.specs.get(symbol)) {
+        (Some(r), Some(spec)) if needs("News window") => {
+            let n = env.tenant.risk.limits.news.as_ref();
+            let min_impact = n.map(|n| n.min_impact).unwrap_or(3);
+            let (b, a) = n.map(|n| (n.minutes_before as i64, n.minutes_after as i64)).unwrap_or((2, 2));
+            (r.news_minutes(spec, env.now, min_impact), r.news_hit(spec, env.now, b, a, min_impact).is_some())
+        }
+        _ => (None, false),
+    };
+    RouteFacts {
+        score: lite.map(|s| s.score),
+        category: lite.map(|s| s.category.as_str()),
+        avg_hold_secs: lite.and_then(|s| s.avg_hold_secs),
+        win_rate: lite.and_then(|s| s.win_rate),
+        country: lite.and_then(|s| s.country.as_deref()),
+        equity_usd,
+        news_minutes,
+        news_active,
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Risk limits (src/risk, docs/RISK-DESK.md)                           */
+/* ------------------------------------------------------------------ */
+
+/// Where in an order's life the risk limits are checked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RiskStage {
+    /// A market order (or a dealer trade) filling now.
+    Market,
+    /// A pending order being placed.
+    Place,
+    /// A pending order filling now (triggered, or filled by a dealer).
+    Fill,
+}
+
+/// USD notional of one lot of `spec` at the mid (None without a price).
+pub fn lot_usd(env: &Env, acc: &crate::model::Account, spec: &Spec) -> Option<D> {
+    let q = env.quote(acc, &spec.symbol)?;
+    let px = q.mid();
+    env.to_usd(acc, &spec.quote_ccy, spec.contract_size * px, (&spec.symbol, px))
+}
+
+/// The tenant's risk limits for a new order: the per-group max lot (an account's own max lot wins) and max open
+/// positions per client, the B-book net exposure cap of the symbol (live accounts; only an order that takes the net
+/// further past the cap is refused, so closing or reducing always passes), and no new pending orders inside a news
+/// window. A limit in `alert` mode only reports what it would have refused; in `enforce` mode the order is refused
+/// with the limit's code (`group_max_lot`, `group_max_positions`, `exposure_limit`, `news_window`). Closes, SL / TP
+/// and stop-out never come here. A dealer's forced trade is not checked.
+#[allow(clippy::too_many_arguments)]
+pub fn risk_gate(env: &Env, st: &AccountState, symbol: &str, side: Side, volume: D, stage: RiskStage, book: Option<Book>, dealer: Option<&DealerCtx>) -> Result<(), Reject> {
+    let Some(risk) = env.risk else { return Ok(()) };
+    if dealer.is_some_and(|d| d.force) {
+        return Ok(());
+    }
+    let Some(spec) = env.specs.get(symbol) else { return Ok(()) };
+    let limits = &env.tenant.risk.limits;
+    let acc = &st.account;
+    let hit = |code: &'static str, message: String, mode: LimitMode| -> Result<(), Reject> {
+        let enforced = mode == LimitMode::Enforce;
+        risk.observe(crate::risk::Observation { tenant_id: acc.tenant_id, login: acc.login, symbol: symbol.to_string(), code, message: message.clone(), enforced, at: env.now });
+        if enforced { Err(Reject::new(code, message)) } else { Ok(()) }
+    };
+    if let Some(g) = limits.group(&acc.group) {
+        if stage != RiskStage::Fill
+            && (stage == RiskStage::Place || is_opening(st, symbol, side, volume))
+            && acc.controls.max_lot.is_none()
+            && let Some(max) = g.max_lot
+            && volume > max
+        {
+            hit("group_max_lot", format!("Volume {} exceeds the {} group max lot {}", volume.normalize(), acc.group, max.normalize()), g.mode)?;
+        }
+        if stage != RiskStage::Place
+            && let Some(max) = g.max_positions
+        {
+            let new = match (acc.mode, st.position_for(symbol)) {
+                (Mode::Hedging, _) | (Mode::Netting, None) => 1,
+                (Mode::Netting, Some(_)) => 0, // adds to, reduces or reverses the one position
+            };
+            let open = st.positions.values().filter(|p| p.option.is_none()).count() + risk.other_positions(acc.tenant_id, acc.user_id, acc.login);
+            if new > 0 && open + new > max as usize {
+                hit("group_max_positions", format!("The {} group allows {max} open positions per client ({open} open)", acc.group), g.mode)?;
+            }
+        }
+    }
+    if stage == RiskStage::Place
+        && let Some(n) = limits.news()
+        && n.block_pending
+        && let Some(h) = risk.news_hit(spec, env.now, n.minutes_before as i64, n.minutes_after as i64, n.min_impact)
+    {
+        hit("news_window", format!("New pending orders on {symbol} are paused around {} ({}, {} UTC)", h.event.title, h.event.currency, h.event.starts_at.format("%H:%M")), n.mode)?;
+    }
+    if stage != RiskStage::Place && acc.kind == AccountKind::Live {
+        let book = book.unwrap_or_else(|| route_for(env, st, symbol, volume, None, 0).0);
+        if book == Book::B
+            && let Some(lot) = lot_usd(env, acc, spec)
+        {
+            let delta = side.sign() * volume * lot;
+            let net = risk.net_b_usd(acc.tenant_id, symbol);
+            let after = net + delta;
+            if let Some(l) = limits.exposure_for(symbol)
+                && after.abs() > l.cap_usd
+                && after.abs() > net.abs()
+            {
+                hit("exposure_limit", format!("{symbol}: this order would take the house's net exposure to {} USD, above the {} USD limit (reducing trades are accepted)", r2(after).round(), l.cap_usd.normalize()), l.mode)?;
+            }
+            risk.add_inflight(acc.tenant_id, symbol, delta, env.now.timestamp_millis());
+        }
+    }
+    Ok(())
+}
+
+/// The margin multiplier on new exposure in `symbol` right now (news window in `enforce` mode; 1 otherwise).
+pub fn news_margin_multiplier(env: &Env, symbol: &str) -> D {
+    let (Some(risk), Some(n), Some(spec)) = (env.risk, env.tenant.risk.limits.news(), env.specs.get(symbol)) else { return D::ONE };
+    if n.mode != LimitMode::Enforce || n.margin_multiplier <= D::ONE {
+        return D::ONE;
+    }
+    match risk.news_hit(spec, env.now, n.minutes_before as i64, n.minutes_after as i64, n.min_impact) {
+        Some(_) => n.margin_multiplier,
+        None => D::ONE,
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -258,6 +400,8 @@ pub fn place_order(tx: &mut Tx, env: &Env, req: OrderReq) -> Result<PlaceResult,
     if !manual {
         market_open(env, &spec)?;
     }
+    let stage = if req.kind == OrderType::Market { RiskStage::Market } else { RiskStage::Place };
+    risk_gate(env, &tx.st, &req.symbol, req.side, req.volume, stage, req.book, dealer)?;
     let acc = tx.st.account.clone();
     let q = match env.live_quote(&acc, &req.symbol) {
         Ok(q) => Some(q),
@@ -460,13 +604,19 @@ pub fn fill(tx: &mut Tx, env: &Env, f: Fill) -> Result<FillOut, Reject> {
     let comm = commission(env, &tx.st, &spec, opens);
     if f.check_margin && opens > ZERO {
         let before = total_margin(env, &tx.st, None);
-        let after = total_margin(env, &tx.st, Some((&f.symbol, f.side, f.volume)));
+        let mut after = total_margin(env, &tx.st, Some((&f.symbol, f.side, f.volume)));
+        // risk desk: inside a news window (enforce mode) new exposure needs `marginMultiplier` × the margin
+        let mult = news_margin_multiplier(env, &f.symbol);
+        if mult > D::ONE && after > before {
+            after = before + (after - before) * mult;
+        }
         let m = super::metrics(env, &tx.st);
         if after > before && m.equity - comm - after - m.order_reserve < ZERO {
-            return Err(Reject::new("no_money", format!("Not enough money: margin {} {} needed, free margin {} {}", r2(after - before).normalize(), tx.st.account.ccy(), r2(m.free_margin).normalize(), tx.st.account.ccy())));
+            let news = if mult > D::ONE { format!(" (news window: margin × {})", mult.normalize()) } else { String::new() };
+            return Err(Reject::new("no_money", format!("Not enough money: margin {} {} needed{news}, free margin {} {}", r2(after - before).normalize(), tx.st.account.ccy(), r2(m.free_margin).normalize(), tx.st.account.ccy())));
         }
     }
-    let (book, route_reason) = route_for(env, &tx.st, &f.symbol, f.volume, f.book);
+    let (book, route_reason) = route_for(env, &tx.st, &f.symbol, f.volume, f.book, f.order_ticket);
     let mut deals = Vec::new();
 
     match existing {

@@ -30,6 +30,8 @@ import { getClient, REASON_CODES, serverTime } from "@kalks/mock/admin-clients";
 import { EXPOSURE_GRID, MARGIN_CALLS, RISK_GROUPS, STOPOUT_LOG, TOP_CLIENTS, type MarginCallRow } from "@kalks/mock/admin-ops";
 import { PnlText, ReasonDialog, usdCompact } from "@/components/command/kit";
 import { useLiveExposure } from "@/components/command/overview";
+import { LiveRiskCommand } from "@/components/command/live-risk";
+import { IS_DEMO } from "@kalks/mock/mode";
 
 /* ------------------------------------------------------------------ */
 
@@ -298,6 +300,10 @@ const stopCols: Column<StopOut>[] = [
 /* ------------------------------------------------------------------ */
 
 export default function LiveRiskPage() {
+  return IS_DEMO ? <DemoLiveRiskPage /> : <LiveRiskCommand />;
+}
+
+function DemoLiveRiskPage() {
   const exp = useLiveExposure();
   const floating = exp.reduce((s, r) => s + r.bookPnl, 0);
   const top = [...exp].sort((a, b) => b.usage - a.usage)[0]!;

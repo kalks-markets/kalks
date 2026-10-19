@@ -11,9 +11,11 @@
  *   - live: the dealing WebSocket (one-time ticket) — position / order / deal / audit deltas and a P&L frame
  *     every second; on `resync` or reconnect the state is reloaded over REST
  *   - writes: POST/PATCH/PUT with { reasonCode, note }; the returned audit entries are merged immediately.
+ *   - risk desk frames (`exposure`, `risk_alert`) go to the risk store (risk.ts), read with useExposure / useRiskAlerts.
  */
 import type { RoutingRule, TradingGroup } from "@kalks/mock/admin-trading";
 import { liveAccount, loadAccounts, loadDirectory } from "./directory";
+import { ingestAlert, ingestExposure, type Exposure, type RiskAlert } from "./risk";
 import type {
   AccountControl,
   AuditEntry,
@@ -268,6 +270,13 @@ export class RestTradingDesk implements TradingDeskApi {
         if (changed) this.set({ positions });
         return;
       }
+      // risk desk: server exposure every 5 s (live accounts) and risk alerts (new / escalated / acked / resolved)
+      case "exposure":
+        ingestExposure(f.exposure as Exposure);
+        return;
+      case "risk_alert":
+        ingestAlert(f.alert as RiskAlert);
+        return;
       case "resync":
         void this.reload();
         return;
