@@ -61,6 +61,7 @@ const shell = {
   "nav.loyalty": "Loyalty",
   "nav.cashback": "Cashback",
   "nav.promotions": "Promotions",
+  "nav.leaderboard": "Leaderboard",
   "nav.developer": "API & Algo",
   "nav.apiKeys": "API keys",
   "nav.webhooks": "Webhooks",

@@ -63,6 +63,7 @@ const shell: NsMessages<"shell"> = {
   "nav.loyalty": "忠诚计划",
   "nav.cashback": "返现",
   "nav.promotions": "优惠活动",
+  "nav.leaderboard": "Leaderboard",
   "nav.developer": "API 与算法交易",
   "nav.apiKeys": "API 密钥",
   "nav.webhooks": "Webhooks",

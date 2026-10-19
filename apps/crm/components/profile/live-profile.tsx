@@ -10,6 +10,8 @@ import { KYC_CHIP, useSession } from "@/components/session";
 import { SUPPORT_EMAIL } from "@/lib/live";
 import { useLocale, useT } from "@kalks/i18n/react";
 import { PageHero } from "@/components/page-hero";
+import { useModules } from "@/components/tenant-config";
+import { LevelStrip, NicknameCard } from "@/components/growth/hub";
 
 function countryName(code: string, lang = "en") {
   if (!code) return "—";
@@ -46,6 +48,7 @@ export function LiveProfile() {
   const me = useSession();
   const t = useT();
   const lang = useLocale().info.intl;
+  const on = useModules();
   const kyc = KYC_CHIP[me.kyc_status];
   const kycLabel = t.dyn(`shell.kyc.${me.kyc_status}`, kyc.label);
   const id = `KL-${String(me.id).padStart(6, "0")}`;
@@ -230,6 +233,12 @@ export function LiveProfile() {
               </Card>
             </Link>
           </Reveal>
+          {on("rewards") && (
+            <Reveal delay={0.25} className="space-y-4">
+              <LevelStrip className="" />
+              <NicknameCard />
+            </Reveal>
+          )}
         </div>
       </div>
     </div>

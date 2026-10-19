@@ -25,7 +25,8 @@ import chart from "./chart";
 import aiTrader from "./aiTrader";
 import options from "./options";
 import desk from "./desk";
+import challenges from "./challenges";
 
 /** English: the source language and the fallback for every missing translation. */
-export const en = { common, shell, auth, dashboard, accounts, accountDetail, wallet, profile, kyc, trader, order, toolbox, market, partner, social, prop, security, rewards, developer, academy, support, news, portfolio, chart, aiTrader, options, desk };
+export const en = { common, shell, auth, dashboard, accounts, accountDetail, wallet, profile, kyc, trader, order, toolbox, market, partner, social, prop, security, rewards, developer, academy, support, news, portfolio, chart, aiTrader, options, desk, challenges };
 export type EnCatalog = typeof en;

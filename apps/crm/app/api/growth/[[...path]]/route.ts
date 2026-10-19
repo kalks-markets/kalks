@@ -21,6 +21,10 @@ import { sameOrigin, sessionUser } from "@/lib/trading";
 //   GET   banners?placement=
 //   POST  banners/{id}/events             {kind}
 //   GET   shares · POST shares            {kind, login, dealId | from/to, showAmounts}
+//   GET   hub                             level, XP, streaks, missions, active contests, recent rewards, nickname (phase 4)
+//   GET   missions · xp                   missions for the current periods · level, streaks, XP history
+//   GET   nickname · POST nickname        {nickname?, public?} the leaderboard nickname and the public-website choice
+//   GET   leaderboard?contest=|period=   nicknames, ranks, scores, level badges; the client's own row as `me`
 
 type Ctx = { params: Promise<{ path?: string[] }> };
 const NO_STORE = { "cache-control": "no-store" };
@@ -30,7 +34,7 @@ function error(status: number, code: string, message: string) {
 }
 
 const ID = String.raw`[A-Za-z0-9_-]{1,64}`;
-const GET_ROUTES = [/^rewards$/, /^points$/, /^redemptions$/, /^vouchers$/, /^cashback$/, /^promotions$/, /^contests$/, new RegExp(`^contests/${ID}$`), /^banners$/, /^shares$/];
+const GET_ROUTES = [/^rewards$/, /^points$/, /^redemptions$/, /^vouchers$/, /^cashback$/, /^promotions$/, /^contests$/, new RegExp(`^contests/${ID}$`), /^banners$/, /^shares$/, /^hub$/, /^missions$/, /^xp$/, /^nickname$/, /^leaderboard$/];
 const POST_ROUTES = [
   /^redeem$/,
   new RegExp(`^cashback/${ID}/enrol$`),
@@ -39,8 +43,9 @@ const POST_ROUTES = [
   new RegExp(`^contests/${ID}/join$`),
   new RegExp(`^banners/${ID}/events$`),
   /^shares$/,
+  /^nickname$/,
 ];
-const QUERY_KEYS = ["placement", "kind", "page", "limit"];
+const QUERY_KEYS = ["placement", "kind", "page", "limit", "contest", "period"];
 
 async function handle(req: NextRequest, ctx: Ctx, method: "GET" | "POST") {
   const path = ((await ctx.params).path ?? []).join("/");

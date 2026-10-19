@@ -291,6 +291,8 @@ export interface Standing {
   prizeStatus: string | null;
   me: boolean;
   updatedAt: string;
+  /** Client views (phase 4): the entrant's level badge; `name` is their leaderboard nickname. */
+  level?: { level: number; name: string; badge: string };
 }
 
 export type ContestCard = Contest & { myEntry: Standing | null };

@@ -26,6 +26,7 @@ import chart from "./chart";
 import aiTrader from "./aiTrader";
 import options from "./options";
 import desk from "./desk";
+import challenges from "./challenges";
 
-const catalog: PartialCatalog = { common, shell, auth, dashboard, accounts, accountDetail, wallet, profile, kyc, trader, order, toolbox, market, partner, social, prop, security, rewards, developer, academy, support, news, portfolio, chart, aiTrader, options, desk };
+const catalog: PartialCatalog = { common, shell, auth, dashboard, accounts, accountDetail, wallet, profile, kyc, trader, order, toolbox, market, partner, social, prop, security, rewards, developer, academy, support, news, portfolio, chart, aiTrader, options, desk, challenges };
 export default catalog;

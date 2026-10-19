@@ -10,6 +10,7 @@ import { useT } from "@kalks/i18n/react";
 import { bandLabel, fmtCount, fmtDate, fmtDateTime, fmtPct, fmtUsd, isOptionsContest, projectedPrize, scoringLabel, useGrowth, type ContestDetail } from "./api";
 import { JoinContestButton, Leaderboard, canJoin, isPast, isRunning, isUpcoming, kindChip, scoreText, tradesHint, volumeText } from "./contests";
 import { CardEmpty, GrowthStatus, PageFallback, RankBadge } from "./ui";
+import { useRewardsLive } from "./challenges-api";
 
 function Stat({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
@@ -203,6 +204,7 @@ function PrizesTable({ d }: { d: ContestDetail }) {
 export function LiveContestDetail({ id }: { id: string }) {
   const t = useT();
   const { data, error, reload } = useGrowth<ContestDetail>(`contests/${encodeURIComponent(id)}`, 15_000);
+  useRewardsLive(reload);
   const back = (
     <Link href="/rewards" className="mb-3 inline-flex items-center gap-1.5 text-[12.5px] text-fg-3 hover:text-fg">
       <ArrowLeft className="size-3.5 rtl:-scale-x-100" /> {t("rewards.detail.allContests")}
