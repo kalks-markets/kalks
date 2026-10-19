@@ -1,37 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, CalendarRange, Flag as FlagIcon, Pencil, Plus, RefreshCw, Trash2, Trophy, Users, Wallet } from "lucide-react";
+import { AlertTriangle, CalendarRange, Copy, Flag as FlagIcon, LayoutTemplate, Pencil, Plus, RefreshCw, Trophy, Users, Wallet } from "lucide-react";
 import { Button, Card, CardHeader, Chip, Dialog, KpiCard, PageHeader, Progress, Reveal, Segmented, cn } from "@kalks/ui";
 import { TableSkeleton, ago, countryName, useApi, useNow, when } from "@/components/live/kit";
-import { M, mkSend, type Contest, type ContestDetail, type ContestFlag, type ContestInput, type ContestInstrument, type Overview, type Prize, type Scoring, type Standing } from "./api";
-import {
-  AreaF,
-  CONTEST_STATUS,
-  DateTimeF,
-  EmptyNote,
-  FormDialog,
-  MkError,
-  NumF,
-  PAY_STATUS,
-  ReadOnlyNote,
-  SelectF,
-  StatusPill,
-  TextF,
-  Tile,
-  ToggleRow,
-  fromLocalInput,
-  int,
-  num,
-  numOrNull,
-  pct,
-  splitList,
-  toLocalInput,
-  usd,
-  usdK,
-  useAction,
-  usePerms,
-} from "./kit";
+import { M, mkSend, type Contest, type ContestDetail, type ContestFlag, type ContestInstrument, type Overview, type Scoring, type Standing } from "./api";
+import { ContestWizard } from "./contest-wizard";
+import { ChallengesTabs, type ChallengesTab } from "./challenges";
+import { CONTEST_STATUS, EmptyNote, MkError, PAY_STATUS, ReadOnlyNote, StatusPill, Tile, int, num, pct, usd, usdK, useAction, usePerms } from "./kit";
 
 type F = "all" | "running" | "scheduled" | "ended" | "done";
 const SCORING: Record<Scoring, string> = { return_pct: "Return %", profit: "Profit", lots: "Lots traded", contracts: "Contracts traded" };
@@ -84,6 +60,8 @@ export function LiveContests() {
   const [f, setF] = React.useState<F>("all");
   const [wizard, setWizard] = React.useState(false);
   const [sel, setSel] = useUrlParam("contest");
+  const [tabParam, setTabParam] = useUrlParam("tab");
+  const tab = (["contests", "templates", "missions", "levels", "payouts", "settings"].includes(tabParam ?? "") ? tabParam : "contests") as ChallengesTab;
   const items = list.data?.items ?? [];
   const match = (c: Contest) => f === "all" || (f === "done" ? ["finalized", "paid", "cancelled"].includes(c.status) : f === "scheduled" ? c.status === "scheduled" || c.status === "draft" : c.status === f);
   const rows = items.filter(match).sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
@@ -93,8 +71,8 @@ export function LiveContests() {
   return (
     <div className="pb-16">
       <PageHeader
-        title="Contests"
-        subtitle="Demo and live trading competitions with live leaderboards, anti-cheat review and prize payouts."
+        title="Contests & challenges"
+        subtitle="Live contests from templates, missions, XP levels and streaks, leaderboards and prize payouts."
         actions={
           <>
             {perms.loaded && !perms.write && <ReadOnlyNote what="create contests" />}
@@ -110,14 +88,16 @@ export function LiveContests() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <ChallengesTabs tab={tab} onTab={(t) => setTabParam(t === "contests" ? null : t)} perms={perms} onNewContest={() => setWizard(true)} />
+
+      <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4", tab !== "contests" && "hidden")}>
         <KpiCard label="Running contests" icon={<Trophy />} value={<span className="k-num">{k ? int(k.running) : "—"}</span>} chip={k ? `${int(k.scheduled)} scheduled` : "Loading"} />
         <KpiCard label="Entrants" icon={<Users />} value={<span className="k-num">{k ? int(k.entrants) : "—"}</span>} chip="Running and scheduled" delay={0.05} />
         <KpiCard label="Live prize pools" icon={<Wallet />} value={<span className="k-num">{list.data ? usdK(running.reduce((s, c) => s + (c.prizePool || 0), 0)) : "—"}</span>} chip="Running contests" chipTone="gold" delay={0.1} />
         <KpiCard label="Awaiting payout" icon={<AlertTriangle />} value={<span className="k-num">{list.data ? int(items.filter((c) => c.status === "ended" || c.status === "finalized").length) : "—"}</span>} chip="Ended or finalized" chipTone="warn" delay={0.15} />
       </div>
 
-      <Reveal delay={0.05} className="mt-4">
+      <Reveal delay={0.05} className={cn("mt-4", tab !== "contests" && "hidden")}>
         <Card>
           <CardHeader
             title="All contests"
@@ -143,7 +123,7 @@ export function LiveContests() {
             ) : !list.data ? (
               <TableSkeleton rows={4} />
             ) : rows.length === 0 ? (
-              <EmptyNote title={items.length ? "No contests match this filter" : "No contests yet"} text={items.length ? undefined : "Create a demo contest (a fresh demo account per entrant) or a live one on clients' own accounts."} />
+              <EmptyNote title={items.length ? "No contests match this filter" : "No contests yet"} text={items.length ? undefined : "Start from a template: a weekly % return contest, a monthly lots race or a weekend crypto sprint."} />
             ) : (
               rows.map((c) => {
                 const endsIn = Date.parse(c.endsAt) - now;
@@ -195,7 +175,7 @@ export function LiveContests() {
         </Card>
       </Reveal>
 
-      <ContestDrawer id={sel} onClose={() => setSel(null)} perms={perms} onChanged={() => (list.reload(), ov.reload())} />
+      <ContestDrawer id={sel} onClose={() => setSel(null)} onOpen={setSel} perms={perms} onChanged={() => (list.reload(), ov.reload())} />
       <ContestWizard open={wizard} onOpenChange={setWizard} onSaved={(c) => (list.reload(), ov.reload(), c?.id && setSel(String(c.id)))} />
     </div>
   );
@@ -205,7 +185,7 @@ export function LiveContests() {
 /* Detail drawer                                                        */
 /* ------------------------------------------------------------------ */
 
-function ContestDrawer({ id, onClose, perms, onChanged }: { id: string | null; onClose: () => void; perms: { write: boolean; approve: boolean }; onChanged: () => void }) {
+function ContestDrawer({ id, onClose, onOpen, perms, onChanged }: { id: string | null; onClose: () => void; onOpen: (id: string) => void; perms: { write: boolean; approve: boolean }; onChanged: () => void }) {
   const valid = id && /^\d+$/.test(id) ? id : null;
   const { data, error, loading, reload } = useApi<ContestDetail>(valid ? M(`contests/${valid}`) : null, { refreshMs: 15_000 });
   const act = useAction();
@@ -230,6 +210,29 @@ function ContestDrawer({ id, onClose, perms, onChanged }: { id: string | null; o
     const r = await post("refresh");
     if (r.ok) reload();
   };
+  const duplicate = () =>
+    act.ask({
+      title: `Duplicate ${c!.name}`,
+      description: "Creates a draft with the same settings and prizes for the next window of the same length. Review it and publish.",
+      confirmLabel: "Create draft copy",
+      confirmTestId: "contest-duplicate-confirm",
+      note: "none",
+      run: () => post<{ contest?: Contest }>("duplicate"),
+      success: (r: { contest?: Contest }) => `Draft created: ${r.contest?.name ?? c!.name}`,
+      onDone: (r: { contest?: Contest }) => {
+        onChanged();
+        if (r?.contest?.id) onOpen(String(r.contest.id));
+      },
+    });
+  const saveTemplate = () =>
+    act.ask({
+      title: `Save ${c!.name} as a template`,
+      description: "Keeps the scoring, eligibility, rules, anti-cheat and the prize split (as shares of the pool) for the next contest wizard.",
+      confirmLabel: "Save template",
+      note: "none",
+      run: () => post("save-template", {}),
+      success: "Template saved",
+    });
   const finalize = () =>
     act.ask({
       title: `Finalize ${c!.name}`,
@@ -245,7 +248,7 @@ function ContestDrawer({ id, onClose, perms, onChanged }: { id: string | null; o
   const pay = () =>
     act.ask({
       title: `Pay prizes · ${c!.name}`,
-      description: "Wallet prizes are credited to the client's wallet; credit prizes go to the entered live account as engine credit. Each payout is idempotent.",
+      description: "Pays every unpaid prize, including those waiting for approval above the auto-pay threshold. Wallet prizes are credited to the client's wallet; credit prizes go to the entered live account as engine credit. Each payout is idempotent.",
       body: (
         <div className="space-y-2">
           <div className="flex items-baseline justify-between rounded-[12px] border border-gold/30 bg-gold-soft px-4 py-3">
@@ -346,6 +349,16 @@ function ContestDrawer({ id, onClose, perms, onChanged }: { id: string | null; o
                   <Pencil /> Edit
                 </Button>
               )}
+              {perms.write && (
+                <Button size="sm" variant="surface" onClick={duplicate} data-testid="contest-duplicate">
+                  <Copy /> Duplicate
+                </Button>
+              )}
+              {perms.write && (
+                <Button size="sm" variant="ghost" onClick={saveTemplate} data-testid="contest-save-template">
+                  <LayoutTemplate /> Save as template
+                </Button>
+              )}
               {perms.write && ["running", "ended"].includes(c.status) && (
                 <Button size="sm" variant="surface" onClick={refresh}>
                   <RefreshCw /> Refresh scores
@@ -356,7 +369,7 @@ function ContestDrawer({ id, onClose, perms, onChanged }: { id: string | null; o
                   Finalize
                 </Button>
               )}
-              {perms.approve && c.status === "finalized" && (
+              {perms.approve && c.status === "finalized" && unpaid.length > 0 && (
                 <Button size="sm" variant="buy" onClick={pay} data-testid="contest-pay">
                   <Wallet /> Pay prizes
                 </Button>
@@ -554,291 +567,5 @@ function ContestDrawer({ id, onClose, perms, onChanged }: { id: string | null; o
       {act.node}
       {c && <ContestWizard open={editing} onOpenChange={setEditing} initial={c} onSaved={() => done()} />}
     </Dialog>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Create wizard (one scrolling form, numbered steps)                    */
-/* ------------------------------------------------------------------ */
-
-type PrizeRow = { rankFrom: string; rankTo: string; amount: string; payout: "wallet" | "credit" };
-
-function startOfTomorrow(addDays = 1) {
-  const d = new Date();
-  d.setDate(d.getDate() + addDays);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
-}
-
-/** Scoring choices per instrument: volume is lots for CFDs and contracts for options (an option contract is never a lot). */
-function scoringOptions(instrument: ContestInstrument): { value: Scoring; label: string }[] {
-  return [
-    { value: "return_pct", label: instrument === "options" ? "Return % (realised option P&L ÷ start equity)" : "Return % (realised + floating ÷ start equity)" },
-    { value: "profit", label: instrument === "options" ? "Profit (realised option P&L, USD)" : "Profit (USD)" },
-    instrument === "options" ? { value: "contracts", label: "Contracts traded" } : { value: "lots", label: "Lots traded" },
-  ];
-}
-
-const numText = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
-
-/**
- * Create or edit a contest. Editing a draft or scheduled contest changes everything; once it has started only the
- * name, description, rules, seats, KYC rule and anti-cheat settings change (the service locks the rest).
- */
-function ContestWizard({ open, onOpenChange, onSaved, initial }: { open: boolean; onOpenChange: (o: boolean) => void; onSaved: (c: Contest | undefined) => void; initial?: Contest }) {
-  const [name, setName] = React.useState("");
-  const [description, setDescription] = React.useState("");
-  const [kind, setKind] = React.useState<"demo" | "live">("demo");
-  const [instrument, setInstrument] = React.useState<ContestInstrument>("cfd");
-  const [startsAt, setStartsAt] = React.useState("");
-  const [endsAt, setEndsAt] = React.useState("");
-  const [scoring, setScoring] = React.useState<Scoring>("return_pct");
-  const [minTrades, setMinTrades] = React.useState("5");
-  const [minPremium, setMinPremium] = React.useState("");
-  const [maxEntrants, setMaxEntrants] = React.useState("");
-  const [startingBalance, setStartingBalance] = React.useState("10000");
-  const [demoGroup, setDemoGroup] = React.useState("");
-  const [accountGroups, setAccountGroups] = React.useState("");
-  const [minEquity, setMinEquity] = React.useState("");
-  const [kyc, setKyc] = React.useState(false);
-  const [prizes, setPrizes] = React.useState<PrizeRow[]>([]);
-  const [rules, setRules] = React.useState("");
-  const [minHold, setMinHold] = React.useState("60");
-  const [maxSingle, setMaxSingle] = React.useState("50");
-  const [dqBalance, setDqBalance] = React.useState(true);
-  const [status, setStatus] = React.useState<"draft" | "scheduled">("scheduled");
-  const editing = !!initial;
-  // the service locks timing, scoring, eligibility and prizes once a contest has started
-  const locked = !!initial && !["draft", "scheduled"].includes(initial.status);
-  // the drawer re-reads the contest every 15 s: the form is filled once per opening, never reset while editing
-  const initialRef = React.useRef(initial);
-  initialRef.current = initial;
-  const initialId = initial?.id;
-  React.useEffect(() => {
-    if (!open) return;
-    const c = initialRef.current;
-    setName(c?.name ?? "");
-    setDescription(c?.description ?? "");
-    setKind(c?.kind ?? "demo");
-    setInstrument(c?.instrument ?? "cfd");
-    setStartsAt(toLocalInput(c?.startsAt ?? startOfTomorrow(1)));
-    setEndsAt(toLocalInput(c?.endsAt ?? startOfTomorrow(8)));
-    setScoring(c?.scoring ?? "return_pct");
-    setMinTrades(c ? String(c.minTrades) : "5");
-    setMinPremium(numText(c?.minPremium));
-    setMaxEntrants(numText(c?.maxEntrants));
-    setStartingBalance(c ? numText(c.startingBalance) || "10000" : "10000");
-    setDemoGroup(c?.demoGroup ?? "");
-    setAccountGroups(c?.accountGroups.join(", ") ?? "");
-    setMinEquity(numText(c?.minEquity));
-    setKyc(c?.kycRequired ?? false);
-    setPrizes(
-      c
-        ? c.prizes.map((p) => ({ rankFrom: String(p.rankFrom), rankTo: String(p.rankTo), amount: String(p.amount), payout: p.payout }))
-        : [
-            { rankFrom: "1", rankTo: "1", amount: "500", payout: "wallet" },
-            { rankFrom: "2", rankTo: "2", amount: "250", payout: "wallet" },
-            { rankFrom: "3", rankTo: "3", amount: "100", payout: "wallet" },
-          ],
-    );
-    setRules(c?.rules ?? "");
-    setMinHold(c ? String(c.antiCheat.minHoldSeconds) : "60");
-    setMaxSingle(c ? String(c.antiCheat.maxSingleTradePct) : "50");
-    setDqBalance(c?.antiCheat.disqualifyOnBalanceChange ?? true);
-    setStatus(c?.status === "draft" ? "draft" : "scheduled");
-  }, [open, initialId]);
-
-  const options = instrument === "options";
-  const pickInstrument = (v: ContestInstrument) => {
-    setInstrument(v);
-    // keep the scoring mode valid: volume is lots for CFDs and contracts for options
-    if (v === "options" && scoring === "lots") setScoring("contracts");
-    if (v === "cfd" && scoring === "contracts") setScoring("lots");
-  };
-
-  const parsed: Prize[] = prizes.map((p) => ({ rankFrom: Math.round(Number(p.rankFrom)), rankTo: Math.round(Number(p.rankTo)), amount: Number(p.amount), payout: kind === "demo" ? "wallet" : p.payout }));
-  const pool = parsed.reduce((s, p) => s + (p.rankTo >= p.rankFrom && p.amount > 0 ? (p.rankTo - p.rankFrom + 1) * p.amount : 0), 0);
-  const upd = (i: number, patch: Partial<PrizeRow>) => setPrizes((x) => x.map((p, j) => (j === i ? { ...p, ...patch } : p)));
-  const antiCheat = { minHoldSeconds: Math.max(0, Math.round(Number(minHold) || 0)), maxSingleTradePct: Number(maxSingle) || 0, disqualifyOnBalanceChange: dqBalance };
-
-  const submit = () => {
-    if (!name.trim()) return "Give the contest a name.";
-    if (locked) {
-      // after the start: only the fields the service still accepts
-      return mkSend<{ contest: Contest }>(`contests/${initial!.id}`, { name: name.trim(), description: description.trim(), rules: rules.trim(), maxEntrants: numOrNull(maxEntrants), kycRequired: kind === "live" ? kyc : false, antiCheat }, "PATCH");
-    }
-    const s = fromLocalInput(startsAt);
-    const e = fromLocalInput(endsAt);
-    if (!s || !e) return "Set when the contest starts and ends.";
-    if (e <= s) return "Ends must be after Starts.";
-    if (kind === "demo" && !(Number(startingBalance) > 0)) return "Set the demo starting balance.";
-    if (options && minPremium.trim() !== "" && !(Number(minPremium) >= 0)) return "The minimum premium must be 0 or more.";
-    let last = 0;
-    for (const p of parsed) {
-      if (!(p.rankFrom >= 1) || !(p.rankTo >= p.rankFrom)) return "Each prize row needs Rank from ≤ Rank to.";
-      if (p.rankFrom <= last) return "Prize ranks must not overlap and must go down the table in order.";
-      if (!(p.amount > 0)) return "Each prize needs an amount above 0.";
-      last = p.rankTo;
-    }
-    const body: ContestInput = {
-      name: name.trim(),
-      description: description.trim(),
-      kind,
-      instrument,
-      startsAt: s,
-      endsAt: e,
-      scoring,
-      minTrades: Math.max(0, Math.round(Number(minTrades) || 0)),
-      maxEntrants: numOrNull(maxEntrants),
-      startingBalance: kind === "demo" ? Number(startingBalance) : null,
-      demoGroup: kind === "demo" ? demoGroup.trim() || null : null,
-      accountGroups: kind === "live" ? splitList(accountGroups) : [],
-      kycRequired: kind === "live" ? kyc : false,
-      minEquity: kind === "live" ? numOrNull(minEquity) : null,
-      prizes: parsed,
-      rules: rules.trim(),
-      antiCheat,
-      minPremium: options ? numOrNull(minPremium) : null,
-      status,
-    };
-    return editing ? mkSend<{ contest: Contest }>(`contests/${initial!.id}`, body, "PATCH") : mkSend<{ contest: Contest }>("contests", body);
-  };
-
-  const Step = ({ n, title, hint }: { n: number; title: string; hint?: string }) => (
-    <div className="flex items-center gap-2.5">
-      <span className="k-num grid size-6 place-items-center rounded-full border border-line bg-surface-2 text-[11.5px] font-semibold text-fg-2">{n}</span>
-      <div>
-        <div className="text-[14px] font-medium">{title}</div>
-        {hint && <div className="text-[12px] text-fg-3">{hint}</div>}
-      </div>
-    </div>
-  );
-
-  return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      side="right"
-      title={editing ? `Edit ${initial!.name}` : "New contest"}
-      description={locked ? "The contest has started: timing, instrument, scoring, eligibility and prizes are locked." : "Configure the window, instrument, scoring, eligibility, prizes and anti-cheat rules."}
-      submitLabel={editing ? "Save changes" : status === "draft" ? "Save draft" : "Schedule contest"}
-      submitTestId="contest-form-submit"
-      footerNote={<span className="k-num">Pool {usd(pool, 0)}</span>}
-      submit={submit}
-      success={(r: { contest?: Contest }) => (editing ? `${r.contest?.name ?? name} saved` : `${r.contest?.name ?? name} ${status === "draft" ? "saved as draft" : "scheduled"}`)}
-      onDone={(r: { contest?: Contest }) => onSaved(r.contest)}
-    >
-      <div className="space-y-3">
-        <Step n={1} title="Basics" />
-        <TextF label="Name" value={name} onChange={setName} placeholder="e.g. October FX Masters" maxLength={120} />
-        <AreaF label="Description" value={description} onChange={setDescription} rows={2} />
-        <fieldset disabled={locked} className={cn("grid min-w-0 grid-cols-2 gap-3", locked && "opacity-60")}>
-          <SelectF label="Account type" value={kind} onChange={setKind} options={[{ value: "demo", label: "Demo (new account per entrant)" }, { value: "live", label: "Live (client's own account)" }]} className="col-span-2" />
-          <SelectF
-            label="Instrument"
-            value={instrument}
-            onChange={pickInstrument}
-            options={[
-              { value: "cfd", label: "CFD (lots)" },
-              { value: "options", label: "Options (Kalks FX Options, contracts)" },
-            ]}
-            hint={options ? "Only option trades count, on realised P&L" : "CFD trades only; options never count"}
-            className="col-span-2"
-          />
-          <DateTimeF label="Starts" value={startsAt} onChange={setStartsAt} />
-          <DateTimeF label="Ends" value={endsAt} onChange={setEndsAt} />
-        </fieldset>
-      </div>
-
-      <fieldset disabled={locked} className={cn("min-w-0 space-y-3", locked && "opacity-60")}>
-        <Step n={2} title="Scoring and eligibility" hint={options ? "Only option exits closed inside the window on the entered account count: closes, expiry settlements, knock-outs" : "Only deals closed inside the window on the entered account count"} />
-        <div className="grid grid-cols-2 gap-3">
-          <SelectF label="Scoring" value={scoring} onChange={setScoring} options={scoringOptions(instrument)} className="col-span-2" />
-          <NumF label="Min trades" value={minTrades} onChange={setMinTrades} step={1} hint="to rank" />
-          <NumF label="Max entrants" value={maxEntrants} onChange={setMaxEntrants} step={1} placeholder="Unlimited" />
-          {options && (
-            <NumF
-              label="Minimum premium per trade"
-              value={minPremium}
-              onChange={setMinPremium}
-              prefix="$"
-              placeholder="None"
-              hint="Trades opened for less add no contracts and don't count as a trade (their P&L still counts), so penny options can't farm volume"
-              className="col-span-2"
-            />
-          )}
-          {kind === "demo" ? (
-            <>
-              <NumF label="Starting balance" value={startingBalance} onChange={setStartingBalance} prefix="$" />
-              <TextF label="Demo group" value={demoGroup} onChange={setDemoGroup} placeholder="Default demo group" mono hint={options ? "Must have options enabled" : undefined} />
-            </>
-          ) : (
-            <>
-              <TextF label="Account groups" value={accountGroups} onChange={setAccountGroups} placeholder="All live groups" hint={options ? "comma separated; copy, PAMM, MAM and prop never trade options" : "comma separated"} />
-              <NumF label="Minimum equity" value={minEquity} onChange={setMinEquity} prefix="$" placeholder="None" />
-            </>
-          )}
-        </div>
-        {options && (
-          <div className="rounded-[12px] border border-info/25 bg-info-soft px-4 py-3 text-[12.5px] leading-relaxed text-fg-2" data-testid="contest-options-note">
-            Open only to clients who can trade Kalks FX Options (the options intro accepted) on accounts outside copy, PAMM, MAM and prop groups. Self-trades between a client&apos;s own accounts are left out of the score and flagged for review. Options still earn no loyalty points, cashback or bonus release.
-          </div>
-        )}
-      </fieldset>
-      {kind === "live" && (
-        <div className="k-row px-4">
-          <ToggleRow label="Require verified KYC" hint="Only verified clients can join" checked={kyc} onChange={setKyc} />
-        </div>
-      )}
-
-      <fieldset disabled={locked} className={cn("min-w-0 space-y-3", locked && "opacity-60")}>
-        <Step n={3} title="Prizes" hint={kind === "demo" ? "Demo contests pay prizes to the wallet" : "Wallet credit, or engine credit on the entered live account"} />
-        <div className="space-y-2">
-          {prizes.map((p, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_1.3fr_1.2fr_auto] items-end gap-2">
-              <NumF label={`Rank from (${i + 1})`} value={p.rankFrom} onChange={(v) => upd(i, { rankFrom: v })} step={1} />
-              <NumF label={`Rank to (${i + 1})`} value={p.rankTo} onChange={(v) => upd(i, { rankTo: v })} step={1} />
-              <NumF label={`Amount (${i + 1})`} value={p.amount} onChange={(v) => upd(i, { amount: v })} prefix="$" />
-              {kind === "live" ? (
-                <SelectF label={`Payout (${i + 1})`} value={p.payout} onChange={(v) => upd(i, { payout: v })} options={[{ value: "wallet", label: "Wallet" }, { value: "credit", label: "Credit" }]} />
-              ) : (
-                <div className="flex h-10 items-center text-[12.5px] text-fg-3">Wallet</div>
-              )}
-              <button type="button" onClick={() => setPrizes((x) => x.filter((_, j) => j !== i))} className="grid size-10 place-items-center rounded-[12px] border border-line text-fg-3 hover:text-down" aria-label={`Remove prize row ${i + 1}`}>
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-          ))}
-          <Button
-            size="sm"
-            variant="surface"
-            onClick={() => {
-              const last = prizes[prizes.length - 1];
-              const from = last ? Number(last.rankTo) + 1 : 1;
-              setPrizes((x) => [...x, { rankFrom: String(from), rankTo: String(from), amount: "50", payout: "wallet" }]);
-            }}
-          >
-            <Plus /> Add prize row
-          </Button>
-          <div className="k-row flex items-center justify-between px-4 py-2.5">
-            <span className="text-[12.5px] text-fg-3">Prize pool</span>
-            <span className="k-num text-[15px] font-semibold text-gold">{usd(pool, 0)}</span>
-          </div>
-        </div>
-      </fieldset>
-
-      <div className="space-y-3">
-        <Step n={4} title="Rules and anti-cheat" />
-        <AreaF label="Rules" value={rules} onChange={setRules} rows={4} placeholder="Shown to clients on the contest page" />
-        <div className="grid grid-cols-2 gap-3">
-          <NumF label="Minimum hold" value={minHold} onChange={setMinHold} suffix="seconds" step={1} />
-          <NumF label="Max single trade" value={maxSingle} onChange={setMaxSingle} suffix="% of profit" />
-        </div>
-        <div className="k-row px-4">
-          <ToggleRow label="Disqualify on balance change" hint="Deposits, withdrawals, transfers or staff adjustments during the contest" checked={dqBalance} onChange={setDqBalance} />
-        </div>
-        {!locked && <SelectF label="Publish as" value={status} onChange={setStatus} options={[{ value: "scheduled", label: "Scheduled (visible, opens at start)" }, { value: "draft", label: "Draft (hidden)" }]} />}
-      </div>
-    </FormDialog>
   );
 }

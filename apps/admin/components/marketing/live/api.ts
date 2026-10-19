@@ -188,6 +188,10 @@ export type ContestInput = {
   /** Options contests: minimum opening premium per trade (USD) for volume and trade count; null = none. */
   minPremium: number | null;
   status: "draft" | "scheduled";
+  /** Phase 4: CFD asset classes that count (empty = all), the template it came from, the contest it was cloned from. */
+  assetClasses?: string[];
+  templateId?: number | null;
+  clonedFrom?: number | null;
 };
 
 export type Contest = Omit<ContestInput, "status" | "slug"> & { id: number; slug: string; status: ContestStatus; entrants: number; prizePool: number; updatedAt: string };
@@ -240,7 +244,24 @@ export type ContestDetail = { contest: Contest; leaderboard: Standing[]; flags: 
 /* Loyalty                                                              */
 /* ------------------------------------------------------------------ */
 
-export type Settings = { pointValue: number; minHoldSeconds: number; pointsExpiryMonths: number; cashbackHoldHours: number; demoPoints?: boolean };
+export type Settings = {
+  pointValue: number;
+  minHoldSeconds: number;
+  pointsExpiryMonths: number;
+  cashbackHoldHours: number;
+  demoPoints?: boolean;
+  // challenges (phase 4)
+  autoPayBelow?: number;
+  autoFinalize?: boolean;
+  autoFinalizeDelayMinutes?: number;
+  publicLeaderboards?: boolean;
+  nicknamePublicDefault?: boolean;
+  streakGraceDays?: number;
+  missionMinLots?: number;
+  missionMinHoldSeconds?: number;
+  xpContestJoin?: number;
+  xpStreakWeek?: number;
+};
 export type Tier = { key: string; name: string; rank: number; minPoints: number; multiplier: number; perks: string[] };
 export type EarnRule = { id: number; name: string; assetClass: string | null; symbols: string[]; accountGroups: string[]; accountType: "live" | "demo" | "any"; pointsPerLot: number; active: boolean; priority: number };
 export type CatalogueKind = "cashback" | "bonus_credit" | "fee_discount";
