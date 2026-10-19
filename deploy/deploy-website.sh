@@ -9,6 +9,10 @@ cd apps/trader
 f=.env.production.local; touch "$f"
 grep -q '^NEWS_URL=' "$f" || printf 'NEWS_URL=http://127.0.0.1:8103\n' >> "$f"
 grep -q '^NEWS_INTERNAL_TOKEN=' "$f" || printf 'NEWS_INTERNAL_TOKEN=%s\n' "$(grep '^NEWS_INTERNAL_TOKEN=' ~/kalks/.env.local | cut -d= -f2-)" >> "$f"
+# editable copy and pictures from the content service's public read (no token: published content only); media URLs
+# point at the API host (CONTENT_PUBLIC_URL in ~/kalks/.env.local)
+grep -q '^CONTENT_URL=' "$f" || printf 'CONTENT_URL=http://127.0.0.1:8105\n' >> "$f"
+grep -q '^CONTENT_TENANT=' "$f" || printf 'CONTENT_TENANT=kalks\n' >> "$f"
 npm ci --no-audit --no-fund
 NODE_OPTIONS=--max-old-space-size=6144 npm run build
 sudo cp ~/kalks/deploy/systemd/kalks-website.service /etc/systemd/system/

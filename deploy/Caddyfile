@@ -54,6 +54,11 @@ trade.kalkstrade.com {
 # /support/stream = support inbox + staff notifications stream (one-time ticket from the admin BFF).
 admin.kalkstrade.com {
 	import common
+	# media library uploads: 10 MB images; the content service enforces the exact limit and sniffs the type
+	@contentUpload path /api/content/media /api/content/media/*
+	request_body @contentUpload {
+		max_size 11MB
+	}
 	handle /support/stream {
 		rewrite * /v1/stream?{query}
 		reverse_proxy 127.0.0.1:8100
@@ -80,6 +85,15 @@ api.kalkstrade.com {
 			reverse_proxy 127.0.0.1:8099
 		}
 		respond 404
+	}
+	# editable content + media library: only the public read-only routes (published content, media files); the
+	# editor API (/v1/admin/*) stays on the server
+	@contentPublic {
+		method GET HEAD
+		path /v1/public/content /v1/public/media/*
+	}
+	handle @contentPublic {
+		reverse_proxy 127.0.0.1:8105
 	}
 	# Kalks FX Options public chain (read-only; the service answers 404 until the public chain is switched on)
 	handle /v1/public/options/* {

@@ -16,6 +16,7 @@ export const SERVICES: ServiceDef[] = [
   { key: "algo", name: "Algo", detail: "Strategies, backtests, runtime, API keys · :8099", url: u(process.env.ALGO_URL, "http://127.0.0.1:8099") },
   { key: "support", name: "Support", detail: "Tickets and notifications · :8100", url: u(process.env.SUPPORT_URL, "http://127.0.0.1:8100"), optional: true },
   { key: "growth", name: "Growth", detail: "Bonuses, contests, rewards · :8101", url: u(process.env.GROWTH_URL, "http://127.0.0.1:8101"), optional: true },
+  { key: "content", name: "Content", detail: "Editable pages, media library · :8105", url: u(process.env.CONTENT_URL, "http://127.0.0.1:8105"), optional: true },
 ];
 
 export type Probe = {

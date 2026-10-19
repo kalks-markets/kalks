@@ -90,6 +90,17 @@ cargo test -p growth
 
 Its settings (`GROWTH_*`) live in `.env.local` at the repo root; the Client Area and Back Office need `GROWTH_URL` / `GROWTH_INTERNAL_TOKEN` in their `.env.local`. Client pages are under `/rewards` (contests, loyalty, cashback, promotions), public share cards at `/s/CODE`; staff pages under `/marketing` (permissions `marketing.read|write|approve`). Rules, API and integration guide: [services/growth/README.md](services/growth/README.md).
 
+## Content and media library
+
+Editable copy and pictures for the website, the Client Area and Kalks Trader: the Rust content service keeps a media library (PNG / JPEG / WebP / SVG up to 10 MB, a light and an optional dark-theme file, resized WebP variants, alt text per language) and content slots per surface / page / slot / locale with draft → publish versions, rollback (last 50 kept) and English fallback. Staff edit in the Back Office under Content → Pages and Content → Media library (permissions `content.read|write|publish`); the apps read the public endpoint server-side and keep their built-in copy for every empty slot, so nothing changes until something is published. It uses PostgreSQL on port 5433 (database `kalks_content`, created and migrated on first start) and stores files under `CONTENT_STORAGE_DIR` (default `~/.kalks-data/content`; Cloudflare R2 with `CONTENT_STORAGE=r2`).
+
+```bash
+cargo run -p content               # http://127.0.0.1:8105 (public read + BFFs)
+cargo test -p content
+```
+
+Its settings (`CONTENT_*`, `R2_*`) live in `.env.local` at the repo root; the apps need `CONTENT_URL` and the Back Office also `CONTENT_INTERNAL_TOKEN`. API, slot catalogue and how to add a slot: [docs/CONTENT.md](docs/CONTENT.md).
+
 ## Layout
 
 ```
@@ -104,6 +115,7 @@ services/trading      Rust trading engine (accounts, orders, margin, ledger, dea
 services/ib           Rust IB / referral programme (tree, commissions, payouts) — :8096
 services/growth       Rust rewards + marketing (loyalty, cashback, contests, bonuses, promos, banners, share cards) — :8101
 services/support      Rust support chat + AI help bot + notifications — :8100
+services/content      Rust content + media library (editable pages, light / dark images, versions) — :8105
 config/         Instrument catalogue + trading contract specs
 brand/          Logo sources
 scripts/        Asset sync
@@ -116,4 +128,5 @@ docs/           Conventions, integrations list, website content PDF
 
 - `docs/CONVENTIONS.md`: how pages and components are built
 - `docs/INTEGRATIONS.md`: every key and credential the Super Admin needs to go live
+- `docs/CONTENT.md`: content service API, slot catalogue, preview links, storage (disk / R2)
 - `docs/Kalks-Website-Content.pdf`: full website copy and build spec for kalkstrade.com
