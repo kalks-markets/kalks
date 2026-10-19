@@ -9,6 +9,7 @@ import { Chip, type ChipTone, IconButton, Button } from "./primitives";
 import { Icon3D } from "./avatars";
 import { Illustration, type IllustrationName } from "./illustration";
 import { SpotlightCard } from "../effects/effects";
+import { ThemedImage, useContentImage } from "../content/react";
 
 /* ------------------------------------------------------------------ */
 /* KPI card — Signal-AI reference                                      */
@@ -94,10 +95,34 @@ export function CopyButton({ value, label, className }: { value: string; label?:
 
 /** `art` shows one of the founder's illustrations instead of the icon: only for a state with nothing to show (the
  *  whole page or panel is empty) or a result worth marking, never for a quiet line inside a data screen. */
-export function EmptyState({ illustration = "package", art, title, text, action, className }: { illustration?: string; art?: IllustrationName; title: string; text?: string; action?: React.ReactNode; className?: string }) {
+export function EmptyState({
+  illustration = "package",
+  art,
+  title,
+  text,
+  action,
+  className,
+  contentSlot,
+}: {
+  illustration?: string;
+  art?: IllustrationName;
+  title: string;
+  text?: string;
+  action?: React.ReactNode;
+  className?: string;
+  /** an image slot (content service, docs/CONTENT.md) that replaces the illustration once staff publish one */
+  contentSlot?: { page: string; slot: string };
+}) {
+  const custom = useContentImage(contentSlot?.page ?? "", contentSlot?.slot ?? "");
   return (
     <div className={cn("flex flex-col items-center justify-center px-6 py-14 text-center", className)}>
-      {art ? <Illustration name={art} width={208} maxHeight={156} className="mb-2" /> : <Icon3D name={illustration} size={72} />}
+      {custom ? (
+        <ThemedImage src={custom.url} srcSet={custom.srcset} darkSrc={custom.dark?.url} darkSrcSet={custom.dark?.srcset} alt={custom.alt} sizes="208px" className="mb-2 h-auto max-h-[156px] w-[208px] object-contain" />
+      ) : art ? (
+        <Illustration name={art} width={208} maxHeight={156} className="mb-2" />
+      ) : (
+        <Icon3D name={illustration} size={72} />
+      )}
       <h4 className="mt-4 text-base font-medium">{title}</h4>
       {text && <p className="mt-1 max-w-sm text-sm text-fg-3">{text}</p>}
       {action && <div className="mt-5">{action}</div>}

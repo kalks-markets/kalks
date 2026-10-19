@@ -20,6 +20,9 @@
     "./primitives": "./src/components/primitives.tsx",
     "./swr-cache": "./src/lib/swr-cache.ts",
     "./illustration": "./src/components/illustration.tsx",
+    "./content": "./src/content/react.tsx",
+    "./content/server": "./src/content/server.ts",
+    "./content/types": "./src/content/types.ts",
     "./*": "./src/*"
   },
   "scripts": {

@@ -10,6 +10,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { ThemedImage, useContentImage } from "@kalks/ui/content";
 import { cn } from "@/components/kit";
 
 export type HeroPage = "dashboard" | "accounts" | "wallet" | "portfolio" | "copy" | "prop" | "markets" | "options" | "partner" | "rewards" | "academy" | "profile" | "support" | "news";
@@ -74,12 +75,16 @@ export function photoForPath(path: string): HeroPage {
  *  colour tints the page), so moving between pages never drops to plain black. */
 export function usePagePhoto(path: string) {
   const page = photoForPath(path);
+  // a photo staff published for the page (content slot app/<page>/hero.image; the Client Area is dark only, so its
+  // dark file when it has one)
+  const custom = useContentImage(page, "hero.image");
+  const photo = custom ? (custom.dark ?? custom).url : `/heroes/${page}.jpg`;
   React.useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--k-page-photo", `url("/heroes/${page}.jpg")`);
+    root.style.setProperty("--k-page-photo", `url(${JSON.stringify(photo)})`);
     root.style.setProperty("--k-photo-rgb", PHOTO_RGB[page]);
     root.dataset.photo = page;
-  }, [page]);
+  }, [page, photo]);
 }
 
 function useHeroHeader(ref: React.RefObject<HTMLElement | null>) {
@@ -158,8 +163,7 @@ export function PageHero({
       className="k-page-hero relative isolate -mx-4 mb-6 overflow-hidden rounded-b-[28px] bg-[#2a0f08] text-white [--k-hero-gap:12px] sm:mx-0 sm:rounded-[28px] sm:[--k-hero-gap:4px]"
       style={{ marginTop: "calc(-1 * (var(--k-hdr, 76px) + var(--k-hero-gap)))" }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={`/heroes/${page}.jpg`} alt="" aria-hidden className="absolute inset-0 -z-10 h-full w-full object-cover" style={{ objectPosition: FOCUS[page] }} />
+      <HeroPhoto page={page} />
       {/* legibility: the bar on top, the headline on the left, the cards at the bottom */}
       <div aria-hidden className="absolute inset-x-0 top-0 -z-10 h-56 bg-gradient-to-b from-black/55 via-black/25 to-transparent lg:h-40 lg:from-black/45 lg:via-transparent" />
       <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_50%_80%,rgba(0,0,0,.32),transparent_70%)]" />
@@ -183,6 +187,18 @@ export function PageHero({
       {children && <div className="relative px-3 pb-3 sm:px-4 sm:pb-4">{children}</div>}
     </section>
   );
+}
+
+/** The page's photo: the one staff published (content slot app/<page>/hero.image, light + dark files), else the
+ *  built-in public/heroes/<page>.jpg. */
+function HeroPhoto({ page }: { page: HeroPage }) {
+  const img = useContentImage(page, "hero.image");
+  const cls = "absolute inset-0 -z-10 h-full w-full object-cover";
+  if (!img) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={`/heroes/${page}.jpg`} alt="" aria-hidden className={cls} style={{ objectPosition: FOCUS[page] }} />;
+  }
+  return <ThemedImage src={img.url} srcSet={img.srcset} darkSrc={img.dark?.url} darkSrcSet={img.dark?.srcset} sizes="100vw" alt="" aria-hidden priority className={cls} />;
 }
 
 /** the frosted card on the photo (the reference's run card) */

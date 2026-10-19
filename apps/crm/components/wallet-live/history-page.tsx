@@ -54,7 +54,7 @@ function Inner() {
           </div>
           <div className="space-y-2 px-4 pb-5 pt-4 sm:px-6">
             {loading && <Skeleton className="h-40 w-full rounded-[14px]" />}
-            {data && data.items.length === 0 && <EmptyState art="emptyHistory" title={t("common.noData")} text={t("wallet.history.emptyText")} />}
+            {data && data.items.length === 0 && <EmptyState art="emptyHistory" contentSlot={{ page: "empty", slot: "history.image" }} title={t("common.noData")} text={t("wallet.history.emptyText")} />}
             {data?.items.map((a) => <ActivityRow key={`${a.type}${a.id}`} a={a} />)}
             {data && data.total > PER && (
               <div className="flex items-center justify-between pt-2 text-[12.5px] text-fg-3">

@@ -5,7 +5,9 @@ import { BrandProvider } from "@kalks/ui/brand";
 import { brandCss, isCustomBrand } from "@kalks/ui/brand-vars";
 import { Providers } from "@kalks/ui/providers";
 import { fontVariables } from "@kalks/ui/fonts";
+import { ContentProvider } from "@kalks/ui/content";
 import { getI18n } from "@kalks/i18n/server";
+import { appContent } from "@/lib/content";
 import { tenantBrand } from "@/lib/tenant-config";
 import "./globals.css";
 
@@ -52,13 +54,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   if (MARKET_DATA_ORIGIN) preconnect(MARKET_DATA_ORIGIN, { crossOrigin: "anonymous" });
   // language from the kalks_locale cookie (set by the switcher) or the browser's Accept-Language
   const [{ locale, dir, messages }, brand] = await Promise.all([getI18n(), tenantBrand()]);
+  // staff-edited copy and pictures (content service, surface "app"); empty slots keep the built-in defaults
+  const content = await appContent(locale);
   const css = brandCss(brand);
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning className={fontVariables}>
       <body>
         {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
         <BrandProvider brand={brand}>
-          <Providers forcedTheme="dark" i18n={{ locale, messages }}>{children}</Providers>
+          <Providers forcedTheme="dark" i18n={{ locale, messages }}>
+            <ContentProvider value={content}>{children}</ContentProvider>
+          </Providers>
         </BrandProvider>
       </body>
     </html>

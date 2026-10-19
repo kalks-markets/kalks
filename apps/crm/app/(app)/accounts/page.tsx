@@ -223,7 +223,7 @@ function DemoAccountsPage() {
               />
             </div>
             <div className="mt-4 space-y-3 px-4 pb-5 sm:px-6">
-              {list.length === 0 && <EmptyState art="welcome" title={t("accounts.empty.noAccounts")} text={t("accounts.empty.openFirst")} />}
+              {list.length === 0 && <EmptyState art="welcome" contentSlot={{ page: "empty", slot: "accounts.image" }} title={t("accounts.empty.noAccounts")} text={t("accounts.empty.openFirst")} />}
               {list.map((a, i) => (
                 <Reveal key={a.login} delay={i * 0.05}>{tab === "archived" ? <ArchivedRow a={a} /> : <AccountRow a={a} />}</Reveal>
               ))}

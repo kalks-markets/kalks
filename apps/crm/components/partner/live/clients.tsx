@@ -612,6 +612,7 @@ export function LivePartnerClients() {
                 <div className="py-6">
                   <CardEmpty
                     art="partnerIb"
+                    contentSlot={{ page: "empty", slot: "referrals.image" }}
                     title={t("partner.clients.emptyTitle")}
                     text={t("partner.clients.emptyText")}
                   >

@@ -39,6 +39,8 @@ import { fmt, useWallet, type ActivityItem, type Page, type WalletConfig } from 
 import { KIND_LABEL } from "@/components/wallet-live/ui";
 import { useGrowth, type Rewards } from "@/components/growth/api";
 import { BannerSlot } from "@/components/growth/banner-slot";
+import { ContentBanner } from "@/components/dashboard/home/content-banner";
+import { useContentText } from "@kalks/ui/content";
 import { LiveCalendarCard, LiveNewsCard, LiveWorldCard } from "@/components/news-live/dashboard";
 import { Trans, useFormat, useT } from "@kalks/i18n/react";
 import { AccountsPanel, type CardAccount } from "@/components/dashboard/home/accounts-panel";
@@ -401,6 +403,9 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
   const readOnly = useReadOnly();
   // modules the broker switched off (gateway): their cards, KPIs, links and quick actions are left out
   const on = useModules();
+  // optional headline over the hero photo (content slots app/dashboard/hero.*; none by default, as before)
+  const heroTitle = useContentText("dashboard", "hero.title", "");
+  const heroLead = useContentText("dashboard", "hero.lead", "");
   const acc = useAccounts(10000);
   // Archived / closed accounts live on the Accounts page's Archived tab only.
   const accounts = React.useMemo(() => acc.data?.accounts.filter((a) => !isArchived(a)) ?? null, [acc.data]);
@@ -535,6 +540,8 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
       <PageHero
         page="dashboard"
         center
+        title={heroTitle || undefined}
+        lead={heroLead || undefined}
         body={!readOnly && on("ai") ? <AskAi hero chips={aiChips} chat={on("support_chat")} /> : undefined}
       />
 
@@ -601,6 +608,7 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
         ]}
       />
 
+      <ContentBanner />
       <BannerSlot placement="dashboard" />
 
       {/* Home, kept short (founder 2026-10-10): Ask Kalks AI with the shortcuts under it, your accounts beside them */}

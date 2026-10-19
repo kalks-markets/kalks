@@ -615,7 +615,7 @@ export function LivePortfolio() {
                   <CardHeader title={tx("portfolio.kpi.openPositions")} subtitle={tx("portfolio.positions.subtitle")} />
                   <div className="mt-3 space-y-2 px-4 pb-5 sm:px-6">
                     {positions === null && <Skeleton className="h-24 w-full rounded-[14px]" />}
-                    {positions && positions.length === 0 && <EmptyState art="emptyPosition" title={tx("portfolio.positions.empty")} className="py-8" />}
+                    {positions && positions.length === 0 && <EmptyState art="emptyPosition" contentSlot={{ page: "empty", slot: "positions.image" }} title={tx("portfolio.positions.empty")} className="py-8" />}
                     {positions?.map(({ a, p }) => {
                       const isOpt = isOptionTrade(p);
                       const prem = isOpt ? positionPremiumsUsd(p, usdFactorOf(a)) : null;

@@ -5,6 +5,8 @@ import { getI18n } from "@kalks/i18n/server";
 import { BrandProvider } from "@kalks/ui/brand";
 import { KALKS_ICONS, brandCss, isCustomBrand } from "@kalks/ui/brand-vars";
 import { fontVariables } from "@kalks/ui/fonts";
+import { ContentProvider } from "@kalks/ui/content";
+import { traderContent } from "@/lib/content";
 import { tenantBrand, tenantModules } from "@/lib/tenant-brand";
 import { TerminalProviders } from "./providers";
 import "./globals.css";
@@ -45,6 +47,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   if (MARKET_DATA_ORIGIN) preconnect(MARKET_DATA_ORIGIN, { crossOrigin: "anonymous" });
   // same language cookie as the Client Area (kalks_locale), else the browser's Accept-Language
   const [{ locale, dir, messages }, brand, modules] = await Promise.all([getI18n(), tenantBrand(), tenantModules()]);
+  // staff-edited copy and pictures (content service, surface "trader"); empty slots keep the built-in defaults
+  const content = await traderContent(locale);
   const css = brandCss(brand);
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning className={fontVariables}>
@@ -52,7 +56,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
         <BrandProvider brand={brand}>
           <TerminalProviders locale={locale} messages={messages} modules={modules}>
-            {children}
+            <ContentProvider value={content}>{children}</ContentProvider>
           </TerminalProviders>
         </BrandProvider>
       </body>
