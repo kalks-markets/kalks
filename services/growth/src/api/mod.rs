@@ -4,6 +4,7 @@
 //! staff identity headers the admin BFF verified with the gateway.
 
 pub mod admin;
+pub mod challenges;
 pub mod client;
 pub mod journeys;
 pub mod public;
@@ -37,7 +38,16 @@ pub fn router(st: AppState) -> Router {
         .route("/v1/growth/me/contests", get(client::contests))
         .route("/v1/growth/me/contests/{id}", get(client::contest))
         .route("/v1/growth/me/contests/{id}/join", post(client::join))
+        // challenges (phase 4): Rewards hub, missions, XP, nickname, leaderboards, Kalks Trader rank widget
+        .route("/v1/growth/me/hub", get(challenges::hub))
+        .route("/v1/growth/me/missions", get(challenges::my_missions))
+        .route("/v1/growth/me/xp", get(challenges::my_xp))
+        .route("/v1/growth/me/nickname", get(challenges::my_nickname).post(challenges::set_nickname))
+        .route("/v1/growth/me/leaderboard", get(challenges::my_leaderboard))
+        .route("/v1/growth/me/rank", get(challenges::my_rank))
         .route_layer(middleware::from_fn_with_state(st.clone(), crate::modules::gate));
+    // public website API (no internal token; nicknames only, cached): proxied on api.kalkstrade.com by Caddy
+    let public = Router::new().route("/v1/public/leaderboard", get(challenges::public_leaderboard)).route("/v1/public/contests", get(challenges::public_contests));
     let v1 = Router::new()
         // public (Client Area server) + other services
         .route("/v1/growth/public/shares/{code}", get(public::share))
@@ -84,6 +94,17 @@ pub fn router(st: AppState) -> Router {
         .route("/v1/growth/admin/contests/{id}/pay", post(admin::pay_contest))
         .route("/v1/growth/admin/contests/{id}/entries/{entry}/{action}", post(admin::entry_action))
         .route("/v1/growth/admin/contests/{id}/flags/{flag}/resolve", post(admin::resolve_flag))
+        .route("/v1/growth/admin/contests/{id}/duplicate", post(challenges::duplicate_contest))
+        .route("/v1/growth/admin/contests/{id}/save-template", post(challenges::save_as_template))
+        .route("/v1/growth/admin/contest-templates", get(challenges::list_templates).post(challenges::create_template))
+        .route("/v1/growth/admin/contest-templates/{id}", patch(challenges::patch_template))
+        .route("/v1/growth/admin/contest-templates/{id}/contest", post(challenges::contest_from_template))
+        .route("/v1/growth/admin/missions", get(challenges::list_missions).post(challenges::create_mission))
+        .route("/v1/growth/admin/missions/{id}", patch(challenges::patch_mission))
+        .route("/v1/growth/admin/missions/rewards/{id}/{action}", post(challenges::decide_mission_reward))
+        .route("/v1/growth/admin/payouts", get(challenges::payouts))
+        .route("/v1/growth/admin/levels", get(challenges::get_levels).put(challenges::put_levels))
+        .route("/v1/growth/admin/xp/adjust", post(challenges::adjust_xp))
         .route("/v1/growth/admin/journeys", get(journeys::list).post(journeys::create))
         .route("/v1/growth/admin/journeys/meta", get(journeys::meta))
         .route("/v1/growth/admin/journeys/{id}", get(journeys::get).patch(journeys::patch))
@@ -98,6 +119,7 @@ pub fn router(st: AppState) -> Router {
         .layer(middleware::from_fn_with_state(st.clone(), internal_only));
     Router::new()
         .route("/health", get(health))
+        .merge(public)
         .merge(v1)
         .fallback(|| async { (axum::http::StatusCode::NOT_FOUND, Json(json!({"error": {"code": "not_found", "message": "Not found."}}))) })
         .with_state(st)

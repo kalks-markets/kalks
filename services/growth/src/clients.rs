@@ -70,6 +70,9 @@ pub struct GwUser {
     pub utm_source: Option<String>,
     #[serde(default)]
     pub utm_campaign: Option<String>,
+    /// The client who referred this one (referral missions).
+    #[serde(default)]
+    pub referred_by: Option<i64>,
 }
 
 /// The gateway's referral users feed (every client, keyset by (changed_at, id)).
@@ -436,8 +439,19 @@ pub async fn wallet_credit(st: &AppState, tenant: &str, key: &str, user_id: i64,
 
 /// Best effort: the notifications service may not exist yet. Never fails the caller.
 pub fn notify(st: &AppState, tenant: &str, user_id: i64, kind: &str, title: String, body: String, link: &str) {
+    notify_dedupe(st, tenant, user_id, kind, title, body, link, None);
+}
+
+/// [`notify`] with a dedupe key (a repeated key for the same client is a no-op in the support service), in-app only.
+/// The support stream pushes it to the client's open Client Area tabs, which reload their rewards views on it.
+#[allow(clippy::too_many_arguments)]
+pub fn notify_dedupe(st: &AppState, tenant: &str, user_id: i64, kind: &str, title: String, body: String, link: &str, dedupe: Option<String>) {
     let st = st.clone();
-    let payload = json!({"userId": user_id, "type": kind, "title": title, "body": body, "link": link});
+    let mut payload = json!({"userId": user_id, "type": kind, "title": title, "body": body, "link": link});
+    if let Some(d) = dedupe {
+        payload["dedupeKey"] = json!(d);
+        payload["email"] = json!(false);
+    }
     let tenant = tenant.to_string();
     tokio::spawn(async move {
         let r = st

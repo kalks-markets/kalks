@@ -25,11 +25,47 @@ pub struct Settings {
     pub cashback_hold_hours: i64,
     /// Demo accounts earn points when a rule says `accountType: "any"` or `"demo"`; this switch turns that off.
     pub demo_points: bool,
+    /// Challenges (phase 4): contest prizes and mission rewards below this USD amount are paid automatically
+    /// (finalize -> pay); the rest wait for staff approval (`marketing.approve`). 0 = every payout needs staff.
+    #[serde(with = "rust_decimal::serde::float")]
+    pub auto_pay_below: D,
+    /// Ended contests are finalized by the service once this long after the end, when no anti-cheat flag is open.
+    pub auto_finalize: bool,
+    pub auto_finalize_delay_minutes: i64,
+    /// The public leaderboard API (`GET /v1/public/leaderboard`) answers for this broker.
+    pub public_leaderboards: bool,
+    /// Whether a client who never chose shows on public leaderboards (nickname only).
+    pub nickname_public_default: bool,
+    /// Missed days a streak forgives once a week.
+    pub streak_grace_days: i64,
+    /// Missions count a trade only from this size (lots) and hold time (anti-abuse).
+    #[serde(with = "rust_decimal::serde::float")]
+    pub mission_min_lots: D,
+    pub mission_min_hold_seconds: i64,
+    /// XP for joining a live contest, and for every 7 days of a trading streak.
+    pub xp_contest_join: i64,
+    pub xp_streak_week: i64,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { point_value: dec("0.01"), min_hold_seconds: 60, points_expiry_months: 12, cashback_hold_hours: 24, demo_points: false }
+        Settings {
+            point_value: dec("0.01"),
+            min_hold_seconds: 60,
+            points_expiry_months: 12,
+            cashback_hold_hours: 24,
+            demo_points: false,
+            auto_pay_below: D::ZERO,
+            auto_finalize: false,
+            auto_finalize_delay_minutes: 60,
+            public_leaderboards: true,
+            nickname_public_default: true,
+            streak_grace_days: 1,
+            mission_min_lots: dec("0.01"),
+            mission_min_hold_seconds: 60,
+            xp_contest_join: 25,
+            xp_streak_week: 50,
+        }
     }
 }
 
@@ -46,6 +82,24 @@ impl Settings {
         }
         if !(0..=24 * 90).contains(&self.cashback_hold_hours) {
             return Err(("cashbackHoldHours", "Hold must be 0–2160 hours.".into()));
+        }
+        if self.auto_pay_below < D::ZERO || self.auto_pay_below > dec("1000000") {
+            return Err(("autoPayBelow", "Auto-pay threshold must be 0 – 1 000 000 USD.".into()));
+        }
+        if !(0..=60 * 24 * 30).contains(&self.auto_finalize_delay_minutes) {
+            return Err(("autoFinalizeDelayMinutes", "Delay must be 0–43200 minutes.".into()));
+        }
+        if !(0..=3).contains(&self.streak_grace_days) {
+            return Err(("streakGraceDays", "Grace must be 0–3 days.".into()));
+        }
+        if self.mission_min_lots < D::ZERO || self.mission_min_lots > dec("100") {
+            return Err(("missionMinLots", "Minimum lots must be 0–100.".into()));
+        }
+        if !(0..=86_400).contains(&self.mission_min_hold_seconds) {
+            return Err(("missionMinHoldSeconds", "Minimum hold must be 0–86400 seconds.".into()));
+        }
+        if !(0..=10_000).contains(&self.xp_contest_join) || !(0..=10_000).contains(&self.xp_streak_week) {
+            return Err(("xpContestJoin", "XP awards must be 0–10000.".into()));
         }
         Ok(())
     }

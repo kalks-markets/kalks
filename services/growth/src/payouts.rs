@@ -116,11 +116,26 @@ pub async fn wallet_tick(st: &AppState) -> anyhow::Result<usize> {
                     .execute(&mut *tx)
                     .await?;
             }
+            if let Some(pid) = reference.strip_prefix("mission:").and_then(|x| x.parse::<i64>().ok()) {
+                sqlx::query("UPDATE mission_progress SET reward_status = $2, reward_ref = COALESCE($3, reward_ref), reward_error = $4, updated_at = now() WHERE id = $1")
+                    .bind(pid)
+                    .bind(if done { "paid" } else { "failed" })
+                    .bind(&txn)
+                    .bind(&err)
+                    .execute(&mut *tx)
+                    .await?;
+            }
             n += 1;
         }
         tx.commit().await?;
         if status == "paid" {
-            let title = if reference.starts_with("prize:") { "Contest prize paid" } else { "Reward paid" };
+            let title = if reference.starts_with("prize:") {
+                "Contest prize paid"
+            } else if reference.starts_with("mission:") {
+                "Mission reward paid"
+            } else {
+                "Reward paid"
+            };
             clients::notify(st, &tenant, user, "reward.paid", title.into(), format!("${} is in your wallet.", amount.normalize()), "/wallet");
         }
     }
