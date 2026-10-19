@@ -1,0 +1,41 @@
+[package]
+name = "content"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "content"
+path = "src/main.rs"
+
+[features]
+default = ["r2"]
+# Cloudflare R2 (S3-compatible) storage behind CONTENT_STORAGE=r2 (storage.rs); disk storage works without it
+r2 = ["dep:reqwest"]
+
+[dependencies]
+anyhow = "1.0.104"
+axum = "0.8.9"
+base64 = "0.23.1"
+chrono = { version = "0.4.45", features = ["serde"] }
+dotenvy = "0.15.7"
+getrandom = "0.4.3"
+hmac = "0.13.0"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls"], optional = true }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+sqlx = { version = "0.9.0", features = ["runtime-tokio", "postgres", "chrono", "migrate", "json"] }
+subtle = "2.6.1"
+tokio = { version = "1.53.1", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+webp = { version = "0.3.1", default-features = false }
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tempfile = "3.27.0"
+tower = { version = "0.5.3", features = ["util"] }
