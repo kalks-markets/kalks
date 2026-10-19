@@ -1,6 +1,6 @@
 # growth
 
-Kalks rewards and marketing (D29, D121, D135, D136, D144, O36): loyalty points per lot with tiers and a redemption catalogue, cashback programmes, trading contests (CFD or Kalks FX Options) with live leaderboards and prizes, deposit / credit bonus campaigns with per-lot release, promo codes, targeted banners, and share P&L cards (incl. options share cards). It is a Rust service (axum 0.8, sqlx 0.9, PostgreSQL) on `127.0.0.1:8101`, database `kalks_growth`.
+Kalks rewards and marketing (D29, D121, D135, D136, D144, O36): loyalty points per lot with tiers and a redemption catalogue, cashback programmes, trading contests (CFD or Kalks FX Options) with live leaderboards and prizes, deposit / credit bonus campaigns with per-lot release, promo codes, targeted banners, and share P&L cards (incl. options share cards); challenges (phase 4, [docs/CHALLENGES.md](../../docs/CHALLENGES.md)): contest templates, missions, XP / levels / streaks, nicknames, leaderboards (incl. a public one for the website) and the auto-pay threshold. It is a Rust service (axum 0.8, sqlx 0.9, PostgreSQL) on `127.0.0.1:8101`, database `kalks_growth`.
 
 - [Run locally](#run-locally)
 - [How it works](#how-it-works)
@@ -44,7 +44,8 @@ On first start it creates `kalks_growth`, runs `migrations/`, and seeds tenant `
 | profiles | `GROWTH_SYNC_SECS` (30 s) | gateway users feed (keyset cursor) into `profiles` |
 | deals | `GROWTH_DEALS_SECS` (5 s) | closing deals per tenant, each processed once (`deals.deal_id`) |
 | bonus | 15 s | awaiting-deposit grants look for the qualifying deposit; posts pending grant / release / removal legs to the engine; expiry; removal on withdrawal |
-| contests | `GROWTH_LEADERBOARD_SECS` (15 s) | start snapshots, live scores and ranks, anti-cheat flags, end freeze |
+| contests | `GROWTH_LEADERBOARD_SECS` (15 s) | start snapshots, live scores and ranks, anti-cheat flags, end freeze; with `autoFinalize`, finalizes ended contests without open flags (then auto-pay) |
+| missions | 30 s | trading streaks from the deals processed since the last step; missions of clients with fresh activity (deals, profile changes, deposits, referrals, contest entries, logins) re-evaluated; rewards waiting for KYC paid once the client is verified |
 | payouts | 30 s | cashback payouts, prize and redemption wallet credits (idempotent keys, retried) |
 | reversals | 10 min | reopened deals of the last 14 days: points reversed, unpaid cashback voided, contest trade removed |
 | points expiry | hourly | points older than `pointsExpiryMonths` with no activity since are expired |
@@ -68,6 +69,13 @@ Every engine / wallet write carries an idempotency key derived from a row id (`g
 | Contests (D135) | `demo`: joining opens a dedicated demo account with `startingBalance` (credentials returned once). `live`: the client picks a live account (groups filter, `minEquity`). Scoring `return_pct` = (realised + floating) ÷ start equity × 100, `profit` = realised + floating, `lots` = lots closed. Only deals closed inside the window on the entered account count. Entrants with fewer than `minTrades` trades rank after everyone who qualifies. Ties: earlier join first |
 | Anti-cheat | Flags (open for review): `balance_change` (deposit, withdrawal, transfer, refill or staff adjustment on the account during the contest; auto-disqualifies when `antiCheat.disqualifyOnBalanceChange`), `single_trade` (one trade > `maxSingleTradePct` of positive profit, with ≥ 3 trades), `short_holds` (> 50% of trades held < `minHoldSeconds`). Disqualified entries keep their row but get no rank and no prize |
 | Prizes | Admin finalizes after the end (ranks frozen), then pays: `wallet` = wallet credit (`adjustment`), `credit` = engine `credit` on the entered live account (or the client's first live account) |
+| Contest templates (phase 4) | Seeded per broker (weekly % return, monthly lots race, weekend crypto sprint; all live, free entry, KYC). `schedule` places the window in server time (GMT+3): `next_monday` (+ `durationDays`), `next_month`, `next_weekend` (Sat 00:00 – Mon 00:00), `tomorrow`. `split` = a preset (`winner`, `top3` 50/30/20, `top5`, `top10` ladder, `top20`) or bands `{rankFrom, rankTo, pct}` adding up to 100 %. Prizes = pool × pct ÷ 100 ÷ ranks in the band, rounded down to the cent, the cents lost go to rank 1 (rows add up to the pool). A template becomes an ordinary contest input, validated like a hand-made one |
+| Asset classes (phase 4) | `contests.asset_classes` (empty = every CFD): only deals of those classes (`config/instruments.json`) count |
+| Clone | `duplicate` copies a contest as a draft for the next window of the same length (from the original's end, or tomorrow 00:00 when that is past), `clonedFrom` set |
+| Missions (phase 4) | Kinds `kyc`, `first_deposit` (one-off only), `deposit` (largest single deposit in the period, engine ledger), `lots`, `trading_days`, `hold` (hours), `join_contest` (live), `referral` (friends whose first deposit landed in the period). Periods: daily, weekly (ISO, Monday) in server time, or once. Trades count when live, CFD, not reversed / price correction, ≥ `missionMinLots` and held ≥ `missionMinHoldSeconds` (per mission `params.minLots`, `params.minHoldSeconds`, `params.assetClasses`). Completion is once per (mission, client, period) under a row lock; XP ref `mission:<id>:<period>`. Cash / credit rewards: `kyc` until verified (when `kycRequired`), then `pending` (below `autoPayBelow`, paid at once) or `approval` |
+| XP, levels, streaks (phase 4) | `xp_ledger` is append-only and unique per (source, ref): missions, `xpContestJoin` per live contest joined, `xpStreakWeek` per 7 days of trading streak, staff adjustments. Level = highest `levels.min_xp` ≤ total XP (seeded Rookie 0 … Legend 12,000). Streaks: `trading` (a day with a qualifying live trade; weekends never break it) and `login` (a day with a Client Area / app call), up to `streakGraceDays` missed days forgiven once a week, otherwise restart at 1; same or earlier days change nothing |
+| Auto-pay (phase 4) | `autoPayBelow` USD (0 = off): at finalize, prizes below it → `pending` and paid at once (`contest.autopay`, system), the rest → `approval`; staff `pay` pays pending, approval and failed; the contest is `paid` once nothing waits for approval. Mission rewards follow the same threshold |
+| Nicknames, leaderboards (phase 4) | Clients see other clients by nickname and level badge only (no name, country, login or user id); a deterministic auto nickname until the client picks one (3–20 letters / digits / `_ - .`, no `@`, not all digits, unique per broker). Public boards leave out `public = false` (and `NULL` when `nicknamePublicDefault` is off); ranks stay real (gaps). Staff views keep names |
 | Banners (D121) | Placement `dashboard` / `wallet` / `rewards` / `terminal`. Targeting: countries (ISO-2, empty = all), KYC statuses, account types (`live`, `demo`, `none` = no account), new users within N days. Active inside the window, highest priority first, dismissed ones hidden for that client |
 | Kalks FX Options (O34) | Option deals (`instrument: "option"` / an `option` object in the engine feed, or an option series symbol such as `EURUSD-20261009-1.1650-C`) earn **no** points, cashback or bonus lot-release, and never count in a CFD contest. They are recorded once with 0 lots (`deals.instrument = 'option'`, plus `premium` = opening premium in USD and `fill_id` = the order-book fill when the engine sends one). CFD contests use CFD P&L only: floating = equity − balance − credit − bonus − `optionValue`, and the start / minimum equity exclude the options. `option_premium` / `option_settlement` ledger postings are trading flows: never a contest balance change, a deposit (deposit bonus) or a withdrawal (bonus forfeiture). Share cards show option contracts as `contracts`, never as lots |
 | Options contests (O36) | `instrument: "options"` (default `cfd`). Only option exits count (manual closes, stop-outs, expiry settlements, knock-outs) closed inside the window on the entered account and opened at or after the start; CFD deals on that account don't. Scoring `return_pct` = realised option P&L ÷ start equity × 100, `profit` = realised option P&L (net of commission, USD), `contracts` = contracts of the trades that count (no floating part: no model prices). Join: the client must be options-eligible (gateway `GET /v1/internal/suitability/{user}?product=options` → `eligible`, else 409 `options_intro_required`; gateway down = 503) and a live account must not be in a copy / PAMM / MAM / prop group (the engine never lets those trade options). Anti-abuse: `minPremium` (USD per trade, admin-set) = a trade whose opening premium (|price P&L − exit cash|) is below it adds no contracts and no trade count, but its P&L still counts so a loss can't be hidden; **self-trades** between the client's own accounts of the same type (live / demo) count for nothing and raise a `self_trade` flag (high): the same order-book fill on both accounts, the opposite side of the same series held at the same time (a hedge), or the opposite direction in the same series within 2 s of this trade's open or close (a cross). Closed legs come from the deals feed (re-checked every refresh); legs still open are read from the engine (`GET /v1/dealing/positions?login=`) once the contest has ended and before finalize (an engine error stops the refresh, so finalize answers 503 rather than freeze unchecked scores). `minTrades` counts only trades that fully count |
@@ -102,7 +110,7 @@ The runner leases due enrolments (`next_run_at + 5 min`, `FOR UPDATE SKIP LOCKED
 
 ## API
 
-Every route except `GET /health` needs `X-Kalks-Internal: $GROWTH_INTERNAL_TOKEN` and takes `X-Kalks-Tenant` (default `kalks`). JSON in and out, camelCase, money in USD as JSON numbers, times RFC 3339. Errors: `{"error": {"code", "message", "field"?}}` with 400 `bad_request`, 401 `unauthorized`, 403 `forbidden`, 404 `not_found`, 409 (`limit_reached`, `already_joined`, `already_claimed`, `insufficient_points`, `out_of_stock`, `not_eligible`, `contest_closed`, `state`), 422 `validation` (+`field`), 503 `unavailable`.
+Every route except `GET /health` and the public website routes (`GET /v1/public/leaderboard`, `GET /v1/public/contests`) needs `X-Kalks-Internal: $GROWTH_INTERNAL_TOKEN` and takes `X-Kalks-Tenant` (default `kalks`). JSON in and out, camelCase, money in USD as JSON numbers, times RFC 3339. Errors: `{"error": {"code", "message", "field"?}}` with 400 `bad_request`, 401 `unauthorized`, 403 `forbidden`, 404 `not_found`, 409 (`limit_reached`, `already_joined`, `already_claimed`, `insufficient_points`, `out_of_stock`, `not_eligible`, `contest_closed`, `state`), 422 `validation` (+`field`), 503 `unavailable`.
 
 ### Client routes (Client Area BFF)
 
@@ -123,6 +131,12 @@ Headers: `X-Kalks-User-Id` (gateway user id, required), plus segment headers the
 | `GET /v1/growth/me/contests` | – | `{items: ContestCard[], stats: {entered, prizesWon, prizeFinishes, bestRank|null, active}}` |
 | `GET /v1/growth/me/contests/{id}` | – | `{contest: Contest, leaderboard: Standing[] (top 100), myEntry: Standing|null, entrants}` |
 | `POST /v1/growth/me/contests/{id}/join` | `{login?}` (required for live) | `{entry: Standing, credentials?: {login, password, investorPassword}}` (demo only, shown once) |
+| `GET /v1/growth/me/hub` | – | `{level: Level, streaks: {trading: Streak, login: Streak, weekXp}, missions: MissionView[], contests: ContestCard[] (scheduled / running), recent: RecentReward[], nickname: Nickname}` |
+| `GET /v1/growth/me/missions` | – | `{items: MissionView[]}` (evaluates first) |
+| `GET /v1/growth/me/xp` | – | `{level: Level, streaks, history: {id, xp, source, description, createdAt}[]}` |
+| `GET /v1/growth/me/nickname` · `POST` | `{nickname?, public?}` | `Nickname`; 409 `nickname_taken`, 422 `validation` |
+| `GET /v1/growth/me/leaderboard?contest=<id|slug>|period=week|month|all&limit=` | – | `Board` with `me` (the client's own row, also when outside the limit) |
+| `GET /v1/growth/me/rank?login=` | – | `{contests: {id, name, scoring, endsAt, rank, ranked, score, trades, minTrades, login, running}[], level: Level}` (Kalks Trader rank widget) |
 | `GET /v1/growth/me/banners?placement=` | – | `{items: BannerView[]}` |
 | `POST /v1/growth/me/banners/{id}/events` | `{kind: "impression"|"click"|"dismiss"}` | `{ok: true}` |
 | `POST /v1/growth/me/shares` | `{kind: "trade", login, dealId, showAmounts}` or `{kind: "period", login, from, to, showAmounts}` | `{share: Share}` |
@@ -176,6 +190,32 @@ ShareData = { name, symbol|null, side|null, openPrice|null, closePrice|null, ope
                          pnlPct, reason, openPremiumUnit, closePremiumUnit, breakeven, settle } }
 ```
 
+Challenges shapes (phase 4):
+
+```ts
+Level = { xp, level, name, badge, minXp, next: {level, name, badge, minXp, xpToGo} | null, progressPct, levels: {level, name, minXp, badge}[] }
+Streak = { current (0 when broken), best, lastDay: "YYYY-MM-DD" | null, graceDays }
+MissionView = Mission & { period: "2026-10-19" | "2026-W43" | "once", resetsAt | null, progress, completedAt | null, done,
+                          rewardStatus: "none"|"kyc"|"approval"|"pending"|"paid"|"failed"|"rejected" }
+Mission = { id, name, description, kind, schedule: "daily"|"weekly"|"once", target, params: {minLots?, minHoldSeconds?, assetClasses?},
+            xp, rewardAmount | null, rewardPayout: "wallet"|"credit"|null, kycRequired, active, startsAt, endsAt | null, sort, updatedAt }
+RecentReward = { kind: "xp"|"prize"|"mission", title, xp | null, amount | null, payout?, status, at }
+Nickname = { nickname, custom, public (effective), publicChoice: boolean | null, publicDefault, suggestion }
+Board = { board: "contest"|"xp", contest?: {id, slug, name, status, kind, scoring, startsAt, endsAt, prizePool, entrants, prizes},
+          period?, since?, scoring?, items: {rank, nickname, score, level: {level, name, badge}, me}[], me: row | null, updatedAt }
+```
+
+Client-facing `Standing`s (contest detail, leaderboard) carry the nickname in `name` and `level: {level, name, badge}`; another client's `country`, `login` and `userId` are null.
+
+### Public website routes (no internal token)
+
+| Method & path | Query | Response |
+|---|---|---|
+| `GET /v1/public/leaderboard` | `contest=<id|slug>` or `period=week|month|all` (default week), `limit` 1–100 (50), `tenant` (default `kalks`) | `Board` without `me` / `me` flags: `{rank, nickname, score, level}` rows only; opted-out clients left out. 404 when the broker has `publicLeaderboards` off or the rewards module off |
+| `GET /v1/public/contests` | `tenant` | `{items: {id, slug, name, description, status, kind, instrument, scoring, startsAt, endsAt, prizePool, prizes, entrants, kycRequired, minTrades}[]}` (running, upcoming, ended in the last 30 days) |
+
+Both answer `Cache-Control: public, max-age=15, s-maxage=15` and `Access-Control-Allow-Origin: *`; boards are cached 15 s per (broker, board, limit) in the service (a nickname change clears the broker's cache). On production Caddy serves them on `api.kalkstrade.com` (GET only, internal headers stripped); see docs/CHALLENGES.md for the website contract.
+
 ### Public routes (Client Area server only)
 
 | `GET /v1/growth/public/shares/{code}` | – | `Share` (no login, no user id); counts a view unless `?view=0` |
@@ -195,7 +235,7 @@ Headers: `X-Kalks-Staff-Id`, `X-Kalks-Staff-Name` (percent-encoded), `X-Kalks-St
 | Method & path | Perm | Body / query | Response |
 |---|---|---|---|
 | `GET /v1/growth/admin/overview` | read | – | `{loyalty:{members, pointsIssued30d, pointsRedeemed30d, liabilityPoints, liabilityUsd}, cashback:{accrued, paid30d}, bonus:{activeCampaigns, activeGrants, issued30d, released30d, forfeited30d, outstanding}, contests:{running, scheduled, entrants}, promos:{active, redemptions30d, blocked30d}, banners:{active, impressions30d, clicks30d}}` |
-| `GET /v1/growth/admin/settings` · `PUT` | read · write | `Settings` `{pointValue, minHoldSeconds, pointsExpiryMonths, cashbackHoldHours, demoPoints}` | `Settings` |
+| `GET /v1/growth/admin/settings` · `PUT` | read · write | `Settings` `{pointValue, minHoldSeconds, pointsExpiryMonths, cashbackHoldHours, demoPoints, autoPayBelow (0), autoFinalize (false), autoFinalizeDelayMinutes (60), publicLeaderboards (true), nicknamePublicDefault (true), streakGraceDays (1), missionMinLots (0.01), missionMinHoldSeconds (60), xpContestJoin (25), xpStreakWeek (50)}` (partial PUT merges) | `Settings` |
 | `GET /v1/growth/admin/tiers` · `PUT` | read · write | `{tiers: Tier[]}` (full replace, ranks 1..n, minPoints ascending) | `{tiers}` |
 | `GET /v1/growth/admin/rules` · `POST` | read · write | `EarnRule` + `{active, priority}` | `{items}` / `{rule}` |
 | `PATCH /v1/growth/admin/rules/{id}` | write | partial | `{rule}` |
@@ -232,7 +272,17 @@ Headers: `X-Kalks-Staff-Id`, `X-Kalks-Staff-Name` (percent-encoded), `X-Kalks-St
 | `POST /v1/growth/admin/contests/{id}/flags/{flagId}/resolve` | write | `{action: "clear"|"disqualify", note}` | `{flag}` |
 | `GET /v1/growth/admin/reports?from=&to=` | read | dates | `{from, to, totals: {bonusIssued, bonusReleased, bonusForfeited, cashbackPaid, cashbackAccrued, prizesPaid, pointsRedeemedUsd, redemptionCashPaid, promoRedemptions, total}, byCampaign: {id, name, issued, released, forfeited, claims}[], byProgramme: {id, name, accrued, paid, lots}[], byContest: {id, name, prizes, entrants}[], series: {day, bonus, cashback, prizes, points}[]}` (`total` = released bonus + cashback + prizes + redeemed points value; issued bonus is shown separately, it is not cash until released) |
 | `GET /v1/growth/admin/audit?page=&limit=` | read | – | `{items: {id, at, actor, actorName, action, target, before, after, note}[], total}` |
-| `POST /v1/growth/admin/run/{job}` | write | job `profiles|deals|bonus|contests|payouts|reversals|expiry|journeys` | `{ok, result}` |
+| `POST /v1/growth/admin/run/{job}` | write | job `profiles|deals|bonus|contests|payouts|reversals|expiry|journeys|missions` | `{ok, result}` |
+| `GET /v1/growth/admin/contest-templates` | read | – | `{items: Template[], presets: {key, label, bands}[], autoPayBelow, assetClasses}` (seeds the defaults on first use) |
+| `POST /v1/growth/admin/contest-templates` · `PATCH …/{id}` | write | `Template` `{key?, name, description, kind, instrument, scoring, schedule, durationDays, minTrades, maxEntrants, accountGroups, assetClasses, kycRequired, minEquity, prizePool, split, payout, rules, antiCheat, active, sort}` | `{template}` |
+| `POST /v1/growth/admin/contest-templates/{id}/contest` | write | `{name?, startsAt?, endsAt?, prizePool?, split?, payout?, status?}` | `{contest}` (window from the schedule, prizes from the pool and split, `templateId` set) |
+| `POST /v1/growth/admin/contests/{id}/duplicate` | write | `{}` | `{contest}` (a draft for the next window, `clonedFrom`) |
+| `POST /v1/growth/admin/contests/{id}/save-template` | write | `{name?}` | `{template}` (the prize table as shares of the pool) |
+| `GET /v1/growth/admin/missions` · `POST` · `PATCH …/{id}` | read · write | `Mission` input (validated: kinds, one-off for `kyc` / `first_deposit`, XP or a reward) | `{items: (Mission & {completions, completions7d, participants})[], kinds, defaults}` / `{mission}` |
+| `GET /v1/growth/admin/payouts?status=approval|pending|failed|paid|kyc|rejected&page=&limit=` | read | – | `{items: {source: "mission"|"contest", id, contestId, userId, name, amount, payout, status, title, error, at}[], total, autoPayBelow}` |
+| `POST /v1/growth/admin/missions/rewards/{id}/approve` · `/reject` | approve | `{note}` (required to reject) | `{reward}`; 409 `state` when not waiting |
+| `GET /v1/growth/admin/levels` · `PUT` | read · write | `{levels: {level, name, minXp, badge}[]}` (1..n, level 1 at 0 XP, increasing; badges `bronze silver gold platinum diamond crown rocket gem`) | `{levels (with clients per level), badges}` |
+| `POST /v1/growth/admin/xp/adjust` | write | `{userId, xp (signed), note}` | `{xp}` (total) |
 | `GET /v1/growth/admin/journeys` | read | – | `{items: Journey[] (with stats), archived}` |
 | `GET /v1/growth/admin/journeys/meta` | read | – | `{triggers, checks, placeholders}` |
 | `POST /v1/growth/admin/journeys` · `PATCH …/journeys/{id}` | write | `{name, description, trigger: {kind, days?}, steps: Step[]}` | `{journey}` (created as `draft`) |
@@ -249,18 +299,20 @@ The gateway RBAC (`services/gateway/src/rbac.rs`) defines `marketing.read`, `mar
 | permission | allows | fallback roles |
 |---|---|---|
 | `marketing.read` | every GET | platform_owner, super_admin, admin, marketing, finance, compliance, support, risk_manager, partner_manager, viewer |
-| `marketing.write` | campaigns, promos, banners, contests (create, edit, finalize, disqualify), rules, tiers, catalogue, programmes, settings, jobs | platform_owner, super_admin, admin, marketing |
-| `marketing.approve` | money out: pay contest prizes, manual bonus grants and cancellations, points adjustments, run cashback payouts, retry redemptions | platform_owner, super_admin, admin, finance |
+| `marketing.write` | campaigns, promos, banners, contests (create, edit, duplicate, finalize, disqualify), contest templates, missions, levels, XP adjustments, rules, tiers, catalogue, programmes, settings, jobs | platform_owner, super_admin, admin, marketing |
+| `marketing.approve` | money out: pay contest prizes (incl. those above the auto-pay threshold), approve or reject mission rewards, manual bonus grants and cancellations, points adjustments, run cashback payouts, retry redemptions | platform_owner, super_admin, admin, finance |
 
 ## How the apps integrate
 
 | App | Integration |
 |---|---|
-| Client Area | BFF `app/api/growth/[[...path]]` → `/v1/growth/me/*` with the session user and segment headers. Pages: `/rewards` (contests, with an OPTIONS badge, contracts and the options rules on options contests), `/rewards/contests/[id]`, `/rewards/loyalty`, `/rewards/cashback`, `/rewards/promotions`. Banner slots (`components/growth/banner-slot.tsx`) on the dashboard and wallet. "Share P&L" on trade history. Public share page `/s/[code]` and PNG `/s/[code]/image` (next/og; option trades get the contract, premiums per contract and a payoff sketch). |
+| Client Area | BFF `app/api/growth/[[...path]]` → `/v1/growth/me/*` with the session user and segment headers. Pages: `/rewards` (the Rewards hub: level, streaks, missions, recent rewards; then contests, with an OPTIONS badge, contracts and the options rules on options contests), `/rewards/leaderboard`, `/rewards/contests/[id]`, the nickname and level on `/profile`, the level strip on the dashboard, `/rewards/loyalty`, `/rewards/cashback`, `/rewards/promotions`. Banner slots (`components/growth/banner-slot.tsx`) on the dashboard and wallet. "Share P&L" on trade history. Public share page `/s/[code]` and PNG `/s/[code]/image` (next/og; option trades get the contract, premiums per contract and a payoff sketch). |
+| Kalks Trader (rank widget) | `GET /api/growth/rank` (owner of the acting engine session; not investor logins) → `GET /v1/growth/me/rank?login=`; the chip in the screen bar shows the running contest's rank. |
 | Kalks Trader | `POST /api/growth/shares {dealId, showAmounts}` (owner of the acting engine session; not investor or staff sessions) → `POST /v1/growth/me/shares`. The Share button on closed option trades (Options › Closed, History option rows) opens the card, served by the Client Area. |
-| Back Office | BFF `app/api/marketing/[...path]` → `/v1/growth/admin/*` with permissions from `lib/marketing-perms.ts`. Pages under `/marketing`: bonuses, promo codes, banners, contests, rewards (rules, tiers, catalogue, redemptions), cashback, reports, automation (journeys) and campaigns (UTM attribution, served by the reports service `GET /v1/admin/campaigns`). |
+| Back Office | BFF `app/api/marketing/[...path]` → `/v1/growth/admin/*` with permissions from `lib/marketing-perms.ts`. Pages under `/marketing`: bonuses, promo codes, banners, contests & challenges (3-step wizard from templates, templates, missions, levels, payouts, challenge settings), rewards (rules, tiers, catalogue, redemptions), cashback, reports, automation (journeys) and campaigns (UTM attribution, served by the reports service `GET /v1/admin/campaigns`). |
 | Other services | `POST /v1/growth/internal/vouchers/redeem` for fee-discount vouchers (prop checkout, commission rebates). |
-| Notifications | Best effort `POST $NOTIFY_URL/v1/notify` `{userId, type, title, body, link}` (header `X-Kalks-Service: growth`) for bonus granted / released / forfeited, prize paid, redemption completed; journeys' in-app steps. |
+| Notifications | Best effort `POST $NOTIFY_URL/v1/notify` `{userId, type, title, body, link}` (header `X-Kalks-Service: growth`) for bonus granted / released / forfeited, prize paid, redemption completed; journeys' in-app steps; challenges: `rewards.mission` (mission complete), `rewards.level_up`, `rewards.paid`, in-app only with a dedupe key. The Client Area reloads its rewards views when one of these arrives on the support stream. |
+| Public website | `GET /v1/public/leaderboard`, `GET /v1/public/contests` through Caddy on `api.kalkstrade.com` (docs/CHALLENGES.md). |
 
 ## Environment
 
@@ -292,7 +344,12 @@ cargo test -p growth
 - Journeys (`tests/journeys.rs`, gateway mailer and support notify mocked): enrolment once per client after `live_since`, email → condition → in-app → wait, suppressed email for an unsubscribed client, retry after a mailer outage, per-step stats, paused journeys don't move, `no_deposit` after N days.
 - Integration (`tests/growth.rs`, throw-away database `kalks_growth_test_<pid>_<n>`, skipped without PostgreSQL; engine and wallet are mock HTTP servers): deal ingest → points / cashback / bonus release / contest trades once per deal; promo limits under 20 concurrent redemptions; bonus grant → release legs → completion; redemption → wallet credit with idempotent retry; option deals earn no points / cashback / bonus release / CFD-contest trade (also when only the series code identifies them), contest floating and start equity exclude `optionValue`, and option premium / settlement postings neither disqualify a contest entry nor forfeit a bonus; options contests (eligibility via the gateway suitability mock and the prop group, realised option P&L, contracts, the minimum premium, self-trades by hedge / shared fill / a leg still open at the end, CFD trades kept out, ranks and prizes after finalize); options share cards (terms, premiums per contract, P&L on premium, expiry of a short put from the series code only, no balance, amounts only on opt-in).
 
+- Challenges (`tests/challenges.rs`, database `kalks_growth_ch_<pid>_<n>`, the router served on a loopback port): templates → contests (split, schedule, refused split), duplicate and save as template, the crypto-only asset filter; missions count only qualifying trades (scalps, demo, micro lots left out), complete once per period also under concurrent evaluation, a new period counts again, the hub shows them; rewards wait for KYC, auto-pay below the threshold, staff approval above it (marketing.approve only, decided once), audit; one-off missions from profile facts (KYC, first deposit, referral); XP once per ref, the append-only ledger, level thresholds validated, trading streak with the 7-day XP once, login streak once per day; contest auto-pay (threshold 0 pays nothing, below paid by the system, above waits, staff pay the rest once, contest `paid` after), auto-finalize; leaderboard privacy (public board without token, nicknames only, no names / emails / logins / user ids / countries, opt-out left out, cache headers, switch-off 404; in-app boards with nicknames, staff with names; rank widget).
+- Unit (`src/challenge_calc.rs`, `src/templates.rs`): split presets add up and split exactly (cents to rank 1), template windows in server time (Monday, month, weekend, year end), clone windows, mission periods (ISO week at year end), streaks (grace once a week, weekends, late data), levels, nickname rules.
+
 ## Known gaps
+
+- Challenges: contest score changes are polled (the support stream has no silent "data changed" event; only notifications push). `deposit` missions read the engine ledger per live account (throttled 2 min per client). Days use a fixed GMT+3 offset.
 
 - The engine has no deals-since-id feed (same gap as the IB service): the poller re-reads a 2-minute overlap and caches account type / group per login.
 - Bonus release reversal: when the desk reopens a deal after its lots released bonus, the release stays (logged for review).
