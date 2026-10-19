@@ -496,7 +496,7 @@ export function CreateWebhookDialog({ open, onOpenChange, onCreate }: { open: bo
       name: name.trim(),
       source,
       symbols,
-      url: `https://hooks.kalks.com/v1/signal/${id}${Array.from(crypto.getRandomValues(new Uint8Array(2)), (b) => b.toString(16).padStart(2, "0")).join("")}`,
+      url: `https://api.kalkstrade.com/algo/hooks/${id}${Array.from(crypto.getRandomValues(new Uint8Array(2)), (b) => b.toString(16).padStart(2, "0")).join("")}`,
       secret,
       enabled: true,
       createdAt: new Date().toISOString(),

@@ -306,7 +306,7 @@ function DemoNewsPage() {
               <Button
                 variant="surface"
                 onClick={() => {
-                  navigator.clipboard?.writeText(`https://kalks.com/news/${open.id}`).catch(() => {});
+                  navigator.clipboard?.writeText(`https://app.kalkstrade.com/news/${open.id}`).catch(() => {});
                   toast.success("Link copied");
                 }}
               >

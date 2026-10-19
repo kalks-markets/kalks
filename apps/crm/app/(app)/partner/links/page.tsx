@@ -33,7 +33,7 @@ import { BANNERS, BANNER_SIZES, CAMPAIGNS, LANDING_PAGES, type Campaign } from "
 import { IS_DEMO } from "@kalks/mock/mode";
 import { LivePartnerLinks } from "@/components/partner/live/links";
 
-const BASE = ME.referralLink; // https://kalks.com/r/ARJUN24
+const BASE = ME.referralLink; // https://app.kalkstrade.com/r/ARJUN24
 const linkFor = (c: Pick<Campaign, "slug">) => `${BASE}/${c.slug}`;
 const short = (u: string) => u.replace("https://", "");
 
@@ -122,7 +122,7 @@ function CreateLinkDialog({ open, onOpenChange, onCreate }: { open: boolean; onO
                 <img src={l.photo} alt="" className="h-10 w-14 shrink-0 rounded-lg object-cover" />
                 <span className="min-w-0">
                   <span className="block truncate text-[13px] font-medium">{l.name}</span>
-                  <span className="block truncate font-mono text-[11px] text-fg-3">kalks.com{l.path}</span>
+                  <span className="block truncate font-mono text-[11px] text-fg-3">kalkstrade.com{l.path}</span>
                 </span>
               </button>
             ))}
@@ -176,7 +176,7 @@ function BannersCard() {
   const [size, setSize] = React.useState<(typeof BANNER_SIZES)[number]["key"]>("300x250");
   const sz = BANNER_SIZES.find((s) => s.key === size)!;
   const html = (b: (typeof BANNERS)[number]) =>
-    `<a href="${BASE}/banner-${b.id}?utm_source=banner&utm_medium=${size}" target="_blank" rel="noopener"><img src="https://cdn.kalks.com/partners/${b.id}-${size}.jpg" width="${sz.w}" height="${sz.h}" alt="${b.title}" /></a>`;
+    `<a href="${BASE}/banner-${b.id}?utm_source=banner&utm_medium=${size}" target="_blank" rel="noopener"><img src="https://cdn.kalkstrade.com/partners/${b.id}-${size}.jpg" width="${sz.w}" height="${sz.h}" alt="${b.title}" /></a>`;
   return (
     <Card className="h-full">
       <CardHeader
@@ -420,7 +420,7 @@ function DemoPartnerLinksPage() {
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-[14px] font-medium">{l.name}</div>
-                      <div className="truncate font-mono text-[11.5px] text-fg-3">kalks.com{l.path}?ref=ARJUN24</div>
+                      <div className="truncate font-mono text-[11.5px] text-fg-3">kalkstrade.com{l.path}?ref=ARJUN24</div>
                     </div>
                     <span className="k-num shrink-0 text-right text-[12px] text-fg-2">{l.visits.toLocaleString()} visits</span>
                   </div>
@@ -432,14 +432,14 @@ function DemoPartnerLinksPage() {
                     ))}
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Button size="xs" variant="surface" onClick={() => toast("Opening preview", { description: `kalks.com${l.path} in a new tab` })}>
+                    <Button size="xs" variant="surface" onClick={() => toast("Opening preview", { description: `kalkstrade.com${l.path} in a new tab` })}>
                       <Eye /> Preview
                     </Button>
                     <Button
                       size="xs"
                       variant="surface"
                       onClick={() => {
-                        navigator.clipboard?.writeText(`https://kalks.com${l.path}?ref=ARJUN24`).catch(() => {});
+                        navigator.clipboard?.writeText(`https://kalkstrade.com${l.path}?ref=ARJUN24`).catch(() => {});
                         toast.success("Landing link copied");
                       }}
                     >

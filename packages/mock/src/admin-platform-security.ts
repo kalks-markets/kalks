@@ -41,7 +41,7 @@ export interface OrgEmployee {
   location: string;
 }
 
-const staffEmail = (n: string) => `${n.toLowerCase().split(" ")[0]}.${n.toLowerCase().split(" ").slice(-1)[0]!.replace(/[^a-z]/g, "")}@kalks.com`;
+const staffEmail = (n: string) => `${n.toLowerCase().split(" ")[0]}.${n.toLowerCase().split(" ").slice(-1)[0]!.replace(/[^a-z]/g, "")}@kalkstrade.com`;
 
 const EMP_RAW: [number, string, OrgRoleKey, OrgDeskKey | null, OrgStatus, OrgTwoFa, string, boolean, OrgTenantKey[], string, string][] = [
   [9, "Chief Operating Officer", "super", null, "active", "hardware", "2026-09-24T14:21:00+03:00", true, ["kalks", "aurum", "nova", "dunes"], "2023-02-01", "London"],

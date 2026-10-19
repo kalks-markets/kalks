@@ -348,9 +348,9 @@ mod tests {
 
     #[test]
     fn validates_recipients() {
-        let mut s = ScheduleIn { name: "Daily P&L".into(), report: "pnl".into(), format: None, frequency: "daily".into(), weekday: None, month_day: None, hour: Some(7), recipients: vec!["Ops@Kalks.com ".into()], enabled: None };
+        let mut s = ScheduleIn { name: "Daily P&L".into(), report: "pnl".into(), format: None, frequency: "daily".into(), weekday: None, month_day: None, hour: Some(7), recipients: vec!["Ops@KalksTrade.com ".into()], enabled: None };
         s.validate().unwrap();
-        assert_eq!(s.recipients, vec!["ops@kalks.com"]);
+        assert_eq!(s.recipients, vec!["ops@kalkstrade.com"]);
         s.recipients = vec!["bad".into()];
         assert!(s.validate().is_err());
     }

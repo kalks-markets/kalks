@@ -162,7 +162,7 @@ const GROWTH_MODS: BrkModuleKey[] = ["trading", "wallet", "ib", "copy_trading", 
 const STARTER_MODS: BrkModuleKey[] = ["trading", "wallet", "academy", "kyc_auto"];
 
 const SEEDS: Seed[] = [
-  ["Kalks Markets", "Kalks Markets Ltd", "SC-8421096", "K", "#ff5a1f", "#e9b949", "kalks.com", "sc", "Seychelles", "FSA Seychelles SD142", "owner", "active", 48210, 184, 1240, 18_420_000_000, 3_842_000, "2024-02-01T09:00:00Z", 4, ALL_MODS],
+  ["Kalks Markets", "Kalks Markets Ltd", "SC-8421096", "K", "#ff5a1f", "#e9b949", "kalkstrade.com", "sc", "Seychelles", "FSA Seychelles SD142", "owner", "active", 48210, 184, 1240, 18_420_000_000, 3_842_000, "2024-02-01T09:00:00Z", 4, ALL_MODS],
   ["Aurum FX", "Aurum Financial Services LLC", "DIFC-CL4471", "A", "#e9b949", "#ff8a3d", "aurumfx.com", "ae", "United Arab Emirates", "DFSA Cat. 3A", "enterprise", "active", 12480, 62, 860, 4_210_000_000, 1_064_000, "2024-09-14T08:00:00Z", 1, ["trading", "wallet", "ib", "copy_trading", "pamm", "prop", "rewards", "academy", "ai", "api", "stocks", "mobile", "kyc_auto"]],
   ["NovaTrade Asia", "NovaTrade Asia Pte. Ltd.", "UEN 202318842K", "N", "#38bdf8", "#22c55e", "novatrade.asia", "sg", "Singapore", "MAS CMS100942", "growth", "active", 8960, 38, 380, 2_730_000_000, 612_000, "2025-01-20T08:00:00Z", 8, GROWTH_MODS],
   ["Dunes Capital", "Dunes Capital Markets LLC", "CN-3902215", "D", "#22c55e", "#e9b949", "dunescapital.ae", "ae", "United Arab Emirates", "SCA 20200000154", "growth", "active", 5340, 24, 310, 1_620_000_000, 388_000, "2025-03-02T08:00:00Z", 5, ["trading", "wallet", "ib", "copy_trading", "academy", "stocks", "kyc_auto"]],
@@ -468,8 +468,8 @@ function svcBars(_seed: number, bad: number[] = [], worse: number[] = []) {
 }
 
 export const BRK_SERVICES: BrkService[] = [
-  { key: "api", name: "Public API", host: "api.kalks.com · eu-central-1", status: "operational", latency: 42, unit: "ms p95", uptime: 99.99, version: "v4.18.2", instances: "12 / 12 pods", series: svcSeries(1, 42, 4), bars: svcBars(1, [11]), metric: "4.8k req/s" },
-  { key: "ws", name: "WebSocket gateway", host: "stream.kalks.com · 3 regions", status: "operational", latency: 18, unit: "ms p95", uptime: 99.98, version: "v2.9.0", instances: "9 / 9 pods", series: svcSeries(2, 18, 2), bars: svcBars(2, [22]), metric: "61.2k conns" },
+  { key: "api", name: "Public API", host: "api.kalkstrade.com · eu-central-1", status: "operational", latency: 42, unit: "ms p95", uptime: 99.99, version: "v4.18.2", instances: "12 / 12 pods", series: svcSeries(1, 42, 4), bars: svcBars(1, [11]), metric: "4.8k req/s" },
+  { key: "ws", name: "WebSocket gateway", host: "stream.kalkstrade.com · 3 regions", status: "operational", latency: 18, unit: "ms p95", uptime: 99.98, version: "v2.9.0", instances: "9 / 9 pods", series: svcSeries(2, 18, 2), bars: svcBars(2, [22]), metric: "61.2k conns" },
   { key: "feed", name: "Price feed", host: "Infoways → aggregator", status: "operational", latency: 38, unit: "ms tick", uptime: 99.98, version: "v3.4.1", instances: "4 / 4 pods", series: svcSeries(3, 38, 3), bars: svcBars(3, [5]), metric: "1,240 ticks/s" },
   { key: "matching", name: "Matching engine", host: "me-01/02 · bare metal LD4", status: "operational", latency: 0.8, unit: "ms exec", uptime: 100, version: "v7.2.0", instances: "2 / 2 active-active", series: svcSeries(4, 0.8, 0.08), bars: svcBars(4), metric: "312 orders/s" },
   { key: "tron", name: "Wallet watcher TRON", host: "tron-watch · TronGrid + full node", status: "degraded", latency: 2.4, unit: "s block lag", uptime: 99.71, version: "v1.12.4", instances: "2 / 3 pods", series: svcSeries(5, 2.4, 0.5).map((v, i) => (i > 20 ? v + 1.8 : v)), bars: svcBars(5, [3, 17, 29]), metric: "Block 66,412,908" },

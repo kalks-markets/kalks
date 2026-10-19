@@ -79,7 +79,7 @@ export function BannerEditor({ open, onOpenChange, banner }: { open: boolean; on
               Cancel
             </Button>
           </DialogClose>
-          <Button size="sm" variant="surface" onClick={() => toast.success("Test banner sent", { description: "Shown to priya.nair@kalks.com on next login" })}>
+          <Button size="sm" variant="surface" onClick={() => toast.success("Test banner sent", { description: "Shown to priya.nair@kalkstrade.com on next login" })}>
             Send test
           </Button>
           <Button

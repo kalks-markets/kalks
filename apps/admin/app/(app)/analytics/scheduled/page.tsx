@@ -217,7 +217,7 @@ function DemoScheduledReportsPage() {
                   toast.success("Schedule duplicated", { description: `${c.name} · paused until you enable it` });
                 },
               },
-              { label: "Send test to me", icon: <Send />, onSelect: () => toast.success("Test sent", { description: `${s.report} → priya.nair@kalks.com` }) },
+              { label: "Send test to me", icon: <Send />, onSelect: () => toast.success("Test sent", { description: `${s.report} → priya.nair@kalkstrade.com` }) },
               "sep",
               {
                 label: "Delete",

@@ -126,7 +126,7 @@ function SystemOpsPage() {
         onOpenChange={setPost}
         onPost={(inc) => {
           setIncidents((xs) => [inc, ...xs]);
-          toast.success("Incident posted", { description: `${inc.title} · status.kalks.com + ${BRK_TENANTS.length} tenant status pages updated` });
+          toast.success("Incident posted", { description: `${inc.title} · status.kalkstrade.com + ${BRK_TENANTS.length} tenant status pages updated` });
         }}
       />
     </div>
@@ -347,9 +347,9 @@ function StatusPagePreview({ incidents }: { incidents: BrkIncident[] }) {
     <Card className="flex h-full flex-col">
       <CardHeader
         title="Public status page"
-        subtitle="Preview of status.kalks.com (mirrored on each tenant's status subdomain)"
+        subtitle="Preview of status.kalkstrade.com (mirrored on each tenant's status subdomain)"
         action={
-          <Button size="sm" variant="surface" onClick={() => toast.message("Opening status.kalks.com")}>
+          <Button size="sm" variant="surface" onClick={() => toast.message("Opening status.kalkstrade.com")}>
             <ExternalLink /> Open
           </Button>
         }
@@ -360,12 +360,12 @@ function StatusPagePreview({ incidents }: { incidents: BrkIncident[] }) {
             <span className="size-2.5 rounded-full bg-fg-3/40" />
             <span className="size-2.5 rounded-full bg-fg-3/40" />
             <span className="size-2.5 rounded-full bg-fg-3/40" />
-            <span className="ml-3 flex-1 rounded-full bg-surface-3 px-3 py-0.5 text-center font-mono text-[11px] text-fg-3">status.kalks.com</span>
+            <span className="ml-3 flex-1 rounded-full bg-surface-3 px-3 py-0.5 text-center font-mono text-[11px] text-fg-3">status.kalkstrade.com</span>
           </div>
           <div className="p-5">
             <div className="flex items-center justify-between">
               <span role="img" aria-label="Kalks" className="block h-5 w-[72px] bg-fg" style={{ WebkitMask: "url(/assets/brand/kalks-logo.svg) left center / contain no-repeat", mask: "url(/assets/brand/kalks-logo.svg) left center / contain no-repeat" }} />
-              <Button size="xs" variant="surface" onClick={() => toast.success("Subscribed", { description: "Status updates to ops@kalks.com" })}>
+              <Button size="xs" variant="surface" onClick={() => toast.success("Subscribed", { description: "Status updates to ops@kalkstrade.com" })}>
                 Subscribe
               </Button>
             </div>
@@ -423,7 +423,7 @@ function PostIncidentDialog({ open, onOpenChange, onPost }: { open: boolean; onO
       onOpenChange={onOpenChange}
       width={640}
       title="Post incident"
-      description="Published to status.kalks.com and every tenant status page."
+      description="Published to status.kalkstrade.com and every tenant status page."
       footer={
         <>
           <DialogClose asChild>

@@ -385,5 +385,5 @@ export const BROKER_INFO = {
   legal: "Kalks Markets Ltd",
   address: "Suite 305, Griffith Corporate Centre, Kingstown, St. Vincent and the Grenadines",
   licence: "Registration No. 27114 BC 2023",
-  support: "support@kalks.com",
+  support: "support@kalkstrade.com",
 };

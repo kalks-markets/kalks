@@ -395,7 +395,7 @@ export function CreateKeyDialog({ open, onOpenChange, onCreated }: { open: boole
     toast.success("API key created", { description: `${name} · ${login}` });
   };
 
-  const envText = secret ? `KALKS_API_KEY=${secret.id}\nKALKS_API_SECRET=${secret.secret}\nKALKS_ACCOUNT=${login}\nKALKS_BASE_URL=https://api.kalks.com/v1\n` : "";
+  const envText = secret ? `KALKS_API_KEY=${secret.id}\nKALKS_API_SECRET=${secret.secret}\nKALKS_ACCOUNT=${login}\nKALKS_BASE_URL=https://api.kalkstrade.com/algo/public/v1\n` : "";
 
   return (
     <Dialog
@@ -872,8 +872,8 @@ kalks.stream(["NAS100"], (t) => console.log(t.bid, t.ask));`,
   },
   fix: {
     label: "FIX 4.4",
-    badge: "fix.kalks.com:9880",
-    install: "openssl s_client -connect fix.kalks.com:9880",
+    badge: "fix.kalkstrade.com:9880",
+    install: "openssl s_client -connect fix.kalkstrade.com:9880",
     lang: "fix",
     file: "logon.fix",
     code: `8=FIX.4.4|9=112|35=A|49=KLK_80412337|56=KALKS|34=1|52=20260924-14:58:12.184|98=0|108=30|141=Y|553=kk_live_EXAMPLE1|554=••••••|10=087|

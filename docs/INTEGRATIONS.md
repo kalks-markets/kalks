@@ -22,7 +22,7 @@ It mirrors **Back Office → Settings → Integrations** (`/settings/integration
 | # | Integration | Provider (default) | Launch | Status in mock |
 |---|---|---|---|---|
 | 1 | Market data feed | Infoways (+ backup) | **Required** | Connected |
-| 2 | Transactional email | Amazon SES (SMTP) or SES / SendGrid / Postmark API | **Required** | Connected |
+| 2 | Transactional email | Google Workspace SMTP relay (in use); SES / SendGrid / Postmark also supported | **Required** | Connected |
 | 3 | SMS & WhatsApp OTP | Twilio / MSG91 / Gupshup | **Required** | Connected |
 | 4 | KYC verification | Sumsub | **Required** | Connected |
 | 5 | USDT-TRC20 blockchain | TronGrid + own wallets | **Required** | Connected |
@@ -58,7 +58,13 @@ Real-time quotes for all asset classes. The feed drives the pricing engine, the 
 ## 2. Transactional email · Required
 Handles the Welcome, OTP, deposit, withdrawal, KYC and margin-call emails. The templates themselves are in **Content → Email templates**.
 
-Choose **SMTP** or **API** mode.
+**In production today:** Google Workspace for kalkstrade.com.
+- MX is `smtp.google.com`. SPF is `include:_spf.google.com`, plus Google DKIM and DMARC (`p=none` for now).
+- The services send through `smtp-relay.gmail.com:587` with STARTTLS. The relay trusts the server's IP, so there is no `SMTP_USER` / `SMTP_PASSWORD`.
+- Mail goes from `no-reply@kalkstrade.com`, with replies to `support@kalkstrade.com`.
+- The server IP must stay allowed in Google Admin → Apps → Gmail → Routing → SMTP relay. Update it when the server changes.
+
+Other providers work through the same `SMTP_*` settings. Choose **SMTP** or **API** mode.
 
 | Field | Example / notes |
 |---|---|
@@ -66,10 +72,10 @@ Choose **SMTP** or **API** mode.
 | Username / password (secret) | SES SMTP credentials |
 | STARTTLS | On |
 | *or* API provider + API key (secret) | Amazon SES / SendGrid / Postmark |
-| From name / From email | `Kalks Markets` / `no-reply@kalks.com` |
+| From name / From email | `Kalks Markets` / `no-reply@kalkstrade.com` |
 
 **Where to get it:**
-1. In the AWS console, go to SES and verify the domain `kalks.com`.
+1. In the AWS console, go to SES and verify the domain `kalkstrade.com`.
 2. Go to SMTP settings and create SMTP credentials.
 3. In your DNS, add the SPF, DKIM and DMARC records. The card shows whether each one passes.
 
@@ -99,7 +105,7 @@ Runs ID document, liveness and proof-of-address checks. The results arrive in **
 | Secret key (secret) | Paired with the app token |
 | Webhook secret (secret) | From the webhook you create in Sumsub |
 | Level name | `kalks-basic-kyc-level` |
-| Webhook URL (read-only) | Paste `https://api.kalks.com/webhooks/sumsub` into Sumsub |
+| Webhook URL (read-only) | Paste `https://api.kalkstrade.com/webhooks/sumsub` into Sumsub |
 
 **Where to get it:**
 - Sumsub dashboard → Dev space → App tokens.
@@ -183,7 +189,7 @@ Browser/PWA notifications for price alerts, margin calls and deposit confirmatio
 |---|---|
 | VAPID public key | Generated on the card ("Generate key pair") |
 | VAPID private key (secret) | Generated together with the public key |
-| Subject | `mailto:ops@kalks.com` |
+| Subject | `mailto:ops@kalkstrade.com` |
 
 **Where to get it:** no external account is needed. Generate the keys on the card or with `npx web-push generate-vapid-keys`.
 
@@ -224,7 +230,7 @@ Sends sign-up, KYC and FTD conversions with UTM parameters. This feeds **Marketi
 ---
 
 ## Go-live checklist (also shown on the page)
-- [x] Domains & SSL: `app.` / `trade.` / `admin.` / `api.kalks.com` verified (Settings → General)
+- [x] Domains & SSL: `app.` / `trade.` / `admin.` / `api.kalkstrade.com` verified (Settings → General)
 - [x] Market data streaming: 28 symbols
 - [x] Email sender authenticated: SPF, DKIM, DMARC pass
 - [x] OTP delivery tested: WhatsApp and SMS fallback
@@ -234,7 +240,7 @@ Sends sign-up, KYC and FTD conversions with UTM parameters. This feeds **Marketi
 - [x] Legal documents published (Content → Legal)
 - [ ] Fix the news RSS feed error
 - [ ] Generate web push VAPID keys
-- [ ] `status.kalks.com` DNS record
+- [ ] `status.kalkstrade.com` DNS record
 
 ## Other settings that are not third-party integrations but must be filled in
 - **General & branding:**

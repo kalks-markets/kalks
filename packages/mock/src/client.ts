@@ -17,7 +17,7 @@ export const ME = {
   ibLevel: 2,
   ibLevelName: "Silver Partner",
   referralCode: "ARJUN24",
-  referralLink: "https://kalks.com/r/ARJUN24",
+  referralLink: "https://app.kalkstrade.com/r/ARJUN24",
   serverTimezone: "GMT+3",
 };
 

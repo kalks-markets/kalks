@@ -30,7 +30,7 @@ const HEAD: Record<PropCertificate["kind"], string> = {
 
 /** Dark premium certificate (always dark, regardless of theme) with share actions. */
 export function CertificateCard({ cert, name, className }: { cert: PropCertificate; name: string; className?: string }) {
-  const url = `https://kalks.com/cert/${cert.id}`;
+  const url = `https://app.kalkstrade.com/verify/${cert.id}`;
   const date = new Date(cert.date).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
   const amountText = cert.kind === "payout" ? formatMoney(cert.amount) : `$${cert.amount.toLocaleString("en-US")}`;
   const share = (where: string) => toast.success(`Shared to ${where}`, { description: `${cert.title} · ${amountText}` });

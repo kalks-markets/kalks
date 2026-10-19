@@ -24,7 +24,7 @@ export function ScheduleDialog({
   initial?: AnlSchedule | null;
   onSave: (d: ScheduleDraft) => void;
 }) {
-  const blank: ScheduleDraft = { name: "", report: ANL_REPORT_TYPES[0]!, frequency: "daily", day: undefined, time: "08:00", recipients: ["priya.nair@kalks.com"], format: "PDF", enabled: true };
+  const blank: ScheduleDraft = { name: "", report: ANL_REPORT_TYPES[0]!, frequency: "daily", day: undefined, time: "08:00", recipients: ["priya.nair@kalkstrade.com"], format: "PDF", enabled: true };
   const [d, setD] = React.useState<ScheduleDraft>(blank);
   const [entry, setEntry] = React.useState("");
   const [err, setErr] = React.useState<string | undefined>();
@@ -150,7 +150,7 @@ export function ScheduleDialog({
                 }
               }}
               onBlur={() => entry && add(entry)}
-              placeholder={d.recipients.length ? "" : "name@kalks.com"}
+              placeholder={d.recipients.length ? "" : "name@kalkstrade.com"}
               className="h-7 min-w-[140px] flex-1 bg-transparent px-1 text-[13px] text-fg outline-none placeholder:text-fg-3"
             />
           </div>

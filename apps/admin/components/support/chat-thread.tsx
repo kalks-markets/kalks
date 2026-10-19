@@ -242,7 +242,7 @@ export function ChatThread({
     amount: conv.context.lastWithdrawal ? `${conv.context.lastWithdrawal.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })} USDT` : "{{amount}}",
     withdrawal_id: conv.context.lastWithdrawal?.id ?? "{{withdrawal_id}}",
     eta: "4 business hours",
-    kb_link: "kalks.com/help/news-spreads",
+    kb_link: "kalkstrade.com/help/news-spreads",
     leverage: "1:500",
     deposit_id: "TX904412",
   };

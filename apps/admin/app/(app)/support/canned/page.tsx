@@ -38,7 +38,7 @@ const SAMPLE: Record<string, string> = {
   withdrawal_id: "WD-904375",
   eta: "4 business hours",
   agent_name: "Priya Nair",
-  kb_link: "kalks.com/help/news-spreads",
+  kb_link: "kalkstrade.com/help/news-spreads",
   tenant_name: "Kalks Markets",
   deposit_id: "TX904412",
   leverage: "1:500",

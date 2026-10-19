@@ -431,7 +431,7 @@ function DemoMasterProfilePage() {
                     size="sm"
                     aria-label="Share profile"
                     onClick={() => {
-                      navigator.clipboard?.writeText(`https://kalks.com/masters/${m.id}`).catch(() => {});
+                      navigator.clipboard?.writeText(`https://app.kalkstrade.com/social/masters/${m.id}`).catch(() => {});
                       toast.success("Profile link copied");
                     }}
                   >

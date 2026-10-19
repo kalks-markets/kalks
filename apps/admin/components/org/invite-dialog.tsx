@@ -31,7 +31,7 @@ export function InviteDialog({ onInvite }: { onInvite: (d: InviteDraft) => void 
   const emailErr = !EMAIL.test(email) ? "Enter a valid work email" : undefined;
   const nameErr = name.trim().length < 3 ? "Enter the full name" : undefined;
   const tenantErr = tenants.length === 0 ? "Grant access to at least one broker" : undefined;
-  const external = EMAIL.test(email) && !email.toLowerCase().endsWith("@kalks.com");
+  const external = EMAIL.test(email) && !email.toLowerCase().endsWith("@kalkstrade.com");
 
   const reset = () => {
     setEmail("");
@@ -89,7 +89,7 @@ export function InviteDialog({ onInvite }: { onInvite: (d: InviteDraft) => void 
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nadia Khoury" />
           </Field>
           <Field label="Work email" error={touched ? emailErr : undefined} hint={external ? <span className="text-warn">External domain</span> : undefined}>
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nadia.khoury@kalks.com" leading={<Mail />} />
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nadia.khoury@kalkstrade.com" leading={<Mail />} />
           </Field>
         </div>
         <div>

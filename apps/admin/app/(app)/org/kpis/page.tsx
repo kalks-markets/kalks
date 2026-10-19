@@ -253,7 +253,7 @@ export default function KpisPage() {
                 <div className="flex items-center gap-1.5 text-[16px] font-medium">
                   {open.person.name} <Flag country={open.person.country} className="size-4" />
                 </div>
-                <div className="text-[12.5px] text-fg-3">{open.person.email.replace(/@.*/, "@kalks.com")}</div>
+                <div className="text-[12.5px] text-fg-3">{open.person.email.replace(/@.*/, "@kalkstrade.com")}</div>
               </div>
               <Sparkline data={open.trend} width={96} height={36} tone="gold" />
             </div>

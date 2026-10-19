@@ -357,7 +357,7 @@ function DemoPropPayoutsPage() {
         <Card>
           <CardHeader
             title="Certificates"
-            subtitle="Verified on kalks.com — share your milestones"
+            subtitle="Verified on kalkstrade.com — share your milestones"
             icon={<Award />}
             action={
               <Button size="sm" variant="surface" onClick={() => toast.success("All certificates downloaded", { description: `${PROP_CERTIFICATES.length} PNG files · kalks-certificates.zip` })}>

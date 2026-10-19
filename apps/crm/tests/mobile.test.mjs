@@ -130,6 +130,9 @@ const auth = (t) => ({ authorization: `Bearer ${t}` });
 /** Runs a request through the proxy, then (like Next) through the handler it rewrites / passes to. */
 async function viaProxy(m, url, init, handler, params, base = BASE) {
   const req = new m.NextRequest(`${base}${url}`, init);
+  // forward the exact bytes, as Next does on a rewrite: re-encoding a FormData body picks a new multipart
+  // boundary that no longer matches the forwarded content-type
+  const raw = init?.body === undefined ? undefined : Buffer.from(await req.clone().arrayBuffer());
   const res = await m.proxy(req);
   const h = headersOf(res);
   if (!h["x-middleware-rewrite"] && !h["x-middleware-next"]) return { res, forwarded: null, proxied: res };
@@ -137,7 +140,8 @@ async function viaProxy(m, url, init, handler, params, base = BASE) {
   const fwd = new Headers();
   for (const k of overridden) fwd.set(k, h[`x-middleware-request-${k}`]);
   const target = h["x-middleware-rewrite"] ?? `${base}${url}`;
-  const inner = new m.NextRequest(target, { method: init?.method ?? "GET", headers: fwd, body: init?.body, duplex: "half" });
+  if (raw !== undefined && !fwd.has("content-type") && req.headers.get("content-type")) fwd.set("content-type", req.headers.get("content-type"));
+  const inner = new m.NextRequest(target, { method: init?.method ?? "GET", headers: fwd, body: raw, duplex: "half" });
   return { res: await handler(inner, { params: Promise.resolve(params) }), forwarded: fwd, target, proxied: res };
 }
 

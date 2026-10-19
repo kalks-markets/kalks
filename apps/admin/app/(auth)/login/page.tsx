@@ -187,7 +187,7 @@ function StaffLogin() {
           <form method="post" className="mt-6 space-y-4" onSubmit={signIn} noValidate>
             <FormError>{err && !err.field ? err.message : null}</FormError>
             <Field label="Work email" error={fieldErr("email")}>
-              <Input leading={<Mail />} type="email" name="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@kalks.com" required />
+              <Input leading={<Mail />} type="email" name="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@kalkstrade.com" required />
             </Field>
             <Field label="Password" error={fieldErr("password")} hint={<button type="button" onClick={() => toast("Ask your Super Admin to reset it", { description: "Staff password resets are done from Organisation › Staff." })} className="text-ember hover:underline">Forgot?</button>}>
               <Input

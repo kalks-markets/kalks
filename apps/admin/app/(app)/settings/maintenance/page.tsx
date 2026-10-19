@@ -65,7 +65,7 @@ function MaintenancePage() {
         subtitle="Take the platform offline gracefully, warn clients with a banner and schedule recurring windows. Staff on bypass IPs keep full access."
         actions={
           <>
-            <Button variant="surface" onClick={() => toast("Opening status.kalks.com")}>
+            <Button variant="surface" onClick={() => toast("Opening status.kalkstrade.com")}>
               <ExternalLink /> Status page
             </Button>
             <Button variant="ember" onClick={() => setSched(true)}>
@@ -186,7 +186,7 @@ function MaintenancePage() {
                           </React.Fragment>
                         ))}
                       </div>
-                      <div className="mt-2 text-[11px] text-fg-3">Back by {until} GMT+3 · status.kalks.com</div>
+                      <div className="mt-2 text-[11px] text-fg-3">Back by {until} GMT+3 · status.kalkstrade.com</div>
                     </motion.div>
                   ) : (
                     <motion.div key="banner" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="relative p-4">
@@ -374,7 +374,7 @@ function MaintenancePage() {
                           }
                           items={[
                             { label: "Start now", icon: <Power />, onSelect: () => { setScope(w.scope.filter((s) => (SCOPES as readonly string[]).includes(s))); setConfirm(true); } },
-                            { label: "Post to status page", icon: <ExternalLink />, onSelect: () => toast.success("Posted to status.kalks.com", { description: w.title }) },
+                            { label: "Post to status page", icon: <ExternalLink />, onSelect: () => toast.success("Posted to status.kalkstrade.com", { description: w.title }) },
                             "sep",
                             { label: "Cancel window", icon: <Trash2 />, danger: true, onSelect: () => { setWindows((ws) => ws.filter((x) => x.id !== w.id)); toast.success("Window cancelled", { description: "Clients notified of the cancellation" }); } },
                           ]}

@@ -58,7 +58,7 @@ export default function WebhooksPage() {
         subtitle="Signed HTTP callbacks to your CRM, data warehouse and partners. Payloads are signed with HMAC-SHA256 in the X-Kalks-Signature header."
         actions={
           <>
-            <Button variant="surface" onClick={() => toast("Opening webhook reference · api.kalks.com/docs/webhooks")}>
+            <Button variant="surface" onClick={() => toast("Opening webhook reference · api.kalkstrade.com/docs/webhooks")}>
               <BookOpen /> Event reference
             </Button>
             <Button variant="ember" onClick={() => setOpen(true)}>

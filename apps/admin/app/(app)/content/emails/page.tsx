@@ -28,7 +28,7 @@ export default function EmailTemplatesPage() {
   const [device, setDevice] = React.useState<"desktop" | "mobile">("desktop");
   const [testOpen, setTestOpen] = React.useState(false);
   const [histOpen, setHistOpen] = React.useState(false);
-  const [testEmail, setTestEmail] = React.useState("priya.nair@kalks.com");
+  const [testEmail, setTestEmail] = React.useState("priya.nair@kalkstrade.com");
   const [langOpen, setLangOpen] = React.useState(false);
 
   const bodyRef = React.useRef<HTMLTextAreaElement>(null);
@@ -423,7 +423,7 @@ export default function EmailTemplatesPage() {
             <Input value={testEmail} onChange={(e) => setTestEmail(e.target.value)} type="email" />
           </Field>
           <div className="flex flex-wrap gap-1.5">
-            {["priya.nair@kalks.com", "qa@kalks.com", "compliance@kalks.com"].map((e) => (
+            {["priya.nair@kalkstrade.com", "qa@kalkstrade.com", "compliance@kalkstrade.com"].map((e) => (
               <button key={e} type="button" onClick={() => setTestEmail(e)} className={cn("rounded-full border px-2.5 py-1 text-[12px]", testEmail === e ? "border-ember/40 bg-ember-soft text-ember" : "border-line bg-surface-2 text-fg-2 hover:text-fg")}>
                 {e}
               </button>

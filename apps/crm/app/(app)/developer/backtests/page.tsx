@@ -139,7 +139,7 @@ function DemoBacktestsPage() {
               items={[
                 { label: "PDF report", icon: <FileDown />, onSelect: () => toast.success("Report exported", { description: `${run.id}.pdf · 6 pages` }) },
                 { label: "Trades CSV", icon: <FileDown />, onSelect: () => toast.success("Trades exported", { description: `${result.trades.length} rows` }) },
-                { label: "Share link", icon: <Share2 />, onSelect: () => toast.success("Share link copied", { description: `kalks.com/bt/${run.id}` }) },
+                { label: "Share link", icon: <Share2 />, onSelect: () => toast.success("Share link copied", { description: `app.kalkstrade.com/developer/backtests/${run.id}` }) },
               ]}
             />
             <Button variant="ember" shimmer onClick={() => toast.success(`Deploying “${strat.name.replace(" (template)", "")}”`, { description: "Pick an account in Strategy builder › Deploy" })}>

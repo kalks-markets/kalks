@@ -176,7 +176,7 @@ export default function GeneralSettingsPage() {
         subtitle="Brand identity, domains and regional defaults for Kalks Markets. White-label tenants override these in Brokers."
         actions={
           <>
-            <Button variant="surface" onClick={() => toast("Opening app.kalks.com preview in a new tab")}>
+            <Button variant="surface" onClick={() => toast("Opening app.kalkstrade.com preview in a new tab")}>
               <ExternalLink /> Preview client area
             </Button>
             <Button variant="ember" onClick={save} disabled={!dirty}>
@@ -259,7 +259,7 @@ export default function GeneralSettingsPage() {
 
         <Reveal delay={0.05} className="xl:col-span-5">
           <Card className="flex h-full flex-col">
-            <CardHeader title="Live preview" subtitle="How clients see the brand on app.kalks.com" action={<Chip tone="up" dot>Live</Chip>} />
+            <CardHeader title="Live preview" subtitle="How clients see the brand on app.kalkstrade.com" action={<Chip tone="up" dot>Live</Chip>} />
             <div className="flex-1 px-4 pb-6 pt-4 sm:px-6">
               <BrandPreview primary={form.primary} accent={form.accent} logo={logo} />
               <div className="mt-4 grid grid-cols-3 gap-2">
@@ -287,7 +287,7 @@ export default function GeneralSettingsPage() {
             <CardHeader
               icon={<Globe2 />}
               title="Domains"
-              subtitle="Point each host to edge.kalks.com with a CNAME. SSL is issued automatically."
+              subtitle="Point each host to edge.kalkstrade.com with a CNAME. SSL is issued automatically."
               action={
                 <Button size="sm" variant="surface" onClick={() => setAddOpen(true)}>
                   <Plus /> Add domain
@@ -415,7 +415,7 @@ export default function GeneralSettingsPage() {
         open={addOpen}
         onOpenChange={setAddOpen}
         title="Add domain"
-        description="Create a CNAME record pointing to edge.kalks.com, then verify."
+        description="Create a CNAME record pointing to edge.kalkstrade.com, then verify."
         footer={
           <>
             <Button variant="ghost" onClick={() => setAddOpen(false)}>
@@ -425,7 +425,7 @@ export default function GeneralSettingsPage() {
               variant="ember"
               onClick={() => {
                 if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(newHost)) {
-                  toast.error("Enter a valid hostname", { description: "e.g. partners.kalks.com" });
+                  toast.error("Enter a valid hostname", { description: "e.g. partners.kalkstrade.com" });
                   return;
                 }
                 setDomains((d) => [...d, { host: newHost.toLowerCase(), purpose: "Custom", dns: "pending", ssl: "pending", expires: "—" }]);
@@ -441,7 +441,7 @@ export default function GeneralSettingsPage() {
       >
         <div className="space-y-4">
           <Field label="Hostname">
-            <Input value={newHost} onChange={(e) => setNewHost(e.target.value)} placeholder="partners.kalks.com" inputClassName="font-mono" leading={<Globe2 />} />
+            <Input value={newHost} onChange={(e) => setNewHost(e.target.value)} placeholder="partners.kalkstrade.com" inputClassName="font-mono" leading={<Globe2 />} />
           </Field>
           <div className="k-row overflow-x-auto p-4 font-mono text-[12px]">
             <div className="grid min-w-[380px] grid-cols-[70px_1fr_1fr] gap-y-2 text-fg-2">
@@ -449,8 +449,8 @@ export default function GeneralSettingsPage() {
               <span className="text-fg-3">NAME</span>
               <span className="text-fg-3">VALUE</span>
               <span>CNAME</span>
-              <span className="truncate">{newHost || "partners.kalks.com"}</span>
-              <span>edge.kalks.com</span>
+              <span className="truncate">{newHost || "partners.kalkstrade.com"}</span>
+              <span>edge.kalkstrade.com</span>
               <span>TXT</span>
               <span className="truncate">_kalks-verify</span>
               <span className="truncate">kv=8f2a91c4e7</span>

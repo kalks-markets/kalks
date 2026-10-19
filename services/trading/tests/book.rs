@@ -186,6 +186,18 @@ async fn drained(pool: &sqlx::PgPool) {
     panic!("the outbox did not drain");
 }
 
+/// Waits until an armed `crash_after_apply` kill point has fired, so the restart that follows always sees the
+/// half-applied state (a fixed sleep raced the dispatcher under load).
+async fn crash_fired(hub: &Hub) {
+    for _ in 0..400 {
+        if hub.shared.books.hooks.crash_after_apply.load(Ordering::SeqCst) <= 0 {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    panic!("the crash_after_apply kill point never fired");
+}
+
 /// Every fill ledger key exists exactly once per (fill, login).
 async fn fill_keys_once(pool: &sqlx::PgPool) -> i64 {
     let dup: i64 = sqlx::query_scalar("SELECT count(*) FROM (SELECT idempotency_key FROM ledger_txns WHERE idempotency_key LIKE 'fill:%' GROUP BY 1 HAVING count(*) > 1) x").fetch_one(pool).await.unwrap();
@@ -282,7 +294,7 @@ async fn order_book_through_the_actor_outbox_shards_and_postgres() {
     assert_eq!(o.rested.len(), 1);
     hub.shared.books.hooks.crash_after_apply.store(1, Ordering::SeqCst);
     let _ = place(&hub, b, ub, Side::Buy, 505, 2, Tif::Ioc).await.unwrap();
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    crash_fired(&hub).await;
     drop(hub);
     let (hub, rep) = restart(&pool).await;
     assert!(rep.mismatches.is_empty(), "{:?}", rep.mismatches);
@@ -471,7 +483,7 @@ async fn combo_rfq_and_bust_book_exactly_once_across_crashes() {
     hub.shared.books.hooks.crash_after_apply.store(1, Ordering::SeqCst);
     let (b, _, _) = entry::call(&hub, t, &key(), Cmd::Bust { fill: fill.clone(), reason: "test".into(), at: at + 20 }).await.unwrap();
     assert!(b.ok && b.busted.len() == 1);
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    crash_fired(&hub).await;
     drop(hub);
     let (hub, rep) = restart(&pool).await;
     assert!(rep.mismatches.is_empty(), "{rep:?}");

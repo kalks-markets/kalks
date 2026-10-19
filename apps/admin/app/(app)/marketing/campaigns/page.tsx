@@ -148,7 +148,7 @@ function DemoCampaigns() {
               c.status === "completed"
                 ? { label: "Duplicate campaign", icon: <Plus />, onSelect: () => toast.success(`${c.campaign}_v2 drafted`) }
                 : { label: c.status === "running" ? "Pause" : "Resume", icon: c.status === "running" ? <Pause /> : <Play />, onSelect: () => toggle(c.id) },
-              { label: "Copy tracked link", icon: <Plug />, onSelect: () => (navigator.clipboard?.writeText(`https://kalks.com/open-account?utm_source=${c.source}&utm_medium=${c.medium}&utm_campaign=${c.campaign}`).catch(() => {}), toast.success("Tracked link copied")) },
+              { label: "Copy tracked link", icon: <Plug />, onSelect: () => (navigator.clipboard?.writeText(`https://app.kalkstrade.com/register?utm_source=${c.source}&utm_medium=${c.medium}&utm_campaign=${c.campaign}`).catch(() => {}), toast.success("Tracked link copied")) },
               { label: "Open cohort in Analytics", icon: <TrendingUp />, href: "/analytics/cohorts" },
             ]}
           />

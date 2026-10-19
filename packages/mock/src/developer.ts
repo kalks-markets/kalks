@@ -126,7 +126,7 @@ export const WEBHOOKS: SignalWebhook[] = [
     name: "TradingView Gold breakout",
     source: "TradingView",
     symbols: ["XAUUSD"],
-    url: "https://hooks.kalks.com/v1/signal/wh_9f3a1c7e2b",
+    url: "https://api.kalkstrade.com/algo/hooks/wh_9f3a1c7e2b",
     secret: "whsec_EXAMPLE000000000000001",
     enabled: true,
     createdAt: "2026-07-02T10:00:00Z",
@@ -145,7 +145,7 @@ export const WEBHOOKS: SignalWebhook[] = [
     name: "NAS100 momentum",
     source: "TradingView",
     symbols: ["NAS100", "US30"],
-    url: "https://hooks.kalks.com/v1/signal/wh_2b77e04d91",
+    url: "https://api.kalkstrade.com/algo/hooks/wh_2b77e04d91",
     secret: "whsec_EXAMPLE000000000000002",
     enabled: true,
     createdAt: "2026-08-11T08:30:00Z",
@@ -163,7 +163,7 @@ export const WEBHOOKS: SignalWebhook[] = [
     name: "EURUSD mean-revert",
     source: "Custom",
     symbols: ["EURUSD", "GBPUSD"],
-    url: "https://hooks.kalks.com/v1/signal/wh_c410d85a3f",
+    url: "https://api.kalkstrade.com/algo/hooks/wh_c410d85a3f",
     secret: "whsec_EXAMPLE000000000000003",
     enabled: false,
     createdAt: "2026-05-19T12:10:00Z",
@@ -309,7 +309,7 @@ export interface ApiEndpoint {
   response: unknown;
 }
 
-export const API_BASE = "https://api.kalks.com/v1";
+export const API_BASE = "https://api.kalkstrade.com/v1";
 
 export const API_ENDPOINTS: Record<"accounts" | "orders" | "positions", ApiEndpoint[]> = {
   accounts: [
@@ -419,7 +419,7 @@ export const API_ERRORS = [
 ];
 
 export const FIX_SESSION = {
-  host: "fix.kalks.com",
+  host: "fix.kalkstrade.com",
   port: 9880,
   senderCompId: "KLK_80412337",
   targetCompId: "KALKS",

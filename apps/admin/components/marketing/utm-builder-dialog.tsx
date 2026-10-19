@@ -8,10 +8,10 @@ import { MKT_UTM_MEDIUMS, MKT_UTM_SOURCES } from "@kalks/mock/admin-growth-marke
 import { ChipPicker, SectionLabel } from "./kit";
 
 const PAGES = [
-  { value: "https://kalks.com/open-account", label: "Open account" },
-  { value: "https://kalks.com/promo/welcome-30", label: "Welcome 30% landing" },
-  { value: "https://kalks.com/prop", label: "Prop challenges" },
-  { value: "https://kalks.com/copy-trading", label: "Copy trading" },
+  { value: "https://app.kalkstrade.com/register", label: "Open account" },
+  { value: "https://kalkstrade.com/promo/welcome-30", label: "Welcome 30% landing" },
+  { value: "https://kalkstrade.com/prop", label: "Prop challenges" },
+  { value: "https://kalkstrade.com/copy-trading", label: "Copy trading" },
 ];
 
 export function UtmBuilderDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpenChange: (o: boolean) => void; onCreate: (v: { source: string; medium: string; campaign: string; budget: number }) => void }) {

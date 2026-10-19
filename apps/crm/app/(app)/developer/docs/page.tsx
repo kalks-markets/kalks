@@ -62,7 +62,7 @@ console.log(await res.json()); // the SDK does all of this for you`,
 };
 
 const WS_SAMPLE: Record<SampleLang, string> = {
-  curl: `wscat -c "wss://stream.kalks.com/v1?key=kk_live_EXAMPLE1&ts=1790261892184&sig=$SIG"
+  curl: `wscat -c "wss://api.kalkstrade.com/v1/stream?key=kk_live_EXAMPLE1&ts=1790261892184&sig=$SIG"
 
 > {"op": "subscribe", "channels": ["quotes"], "symbols": ["XAUUSD", "EURUSD"]}
 > {"op": "subscribe", "channels": ["positions", "orders"], "login": "80412337"}`,
@@ -96,18 +96,18 @@ const WS_STREAM = `{"channel":"subscribed","symbols":["XAUUSD","EURUSD"],"id":1}
 {"channel":"heartbeat","ts":1790261897000}`;
 
 const WEBHOOK_VERIFY: Record<SampleLang, string> = {
-  curl: `curl -X POST "https://hooks.kalks.com/v1/signal/wh_9f3a1c7e2b" \\
+  curl: `curl -X POST "https://api.kalkstrade.com/algo/hooks/wh_9f3a1c7e2b" \\
   -H "Content-Type: application/json" \\
   -d '{"secret":"whsec_EXAMPLE0…","action":"buy","symbol":"XAUUSD","volume":1.0,"sl":2638.0,"tp":2690.0,"comment":"gold-bo"}'`,
   python: `import requests
 
 requests.post(
-    "https://hooks.kalks.com/v1/signal/wh_9f3a1c7e2b",
+    "https://api.kalkstrade.com/algo/hooks/wh_9f3a1c7e2b",
     json={"secret": "whsec_EXAMPLE0…", "action": "buy", "symbol": "XAUUSD",
           "volume": 1.0, "sl": 2638.0, "tp": 2690.0, "comment": "gold-bo"},
     timeout=5,
 )`,
-  js: `await fetch("https://hooks.kalks.com/v1/signal/wh_9f3a1c7e2b", {
+  js: `await fetch("https://api.kalkstrade.com/algo/hooks/wh_9f3a1c7e2b", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ secret: "whsec_EXAMPLE0…", action: "buy", symbol: "XAUUSD",
@@ -156,9 +156,9 @@ function DemoDocsPage() {
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { k: "REST", v: API_BASE.replace("https://", ""), sub: "JSON · HMAC-SHA256" },
-              { k: "WebSocket", v: "stream.kalks.com/v1", sub: "Quotes, orders, positions" },
+              { k: "WebSocket", v: "api.kalkstrade.com/v1/stream", sub: "Quotes, orders, positions" },
               { k: "FIX 4.4", v: `${FIX_SESSION.host}:${FIX_SESSION.port}`, sub: "TLS 1.3 · LD4" },
-              { k: "Webhooks", v: "hooks.kalks.com/v1", sub: "TradingView-ready" },
+              { k: "Webhooks", v: "api.kalkstrade.com/algo/hooks", sub: "TradingView-ready" },
             ].map((x) => (
               <div key={x.k} className="k-card flex min-w-0 items-center gap-3 px-4 py-3.5">
                 <div className="min-w-0 flex-1">
@@ -242,8 +242,8 @@ function DemoDocsPage() {
               <Card className="overflow-hidden">
                 <div className="flex flex-wrap items-center gap-3 border-b border-line bg-surface-2/40 px-5 py-3.5">
                   <MethodBadge method="WS" />
-                  <span className="font-mono text-[13.5px]">wss://stream.kalks.com/v1</span>
-                  <CopyButton value="wss://stream.kalks.com/v1" label="WebSocket URL" />
+                  <span className="font-mono text-[13.5px]">wss://api.kalkstrade.com/v1/stream</span>
+                  <CopyButton value="wss://api.kalkstrade.com/v1/stream" label="WebSocket URL" />
                   <div className="ml-auto flex gap-1.5">
                     {["quotes", "orders", "positions", "account"].map((c) => (
                       <Chip key={c} size="sm">
@@ -283,7 +283,7 @@ function DemoDocsPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <MethodBadge method="POST" />
                   <span className="font-mono text-[13.5px]">
-                    https://hooks.kalks.com/v1/signal/<span className="text-gold">{"{webhook_id}"}</span>
+                    https://api.kalkstrade.com/algo/hooks/<span className="text-gold">{"{webhook_id}"}</span>
                   </span>
                 </div>
                 <div className="mt-4">

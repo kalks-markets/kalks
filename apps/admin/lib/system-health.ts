@@ -11,7 +11,7 @@ export const SERVICES: ServiceDef[] = [
   { key: "trading", name: "Trading engine", detail: "Accounts, orders, margin, ledger, dealing · :8090", url: u(process.env.TRADING_URL, "http://127.0.0.1:8090") },
   { key: "wallet", name: "Wallet", detail: "USDT deposits, withdrawals, transfers · :8095", url: u(process.env.WALLET_URL, "http://127.0.0.1:8095") },
   { key: "ib", name: "IB programme", detail: "Referral tree, commissions, payouts · :8096", url: u(process.env.IB_URL, "http://127.0.0.1:8096") },
-  { key: "prop", name: "Prop firm", detail: "Challenges, funded accounts, payouts · :8097", url: u(process.env.PROP_URL, "http://127.0.0.1:8097") },
+  { key: "prop", name: "Prop firm", detail: "Challenges, funded accounts, payouts · :8097", url: u(process.env.PROP_URL, "http://127.0.0.1:8097"), optional: true },
   { key: "academy", name: "Academy", detail: "Courses, exams, certificates · :8098", url: u(process.env.ACADEMY_URL, "http://127.0.0.1:8098") },
   { key: "algo", name: "Algo", detail: "Strategies, backtests, runtime, API keys · :8099", url: u(process.env.ALGO_URL, "http://127.0.0.1:8099") },
   { key: "support", name: "Support", detail: "Tickets and notifications · :8100", url: u(process.env.SUPPORT_URL, "http://127.0.0.1:8100"), optional: true },

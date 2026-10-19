@@ -148,7 +148,7 @@ async fn news_and_calendar_end_to_end() {
     assert_ne!(p1["items"][1]["id"], p2["items"][0]["id"]);
 
     // --- Back Office: pin / hide / retag are per tenant ---
-    let staff = [("x-kalks-staff", "editor@kalks.com")];
+    let staff = [("x-kalks-staff", "editor@kalkstrade.com")];
     let other = [("x-kalks-staff", "ops@acme.com"), ("x-kalks-tenant", "acme")];
     let fomc_id = v["items"].as_array().unwrap().iter().find(|i| i["title"] == "Federal Reserve issues FOMC statement").unwrap()["id"].as_i64().unwrap();
     let btc_id = v["items"].as_array().unwrap().iter().find(|i| i["symbols"][0] == "BTCUSD").unwrap()["id"].as_i64().unwrap();

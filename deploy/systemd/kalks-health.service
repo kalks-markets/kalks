@@ -3,4 +3,6 @@ Description=Kalks production watchdog
 
 [Service]
 Type=oneshot
+# optional: KALKS_ALERT_TO, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (root-only file, never committed)
+EnvironmentFile=-/etc/kalks/alerts.env
 ExecStart=/home/kalks/kalks/deploy/healthcheck.sh

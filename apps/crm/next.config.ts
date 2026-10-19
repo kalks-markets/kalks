@@ -13,7 +13,7 @@ const config: NextConfig = {
   // Client router cache: pages here are client components whose server payload carries no user data, so a page
   // visited in the last minute opens without a server round trip (data still refetches on mount).
   experimental: { staleTimes: { dynamic: 60 } },
-  // Trading lives in the separate Kalks Trader app (trade.kalks.com); query params are forwarded.
+  // Trading lives in the separate Kalks Trader app (trade.kalkstrade.com); query params are forwarded.
   async redirects() {
     return [{ source: "/trade", destination: `${TERMINAL_URL}/`, permanent: false }];
   },

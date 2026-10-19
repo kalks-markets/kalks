@@ -7,7 +7,7 @@ import { seeded } from "./rng";
 /* ------------------------------------------------------------------ */
 
 export const CNT_TENANTS = [
-  { id: "kalks", name: "Kalks Markets", color: "#ff5a1f", domain: "kalks.com", languages: 22 },
+  { id: "kalks", name: "Kalks Markets", color: "#ff5a1f", domain: "kalkstrade.com", languages: 22 },
   { id: "aurum", name: "Aurum FX", color: "#e9b949", domain: "aurumfx.com", languages: 14 },
   { id: "nova", name: "NovaTrade Asia", color: "#38bdf8", domain: "novatrade.asia", languages: 11 },
   { id: "dunes", name: "Dunes Capital", color: "#22c55e", domain: "dunescapital.ae", languages: 6 },
@@ -217,8 +217,8 @@ export const CNT_EMAIL_VARIABLES: { key: string; label: string; sample: string }
   { key: "tx_id", label: "Transaction ID", sample: "TX904412" },
   { key: "margin_level", label: "Margin level", sample: "84.2%" },
   { key: "reason", label: "Rejection reason", sample: "Proof of address older than 90 days" },
-  { key: "reset_link", label: "Reset link", sample: "https://kalks.com/reset/4f1c…" },
-  { key: "support_email", label: "Support email", sample: "support@kalks.com" },
+  { key: "reset_link", label: "Reset link", sample: "https://kalkstrade.com/reset/4f1c…" },
+  { key: "support_email", label: "Support email", sample: "support@kalkstrade.com" },
   { key: "date", label: "Date", sample: "24 Sep 2026, 14:32 GMT+3" },
   { key: "commission", label: "IB commission", sample: "$4,812.40" },
   { key: "server", label: "Trading server", sample: "Kalks-Live01" },

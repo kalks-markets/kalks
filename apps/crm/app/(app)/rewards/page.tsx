@@ -46,7 +46,7 @@ function DemoContestsPage() {
             <Button variant="surface" onClick={() => toast("Contest history", { description: "You've entered 6 contests · best finish #9 (Demo Sprint · July)" })}>
               <History /> My history
             </Button>
-            <Button variant="ember" shimmer onClick={() => toast.success("Invite link copied", { description: "kalks.com/contest/gold-rush?ref=ARJUN24 · both get +250 pts" })}>
+            <Button variant="ember" shimmer onClick={() => toast.success("Invite link copied", { description: "app.kalkstrade.com/rewards/contests/gold-rush?ref=ARJUN24 · both get +250 pts" })}>
               <Sparkles /> Invite a friend
             </Button>
           </>

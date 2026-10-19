@@ -554,21 +554,21 @@ export const ANL_REPORT_TYPES = [
   "AML flags & STRs",
 ];
 
-/** Staff mailbox for a person, e.g. priya.nair@kalks.com */
+/** Staff mailbox for a person, e.g. priya.nair@kalkstrade.com */
 export function anlStaffEmail(p: Person) {
-  return `${p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "")}@kalks.com`;
+  return `${p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "")}@kalkstrade.com`;
 }
 
 export const ANL_SCHEDULES: AnlSchedule[] = [
-  { id: "SCH-104", name: "Daily P&L flash", report: "Broker P&L summary", frequency: "daily", time: "08:00", nextRun: "2026-09-25T05:00:00Z", recipients: [anlStaffEmail(PEOPLE[4]!), anlStaffEmail(PEOPLE[9]!), "ceo@kalks.com", "finance@kalks.com"], format: "PDF", enabled: true, lastStatus: "delivered", owner: PEOPLE[4]! },
-  { id: "SCH-108", name: "Regulator · transaction feed", report: "Transaction report", frequency: "daily", time: "09:00", nextRun: "2026-09-25T06:00:00Z", recipients: ["reporting@kalks.com", "compliance@kalks.com"], format: "XML", enabled: true, lastStatus: "delivered", owner: PEOPLE[12]! },
-  { id: "SCH-111", name: "Weekly growth review", report: "Acquisition funnel", frequency: "weekly", day: "Mon", time: "10:00", nextRun: "2026-09-28T07:00:00Z", recipients: [anlStaffEmail(PEOPLE[1]!), anlStaffEmail(PEOPLE[8]!), "growth@kalks.com"], format: "PDF", enabled: true, lastStatus: "delivered", owner: PEOPLE[1]! },
-  { id: "SCH-115", name: "IB payouts leaderboard", report: "IB leaderboard", frequency: "weekly", day: "Fri", time: "17:30", nextRun: "2026-09-25T14:30:00Z", recipients: [anlStaffEmail(PEOPLE[5]!), "partners@kalks.com"], format: "XLSX", enabled: true, lastStatus: "failed", owner: PEOPLE[5]! },
-  { id: "SCH-119", name: "Treasury cash-flow", report: "Deposits & withdrawals", frequency: "daily", time: "23:55", nextRun: "2026-09-24T20:55:00Z", recipients: [anlStaffEmail(PEOPLE[9]!), "treasury@kalks.com", "cfo@kalks.com"], format: "XLSX", enabled: true, lastStatus: "delivered", owner: PEOPLE[9]! },
-  { id: "SCH-122", name: "Board pack · monthly", report: "Cohort retention", frequency: "monthly", day: "1st", time: "07:00", nextRun: "2026-10-01T04:00:00Z", recipients: ["board@kalks.com", "ceo@kalks.com", anlStaffEmail(PEOPLE[4]!), anlStaffEmail(PEOPLE[20]!), anlStaffEmail(PEOPLE[13]!)], format: "PDF", enabled: true, lastStatus: "delivered", owner: PEOPLE[4]! },
-  { id: "SCH-127", name: "Large transactions → FIU", report: "Large transactions", frequency: "daily", time: "06:30", nextRun: "2026-09-25T03:30:00Z", recipients: ["mlro@kalks.com"], format: "CSV", enabled: true, lastStatus: "delivered", owner: PEOPLE[12]! },
-  { id: "SCH-131", name: "Symbol revenue deep-dive", report: "Revenue by symbol", frequency: "weekly", day: "Wed", time: "12:00", nextRun: "2026-09-30T09:00:00Z", recipients: [anlStaffEmail(PEOPLE[15]!), "dealing@kalks.com"], format: "XLSX", enabled: false, lastStatus: "never", owner: PEOPLE[15]! },
-  { id: "SCH-134", name: "EOD positions snapshot", report: "Positions snapshot", frequency: "daily", time: "00:00", nextRun: "2026-09-24T21:00:00Z", recipients: ["risk@kalks.com", anlStaffEmail(PEOPLE[4]!)], format: "CSV", enabled: true, lastStatus: "delivered", owner: PEOPLE[4]! },
+  { id: "SCH-104", name: "Daily P&L flash", report: "Broker P&L summary", frequency: "daily", time: "08:00", nextRun: "2026-09-25T05:00:00Z", recipients: [anlStaffEmail(PEOPLE[4]!), anlStaffEmail(PEOPLE[9]!), "ceo@kalkstrade.com", "finance@kalkstrade.com"], format: "PDF", enabled: true, lastStatus: "delivered", owner: PEOPLE[4]! },
+  { id: "SCH-108", name: "Regulator · transaction feed", report: "Transaction report", frequency: "daily", time: "09:00", nextRun: "2026-09-25T06:00:00Z", recipients: ["reporting@kalkstrade.com", "compliance@kalkstrade.com"], format: "XML", enabled: true, lastStatus: "delivered", owner: PEOPLE[12]! },
+  { id: "SCH-111", name: "Weekly growth review", report: "Acquisition funnel", frequency: "weekly", day: "Mon", time: "10:00", nextRun: "2026-09-28T07:00:00Z", recipients: [anlStaffEmail(PEOPLE[1]!), anlStaffEmail(PEOPLE[8]!), "growth@kalkstrade.com"], format: "PDF", enabled: true, lastStatus: "delivered", owner: PEOPLE[1]! },
+  { id: "SCH-115", name: "IB payouts leaderboard", report: "IB leaderboard", frequency: "weekly", day: "Fri", time: "17:30", nextRun: "2026-09-25T14:30:00Z", recipients: [anlStaffEmail(PEOPLE[5]!), "partners@kalkstrade.com"], format: "XLSX", enabled: true, lastStatus: "failed", owner: PEOPLE[5]! },
+  { id: "SCH-119", name: "Treasury cash-flow", report: "Deposits & withdrawals", frequency: "daily", time: "23:55", nextRun: "2026-09-24T20:55:00Z", recipients: [anlStaffEmail(PEOPLE[9]!), "treasury@kalkstrade.com", "cfo@kalkstrade.com"], format: "XLSX", enabled: true, lastStatus: "delivered", owner: PEOPLE[9]! },
+  { id: "SCH-122", name: "Board pack · monthly", report: "Cohort retention", frequency: "monthly", day: "1st", time: "07:00", nextRun: "2026-10-01T04:00:00Z", recipients: ["board@kalkstrade.com", "ceo@kalkstrade.com", anlStaffEmail(PEOPLE[4]!), anlStaffEmail(PEOPLE[20]!), anlStaffEmail(PEOPLE[13]!)], format: "PDF", enabled: true, lastStatus: "delivered", owner: PEOPLE[4]! },
+  { id: "SCH-127", name: "Large transactions → FIU", report: "Large transactions", frequency: "daily", time: "06:30", nextRun: "2026-09-25T03:30:00Z", recipients: ["mlro@kalkstrade.com"], format: "CSV", enabled: true, lastStatus: "delivered", owner: PEOPLE[12]! },
+  { id: "SCH-131", name: "Symbol revenue deep-dive", report: "Revenue by symbol", frequency: "weekly", day: "Wed", time: "12:00", nextRun: "2026-09-30T09:00:00Z", recipients: [anlStaffEmail(PEOPLE[15]!), "dealing@kalkstrade.com"], format: "XLSX", enabled: false, lastStatus: "never", owner: PEOPLE[15]! },
+  { id: "SCH-134", name: "EOD positions snapshot", report: "Positions snapshot", frequency: "daily", time: "00:00", nextRun: "2026-09-24T21:00:00Z", recipients: ["risk@kalkstrade.com", anlStaffEmail(PEOPLE[4]!)], format: "CSV", enabled: true, lastStatus: "delivered", owner: PEOPLE[4]! },
 ];
 
 export interface AnlDelivery {
@@ -587,7 +587,7 @@ export const ANL_DELIVERY_LOG: AnlDelivery[] = [
   { id: "DLV-99811", schedule: "Large transactions → FIU", at: "2026-09-24T03:30:08Z", recipients: 1, status: "delivered", size: "214 KB", channel: "SFTP" },
   { id: "DLV-99809", schedule: "Regulator · transaction feed", at: "2026-09-24T06:00:41Z", recipients: 2, status: "delivered", size: "42.6 MB", channel: "SFTP" },
   { id: "DLV-99806", schedule: "EOD positions snapshot", at: "2026-09-23T21:00:05Z", recipients: 2, status: "delivered", size: "3.4 MB", channel: "Email" },
-  { id: "DLV-99804", schedule: "Treasury cash-flow", at: "2026-09-23T20:55:18Z", recipients: 3, status: "bounced", size: "2.1 MB", channel: "Email", note: "cfo@kalks.com mailbox full" },
+  { id: "DLV-99804", schedule: "Treasury cash-flow", at: "2026-09-23T20:55:18Z", recipients: 3, status: "bounced", size: "2.1 MB", channel: "Email", note: "cfo@kalkstrade.com mailbox full" },
   { id: "DLV-99801", schedule: "IB payouts leaderboard", at: "2026-09-19T14:30:02Z", recipients: 2, status: "failed", size: "—", channel: "Slack", note: "Slack webhook 410 Gone" },
   { id: "DLV-99797", schedule: "Daily P&L flash", at: "2026-09-23T05:00:09Z", recipients: 4, status: "delivered", size: "1.7 MB", channel: "Email" },
   { id: "DLV-99794", schedule: "Weekly growth review", at: "2026-09-21T07:00:22Z", recipients: 3, status: "delivered", size: "5.2 MB", channel: "Email" },

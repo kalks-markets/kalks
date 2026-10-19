@@ -10,7 +10,7 @@ import { LiveSupport } from "@/components/support/live-support";
 import { IS_DEMO } from "@kalks/mock";
 
 const CONTACTS = [
-  { key: "email", icon: <Mail />, title: "Email", value: "support@kalks.com", hours: "Reply within 2 hours · 24/7", action: "Copy", copy: "support@kalks.com" },
+  { key: "email", icon: <Mail />, title: "Email", value: "support@kalkstrade.com", hours: "Reply within 2 hours · 24/7", action: "Copy", copy: "support@kalkstrade.com" },
   { key: "wa", icon: <MessageCircle />, title: "WhatsApp", value: "+971 4 568 2210", hours: "Mon–Fri 08:00–22:00 GMT+3", action: "Open", copy: "" },
   { key: "phone", icon: <Phone />, title: "Phone", value: "+44 20 3808 4412", hours: "Mon–Fri 09:00–21:00 GMT+3", action: "Call", copy: "" },
 ];

@@ -37,7 +37,7 @@ export const EML_VARIABLES: { key: string; label: string; sample: string }[] = [
   { key: "commission", label: "Commission", sample: "$4,812.40" },
   { key: "period", label: "Period", sample: "August 2026" },
   { key: "broker_name", label: "Broker name", sample: "Kalks Markets" },
-  { key: "support_email", label: "Support email", sample: "support@kalks.com" },
+  { key: "support_email", label: "Support email", sample: "support@kalkstrade.com" },
 ];
 
 export interface EmlContent {

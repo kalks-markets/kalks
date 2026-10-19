@@ -36,7 +36,7 @@ function DemoViewersPage() {
         actions={
           <Dialog
             title={t("profile.viewers.createTitle")}
-            description={t("profile.viewers.createDescription", { host: "app.kalks.com" })}
+            description={t("profile.viewers.createDescription", { host: "app.kalkstrade.com" })}
             trigger={
               <Button variant="ember">
                 <Plus /> {t("profile.viewers.new")}

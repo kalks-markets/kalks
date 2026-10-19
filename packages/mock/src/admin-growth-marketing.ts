@@ -627,7 +627,7 @@ export const MKT_JOURNEYS: MktJourney[] = [
       yes: [
         ["email", "Email · Finish in 2 minutes", "Template: kyc-reminder-v2", [["Template", "kyc-reminder-v2"], ["Subject", "One step left to unlock withdrawals"], ["Open rate", "52.9%"]]],
         ["push", "Push · Upload proof of address", "Mobile app deep link", [["Deep link", "kalks://profile/verification"], ["CTR", "14.1%"]]],
-        ["sms", "SMS · Help from support", "Link to live chat", [["Sender", "KALKS"], ["Message", "Need help verifying? Chat with us: kalks.com/help"]]],
+        ["sms", "SMS · Help from support", "Link to live chat", [["Sender", "KALKS"], ["Message", "Need help verifying? Chat with us: kalkstrade.com/help"]]],
       ],
       no: ["exit", "Exit · KYC approved", "Remove from journey"],
       goal: ["Goal · KYC approved", "kyc.approved within 14 days"],

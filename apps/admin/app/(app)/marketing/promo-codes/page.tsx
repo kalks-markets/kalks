@@ -173,7 +173,7 @@ function DemoPromoCodesPage() {
               c.status === "active"
                 ? { label: "Pause code", icon: <Pause />, onSelect: () => (setStatus(c.id, "paused"), toast.success(`${c.code} paused`, { description: "New redemptions are blocked; existing benefits stay." })) }
                 : { label: "Activate code", icon: <Play />, onSelect: () => (setStatus(c.id, "active"), toast.success(`${c.code} is live`)) },
-              { label: "Copy share link", icon: <Copy />, onSelect: () => (navigator.clipboard?.writeText(`https://kalks.com/r/${c.code}`).catch(() => {}), toast.success("Link copied", { description: `kalks.com/r/${c.code}` })) },
+              { label: "Copy share link", icon: <Copy />, onSelect: () => (navigator.clipboard?.writeText(`https://app.kalkstrade.com/r/${c.code}`).catch(() => {}), toast.success("Link copied", { description: `app.kalkstrade.com/r/${c.code}` })) },
               { label: "Export redemptions", icon: <Download />, onSelect: () => toast.success("Export started", { description: `${c.code.toLowerCase()}-redemptions.csv · ${c.uses.toLocaleString("en-US")} rows` }) },
               "sep",
               { label: "Expire now", icon: <TimerOff />, danger: true, onSelect: () => (setStatus(c.id, "expired"), toast.success(`${c.code} expired`, { description: "Logged in the admin audit trail." })) },

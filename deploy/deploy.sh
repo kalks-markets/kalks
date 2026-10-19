@@ -11,8 +11,13 @@ if [ -z "${KALKS_DEPLOY_PULLED:-}" ]; then
   git pull --ff-only
   KALKS_DEPLOY_PULLED=1 exec "$0" "$@"
 fi
+# Deploy options that persist between deploys live in ~/.kalks-deploy/options (shell syntax), e.g.
+#   KALKS_DISABLE_PROP=1   the prop service is not built and its unit is stopped and disabled
+[ -f ~/.kalks-deploy/options ] && . ~/.kalks-deploy/options
+PROP=1; [ "${KALKS_DISABLE_PROP:-}" = 1 ] && PROP=
+
 pnpm install --frozen-lockfile
-cargo build --release -p market-data -p gateway -p trading -p prop -p ib
+cargo build --release -p market-data -p gateway -p trading -p ib ${PROP:+-p prop}
 cargo build --release -p academy
 cargo build --release -p algo
 cargo build --release -p wallet
@@ -68,22 +73,6 @@ for app in apps/crm apps/admin; do
   f="$app/.env.production.local"; touch "$f"
   grep -q '^PROP_URL=' "$f" || printf 'PROP_URL=http://127.0.0.1:8097\n' >> "$f"
   grep -q '^PROP_INTERNAL_TOKEN=' "$f" || printf 'PROP_INTERNAL_TOKEN=%s\n' "$(grep '^PROP_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
-done
-# ALGO service secrets: internal token and API-key HMAC master generated once (never printed), database
-# kalks_algo. The AI assistant's Claude key is read from .env.claude (copied from the terminal's env if missing).
-grep -q '^ALGO_INTERNAL_TOKEN=' .env.local || printf 'ALGO_INTERNAL_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env.local
-grep -q '^ALGO_KEY_SECRET=' .env.local || printf 'ALGO_KEY_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env.local
-if ! grep -q '^ALGO_DATABASE_URL=' .env.local && grep -q '^GATEWAY_DATABASE_URL=' .env.local; then
-  printf 'ALGO_DATABASE_URL=%s\n' "$(grep '^GATEWAY_DATABASE_URL=' .env.local | cut -d= -f2- | sed -E 's#/[^/?]+([?].*)?$#/kalks_algo\1#')" >> .env.local
-fi
-if ! grep -q '^ANTHROPIC_API_KEY=' .env.claude 2>/dev/null && grep -q '^ANTHROPIC_API_KEY=' apps/terminal/.env.production.local 2>/dev/null; then
-  (umask 077; grep '^ANTHROPIC_API_KEY=' apps/terminal/.env.production.local > .env.claude)
-fi
-# the Client Area and Back Office BFFs reach the ALGO service with the same token
-for app in apps/crm apps/admin; do
-  f="$app/.env.production.local"; touch "$f"
-  grep -q '^ALGO_URL=' "$f" || printf 'ALGO_URL=http://127.0.0.1:8099\n' >> "$f"
-  grep -q '^ALGO_INTERNAL_TOKEN=' "$f" || printf 'ALGO_INTERNAL_TOKEN=%s\n' "$(grep '^ALGO_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
 done
 # ALGO service secrets: internal token and API-key HMAC master generated once (never printed), database
 # kalks_algo. The AI assistant's Claude key is read from .env.claude (copied from the terminal's env if missing).
@@ -210,10 +199,13 @@ MD_FP_FILE="$HOME/.kalks-deploy/market-data.fingerprint"
 mkdir -p "$(dirname "$MD_FP_FILE")"
 
 # service units + edge config (idempotent)
-sudo cp deploy/systemd/*.service /etc/systemd/system/
+sudo cp deploy/systemd/*.service deploy/systemd/*.timer /etc/systemd/system/
 sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
 sudo systemctl daemon-reload
-sudo systemctl enable kalks-market-data kalks-gateway kalks-trading kalks-ib kalks-prop kalks-crm kalks-admin kalks-terminal >/dev/null
+sudo systemctl enable kalks-market-data kalks-gateway kalks-trading kalks-ib kalks-crm kalks-admin kalks-terminal >/dev/null
+if [ -n "$PROP" ]; then sudo systemctl enable kalks-prop >/dev/null; else sudo systemctl disable --now kalks-prop >/dev/null 2>&1 || true; echo "prop: disabled (KALKS_DISABLE_PROP=1)"; fi
+# the watchdog (deploy/healthcheck.sh) runs every minute from its timer
+sudo systemctl enable --now kalks-health.timer >/dev/null
 md_now="$(md_fingerprint)"
 if [ "$md_now" != "$(cat "$MD_FP_FILE" 2>/dev/null || true)" ]; then
   echo "market-data changed: restarting it (it closes its provider connections first)"
@@ -225,7 +217,8 @@ elif ! sudo systemctl is-active --quiet kalks-market-data; then
 else
   echo "market-data unchanged: not restarted (provider connections untouched)"
 fi
-sudo systemctl restart kalks-gateway kalks-trading kalks-ib kalks-prop kalks-crm kalks-admin kalks-terminal
+sudo systemctl restart kalks-gateway kalks-trading kalks-ib kalks-crm kalks-admin kalks-terminal
+[ -n "$PROP" ] && sudo systemctl restart kalks-prop
 sudo systemctl enable kalks-academy >/dev/null && sudo systemctl restart kalks-academy
 sudo systemctl enable kalks-algo >/dev/null && sudo systemctl restart kalks-algo
 sudo systemctl enable kalks-wallet >/dev/null && sudo systemctl restart kalks-wallet
@@ -236,7 +229,7 @@ sudo systemctl enable kalks-news >/dev/null && sudo systemctl restart kalks-news
 sudo systemctl enable kalks-options >/dev/null && sudo systemctl restart kalks-options
 sudo systemctl reload caddy || echo "caddy reload timed out (long-lived connections); config is validated, continuing"
 sleep 5
-for u in 127.0.0.1:8081/health 127.0.0.1:8080/health 127.0.0.1:8090/health 127.0.0.1:8096/health 127.0.0.1:8097/health 127.0.0.1:3000/login 127.0.0.1:3001/login 127.0.0.1:3002/login; do
+for u in 127.0.0.1:8081/health 127.0.0.1:8080/health 127.0.0.1:8090/health 127.0.0.1:8096/health ${PROP:+127.0.0.1:8097/health} 127.0.0.1:3000/login 127.0.0.1:3001/login 127.0.0.1:3002/login; do
   printf "%-26s %s\n" "$u" "$(curl -s -o /dev/null -w '%{http_code}' "http://$u")"
 done
 printf "%-26s %s\n" 127.0.0.1:8098/health "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8098/health)"

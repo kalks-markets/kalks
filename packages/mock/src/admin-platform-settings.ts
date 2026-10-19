@@ -21,8 +21,8 @@ export const SET_GENERAL = {
   baseCurrency: "USD",
   primary: "#FF5A1F",
   accent: "#E9B949",
-  supportEmail: "support@kalks.com",
-  complianceEmail: "compliance@kalks.com",
+  supportEmail: "support@kalkstrade.com",
+  complianceEmail: "compliance@kalkstrade.com",
   supportPhone: "+971 4 568 2210",
   whatsapp: "+971 50 118 4420",
   liveChatHours: "24/5 · Mon 00:00 – Sat 00:00 GMT+3",
@@ -39,11 +39,11 @@ export interface SetDomain {
 }
 
 export const SET_DOMAINS: SetDomain[] = [
-  { host: "app.kalks.com", purpose: "Client Area", dns: "verified", ssl: "active", expires: "2026-12-19" },
-  { host: "trade.kalks.com", purpose: "Web terminal", dns: "verified", ssl: "active", expires: "2026-12-19" },
-  { host: "admin.kalks.com", purpose: "Back Office", dns: "verified", ssl: "active", expires: "2026-12-19" },
-  { host: "api.kalks.com", purpose: "Public API & webhooks", dns: "verified", ssl: "active", expires: "2026-12-19" },
-  { host: "status.kalks.com", purpose: "Status page", dns: "pending", ssl: "pending", expires: "—" },
+  { host: "app.kalkstrade.com", purpose: "Client Area", dns: "verified", ssl: "active", expires: "2026-12-19" },
+  { host: "trade.kalkstrade.com", purpose: "Web terminal", dns: "verified", ssl: "active", expires: "2026-12-19" },
+  { host: "admin.kalkstrade.com", purpose: "Back Office", dns: "verified", ssl: "active", expires: "2026-12-19" },
+  { host: "api.kalkstrade.com", purpose: "Public API & webhooks", dns: "verified", ssl: "active", expires: "2026-12-19" },
+  { host: "status.kalkstrade.com", purpose: "Status page", dns: "pending", ssl: "pending", expires: "—" },
 ];
 
 export const SET_TIMEZONES = [
@@ -207,7 +207,7 @@ export const SET_INTEGRATIONS: SetIntegration[] = [
     need: "required",
     description: "Welcome, OTP, deposit and withdrawal emails. Templates live in Content → Email templates.",
     docsUrl: "https://docs.aws.amazon.com/ses/latest/dg/send-email-smtp.html",
-    whereToGet: "AWS console → SES → verified identity (kalks.com) → SMTP settings → create SMTP credentials. Or an API key from SendGrid / Postmark.",
+    whereToGet: "AWS console → SES → verified identity (kalkstrade.com) → SMTP settings → create SMTP credentials. Or an API key from SendGrid / Postmark.",
     lastChecked: "2026-09-24T15:41:00Z",
     latencyMs: 212,
     meta: [
@@ -225,7 +225,7 @@ export const SET_INTEGRATIONS: SetIntegration[] = [
       { key: "provider", label: "API provider", type: "select", value: "Amazon SES", options: ["Amazon SES", "SendGrid", "Postmark"], when: "API" },
       { key: "apiKey", label: "API key", type: "secret", placeholder: "Paste provider API key", required: true, when: "API" },
       { key: "fromName", label: "From name", type: "text", value: "Kalks Markets", required: true },
-      { key: "fromEmail", label: "From email", type: "text", value: "no-reply@kalks.com", required: true },
+      { key: "fromEmail", label: "From email", type: "text", value: "no-reply@kalkstrade.com", required: true },
     ],
   },
   {
@@ -268,7 +268,7 @@ export const SET_INTEGRATIONS: SetIntegration[] = [
     fields: [
       { key: "public", label: "VAPID public key", type: "text", placeholder: "BEl6…", required: true, span: 2 },
       { key: "private", label: "VAPID private key", type: "secret", placeholder: "Keep secret", required: true },
-      { key: "subject", label: "Subject (mailto)", type: "text", value: "mailto:ops@kalks.com", required: true },
+      { key: "subject", label: "Subject (mailto)", type: "text", value: "mailto:ops@kalkstrade.com", required: true },
     ],
   },
   {
@@ -293,7 +293,7 @@ export const SET_INTEGRATIONS: SetIntegration[] = [
       { key: "secret", label: "Secret key", type: "secret", value: "••••••••••••••••••••••••", reveal: "EXAMPLEEXAMPLEEXAMPLE000", required: true },
       { key: "whSecret", label: "Webhook secret", type: "secret", value: "••••••••••••••••", reveal: "whsec_EXAMPLE00000", required: true },
       { key: "level", label: "Level name", type: "text", value: "kalks-basic-kyc-level", required: true },
-      { key: "webhook", label: "Webhook URL (paste into Sumsub)", type: "readonly", value: "https://api.kalks.com/webhooks/sumsub", span: 2 },
+      { key: "webhook", label: "Webhook URL (paste into Sumsub)", type: "readonly", value: "https://api.kalkstrade.com/webhooks/sumsub", span: 2 },
     ],
   },
   {
@@ -304,7 +304,7 @@ export const SET_INTEGRATIONS: SetIntegration[] = [
     icon: "key",
     status: "connected",
     need: "optional",
-    description: "One-tap sign-up and login with Google on app.kalks.com.",
+    description: "One-tap sign-up and login with Google on app.kalkstrade.com.",
     docsUrl: "https://developers.google.com/identity/protocols/oauth2/web-server",
     whereToGet: "Google Cloud console → APIs & Services → Credentials → OAuth client ID (Web). Add the redirect URL below.",
     lastChecked: "2026-09-24T15:30:00Z",
@@ -313,7 +313,7 @@ export const SET_INTEGRATIONS: SetIntegration[] = [
     fields: [
       { key: "clientId", label: "Client ID", type: "text", value: "418027733915-q8r1…apps.googleusercontent.com", required: true, span: 2 },
       { key: "secret", label: "Client secret", type: "secret", value: "GOCSPX-••••••••••••••••Xs2", reveal: "GOCSPX-EXAMPLEEXAMPLEEXAMPXs2", required: true },
-      { key: "redirect", label: "Redirect URL", type: "readonly", value: "https://app.kalks.com/auth/callback/google" },
+      { key: "redirect", label: "Redirect URL", type: "readonly", value: "https://app.kalkstrade.com/auth/callback/google" },
     ],
   },
   {
@@ -440,7 +440,7 @@ export const SET_GO_LIVE: { id: string; label: string; detail: string; done: boo
   { id: "legal", label: "Legal documents published", detail: "7 documents · v1.0", done: true, href: "/content/legal" },
   { id: "news", label: "Fix news feed error", detail: "1 RSS feed returning 403", done: false, href: "/settings/integrations" },
   { id: "push", label: "Web push keys", detail: "Generate VAPID key pair", done: false, href: "/settings/integrations" },
-  { id: "status", label: "Status page domain", detail: "status.kalks.com DNS pending", done: false, href: "/settings" },
+  { id: "status", label: "Status page domain", detail: "status.kalkstrade.com DNS pending", done: false, href: "/settings" },
 ];
 
 /* ------------------------------------------------------------------ */

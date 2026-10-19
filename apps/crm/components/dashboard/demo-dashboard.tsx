@@ -577,7 +577,7 @@ function PartnerBanner() {
           </Chip>
           <h3 className="k-display text-[22px] font-bold tracking-[-0.02em] sm:text-2xl">{t("dashboard.partner.title")}</h3>
           <p className="mt-2 text-sm text-fg-2">
-            <Trans k="dashboard.partner.text" vars={{ url: `kalks.com/r/${me.referral_code}` }} tags={{ link: (c) => <span className="font-mono text-fg" dir="ltr">{c}</span> }} />
+            <Trans k="dashboard.partner.text" vars={{ url: `app.kalkstrade.com/r/${me.referral_code}` }} tags={{ link: (c) => <span className="font-mono text-fg" dir="ltr">{c}</span> }} />
           </p>
         </div>
         <div className="flex items-center gap-4">

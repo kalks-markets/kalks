@@ -45,7 +45,7 @@ export function ExportActions({ name, scheduleHref = "/analytics/scheduled" }: {
           { label: "Excel", icon: <FileSpreadsheet />, hint: ".xlsx", onSelect: () => done("XLSX") },
           { label: "PDF report", icon: <FileText />, hint: ".pdf", onSelect: () => done("PDF") },
           "sep",
-          { label: "Email to me", icon: <Mail />, onSelect: () => toast.success("Report queued", { description: "Sending to priya.nair@kalks.com within 2 minutes" }) },
+          { label: "Email to me", icon: <Mail />, onSelect: () => toast.success("Report queued", { description: "Sending to priya.nair@kalkstrade.com within 2 minutes" }) },
         ]}
       />
     </>

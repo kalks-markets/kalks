@@ -23,7 +23,7 @@ function DemoPropOverviewPage() {
         subtitle="Evaluation pipeline, funded traders and the fee vs payout book · September 2026"
         actions={
           <>
-            <Button variant="surface" size="sm" onClick={() => auditToast("Monthly prop report queued", "PDF + CSV will be emailed to finance@kalks.com")}>
+            <Button variant="surface" size="sm" onClick={() => auditToast("Monthly prop report queued", "PDF + CSV will be emailed to finance@kalkstrade.com")}>
               <Layers /> Export report
             </Button>
             <Link href="/prop/payouts">
