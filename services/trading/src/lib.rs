@@ -16,6 +16,7 @@ pub mod money;
 pub mod notify;
 pub mod options;
 pub mod persist;
+pub mod risk;
 pub mod rules;
 pub mod shard;
 pub mod social;

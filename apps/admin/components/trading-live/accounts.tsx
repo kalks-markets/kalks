@@ -8,6 +8,7 @@ import { ErrorState, FilterSelect, Pager, TableSkeleton, ago, qs, useApi, useDeb
 import { useCan, useStaff } from "@/components/staff-session";
 import { BulkDialog, BulkMenu, CloseAccountDialog, ReopenAccountDialog, type BulkKind } from "./account-ops";
 import { ProductChip } from "./groups";
+import { ClientScoreBlock } from "./risk-kit";
 import { MiniClient, SideChip, fmtPrice } from "@/components/trading/shared";
 import { BookChip, DeskDialog, MetaTile } from "@/components/trading-desk/kit";
 import { CreateTradeDrawer } from "@/components/trading-desk/create-trade";
@@ -366,6 +367,7 @@ export function AccountDrawer({ login, onClose, onAct }: { login: string | null;
             <Info k="Dealer controls" v={[a.controls.tradingDisabled && "trading off", a.controls.closeOnly && "close-only", a.controls.maxLot && `max ${a.controls.maxLot} lots`, a.controls.execDelayMs > 0 && `${a.controls.execDelayMs} ms delay`, a.controls.markupPips && `+${a.controls.markupPips} pips`].filter(Boolean).join(" · ") || "none"} />
             {a.demo && <Info k="Demo" v={`initial ${money2(a.demo.initialBalance, ccy)} · ${a.demo.refillsUsedToday}/${a.demo.refillsPerDay} refills · expires after ${a.demo.expiryDays} d idle`} />}
           </div>
+          <ClientScoreBlock login={a.login} />
           <div className="flex flex-wrap gap-2 text-[12px]">
             <Link href={`/clients/${a.userId}`} className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-2 px-2.5 py-1 text-fg-2 hover:text-fg">
               <UserRound className="size-3" /> Client profile

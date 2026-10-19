@@ -93,7 +93,9 @@ fn trigger_fill(tx: &mut Tx, env: &Env, ticket: i64, q: &Quote) {
     if super::trade::cfd_product_gate(env, opening).is_err() || gate(env, &tx.st, &o.symbol, opening, o.volume, None).is_err() {
         return;
     }
-    let res = {
+    // risk desk limits at fill time (enforce mode): a refused order is rejected with the limit's reason, like a fill
+    // without margin (alert mode: reported only)
+    let res = super::trade::risk_gate(env, &tx.st, &o.symbol, o.side, o.volume, super::trade::RiskStage::Fill, o.book, None).and_then(|_| {
         fill(
             tx,
             env,
@@ -117,7 +119,7 @@ fn trigger_fill(tx: &mut Tx, env: &Env, ticket: i64, q: &Quote) {
                 check_margin: true,
             },
         )
-    };
+    });
     match res {
         Ok(out) => {
             tx.emit(Event::OrderRemoved { ticket, status: OrderStatus::Filled, reason: "triggered".into(), at: env.now, fill_price: Some(price), position_ticket: out.position_ticket });

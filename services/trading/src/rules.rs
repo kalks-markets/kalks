@@ -156,12 +156,55 @@ pub struct RouteCtx<'a> {
     pub group: &'a str,
     pub symbol: &'a str,
     pub volume: D,
+    /// Ticket the decision is for (the order, or the position for a routing suggestion): a rule's percentage split
+    /// is a deterministic function of it, so the same ticket always lands in the same bucket.
+    pub id: i64,
+    /// What the risk desk knows about the client and the market (src/risk): None = no data, the condition never matches.
+    pub facts: RouteFacts<'a>,
 }
 
-/// First enabled matching rule wins (D140). Conditions the engine has no data for yet (risk score, hold
-/// time, win rate, news window, country, equity) never match. A rule sending < 50 % to its book routes the
-/// ticket to the other book (the split itself is done by a book transfer).
-pub fn resolve_route(rules: &[RoutingRule], ctx: &RouteCtx, fallback: Book) -> (Book, Option<String>) {
+/// Risk-desk facts for the routing conditions beyond login / group / symbol / lot size.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RouteFacts<'a> {
+    /// Client profitability score 0-100 (src/risk/score.rs).
+    pub score: Option<f64>,
+    /// `toxic` | `likely_profitable` | `neutral` | `likely_losing`.
+    pub category: Option<&'a str>,
+    /// Average holding time of the client's closed trades (seconds).
+    pub avg_hold_secs: Option<f64>,
+    /// Win rate of the closed trades, percent.
+    pub win_rate: Option<f64>,
+    /// ISO 3166 alpha-2, lower case.
+    pub country: Option<&'a str>,
+    /// Account equity in USD.
+    pub equity_usd: Option<D>,
+    /// Minutes between now and the nearest high-impact news event on the symbol's currencies (|Δ|, within 4 h).
+    pub news_minutes: Option<i64>,
+    /// The symbol is inside the tenant's configured news window right now.
+    pub news_active: bool,
+}
+
+/// Deterministic bucket 0..10 000 of a ticket (splitmix64): `pct` % of tickets fall below `pct × 100`.
+pub fn split_bucket(id: i64) -> u64 {
+    let mut z = (id as u64).wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    (z ^ (z >> 31)) % 10_000
+}
+
+/// The book a matching rule sends ticket `id` to: `pct` % of tickets (by `split_bucket`) to the rule's book, the
+/// rest to the other book. 100 % (or more) always the rule's book, 0 % never.
+pub fn split_book(action: &RoutingAction, id: i64) -> Book {
+    let other = if action.book == Book::A { Book::B } else { Book::A };
+    let pct = if action.pct.is_finite() { action.pct.clamp(0.0, 100.0) } else { 100.0 };
+    if pct >= 100.0 {
+        return action.book;
+    }
+    if (split_bucket(id) as f64) < pct * 100.0 { action.book } else { other }
+}
+
+/// The first enabled rule whose conditions match, and the book it sends this ticket to.
+pub fn match_rule<'r>(rules: &'r [RoutingRule], ctx: &RouteCtx) -> Option<(&'r RoutingRule, Book)> {
     for r in rules {
         if !r.enabled || r.conditions.is_empty() {
             continue;
@@ -169,11 +212,40 @@ pub fn resolve_route(rules: &[RoutingRule], ctx: &RouteCtx, fallback: Book) -> (
         let m = |c: &RoutingCondition| cond_match(c, ctx);
         let ok = if r.join.eq_ignore_ascii_case("OR") { r.conditions.iter().any(m) } else { r.conditions.iter().all(m) };
         if ok {
-            let book = if r.action.pct >= 50.0 { r.action.book } else if r.action.book == Book::A { Book::B } else { Book::A };
-            return (book, Some(format!("Rule {} · {}", r.id, r.name)));
+            return Some((r, split_book(&r.action, ctx.id)));
         }
     }
-    (fallback, None)
+    None
+}
+
+/// First enabled matching rule wins (D140). Conditions the engine has no data for (no score yet, no news feed,
+/// unknown country) never match. A rule with `pct` < 100 splits deterministically by ticket (`split_book`).
+pub fn resolve_route(rules: &[RoutingRule], ctx: &RouteCtx, fallback: Book) -> (Book, Option<String>) {
+    match match_rule(rules, ctx) {
+        Some((r, book)) => (book, Some(format!("Rule {} · {}", r.id, r.name))),
+        None => (fallback, None),
+    }
+}
+
+/// `60s`, `5m`, `2h`, `1d` or a bare number of seconds.
+pub fn duration_secs(s: &str) -> Option<D> {
+    let t = s.trim().to_lowercase();
+    let digits: String = t.chars().filter(|c| c.is_ascii_digit() || *c == '.').collect();
+    let n: D = digits.parse().ok()?;
+    let unit = t.chars().find(|c| c.is_ascii_alphabetic());
+    Some(match unit {
+        Some('m') => n * D::from(60),
+        Some('h') => n * D::from(3600),
+        Some('d') => n * D::from(86_400),
+        _ => n,
+    })
+}
+
+/// `±2m` / `+-5 min` in a News window value: the window in minutes it asks for.
+fn news_minutes_of(value: &str) -> Option<i64> {
+    let i = value.find('±').map(|i| i + '±'.len_utf8()).or_else(|| value.find("+-").map(|i| i + 2))?;
+    let rest: String = value[i..].trim_start().chars().take_while(|c| c.is_ascii_digit()).collect();
+    rest.parse().ok()
 }
 
 fn cond_match(c: &RoutingCondition, ctx: &RouteCtx) -> bool {
@@ -182,8 +254,8 @@ fn cond_match(c: &RoutingCondition, ctx: &RouteCtx) -> bool {
         let t: String = s.chars().filter(|ch| ch.is_ascii_digit() || *ch == '.' || *ch == '-').collect();
         t.parse().ok()
     };
-    let cmp = |v: D| -> bool {
-        let Some(t) = num(&c.value) else { return false };
+    let cmp_to = |v: D, t: Option<D>| -> bool {
+        let Some(t) = t else { return false };
         match c.op.as_str() {
             "≥" | ">=" => v >= t,
             "≤" | "<=" => v <= t,
@@ -192,11 +264,28 @@ fn cond_match(c: &RoutingCondition, ctx: &RouteCtx) -> bool {
             _ => v == t,
         }
     };
+    let cmp = |v: D| cmp_to(v, num(&c.value));
+    let f = &ctx.facts;
+    let dec = |x: Option<f64>| x.and_then(crate::money::from_f64);
     match c.field.as_str() {
         "Login" => list.contains(&ctx.login.to_string()),
         "Group" => list.contains(&ctx.group.to_lowercase()),
         "Symbol" => list.contains(&ctx.symbol.to_lowercase()),
         "Lot size" => cmp(ctx.volume),
+        "Risk score" | "Score" => dec(f.score).is_some_and(cmp),
+        "Risk category" | "Category" => f.category.is_some_and(|cat| list.iter().any(|x| x.replace([' ', '-'], "_") == cat)),
+        "Avg hold time" | "Hold time" => dec(f.avg_hold_secs).is_some_and(|v| cmp_to(v, duration_secs(&c.value))),
+        "Win rate (30d)" | "Win rate" => dec(f.win_rate).is_some_and(cmp),
+        "Equity" => f.equity_usd.is_some_and(cmp),
+        "Country" => f.country.is_some_and(|cc| list.contains(&cc.to_lowercase())),
+        "News window" => {
+            let wanted = !matches!(c.value.trim().to_lowercase().as_str(), "no" | "false" | "off" | "outside");
+            let inside = match news_minutes_of(&c.value) {
+                Some(m) => f.news_minutes.is_some_and(|x| x <= m),
+                None => f.news_active,
+            };
+            inside == wanted
+        }
         _ => false,
     }
 }
@@ -210,6 +299,8 @@ pub struct TenantConfig {
     pub policy: TenantPolicy,
     pub symbol_controls: Vec<SymbolControl>,
     pub routing_rules: Vec<RoutingRule>,
+    /// Risk desk: limits and settings (`risk_limits`, `risk_settings`; src/risk).
+    pub risk: crate::risk::RiskConfig,
 }
 
 impl TenantConfig {
@@ -265,17 +356,72 @@ mod tests {
     fn routing_first_match_wins() {
         let rules = vec![
             rule("RQ-L100", "Login", "=", "100", Book::A, 100.0),
-            rule("RR-2", "Lot size", "≥", "20", Book::A, 50.0),
+            rule("RR-2", "Lot size", "≥", "20", Book::A, 100.0),
             rule("RR-X", "Risk score", "≥", "8", Book::A, 100.0),
             rule("RR-4", "Group", "is", "Prop", Book::B, 100.0),
         ];
-        let ctx = |login, group, vol: i64| RouteCtx { login, group, symbol: "EURUSD", volume: D::from(vol) };
+        let ctx = |login, group, vol: i64| RouteCtx { login, group, symbol: "EURUSD", volume: D::from(vol), id: 1_000_001, facts: RouteFacts::default() };
         assert_eq!(resolve_route(&rules, &ctx(100, "standard", 1), Book::B).0, Book::A);
         assert_eq!(resolve_route(&rules, &ctx(7, "standard", 25), Book::B).0, Book::A);
         assert_eq!(resolve_route(&rules, &ctx(7, "standard", 1), Book::B), (Book::B, None));
         assert_eq!(resolve_route(&rules, &ctx(7, "prop", 1), Book::A).0, Book::B);
-        // pct < 50 sends the ticket to the other book
-        let r = vec![rule("R", "Symbol", "in", "EURUSD, GBPUSD", Book::A, 30.0)];
+        // 0 % sends every ticket to the other book, 100 % none
+        let r = vec![rule("R", "Symbol", "in", "EURUSD, GBPUSD", Book::A, 0.0)];
         assert_eq!(resolve_route(&r, &ctx(1, "x", 1), Book::A).0, Book::B);
+        let r = vec![rule("R", "Symbol", "in", "EURUSD, GBPUSD", Book::A, 100.0)];
+        assert_eq!(resolve_route(&r, &ctx(1, "x", 1), Book::B).0, Book::A);
+    }
+
+    fn ctx_with<'a>(id: i64, facts: RouteFacts<'a>) -> RouteCtx<'a> {
+        RouteCtx { login: 10_000_001, group: "standard", symbol: "EURUSD", volume: D::from(1), id, facts }
+    }
+
+    #[test]
+    fn percentage_split_is_deterministic_and_proportional() {
+        let action = RoutingAction { book: Book::A, pct: 30.0, lp: None };
+        // the same ticket always lands in the same book
+        for id in 1_000_001..1_000_200 {
+            assert_eq!(split_book(&action, id), split_book(&action, id));
+        }
+        // about 30 % of 10 000 consecutive tickets go to A
+        let a = (1_000_001..1_010_001).filter(|id| split_book(&action, *id) == Book::A).count();
+        assert!((2_800..=3_200).contains(&a), "{a} of 10 000 routed to A");
+        // a rule with a 30 % split routes through resolve_route the same way
+        let rules = vec![rule("S", "Symbol", "in", "EURUSD", Book::A, 30.0)];
+        for id in [1_000_001_i64, 1_000_002, 1_000_003, 2_000_000] {
+            assert_eq!(resolve_route(&rules, &ctx_with(id, RouteFacts::default()), Book::B).0, split_book(&action, id));
+        }
+        // 0 % and 100 % are not random
+        assert!((1..500).all(|id| split_book(&RoutingAction { book: Book::A, pct: 100.0, lp: None }, id) == Book::A));
+        assert!((1..500).all(|id| split_book(&RoutingAction { book: Book::A, pct: 0.0, lp: None }, id) == Book::B));
+    }
+
+    #[test]
+    fn risk_conditions_match_on_facts() {
+        let f = RouteFacts { score: Some(82.0), category: Some("toxic"), avg_hold_secs: Some(25.0), win_rate: Some(74.5), country: Some("ae"), equity_usd: Some(D::from(60_000)), news_minutes: Some(1), news_active: true };
+        let m = |field: &str, op: &str, value: &str, facts: RouteFacts| resolve_route(&[rule("X", field, op, value, Book::A, 100.0)], &ctx_with(7, facts), Book::B).0 == Book::A;
+        assert!(m("Risk score", "≥", "70", f));
+        assert!(!m("Risk score", "≥", "90", f));
+        assert!(m("Risk category", "in", "toxic, likely profitable", f));
+        assert!(!m("Risk category", "in", "neutral", f));
+        assert!(m("Avg hold time", "<", "60s", f));
+        assert!(m("Avg hold time", "<", "1m", f));
+        assert!(m("Avg hold time", "<", "1 min", f));
+        assert!(!m("Avg hold time", ">", "2m", f));
+        assert!(m("Win rate (30d)", "≥", "70%", f));
+        assert!(!m("Win rate (30d)", "≥", "80%", f));
+        assert!(m("Equity", "≥", "$50,000", f));
+        assert!(!m("Equity", "≥", "$100,000", f));
+        assert!(m("Country", "in", "AE, SA", f));
+        assert!(!m("Country", "in", "GB", f));
+        assert!(m("News window", "is", "High impact ±2m", f));
+        assert!(!m("News window", "is", "High impact ±2m", RouteFacts { news_minutes: Some(5), ..f }));
+        assert!(m("News window", "is", "active", f));
+        assert!(!m("News window", "is", "active", RouteFacts { news_active: false, ..f }));
+        // no data: never matches
+        let none = RouteFacts::default();
+        for (field, op, value) in [("Risk score", "≥", "0"), ("Risk category", "in", "neutral"), ("Avg hold time", ">", "0s"), ("Win rate (30d)", "≥", "0%"), ("Equity", "≥", "0"), ("Country", "in", "ae"), ("News window", "is", "±60m")] {
+            assert!(!m(field, op, value, none), "{field} matched without data");
+        }
     }
 }

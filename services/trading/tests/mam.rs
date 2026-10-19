@@ -137,6 +137,7 @@ async fn mam_link_allocate_close_fee_revoke_with_replay() {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     let hub = Hub::start(shared, 4, Default::default());
     set_btc(&quotes, "80000", "80000");

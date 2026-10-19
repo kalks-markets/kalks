@@ -84,6 +84,7 @@ async fn a_new_broker_is_provisioned_on_its_first_request() {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     let hub = Hub::start(shared, 1, Default::default());
 

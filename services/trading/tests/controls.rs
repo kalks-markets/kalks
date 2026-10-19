@@ -122,6 +122,7 @@ async fn restrictions_and_staff_sessions_through_the_api() {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     let hub = Hub::start(shared, 2, Default::default());
     let t = Utc::now().timestamp_millis();

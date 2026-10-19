@@ -122,6 +122,7 @@ async fn splits_and_dividends_end_to_end_with_a_crash_and_replay() {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     let hub = Hub::start(shared, 2, Default::default());
     let logins = Arc::new(LoginAlloc { live: AtomicI64::new(live), demo: AtomicI64::new(demo) });

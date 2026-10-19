@@ -11,6 +11,7 @@ pub mod controls;
 pub mod corporate;
 pub mod dealing;
 pub mod ledger;
+pub mod risk;
 pub mod lifecycle;
 pub mod mam;
 pub mod options;
@@ -186,6 +187,19 @@ pub fn router(st: AppState) -> Router {
         .route("/v1/dealing/routing/quick", put(dealing::quick_route))
         .route("/v1/dealing/audit", get(dealing::audit))
         .route("/v1/dealing/stream-ticket", post(dealing::stream_ticket))
+        // risk desk (api/risk.rs, docs/RISK-DESK.md)
+        .route("/v1/dealing/exposure", get(risk::exposure))
+        .route("/v1/dealing/risk/limits", get(risk::limits).put(risk::save_limits))
+        .route("/v1/dealing/risk/settings", put(risk::save_settings))
+        .route("/v1/dealing/risk/alerts", get(risk::alerts))
+        .route("/v1/dealing/risk/alerts/{id}/ack", post(risk::ack_alert))
+        .route("/v1/dealing/risk/scores", get(risk::scores))
+        .route("/v1/dealing/risk/scores/run", post(risk::run_scores))
+        .route("/v1/dealing/risk/scores/{login}", get(risk::score))
+        .route("/v1/dealing/risk/news", get(risk::news))
+        .route("/v1/dealing/routing/suggestions", get(risk::suggestions))
+        .route("/v1/dealing/routing/suggestions/{id}/approve", post(risk::approve))
+        .route("/v1/dealing/routing/suggestions/{id}/reject", post(risk::reject))
         // Back Office account operations
         .route("/v1/admin/accounts", get(admin::accounts))
         .route("/v1/admin/accounts/{login}", get(admin::account))

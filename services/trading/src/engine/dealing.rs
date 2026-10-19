@@ -269,6 +269,7 @@ pub fn fill_order(tx: &mut Tx, env: &Env, ticket: i64, dealer: &DealerCtx) -> Re
     let spec = env.spec(&o.symbol)?.clone();
     super::trade::cfd_product_gate(env, is_opening(&tx.st, &o.symbol, o.side, o.volume))?;
     gate(env, &tx.st, &o.symbol, is_opening(&tx.st, &o.symbol, o.side, o.volume), o.volume, Some(dealer))?;
+    super::trade::risk_gate(env, &tx.st, &o.symbol, o.side, o.volume, super::trade::RiskStage::Fill, o.book, Some(dealer))?;
     market_open(env, &spec)?;
     let q = env.live_quote(&tx.st.account, &o.symbol)?;
     let price = q.open_price(o.side);

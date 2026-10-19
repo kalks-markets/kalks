@@ -19,6 +19,11 @@ const ROUTES: Route[] = [
   // dealing desk reads
   { method: "GET", re: /^dealing\/(state|positions|orders|deals|controls|audit)$/, perm: "dealing.read" },
   { method: "GET", re: /^dealing\/routing\/rules$/, perm: "dealing.read" },
+  // risk desk (exposure with limit usage, risk limits, alerts, client scores, news windows, routing suggestions)
+  { method: "GET", re: /^dealing\/exposure$/, perm: "dealing.read" },
+  { method: "GET", re: /^dealing\/risk\/(limits|alerts|scores|news)$/, perm: "dealing.read" },
+  { method: "GET", re: new RegExp(`^dealing/risk/scores/${T}$`), perm: "dealing.read" },
+  { method: "GET", re: /^dealing\/routing\/suggestions$/, perm: "dealing.read" },
   { method: "GET", re: /^symbols$/, perm: "dealing.read", to: () => "/v1/symbols" },
   // instrument catalogue (Config › Symbols): live-trading switch and spec templates. Changes need dealing.policy here;
   // the engine then allows them only to the platform owner / super admin of the Kalks platform tenant.
@@ -48,6 +53,11 @@ const ROUTES: Route[] = [
   { method: "PUT", re: new RegExp(`^dealing/controls/accounts/${T}$`), perm: "dealing.write" },
   { method: "PUT", re: /^dealing\/controls\/tenant$/, perm: "dealing.policy" },
   { method: "PUT", re: /^dealing\/routing\/(rules|quick)$/, perm: "dealing.write" },
+  { method: "PUT", re: /^dealing\/risk\/limits$/, perm: "dealing.write" },
+  { method: "PUT", re: /^dealing\/risk\/settings$/, perm: "dealing.policy" },
+  { method: "POST", re: new RegExp(`^dealing/risk/alerts/${T}/ack$`), perm: "dealing.write" },
+  { method: "POST", re: /^dealing\/risk\/scores\/run$/, perm: "dealing.write" },
+  { method: "POST", re: new RegExp(`^dealing/routing/suggestions/${T}/(approve|reject)$`), perm: "dealing.write" },
   // trading accounts, groups, ledger
   { method: "GET", re: /^admin\/accounts$/, perm: "accounts.read" },
   { method: "GET", re: new RegExp(`^admin/accounts/${T}$`), perm: "accounts.read" },
@@ -169,8 +179,16 @@ async function handle(req: NextRequest, parts: string[], method: Method) {
 
   const target = route.to ? route.to(path.match(route.re)!) : `/v1/${path}${method === "GET" ? req.nextUrl.search : ""}`;
   const r = await engine(target, { method, body, staff: who.staff, ip: clientIp(req.headers), userAgent: req.headers.get("user-agent") });
+  // risk desk routes on an engine without them answer its generic 404: say so instead of "Not found"
+  if (r.status === 404 && RISK_PATH.test(path)) {
+    const err = (r.data as { error?: { code?: string; message?: string } } | null)?.error;
+    if (!err || (err.code === "not_found" && err.message === "Not found.")) return apiError(404, "engine_pending", "Available after the engine update.");
+  }
   return json(r.data, r.status);
 }
+
+/** Risk desk paths (exposure, risk limits / alerts / scores / news, routing suggestions). */
+const RISK_PATH = /^dealing\/(exposure|risk\/|routing\/suggestions)/;
 
 /**
  * Option routes on the engine. Writes carry a reason (`reason`, or `reasonCode` + `note` for a void); DELETE takes

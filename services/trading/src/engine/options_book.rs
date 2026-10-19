@@ -690,6 +690,8 @@ fn split(total: D, weights: &[D]) -> Vec<D> {
 /// One side of a fill on this account. Never refuses for money (it was reserved); idempotent per (fill, role).
 pub fn apply_fill(tx: &mut Tx, env: &Env, fill: &Fill, role: Role) -> Result<Value, Reject> {
     let v = book_fill(tx, env, fill, role, false)?;
+    // D16: a fill that leaves the account flat with a negative balance (a liquidation / backstop close) is covered
+    super::trade::apply_nbp(tx, env);
     risk::check_margin(tx, env);
     Ok(v)
 }
@@ -706,6 +708,7 @@ pub fn apply_fills(tx: &mut Tx, env: &Env, fills: &[Fill], role: Role, quote: Op
     {
         tx.book_dirty = true;
     }
+    super::trade::apply_nbp(tx, env);
     risk::check_margin(tx, env);
     Ok(json!({"combo": fills.first().and_then(|f| f.combo), "role": role.as_str(), "legs": legs}))
 }

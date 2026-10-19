@@ -48,11 +48,11 @@ pub fn check_reason(r: &Reason) -> ApiResult<()> {
     Ok(())
 }
 
-fn dealer(s: &StaffCtx, r: &Reason, force: bool) -> DealerCtx {
+pub(crate) fn dealer(s: &StaffCtx, r: &Reason, force: bool) -> DealerCtx {
     DealerCtx { staff: s.staff.name.clone(), reason_code: r.reason_code.clone(), force }
 }
 
-fn row(s: &StaffCtx, r: &Reason, action: &str, tickets: Vec<String>, login: Option<i64>, symbol: Option<String>, before: Option<Value>, after: Option<Value>, flags: Vec<String>) -> AuditRow {
+pub(crate) fn row(s: &StaffCtx, r: &Reason, action: &str, tickets: Vec<String>, login: Option<i64>, symbol: Option<String>, before: Option<Value>, after: Option<Value>, flags: Vec<String>) -> AuditRow {
     AuditRow {
         tenant_id: s.ctx.tenant.tenant_id,
         at: Utc::now(),
@@ -99,11 +99,11 @@ async fn dexec(st: &AppState, s: &StaffCtx, login: i64, r: &Reason, attempted: &
     }
 }
 
-fn reply(data: Value, audit: Vec<Value>) -> Json<Value> {
+pub(crate) fn reply(data: Value, audit: Vec<Value>) -> Json<Value> {
     Json(json!({"data": data, "audit": audit}))
 }
 
-fn login_of(st: &AppState, s: &StaffCtx, ticket: i64) -> ApiResult<i64> {
+pub(crate) fn login_of(st: &AppState, s: &StaffCtx, ticket: i64) -> ApiResult<i64> {
     let login = st.hub.login_of_ticket(ticket).ok_or_else(|| ApiError::NotFound(format!("Ticket #{ticket} not found")))?;
     match st.hub.meta(login) {
         Some(m) if m.tenant_id == s.ctx.tenant.tenant_id => Ok(login),
@@ -111,7 +111,7 @@ fn login_of(st: &AppState, s: &StaffCtx, ticket: i64) -> ApiResult<i64> {
     }
 }
 
-fn draft(action: &'static str, tickets: Vec<i64>, symbol: Option<String>, before: Option<Value>, after: Option<Value>, flags: Vec<&str>) -> AuditDraft {
+pub(crate) fn draft(action: &'static str, tickets: Vec<i64>, symbol: Option<String>, before: Option<Value>, after: Option<Value>, flags: Vec<&str>) -> AuditDraft {
     AuditDraft { action, tickets, login: None, symbol, before, after, flags: flags.into_iter().map(String::from).collect() }
 }
 
@@ -345,7 +345,7 @@ pub async fn create_trade(State(st): State<AppState>, s: StaffCtx, Body(b): Body
             }
             PlaceResult::Pending { ticket, price, book } => {
                 let o = tx.st.orders[ticket].clone();
-                let rb = book.unwrap_or_else(|| trade::route_for(env, &tx.st, &sym, b.volume, None).0);
+                let rb = book.unwrap_or_else(|| trade::route_for(env, &tx.st, &sym, b.volume, None, *ticket).0);
                 tx.audit.push(draft(
                     "order.place",
                     vec![*ticket],
@@ -1011,7 +1011,7 @@ pub async fn routing_rules(s: StaffCtx) -> ApiResult<Json<Value>> {
     Ok(Json(json!(s.ctx.tenant.routing_rules)))
 }
 
-async fn store_rules(st: &AppState, s: &StaffCtx, rules: Vec<RoutingRule>, a: AuditRow) -> ApiResult<Json<Value>> {
+pub(crate) async fn store_rules(st: &AppState, s: &StaffCtx, rules: Vec<RoutingRule>, a: AuditRow) -> ApiResult<Json<Value>> {
     let t = s.ctx.tenant.tenant_id;
     let mut tx = st.pool.begin().await?;
     sqlx::query("INSERT INTO routing_rules (tenant_id, rules, updated_at) VALUES ($1,$2, now()) ON CONFLICT (tenant_id) DO UPDATE SET rules = EXCLUDED.rules, updated_at = now()")

@@ -117,4 +117,5 @@ docs/           Conventions, integrations list, website content PDF
 - `docs/CONVENTIONS.md`: how pages and components are built
 - `docs/INTEGRATIONS.md`: every key and credential the Super Admin needs to go live
 - `docs/SECTIONS.md`: Client Area sections: which pages and dashboard blocks a broker shows, for everyone or by country, account group or client (Back Office Settings › Client Area layout)
+- `docs/RISK-DESK.md`: dealer risk desk (exposure, risk limits, client scores, routing suggestions, alerts)
 - `docs/Kalks-Website-Content.pdf`: full website copy and build spec for kalkstrade.com

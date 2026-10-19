@@ -7,6 +7,7 @@ import { Card, EmptyState, PageHeader, Reveal, buttonVariants } from "@kalks/ui"
 import { ClientDetailView, ClientHeader } from "./client-detail";
 import { ClientControlsProvider, ClientControlsSection, ClientStaffActions } from "@/components/clients/client-controls";
 import { useApi } from "./kit";
+import { ClientScoreBlock } from "@/components/trading-live/risk-kit";
 import type { ClientDetail } from "./types";
 
 export function LiveClientPage() {
@@ -37,6 +38,10 @@ export function LiveClientPage() {
         )}
         {/* presence, devices and restrictions (client-controls.tsx) */}
         <ClientControlsSection />
+        {/* engine client score (risk desk), for staff with dealing.read */}
+        <Reveal delay={0.03}>
+          <ClientScoreBlock userId={String(id)} className="mb-4" />
+        </Reveal>
         <Reveal delay={0.05}>
           <ClientDetailView id={id} />
         </Reveal>

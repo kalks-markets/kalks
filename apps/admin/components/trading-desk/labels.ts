@@ -32,6 +32,8 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
   "account.rejected": "Account change rejected",
   "group.create": "Group created",
   "group.update": "Group updated",
+  "risk.limits": "Risk limits changed",
+  "risk.settings": "Routing mode changed",
 };
 
 /** Label for any audit action (the engine may add actions this build doesn't know yet). */

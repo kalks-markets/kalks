@@ -227,6 +227,7 @@ async fn options_through_the_api_shards_and_postgres() {
         clock: Default::default(),
         books: Default::default(),
         corp: Default::default(),
+        risk: Default::default(),
     });
     // Monday of the test week, 12:00 UTC (in the past: the snapshot's freshness is measured on the wall clock)
     shared.clock.set(Some(t("2026-09-21T12:00:00Z")));

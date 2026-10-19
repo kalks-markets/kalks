@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
-import { AlertTriangle, ArrowRight, Cable, GripVertical, Pencil, Plug, Plus, Route as RouteIcon, Server, Split, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Cable, Info, GripVertical, Pencil, Plug, Plus, Route as RouteIcon, Server, Split, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Button,
@@ -33,10 +34,11 @@ import { EXPOSURE, notionalUsd } from "@kalks/mock/admin-ops";
 import { getInstrument } from "@kalks/mock";
 import { ShareBar, usdCompact } from "@/components/command/kit";
 
-const FIELDS: RoutingCondition["field"][] = ["Risk score", "Avg hold time", "Lot size", "Symbol", "Group", "Login", "Win rate (30d)", "Equity", "Country", "News window"];
+const FIELDS: RoutingCondition["field"][] = ["Risk score", "Risk category", "Avg hold time", "Lot size", "Symbol", "Group", "Login", "Win rate (30d)", "Equity", "Country", "News window"];
 const OPS: RoutingCondition["op"][] = ["≥", "≤", ">", "<", "=", "in", "is"];
 const DEF: Record<RoutingCondition["field"], [RoutingCondition["op"], string]> = {
-  "Risk score": ["≥", "8"],
+  "Risk score": ["≥", "70"],
+  "Risk category": ["in", "toxic, likely_profitable"],
   "Avg hold time": ["<", "60s"],
   "Lot size": ["≥", "20"],
   Symbol: ["in", "XAUUSD"],
@@ -245,6 +247,21 @@ export default function RoutingPage() {
               <span className="font-medium">No LP connected.</span> <span className="text-fg-2">A-book matches are held on the B-book and flagged for manual hedging until a FIX 4.4 session is live.</span>
             </span>
             <Chip tone="warn">Fallback: B-book</Chip>
+          </div>
+        </Reveal>
+      )}
+
+      {!IS_DEMO && (
+        <Reveal>
+          <div className="mb-4 flex flex-wrap items-start gap-3 rounded-[16px] border border-line bg-surface-2/60 px-5 py-3.5 text-[12.5px]">
+            <Info className="mt-0.5 size-4 shrink-0 text-fg-3" />
+            <span className="min-w-0 flex-1 text-fg-2">
+              Conditions on <span className="text-fg">risk score</span> (0-100), <span className="text-fg">risk category</span>, <span className="text-fg">avg hold time</span>, <span className="text-fg">win rate</span>, <span className="text-fg">country</span>, <span className="text-fg">equity</span> and <span className="text-fg">news window</span> are now evaluated by the engine. A rule with a share under 100% splits deterministically by ticket (that share of tickets goes to the rule&apos;s book). In recommend mode rules only label trades and queue{" "}
+              <Link href="/trading/routing-suggestions" className="text-fg underline decoration-line underline-offset-2 hover:text-ember">
+                routing suggestions
+              </Link>
+              .
+            </span>
           </div>
         </Reveal>
       )}

@@ -98,6 +98,8 @@ pub struct Env<'a> {
     pub options: &'a dyn crate::options::OptionPricing,
     /// Corporate actions due but not yet applied everywhere (engine/corporate.rs); None = none.
     pub corp: Option<&'a corporate::CorpDue>,
+    /// Risk desk (src/risk): exposure index, client scores, news windows, limit observations. None = no limits.
+    pub risk: Option<&'a crate::risk::RiskCtx>,
 }
 
 impl Env<'_> {
@@ -467,3 +469,6 @@ mod tests_catalogue;
 
 #[cfg(test)]
 mod tests_corporate;
+
+#[cfg(test)]
+mod tests_risk;
