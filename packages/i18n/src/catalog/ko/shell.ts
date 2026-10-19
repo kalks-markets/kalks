@@ -63,6 +63,7 @@ const shell: NsMessages<"shell"> = {
   "nav.loyalty": "로열티",
   "nav.cashback": "캐시백",
   "nav.promotions": "프로모션",
+  "nav.leaderboard": "Leaderboard",
   "nav.developer": "API & 알고",
   "nav.apiKeys": "API 키",
   "nav.webhooks": "웹훅",

@@ -22,6 +22,10 @@ use sqlx::Row;
 /// Refreshes the profile from the BFF's hints and returns it.
 async fn profile(st: &AppState, u: &UserCtx) -> ApiResult<Profile> {
     profiles::touch(st, &u.tenant, u.user_id, &u.hints).await?;
+    // a day the client opened the Client Area or the app (login streak, phase 4); never fails the call
+    if let Err(e) = super::challenges::touch_login(st, &u.tenant, u.user_id).await {
+        tracing::debug!(error = %e, "login streak not recorded");
+    }
     Ok(profiles::get(st, &u.tenant, u.user_id).await?)
 }
 

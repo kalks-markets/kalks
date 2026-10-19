@@ -85,6 +85,22 @@ api.kalkstrade.com {
 	handle /v1/public/options/* {
 		reverse_proxy 127.0.0.1:8104
 	}
+	# Public leaderboards and contests for the website (growth service, read-only GET, nicknames only; the service
+	# caches 15 s and sends Cache-Control: public, max-age=15). Never forwards an internal token or a tenant header
+	# from the internet: the broker comes from ?tenant= (default kalks).
+	@growthPublic path /v1/public/leaderboard /v1/public/contests
+	handle @growthPublic {
+		@growthWrite not method GET HEAD OPTIONS
+		respond @growthWrite 405
+		reverse_proxy 127.0.0.1:8101 {
+			header_up -X-Kalks-Internal
+			header_up -X-Kalks-Tenant
+			header_up -X-Kalks-User-Id
+			header_up -X-Kalks-Staff-Id
+			header_up -X-Kalks-Staff-Role
+			header_up -X-Kalks-Staff-Perms
+		}
+	}
 	# admin (spreads) and internal (service-to-service) endpoints stay on the server
 	@admin path /v1/admin* /v1/internal*
 	respond @admin 404

@@ -63,6 +63,7 @@ const shell: NsMessages<"shell"> = {
   "nav.loyalty": "باشگاه وفاداری",
   "nav.cashback": "کش‌بک",
   "nav.promotions": "پیشنهادهای ویژه",
+  "nav.leaderboard": "Leaderboard",
   "nav.developer": "API و الگو",
   "nav.apiKeys": "کلیدهای API",
   "nav.webhooks": "وب‌هوک‌ها",

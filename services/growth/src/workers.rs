@@ -1,7 +1,7 @@
 //! Background loops. Each loop logs and carries on after an error; all work is idempotent.
 
 use crate::state::AppState;
-use crate::{bonus, contests, db, deals, journeys, loyalty, payouts, profiles};
+use crate::{bonus, contests, db, deals, journeys, loyalty, missions, payouts, profiles};
 use std::future::Future;
 use std::time::Duration;
 
@@ -79,6 +79,7 @@ pub async fn run_job(st: &AppState, job: &str) -> anyhow::Result<serde_json::Val
             }
             json!({"facts": facts, "enrolled": journeys::enrol_tick(st).await?, "processed": journeys::run_tick(st).await?})
         }
+        "missions" => json!({"completed": missions::tick(st).await?}),
         _ => anyhow::bail!("unknown job"),
     })
 }
@@ -102,6 +103,11 @@ pub fn spawn(st: &AppState) {
     });
     every(st, "contests", secs(st.cfg.leaderboard_secs), |st| async move {
         contests::tick(&st).await?;
+        Ok(())
+    });
+    // missions, trading streaks and rewards waiting for KYC (phase 4)
+    every(st, "missions", secs(30), |st| async move {
+        missions::tick(&st).await?;
         Ok(())
     });
     every(st, "cashback-batches", secs(300), |st| async move {

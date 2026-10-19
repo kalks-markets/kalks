@@ -9,6 +9,8 @@ import { TERMINAL_URL } from "@/lib/live";
 import { Countdown } from "@/components/rewards/countdown";
 import { tr, useT } from "@kalks/i18n/react";
 import { BannerSlot } from "./banner-slot";
+import { LevelBadge, RewardsHub } from "./hub";
+import { useRewardsLive } from "./challenges-api";
 import {
   GrowthApiError,
   bandLabel,
@@ -283,7 +285,7 @@ function StandingRow({ c, s }: { c: Contest; s: Standing }) {
       </div>
       <div className="flex min-w-0 items-center gap-3">
         <div className="relative shrink-0">
-          <Avatar name={s.name.replace(/[^\p{L}\s]/gu, "").trim() || "?"} size={34} />
+          {s.level ? <LevelBadge level={s.level} size={34} /> : <Avatar name={s.name.replace(/[^\p{L}\s]/gu, "").trim() || "?"} size={34} />}
           {s.country && <Flag country={s.country.toLowerCase()} className="absolute -bottom-1 -end-1 size-3.5 ring-2 ring-surface-2" />}
         </div>
         <div className="min-w-0">
@@ -799,6 +801,8 @@ export function LiveContestsPage() {
     list.reload();
     detail.reload();
   };
+  // prizes, finals and level-ups arrive on the support stream (polling stays the fallback)
+  useRewardsLive(reload);
 
   const title = t("rewards.contests.title");
   const subtitle = t("rewards.contests.subtitle");
@@ -824,6 +828,8 @@ export function LiveContestsPage() {
         }
       />
       <BannerSlot placement="rewards" />
+
+      <RewardsHub />
 
       {featured ? (
         <Reveal>

@@ -95,11 +95,11 @@ pub async fn sync_once(st: &AppState) -> anyhow::Result<usize> {
         for u in &users {
             sqlx::query(
                 "INSERT INTO profiles (tenant, user_id, first_name, last_name, email, country, kyc_status, referral_code, signed_up_at, synced_at,
-                                       status, email_verified_at, kyc_verified_at, last_login_at, birthday, marketing_consent, utm_source, utm_campaign)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now(), $10,$11,$12,$13,$14,$15,$16,$17)
+                                       status, email_verified_at, kyc_verified_at, last_login_at, birthday, marketing_consent, utm_source, utm_campaign, referred_by)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now(), $10,$11,$12,$13,$14,$15,$16,$17,$18)
                  ON CONFLICT (tenant, user_id) DO UPDATE SET first_name = $3, last_name = $4, email = $5, country = $6, kyc_status = $7,
                    referral_code = $8, signed_up_at = $9, synced_at = now(), status = $10, email_verified_at = $11, kyc_verified_at = $12,
-                   last_login_at = $13, birthday = $14, marketing_consent = $15, utm_source = $16, utm_campaign = $17",
+                   last_login_at = $13, birthday = $14, marketing_consent = $15, utm_source = $16, utm_campaign = $17, referred_by = $18",
             )
             .bind(&u.tenant)
             .bind(u.id)
@@ -118,6 +118,7 @@ pub async fn sync_once(st: &AppState) -> anyhow::Result<usize> {
             .bind(u.marketing_consent.unwrap_or(true))
             .bind(&u.utm_source)
             .bind(&u.utm_campaign)
+            .bind(u.referred_by.filter(|r| *r > 0 && *r != u.id))
             .execute(&st.pool)
             .await?;
         }

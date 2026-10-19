@@ -62,6 +62,9 @@ pub fn contest_json(r: &sqlx::postgres::PgRow) -> Value {
         "prizePool": num(prize_pool(&prizes)),
         "rules": r.get::<String, _>("rules"),
         "antiCheat": anti_of(r),
+        "assetClasses": r.try_get::<Vec<String>, _>("asset_classes").unwrap_or_default(),
+        "templateId": r.try_get::<Option<i64>, _>("template_id").ok().flatten(),
+        "clonedFrom": r.try_get::<Option<i64>, _>("cloned_from").ok().flatten(),
         "refreshedAt": r.get::<Option<DateTime<Utc>>, _>("refreshed_at"),
         "finalizedAt": r.get::<Option<DateTime<Utc>>, _>("finalized_at"),
         "paidAt": r.get::<Option<DateTime<Utc>>, _>("paid_at"),
@@ -112,11 +115,34 @@ pub const ORDER: &str = "ORDER BY (rank IS NULL), rank, joined_at, id";
 pub async fn leaderboard(st: &AppState, contest_id: i64, me: Option<i64>, staff: bool, limit: i64) -> anyhow::Result<(Vec<Value>, Option<Value>)> {
     let min: i32 = sqlx::query_scalar("SELECT min_trades FROM contests WHERE id = $1").bind(contest_id).fetch_one(&st.pool).await?;
     let rows = sqlx::query(sqlx::AssertSqlSafe(format!("SELECT * FROM contest_entries WHERE contest_id = $1 {ORDER} LIMIT $2"))).bind(contest_id).bind(limit).fetch_all(&st.pool).await?;
-    let list = rows.iter().map(|r| standing_json(r, me, staff, min)).collect();
-    let mine = match me {
-        Some(u) => sqlx::query("SELECT * FROM contest_entries WHERE contest_id = $1 AND user_id = $2").bind(contest_id).bind(u).fetch_optional(&st.pool).await?.map(|r| standing_json(&r, me, staff, min)),
+    let mut list: Vec<Value> = rows.iter().map(|r| standing_json(r, me, staff, min)).collect();
+    let mine_row = match me {
+        Some(u) => sqlx::query("SELECT * FROM contest_entries WHERE contest_id = $1 AND user_id = $2").bind(contest_id).bind(u).fetch_optional(&st.pool).await?,
         None => None,
     };
+    let mut mine = mine_row.as_ref().map(|r| standing_json(r, me, staff, min));
+    if !staff {
+        // clients see nicknames and level badges, never another client's name or country (phase 4)
+        let tenant: String = sqlx::query_scalar("SELECT tenant FROM contests WHERE id = $1").bind(contest_id).fetch_one(&st.pool).await?;
+        let mut users: Vec<i64> = rows.iter().map(|r| r.get::<i64, _>("user_id")).collect();
+        users.extend(mine_row.iter().map(|r| r.get::<i64, _>("user_id")));
+        let nicks = crate::leaderboard::many(&st.pool, &tenant, &users).await?;
+        let xps = crate::xp::totals(&st.pool, &tenant, &users).await?;
+        let levels = crate::xp::levels(&st.pool, &tenant).await?;
+        let patch = |v: &mut Value, uid: i64| {
+            v["name"] = json!(nicks.get(&uid).map(|n| n.nickname.clone()).unwrap_or_else(|| "Trader".into()));
+            v["level"] = crate::xp::badge_json(&levels, *xps.get(&uid).unwrap_or(&0));
+            if me != Some(uid) {
+                v["country"] = Value::Null;
+            }
+        };
+        for (v, r) in list.iter_mut().zip(rows.iter()) {
+            patch(v, r.get("user_id"));
+        }
+        if let (Some(v), Some(r)) = (mine.as_mut(), mine_row.as_ref()) {
+            patch(v, r.get("user_id"));
+        }
+    }
     Ok((list, mine))
 }
 
@@ -208,6 +234,13 @@ pub async fn join(st: &AppState, tenant: &str, user_id: i64, contest_id: i64, lo
     .ok_or(ApiError::Conflict { code: "already_joined", message: "You have already joined this contest (or that account is entered).".into() })?;
     audit::record(&mut *tx, tenant, &Actor { id: format!("user:{user_id}"), name: None }, "contest.join", Some(format!("contest:{contest_id}")), None, Some(json!({"login": acc_login})), None).await?;
     tx.commit().await?;
+    // phase 4: XP for entering a live contest (once per contest), the nickname others will see, join missions
+    if kind == "live" {
+        let s = crate::db::settings(&st.pool, tenant).await?;
+        crate::xp::award(st, tenant, user_id, s.xp_contest_join, "contest", &format!("join:{contest_id}"), &format!("Joined {name}")).await?;
+    }
+    crate::leaderboard::ensure(&st.pool, tenant, user_id).await?;
+    crate::missions::evaluate_soon(st, tenant, user_id);
     let mut out = json!({"entry": standing_json(&r, Some(user_id), false, c.get("min_trades"))});
     if let Some(cr) = credentials {
         out["credentials"] = cr;
@@ -407,7 +440,36 @@ pub async fn tick(st: &AppState) -> anyhow::Result<usize> {
             tracing::warn!(contest = id, error = %e, "contest refresh failed");
         }
     }
+    auto_finalize_tick(st).await?;
     Ok(ids.len())
+}
+
+/// Brokers with `autoFinalize`: contests ended at least `autoFinalizeDelayMinutes` ago, scored after their end and
+/// with no open anti-cheat flag are finalized by the service (then auto-pay pays the prizes below the threshold).
+pub async fn auto_finalize_tick(st: &AppState) -> anyhow::Result<usize> {
+    let mut n = 0;
+    for tenant in crate::db::tenants(&st.pool).await? {
+        let s = crate::db::settings(&st.pool, &tenant).await?;
+        if !s.auto_finalize {
+            continue;
+        }
+        let ids: Vec<i64> = sqlx::query_scalar(
+            "SELECT c.id FROM contests c WHERE c.tenant = $1 AND c.status IN ('scheduled','running','ended')
+               AND c.ends_at + make_interval(mins => $2) <= now() AND c.refreshed_at >= c.ends_at
+               AND NOT EXISTS (SELECT 1 FROM contest_flags f WHERE f.contest_id = c.id AND f.status = 'open') ORDER BY c.ends_at LIMIT 20",
+        )
+        .bind(&tenant)
+        .bind(s.auto_finalize_delay_minutes as i32)
+        .fetch_all(&st.pool)
+        .await?;
+        for id in ids {
+            match finalize(st, id, &Actor::system()).await {
+                Ok(()) => n += 1,
+                Err(e) => tracing::warn!(contest = id, error = ?e, "auto-finalize failed"),
+            }
+        }
+    }
+    Ok(n)
 }
 
 /// Freezes ranks and prizes after the end.
@@ -426,22 +488,51 @@ pub async fn finalize(st: &AppState, contest_id: i64, actor: &Actor) -> ApiResul
         .collect();
     let ranks = calc::rank(&input, min_trades as i64);
     let prizes = calc::allocate_prizes(&prizes_of(&c), &ranks);
+    let tenant: String = c.get("tenant");
+    // phase 4: prizes below the broker's auto-pay threshold are paid now, the rest wait for staff approval
+    // (threshold 0 = every prize waits for staff, as before)
+    let threshold = crate::db::settings(&st.pool, &tenant).await?.auto_pay_below;
     let mut tx = st.pool.begin().await?;
+    let locked: String = sqlx::query_scalar("SELECT status FROM contests WHERE id = $1 FOR UPDATE").bind(contest_id).fetch_one(&mut *tx).await?;
+    if matches!(locked.as_str(), "finalized" | "paid" | "cancelled") {
+        return Err(ApiError::Conflict { code: "state", message: "This contest is already finalized.".into() });
+    }
     for (id, rank, _) in &ranks {
         sqlx::query("UPDATE contest_entries SET rank = $2, prize_amount = NULL, prize_payout = NULL, prize_status = 'none' WHERE id = $1").bind(id).bind(rank).execute(&mut *tx).await?;
     }
+    let mut auto = 0;
     for (id, amount, payout) in &prizes {
-        sqlx::query("UPDATE contest_entries SET prize_amount = $2, prize_payout = $3, prize_status = 'pending' WHERE id = $1").bind(id).bind(amount).bind(payout).execute(&mut *tx).await?;
+        let status = prize_decision(*amount, threshold);
+        if threshold > ZERO && status == "pending" {
+            auto += 1;
+        }
+        sqlx::query("UPDATE contest_entries SET prize_amount = $2, prize_payout = $3, prize_status = $4 WHERE id = $1").bind(id).bind(amount).bind(payout).bind(status).execute(&mut *tx).await?;
     }
     sqlx::query("UPDATE contests SET status = 'finalized', finalized_at = now(), finalized_by = $2, updated_at = now() WHERE id = $1").bind(contest_id).bind(actor.label()).execute(&mut *tx).await?;
     let total: D = prizes.iter().map(|p| p.1).sum();
-    audit::record(&mut *tx, c.get::<&str, _>("tenant"), actor, "contest.finalize", Some(format!("contest:{contest_id}")), None, Some(json!({"winners": prizes.len(), "prizes": num(total)})), None).await?;
+    audit::record(&mut *tx, &tenant, actor, "contest.finalize", Some(format!("contest:{contest_id}")), None, Some(json!({"winners": prizes.len(), "prizes": num(total), "autoPay": auto, "autoPayBelow": num(threshold)})), None).await?;
     tx.commit().await?;
+    if auto > 0 {
+        pay_with(st, contest_id, &Actor::system(), Some(threshold)).await?;
+    }
     Ok(())
 }
 
-/// Pays pending (or failed) prizes: wallet credits, or trading credit on a live account.
+/// Prize status at finalize: `pending` (paid by the next payout run: at once when auto-pay applies, else when staff
+/// press Pay) or `approval` (at or above a non-zero threshold: staff with `marketing.approve` pay it).
+pub fn prize_decision(amount: D, auto_pay_below: D) -> &'static str {
+    if auto_pay_below <= ZERO || amount < auto_pay_below { "pending" } else { "approval" }
+}
+
+/// Pays every unpaid prize (staff: pending, waiting for approval or failed): wallet credits, or trading credit on a
+/// live account.
 pub async fn pay(st: &AppState, contest_id: i64, actor: &Actor) -> ApiResult<Value> {
+    pay_with(st, contest_id, actor, None).await
+}
+
+/// `below` = auto-pay: only pending / failed prizes under that amount. Every payout is idempotent (wallet key
+/// `growth:prize:<entry>`, engine key `growth:prize:<entry>:c`).
+pub async fn pay_with(st: &AppState, contest_id: i64, actor: &Actor, below: Option<D>) -> ApiResult<Value> {
     let c = sqlx::query("SELECT * FROM contests WHERE id = $1").bind(contest_id).fetch_one(&st.pool).await?;
     let stored: String = c.get("status");
     if stored != "finalized" && stored != "paid" {
@@ -450,7 +541,10 @@ pub async fn pay(st: &AppState, contest_id: i64, actor: &Actor) -> ApiResult<Val
     let tenant: String = c.get("tenant");
     let name: String = c.get("name");
     let kind: String = c.get("kind");
-    let winners = sqlx::query("SELECT * FROM contest_entries WHERE contest_id = $1 AND prize_status IN ('pending','failed') AND prize_amount > 0 ORDER BY rank").bind(contest_id).fetch_all(&st.pool).await?;
+    let winners = match below {
+        None => sqlx::query("SELECT * FROM contest_entries WHERE contest_id = $1 AND prize_status IN ('pending','approval','failed') AND prize_amount > 0 ORDER BY rank").bind(contest_id).fetch_all(&st.pool).await?,
+        Some(t) => sqlx::query("SELECT * FROM contest_entries WHERE contest_id = $1 AND prize_status IN ('pending','failed') AND prize_amount > 0 AND prize_amount < $2 ORDER BY rank").bind(contest_id).bind(t).fetch_all(&st.pool).await?,
+    };
     let (mut paid, mut failed, mut amount) = (0, 0, ZERO);
     for w in winners {
         let id: i64 = w.get("id");
@@ -493,8 +587,16 @@ pub async fn pay(st: &AppState, contest_id: i64, actor: &Actor) -> ApiResult<Val
         }
     }
     let mut tx = st.pool.begin().await?;
-    sqlx::query("UPDATE contests SET status = 'paid', paid_at = COALESCE(paid_at, now()), updated_at = now() WHERE id = $1").bind(contest_id).execute(&mut *tx).await?;
-    audit::record(&mut *tx, &tenant, actor, "contest.pay", Some(format!("contest:{contest_id}")), None, Some(json!({"paid": paid, "failed": failed, "amount": num(amount)})), None).await?;
+    // paid once nothing waits for approval any more (auto-pay leaves the larger prizes to staff)
+    sqlx::query(
+        "UPDATE contests SET status = 'paid', paid_at = COALESCE(paid_at, now()), updated_at = now()
+          WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM contest_entries e WHERE e.contest_id = $1 AND e.prize_status = 'approval')",
+    )
+    .bind(contest_id)
+    .execute(&mut *tx)
+    .await?;
+    let action = if below.is_some() { "contest.autopay" } else { "contest.pay" };
+    audit::record(&mut *tx, &tenant, actor, action, Some(format!("contest:{contest_id}")), None, Some(json!({"paid": paid, "failed": failed, "amount": num(amount), "below": below.map(num)})), None).await?;
     tx.commit().await?;
     st.wake.notify_one();
     // wallet prizes are paid by the payout loop; run it now so the response reflects them

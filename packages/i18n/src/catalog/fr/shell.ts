@@ -63,6 +63,7 @@ const shell: NsMessages<"shell"> = {
   "nav.loyalty": "Fidélité",
   "nav.cashback": "Cashback",
   "nav.promotions": "Promotions",
+  "nav.leaderboard": "Leaderboard",
   "nav.developer": "API et algo",
   "nav.apiKeys": "Clés API",
   "nav.webhooks": "Webhooks",

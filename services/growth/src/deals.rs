@@ -278,11 +278,13 @@ pub async fn ingest(st: &AppState, p: &Programme, d: &DealIn) -> anyhow::Result<
     let entries = sqlx::query(
         "SELECT e.id, e.contest_id FROM contest_entries e JOIN contests c ON c.id = e.contest_id
          WHERE e.login = $1 AND e.status = 'active' AND c.instrument = 'cfd' AND c.status NOT IN ('draft','cancelled','finalized','paid')
-           AND c.starts_at <= $2 AND c.ends_at > $2 AND $3 >= c.starts_at",
+           AND c.starts_at <= $2 AND c.ends_at > $2 AND $3 >= c.starts_at
+           AND (cardinality(c.asset_classes) = 0 OR lower(COALESCE($4, '')) = ANY(c.asset_classes))",
     )
     .bind(d.login)
     .bind(d.close_time)
     .bind(d.open_time)
+    .bind(&asset_class)
     .fetch_all(&mut *tx)
     .await?;
     for e in entries {

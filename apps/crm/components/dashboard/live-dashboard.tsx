@@ -39,6 +39,7 @@ import { fmt, useWallet, type ActivityItem, type Page, type WalletConfig } from 
 import { KIND_LABEL } from "@/components/wallet-live/ui";
 import { useGrowth, type Rewards } from "@/components/growth/api";
 import { BannerSlot } from "@/components/growth/banner-slot";
+import { LevelStrip } from "@/components/growth/hub";
 import { LiveCalendarCard, LiveNewsCard, LiveWorldCard } from "@/components/news-live/dashboard";
 import { Trans, useFormat, useT } from "@kalks/i18n/react";
 import { AccountsPanel, type CardAccount } from "@/components/dashboard/home/accounts-panel";
@@ -621,6 +622,7 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
       )}
 
       {show("dashboard.banners") && <BannerSlot placement="dashboard" />}
+      {show("dashboard.level_strip") && <LevelStrip />}
 
       {/* Home, kept short (founder 2026-10-10): Ask Kalks AI with the shortcuts under it, your accounts beside them */}
       <div className="mt-8 grid grid-cols-1 items-start gap-6 xl:grid-cols-12">

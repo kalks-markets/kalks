@@ -38,6 +38,7 @@ import {
   Medal,
   Percent,
   Ticket,
+  ListOrdered,
   KeyRound,
   Webhook,
   Workflow,
@@ -165,6 +166,7 @@ export const CRM_NAV: NavModule[] = [
     section: "grow",
     sub: [
       { href: "/rewards", label: "Contests", icon: Medal },
+      { href: "/rewards/leaderboard", label: "Leaderboard", icon: ListOrdered },
       { href: "/rewards/loyalty", label: "Loyalty", icon: Gift },
       { href: "/rewards/cashback", label: "Cashback", icon: Percent },
       { href: "/rewards/promotions", label: "Promotions", icon: Ticket },
@@ -295,6 +297,7 @@ const SUB_KEYS: Record<string, MessageKey> = {
   "/prop/payouts": "shell.nav.payouts",
   "/prop/certificates": "shell.nav.certificates",
   "/rewards": "shell.nav.contests",
+  "/rewards/leaderboard": "shell.nav.leaderboard",
   "/rewards/loyalty": "shell.nav.loyalty",
   "/rewards/cashback": "shell.nav.cashback",
   "/rewards/promotions": "shell.nav.promotions",

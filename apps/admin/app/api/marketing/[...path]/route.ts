@@ -21,17 +21,23 @@ const ROUTES: Route[] = [
   { method: "GET", re: /^promos(\/redemptions)?$/, perm: "marketing.read" },
   { method: "GET", re: /^banners(\/preview)?$/, perm: "marketing.read" },
   { method: "GET", re: /^contests$/, perm: "marketing.read" },
+  // challenges (phase 4): templates, missions, levels, payout approvals
+  { method: "GET", re: /^(contest-templates|missions|levels|payouts)$/, perm: "marketing.read" },
   { method: "GET", re: R(`contests/${ID}`), perm: "marketing.read" },
   { method: "GET", re: /^journeys(\/meta)?$/, perm: "marketing.read" },
   { method: "GET", re: R(`journeys/${ID}(/enrollments|/events)?`), perm: "marketing.read" },
   // configuration writes
-  { method: "PUT", re: /^(settings|tiers)$/, perm: "marketing.write" },
+  { method: "PUT", re: /^(settings|tiers|levels)$/, perm: "marketing.write" },
+  { method: "POST", re: /^(contest-templates|missions|xp\/adjust)$/, perm: "marketing.write" },
+  { method: "PATCH", re: R(`(contest-templates|missions)/${ID}`), perm: "marketing.write" },
+  { method: "POST", re: R(`contest-templates/${ID}/contest`), perm: "marketing.write" },
+  { method: "POST", re: R(`contests/${ID}/(duplicate|save-template)`), perm: "marketing.write" },
   { method: "POST", re: /^(rules|catalogue|cashback\/programmes|bonuses\/campaigns|promos|banners|contests)$/, perm: "marketing.write" },
   { method: "PATCH", re: R(`(rules|catalogue|cashback/programmes|bonuses/campaigns|promos|banners|contests)/${ID}`), perm: "marketing.write" },
   { method: "POST", re: R(`contests/${ID}/(cancel|refresh|finalize)`), perm: "marketing.write" },
   { method: "POST", re: R(`contests/${ID}/entries/${ID}/(disqualify|reinstate)`), perm: "marketing.write" },
   { method: "POST", re: R(`contests/${ID}/flags/${ID}/resolve`), perm: "marketing.write" },
-  { method: "POST", re: /^run\/(profiles|deals|bonus|contests|payouts|reversals|expiry|journeys)$/, perm: "marketing.write" },
+  { method: "POST", re: /^run\/(profiles|deals|bonus|contests|payouts|reversals|expiry|journeys|missions)$/, perm: "marketing.write" },
   { method: "POST", re: /^journeys$/, perm: "marketing.write" },
   { method: "PATCH", re: R(`journeys/${ID}`), perm: "marketing.write" },
   { method: "POST", re: R(`journeys/${ID}/(status|test)`), perm: "marketing.write" },
@@ -42,6 +48,7 @@ const ROUTES: Route[] = [
   { method: "POST", re: /^points\/adjust$/, perm: "marketing.approve" },
   { method: "POST", re: /^cashback\/payouts\/run$/, perm: "marketing.approve" },
   { method: "POST", re: R(`redemptions/${ID}/retry`), perm: "marketing.approve" },
+  { method: "POST", re: R(`missions/rewards/${ID}/(approve|reject)`), perm: "marketing.approve" },
 ];
 
 const QUERY_KEYS = ["status", "campaign", "user", "promo", "programme", "page", "limit", "q", "from", "to", "placement", "country", "kyc", "accountType", "signupDays", "enrollment"];

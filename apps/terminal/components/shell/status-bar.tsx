@@ -15,6 +15,7 @@ import { serverTime } from "@/lib/trading";
 import { useStreamStatus } from "@/lib/engine/live";
 import { CountBadge, Tip } from "@/components/ui/kit";
 import { AccountHealth } from "./account-health";
+import { RankWidget } from "./rank-widget";
 import { scrollToActivity } from "./commands";
 import { useActivityTabs } from "@/components/toolbox/toolbox";
 
@@ -103,6 +104,7 @@ export function ScreenBar() {
   return (
     <div className="t-glass flex h-10 shrink-0 items-center gap-2 overflow-hidden rounded-[12px] border border-line pe-1.5">
       <AccountHealth className="min-w-0 flex-1" />
+      <RankWidget />
       <Connection />
       <PositionsCue />
     </div>

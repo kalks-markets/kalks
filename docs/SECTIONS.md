@@ -44,6 +44,7 @@ blocks do. Module in brackets.
 | `dashboard.open_positions` | Open positions |
 | `dashboard.rewards_card` | Reward points (rewards) |
 | `dashboard.banners` | Promotion banners |
+| `dashboard.level_strip` | Level and streaks (rewards) |
 | `dashboard.shortcuts` | Shortcuts (each shortcut also follows the page it opens) |
 | `dashboard.accounts` | Your accounts |
 
@@ -59,7 +60,7 @@ blocks do. Module in brackets.
 | Partner (ib) | `page.partner`, `page.partner.clients`, `page.partner.network`, `page.partner.commissions`, `page.partner.links`, `page.partner.payouts` |
 | Copy & PAMM | `page.social`, `page.social.copy`, `page.social.master` (copy_trading); `page.social.pamm`, `page.social.investments` (pamm); `page.social.managed`, `page.social.mam` (mam) |
 | Prop (prop) | `page.prop`, `page.prop.mine`, `page.prop.payouts`, `page.prop.certificates` |
-| Rewards (rewards) | `page.rewards`, `page.rewards.loyalty`, `page.rewards.cashback`, `page.rewards.promotions` |
+| Rewards (rewards) | `page.rewards`, `page.rewards.loyalty`, `page.rewards.cashback`, `page.rewards.promotions`, `page.rewards.leaderboard` |
 | API & Algo | `page.developer`, `page.developer.webhooks`, `page.developer.docs` (api); `page.developer.strategies`, `page.developer.deployments`, `page.developer.backtests`, `page.developer.marketplace` (algo) |
 | Academy (academy) | `page.academy`, `page.academy.glossary`, `page.academy.progress`, `page.academy.coach` |
 | Profile & Security | `page.profile`, `page.profile.security`, `page.profile.verification`, `page.profile.viewers`, `page.profile.notifications`, `page.profile.preferences` |

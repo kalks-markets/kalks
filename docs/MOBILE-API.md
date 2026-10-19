@@ -253,7 +253,7 @@ header comment of its route file in `apps/crm/app/api/<family>/…/route.ts`.
 | `security` | sessions, sign-in history, view-only logins, closure / data-export requests |
 | `support` | chat (`me`, `messages`, `handover`, conversations, `read`, `typing`, rate / resolve), attachments, `stream-ticket`. **Ask Kalks AI** is the support assistant in this chat: post a message and the reply streams over the support stream. |
 | `status` | public status page data |
-| `growth` | rewards, points, redeem, cashback, promotions, bonuses, promo codes, contests, banners, share cards |
+| `growth` | rewards, points, redeem, cashback, promotions, bonuses, promo codes, contests, banners, share cards; challenges: `hub` (level, XP, streaks, missions, active contests, recent rewards, nickname in one call), `missions`, `xp`, `nickname` (GET, POST `{nickname?, public?}`), `leaderboard?period=week\|month\|all` or `?contest=<id\|slug>` (nicknames and level badges only, your own row as `me`). Shapes: docs/CHALLENGES.md |
 | `partner` | IB dashboard, programme, campaigns, clients, network, commissions, payouts, settings |
 | `social` | copy trading (leaderboard, masters, subscriptions) and PAMM (funds, investments) |
 | `prop` | prop plans, challenges, payouts, certificates, notifications |

@@ -64,6 +64,10 @@ pub async fn seed(pool: &PgPool, tenant: &str) -> anyhow::Result<()> {
         }
     }
     tx.commit().await?;
+    // phase 4: contest templates, starter missions and levels
+    crate::templates::seed(pool, tenant).await?;
+    crate::missions::seed(pool, tenant).await?;
+    crate::xp::levels(pool, tenant).await?;
     Ok(())
 }
 

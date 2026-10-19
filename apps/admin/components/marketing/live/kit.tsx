@@ -254,6 +254,9 @@ export const PAY_STATUS: Record<string, { label: string; tone: ChipTone }> = {
   open: S("Open", "warn"),
   cleared: S("Cleared", "neutral"),
   disqualified: S("Disqualified", "down"),
+  approval: S("Needs approval", "gold"),
+  kyc: S("Waiting for KYC", "neutral"),
+  rejected: S("Rejected", "neutral"),
 };
 
 export function StatusPill({ map, status }: { map: Record<string, { label: string; tone: ChipTone }>; status: string }) {

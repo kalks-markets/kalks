@@ -27,7 +27,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use sqlx::Row;
 
-fn merge(mut base: Value, patch: &Value) -> Value {
+pub(crate) fn merge(mut base: Value, patch: &Value) -> Value {
     if let (Some(b), Some(p)) = (base.as_object_mut(), patch.as_object()) {
         for (k, v) in p {
             b.insert(k.clone(), v.clone());
@@ -36,7 +36,7 @@ fn merge(mut base: Value, patch: &Value) -> Value {
     base
 }
 
-fn parse<T: DeserializeOwned>(v: Value) -> ApiResult<T> {
+pub(crate) fn parse<T: DeserializeOwned>(v: Value) -> ApiResult<T> {
     serde_json::from_value(v).map_err(|e| ApiError::BadRequest(format!("Invalid request: {e}")))
 }
 
@@ -44,14 +44,14 @@ fn time_req(v: &Option<String>, field: &'static str) -> ApiResult<Option<DateTim
     parse_time(v).map_err(|_| invalid(field, "Use YYYY-MM-DD or an RFC 3339 time."))
 }
 
-fn clean_list(v: &[String], upper: bool) -> Vec<String> {
+pub(crate) fn clean_list(v: &[String], upper: bool) -> Vec<String> {
     let mut out: Vec<String> = v.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).map(|s| if upper { s.to_uppercase() } else { s.to_lowercase() }).collect();
     out.sort();
     out.dedup();
     out
 }
 
-fn text(v: &str, field: &'static str, max: usize, required: bool) -> ApiResult<String> {
+pub(crate) fn text(v: &str, field: &'static str, max: usize, required: bool) -> ApiResult<String> {
     let t = v.trim().to_string();
     if required && t.is_empty() {
         return Err(invalid(field, "Required."));
@@ -1343,7 +1343,7 @@ pub async fn banner_preview(State(st): State<AppState>, s: StaffCtx, Query(q): Q
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ContestIn {
+pub(crate) struct ContestIn {
     #[serde(default)]
     slug: Option<String>,
     name: String,
@@ -1382,6 +1382,13 @@ pub struct ContestIn {
     min_premium: Option<D>,
     #[serde(default = "scheduled")]
     status: String,
+    /// Phase 4: CFD asset classes that count (empty = all), the template it came from, the contest it was cloned from.
+    #[serde(default)]
+    asset_classes: Vec<String>,
+    #[serde(default)]
+    template_id: Option<i64>,
+    #[serde(default)]
+    cloned_from: Option<i64>,
 }
 
 fn ret() -> String {
@@ -1394,7 +1401,7 @@ fn scheduled() -> String {
     "scheduled".into()
 }
 
-fn slugify(s: &str) -> String {
+pub(crate) fn slugify(s: &str) -> String {
     let mut out = String::new();
     for c in s.to_lowercase().chars() {
         if c.is_ascii_alphanumeric() {
@@ -1406,7 +1413,7 @@ fn slugify(s: &str) -> String {
     out.trim_matches('-').chars().take(50).collect()
 }
 
-async fn write_contest(st: &AppState, s: &StaffCtx, id: Option<i64>, mut c: ContestIn, before: Option<Value>) -> ApiResult<Json<Value>> {
+pub(crate) async fn write_contest(st: &AppState, s: &StaffCtx, id: Option<i64>, mut c: ContestIn, before: Option<Value>) -> ApiResult<Json<Value>> {
     c.name = text(&c.name, "name", 80, true)?;
     c.description = text(&c.description, "description", 1000, false)?;
     c.rules = text(&c.rules, "rules", 5000, false)?;
@@ -1464,6 +1471,25 @@ async fn write_contest(st: &AppState, s: &StaffCtx, id: Option<i64>, mut c: Cont
     if options && let Some(g) = c.account_groups.iter().find(|g| calc::options_system_group(g)) {
         return Err(invalid("accountGroups", format!("Options can't be traded in the {g} group (copy-trading, PAMM, MAM and prop accounts never trade options).")));
     }
+    c.asset_classes = clean_list(&c.asset_classes, false);
+    if options {
+        c.asset_classes.clear();
+    }
+    if let Some(a) = c.asset_classes.iter().find(|a| !ASSET_CLASSES.contains(&a.as_str())) {
+        return Err(invalid("assetClasses", format!("Unknown asset class '{a}' ({}).", ASSET_CLASSES.join(", "))));
+    }
+    if let Some(t) = c.template_id {
+        let ok: Option<i64> = sqlx::query_scalar("SELECT id FROM contest_templates WHERE id = $1 AND tenant = $2").bind(t).bind(&s.tenant).fetch_optional(&st.pool).await?;
+        if ok.is_none() {
+            c.template_id = None;
+        }
+    }
+    if let Some(t) = c.cloned_from {
+        let ok: Option<i64> = sqlx::query_scalar("SELECT id FROM contests WHERE id = $1 AND tenant = $2").bind(t).bind(&s.tenant).fetch_optional(&st.pool).await?;
+        if ok.is_none() {
+            c.cloned_from = None;
+        }
+    }
     validate_prizes(&c.prizes).map_err(|m| invalid("prizes", m))?;
     if c.anti_cheat.max_single_trade_pct <= ZERO || c.anti_cheat.max_single_trade_pct > D::from(100) || c.anti_cheat.min_hold_seconds < 0 {
         return Err(invalid("antiCheat", "Single-trade share 1–100%, hold ≥ 0 s."));
@@ -1480,14 +1506,14 @@ async fn write_contest(st: &AppState, s: &StaffCtx, id: Option<i64>, mut c: Cont
             }
             sqlx::query(
                 "INSERT INTO contests (tenant, slug, name, description, kind, status, starts_at, ends_at, scoring, min_trades, max_entrants, starting_balance, demo_group, account_groups,
-                   kyc_required, min_equity, prizes, rules, anti_cheat, created_by, instrument, min_premium)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$22,$23) RETURNING *",
+                   kyc_required, min_equity, prizes, rules, anti_cheat, created_by, instrument, min_premium, asset_classes, template_id, cloned_from)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$22,$23,$24,$25,$26) RETURNING *",
             )
         }
         Some(_) => sqlx::query(
             "UPDATE contests SET slug = $2, name = $3, description = $4, kind = $5, status = $6, starts_at = $7, ends_at = $8, scoring = $9, min_trades = $10, max_entrants = $11,
                starting_balance = $12, demo_group = $13, account_groups = $14, kyc_required = $15, min_equity = $16, prizes = $17, rules = $18, anti_cheat = $19,
-               instrument = $22, min_premium = $23, updated_at = now()
+               instrument = $22, min_premium = $23, asset_classes = $24, template_id = COALESCE($25, template_id), cloned_from = COALESCE($26, cloned_from), updated_at = now()
              WHERE id = $21 AND tenant = $1 AND $20::text IS NOT NULL RETURNING *",
         ),
     }
@@ -1514,6 +1540,9 @@ async fn write_contest(st: &AppState, s: &StaffCtx, id: Option<i64>, mut c: Cont
     .bind(id.unwrap_or(0))
     .bind(&c.instrument)
     .bind(c.min_premium)
+    .bind(&c.asset_classes)
+    .bind(c.template_id)
+    .bind(c.cloned_from)
     .fetch_one(&mut *tx)
     .await
     .map_err(|e| match &e {
@@ -1590,7 +1619,7 @@ pub async fn patch_contest(State(st): State<AppState>, s: StaffCtx, Path(id): Pa
         if matches!(effective.as_str(), "finalized" | "paid" | "cancelled") {
             return Err(ApiError::Conflict { code: "state", message: "This contest can no longer be edited.".into() });
         }
-        const LOCKED: &[&str] = &["kind", "instrument", "startsAt", "endsAt", "scoring", "minTrades", "minPremium", "startingBalance", "demoGroup", "accountGroups", "prizes", "minEquity", "status", "slug"];
+        const LOCKED: &[&str] = &["kind", "instrument", "startsAt", "endsAt", "scoring", "minTrades", "minPremium", "startingBalance", "demoGroup", "accountGroups", "assetClasses", "prizes", "minEquity", "status", "slug"];
         if let Some(o) = body.as_object()
             && let Some(k) = o.keys().find(|k| LOCKED.contains(&k.as_str()) && o[k.as_str()] != before[k.as_str()])
         {
