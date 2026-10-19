@@ -19,6 +19,7 @@
     "./logo": "./src/shell/logo.tsx",
     "./primitives": "./src/components/primitives.tsx",
     "./swr-cache": "./src/lib/swr-cache.ts",
+    "./sections": "./src/lib/sections.ts",
     "./illustration": "./src/components/illustration.tsx",
     "./*": "./src/*"
   },

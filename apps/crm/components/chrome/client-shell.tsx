@@ -12,7 +12,8 @@ import { Avatar, Button, Chip, CommandPalette, LanguageMenu, MarketBoundary, Too
 import { IS_DEMO } from "@kalks/mock";
 import { useT } from "@kalks/i18n/react";
 import { CRM_COMMANDS, NAV, localizeCommands, localizeNav } from "@/lib/nav";
-import { navForFeatures, pageModule, useFeatures } from "@/components/tenant-config";
+import { navForFeatures, useFeatures } from "@/components/tenant-config";
+import { pathOn } from "@kalks/ui/sections";
 import { TERMINAL_URL } from "@/lib/live";
 import { LiveGate } from "@/components/live-gate";
 import { NotificationsBell, NotificationsProvider } from "@/components/notifications";
@@ -73,7 +74,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const me = useSession();
   const verified = me.kyc_status === "verified";
   const kyc = KYC_CHIP[me.kyc_status];
-  // modules the broker switched off (Platform Owner, D112) disappear from the navigation
+  // modules the broker switched off (Platform Owner, D112) and pages hidden for this client (sections) disappear from
+  // the navigation, the palette and the account menu
   const features = useFeatures();
   // a view-only session (D90) only gets the sections it was given, and no account actions
   const viewer = me.viewer ?? null;
@@ -89,10 +91,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const signOut = () => void logout();
 
   const commands = localizeCommands(CRM_COMMANDS, t)
-    .filter((c) => {
-      const m = pageModule(c.href);
-      return (!m || features?.modules[m] !== false) && (!viewer || viewerPageAllowed(viewer, c.href));
-    })
+    .filter((c) => pathOn(features, c.href) && (!viewer || viewerPageAllowed(viewer, c.href)))
     .map((c) => ({ group: c.group, label: c.label, href: c.href, icon: <c.Icon /> }));
 
   const menuHeader = (
@@ -114,7 +113,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     </div>
   );
   const menuItems: MenuItem[] = [
-    ...(viewer ? [] : IS_DEMO ? ACCOUNT_MENU_DEMO : ACCOUNT_MENU_LIVE).map(({ label, ...m }) => ({ ...m, label: t(label) })),
+    ...(viewer ? [] : IS_DEMO ? ACCOUNT_MENU_DEMO : ACCOUNT_MENU_LIVE).filter((m) => pathOn(features, m.href)).map(({ label, ...m }) => ({ ...m, label: t(label) })),
     ...(viewer ? [] : ["sep" as const]),
     { label: t("shell.logOut"), icon: <LogOut />, onSelect: signOut, danger: true },
   ];

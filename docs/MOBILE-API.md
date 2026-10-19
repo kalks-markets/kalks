@@ -59,6 +59,7 @@ the codes you know.
 | 403 | `viewer_read_only` / `viewer_scope` | A view-only login tried a change, or a section it was not given |
 | 403 | `staff_read_only` | A read-only staff session ("log in as client") tried a change |
 | 403 | `module_disabled` | The broker switched the module off. Hide it (see `config.modules`). |
+| 403 | `section_disabled` | The broker hid this page for the client. Hide it (see `me/features` `sections`). |
 | 403 | `stepup_required` / `stepup_invalid` | Run the step-up dialog (section 4), then retry with `stepup_token` |
 | 404 | `not_found` | Unknown path or object |
 | 409 | various | Business conflicts: `wrong_server`, `needs_empty`, `positions_open`, … |
@@ -123,6 +124,7 @@ No session needed. Read it at start-up and refresh it on resume. It still answer
   "tenant": { "slug": "kalks", "name": "Kalks", "default": true, "logoUrl": null, "primary": null, "accent": null, "supportEmail": null, "website": null },
   "modules": { "wallet": true, "prop": true, "ib": true, "academy": true, "copy_trading": true, "pamm": true, "mam": true, "algo": true, "api": true, "rewards": true, "options": true, "news": true, "calendar": true, "markets": true, "ai": true, "support_chat": true },
   "flags": { "demo_accounts": true },
+  "sections": { "page.wallet.deposit": true, "dashboard.wallet_card": true, "…": true },
   "maintenance": { "active": false, "message": "", "until": null }
 }
 ```
@@ -133,6 +135,10 @@ No session needed. Read it at start-up and refresh it on resume. It still answer
   native trade routes follow `options` (`trade/options*`), `mam` (`trade/mam`) and `ai` (`trade/ai-trader`;
   `trade/options/explain` needs both `options` and `ai`); `support_chat` closes the chat routes of `support/*` only
   while `ai` is off too (Ask Kalks AI asks through them), the stream ticket stays open.
+- `sections`: Client Area pages and dashboard blocks for everyone (keys and meaning: `docs/SECTIONS.md`). Signed in,
+  use the client's own from `GET /api/mobile/me/features` (`{ modules, flags, sections }`, after the broker's country,
+  account group and client rules); `false` = hide that screen or card, missing = on. Reload it on start and when an
+  API answers `403 section_disabled`.
 - `minAppVersion`: when set (env `MOBILE_MIN_APP_VERSION`), an older app must ask the user to update.
 - A white-label broker's `terminal` and `engine` / `options` streams use its own trade domain.
 

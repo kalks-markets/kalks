@@ -709,7 +709,7 @@ pub async fn invite_admin(State(st): State<AppState>, ctx: Ctx, Path(id): Path<i
 
 pub async fn feature_catalogue(State(st): State<AppState>, ctx: Ctx) -> ApiResult<Json<Value>> {
     let _me = require_key(&st, &ctx, "owner.tenants").await?;
-    let flags = sqlx::query("SELECT key, kind, name, description, default_enabled, builtin, created_at FROM feature_flags ORDER BY kind DESC, builtin DESC, created_at, key")
+    let flags = sqlx::query("SELECT key, kind, name, description, default_enabled, builtin, created_at FROM feature_flags WHERE kind <> 'section' ORDER BY kind DESC, builtin DESC, created_at, key")
         .fetch_all(&st.pool)
         .await?;
     let tenants = sqlx::query("SELECT id, slug, name, status FROM tenants ORDER BY id").fetch_all(&st.pool).await?;

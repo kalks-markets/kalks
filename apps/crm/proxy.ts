@@ -3,7 +3,9 @@ import { IS_DEMO } from "@kalks/mock/mode";
 import { SESSION_COOKIE, clientIp, gateway, safeNext } from "@/lib/gateway";
 import { REF_COOKIE, cleanRef, trackClick } from "@/lib/ib";
 import { captureAttribution } from "@/lib/attribution";
-import { moduleOff, offModule, tenantConfig } from "@/lib/tenant-config";
+import { moduleOff, offModule, sectionFor, tenantConfig } from "@/lib/tenant-config";
+import { userFeatures } from "@/lib/features";
+import { isOn } from "@kalks/ui/sections";
 import { hostOf } from "@/lib/tenant-host";
 import { VIEWER_OUT_OF_SCOPE, VIEWER_READ_ONLY, isViewerToken, viewerApiAllowed, viewerHome, viewerPageAllowed, type ViewerScope } from "@/lib/viewer";
 import { MOBILE_PREFIX, bearerOf, hasCookies, mobileRequestHeaders, mobileRoute } from "@/lib/mobile";
@@ -29,7 +31,9 @@ const ALWAYS_OPEN = ["/status", "/maintenance", "/unavailable", "/api/status", "
 
 // Broker runtime config (gateway tenant config): maintenance mode holds clients on /maintenance (their API
 // calls answer 503); a module the Platform Owner switched off (D112) is hidden from the nav and its pages and
-// BFF routes answer "not available". Staff (Back Office) are never affected.
+// BFF routes answer "not available". A section (page) the broker switched off for this client (docs/SECTIONS.md) is
+// simply hidden: its page sends the client to the dashboard and its single-page BFF routes answer 403
+// `section_disabled`. Staff (Back Office) are never affected.
 export async function proxy(req: NextRequest) {
   if (IS_DEMO) return routes(req);
   const { pathname } = req.nextUrl;
@@ -38,7 +42,7 @@ export async function proxy(req: NextRequest) {
   const open = ALWAYS_OPEN.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const api = pathname.startsWith("/api/");
   if (!open) {
-    const held = await brokerGate(req, pathname, api);
+    const held = await brokerGate(req, pathname, api, req.cookies.get(SESSION_COOKIE)?.value);
     if (held) return held;
   }
   if (api && !open) {
@@ -51,9 +55,11 @@ export async function proxy(req: NextRequest) {
   return captureAttribution(req, await routes(req));
 }
 
-/** Maintenance mode and modules switched off for the broker; null = go ahead. */
-async function brokerGate(req: NextRequest, pathname: string, api: boolean): Promise<NextResponse | null> {
-  const cfg = await tenantConfig(hostOf(req.headers) ?? "");
+/** Maintenance mode, modules switched off for the broker and sections switched off for the client (`token`: their
+ *  session, cookie or bearer); null = go ahead. */
+async function brokerGate(req: NextRequest, pathname: string, api: boolean, token?: string | null): Promise<NextResponse | null> {
+  const host = hostOf(req.headers) ?? "";
+  const cfg = await tenantConfig(host);
   if (cfg?.maintenance.active && pathname !== "/api/auth/logout") {
     if (api) return NextResponse.json({ error: { code: "maintenance", message: "The Client Area is under maintenance. Please try again shortly." } }, { status: 503, headers: { "retry-after": "60" } });
     return NextResponse.rewrite(new URL("/maintenance", req.url));
@@ -64,6 +70,15 @@ async function brokerGate(req: NextRequest, pathname: string, api: boolean): Pro
     to.search = "";
     to.searchParams.set("m", offModule(cfg.modules, pathname) ?? "");
     return NextResponse.rewrite(to);
+  }
+  const section = cfg ? sectionFor(pathname) : null;
+  if (cfg && section) {
+    // the client's own switches (country, account group and client rules), else the broker's for everyone
+    const sections = (token ? (await userFeatures(token, req.headers, host))?.sections : null) ?? cfg.sections;
+    if (!isOn(sections, section)) {
+      if (api) return NextResponse.json({ error: { code: "section_disabled", message: "This isn't available on your account." } }, { status: 403, headers: { "cache-control": "no-store" } });
+      return NextResponse.redirect(new URL("/", req.url));
+    }
   }
   return null;
 }
@@ -85,7 +100,7 @@ async function mobileApi(req: NextRequest): Promise<NextResponse> {
   const path = route.policyPath;
   const open = ALWAYS_OPEN.some((p) => path === p || path.startsWith(`${p}/`));
   if (!open) {
-    const held = await brokerGate(req, path, true);
+    const held = await brokerGate(req, path, true, token);
     if (held) return held;
   }
   if (token && !open) {

@@ -30,7 +30,7 @@ const DEVICE_RE = /^[A-Za-z0-9_-]{16,128}$/;
 const VERSION_RE = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:[-+][0-9A-Za-z.+-]{1,32})?$/;
 
 /** Existing cookie BFF families the app uses through a rewrite (first path segment under /api). */
-export const REWRITE_FAMILIES = ["trading", "wallet", "news", "notifications", "kyc", "security", "support", "status", "growth", "partner", "social", "prop", "academy", "reports", "algo", "suitability"] as const;
+export const REWRITE_FAMILIES = ["trading", "wallet", "news", "notifications", "kyc", "security", "support", "status", "growth", "partner", "social", "prop", "academy", "reports", "algo", "suitability", "me"] as const;
 const REWRITES = new Set<string>(REWRITE_FAMILIES);
 /** Cookie auth routes that answer without a session in the body: served through a rewrite as well. */
 const AUTH_REWRITES = new Set(["heartbeat", "impersonation", "marketing"]);

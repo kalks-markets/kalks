@@ -1,5 +1,6 @@
 // Server-only: the broker brand and module switches of the visitor's host (gateway /v1/public/tenant-config →
-// `branding`, `modules`; the gateway resolves the tenant from tenant_domains). Cached 30 s per host per server
+// `branding`, `modules`, and `sections` for everyone, docs/SECTIONS.md; the gateway resolves the tenant from
+// tenant_domains). Cached 30 s per host per server
 // process, so a module the Platform Owner switches off disappears here within that window.
 
 import { NextResponse } from "next/server";
@@ -22,10 +23,11 @@ async function load(host?: string): Promise<Entry> {
   const pending = inflight.get(key);
   if (pending) return pending;
   const p = (async () => {
-    const r = await gateway<{ branding?: TenantBrand; modules?: Modules }>("/v1/public/tenant-config", { host: key || null });
+    const r = await gateway<{ branding?: TenantBrand; modules?: Modules; sections?: Modules }>("/v1/public/tenant-config", { host: key || null });
     const ok = r.status === 200 && !!r.data?.branding?.slug;
     // the gateway unreachable: keep what we had (else the stock Kalks look with every module on)
-    const e: Entry = ok ? { brand: r.data.branding!, modules: r.data.modules ?? null } : { brand: hit?.brand ?? null, modules: hit?.modules ?? null };
+    // section keys (`page.news`) never clash with module keys: one map serves both (lib/modules.ts TAB_MODULES)
+    const e: Entry = ok ? { brand: r.data.branding!, modules: r.data.modules ? { ...r.data.sections, ...r.data.modules } : null } : { brand: hit?.brand ?? null, modules: hit?.modules ?? null };
     if (cache.size >= MAX_HOSTS) cache.clear();
     cache.set(key, { at: Date.now(), ...e });
     return e;

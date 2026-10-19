@@ -40,7 +40,7 @@ export const VIEWER_SECTION_KEYS = Object.keys(VIEWER_SECTIONS) as ViewerSection
 const VIEWER_BLOCKED_PAGES = ["/accounts/new", "/wallet/deposit", "/wallet/withdraw", "/wallet/transfer", "/partner/payouts", "/partner/links"];
 
 /** APIs every viewer session may read / call. */
-const VIEWER_ALWAYS_GET = ["/api/auth/me", "/api/status"];
+const VIEWER_ALWAYS_GET = ["/api/auth/me", "/api/status", "/api/me/features"];
 const VIEWER_ALWAYS_POST = ["/api/auth/logout", "/api/security/viewer-activity"];
 
 const under = (path: string, prefix: string) => (prefix === "/" ? path === "/" : path === prefix || path.startsWith(`${prefix}/`));

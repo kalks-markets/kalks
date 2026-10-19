@@ -37,6 +37,8 @@ export async function GET(req: NextRequest) {
       // module switches (D112): false = hidden in the app, its API answers 403 module_disabled
       modules: cfg?.modules ?? {},
       flags: cfg?.flags ?? {},
+      // Client Area pages and dashboard blocks for everyone; signed in, the client's own: /api/mobile/me/features
+      sections: cfg?.sections ?? {},
       maintenance: cfg?.maintenance ? { active: cfg.maintenance.active, message: cfg.maintenance.message, until: cfg.maintenance.until } : { active: false, message: "", until: null },
     },
     { headers: { "cache-control": "no-store" } },

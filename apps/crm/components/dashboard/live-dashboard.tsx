@@ -51,7 +51,7 @@ import { RANGE_DAYS, StatisticCard, type StatMode, type StatRange } from "@/comp
 import type { TrendPoint } from "@/components/dashboard/home/trend-chart";
 import { AiFacts, AiLink, AskAi, type AiChip } from "@/components/ai/ask-ai";
 import { ArcGauge, HeroButton, HeroGlass, MiniBars, MiniLine, PageHero, StatTile } from "@/components/page-hero";
-import { useModules } from "@/components/tenant-config";
+import { useModules, usePageOn, useSections } from "@/components/tenant-config";
 
 /** the last 7 calendar days ending today, with no P&L yet (accounts without history) */
 function lastWeekDays() {
@@ -393,14 +393,27 @@ const ACTIVITY_ICON: Record<string, { icon: React.ReactNode; tone: ListRowItem["
   other: { icon: <Coins />, tone: "amber" },
 };
 
+/** Balance strip cells → their section (docs/SECTIONS.md). */
+const CELL_SECTION: Record<string, string> = {
+  total: "dashboard.balance_total",
+  equity: "dashboard.balance_equity",
+  wallet: "dashboard.wallet_card",
+  pnl: "dashboard.today_pnl",
+  positions: "dashboard.open_positions",
+  rewards: "dashboard.rewards_card",
+};
+
 /** Live builds: only data that is real for this client — their record, accounts, wallet, live prices, real links. */
 export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
   const me = useSession();
   const t = useT();
   const f = useFormat();
   const readOnly = useReadOnly();
-  // modules the broker switched off (gateway): their cards, KPIs, links and quick actions are left out
+  // modules the broker switched off (gateway): their cards, KPIs, links and quick actions are left out; so are the
+  // blocks and pages the broker hid for this client (sections, `dashboard.*` / `page.*`)
   const on = useModules();
+  const show = useSections();
+  const open = usePageOn();
   const acc = useAccounts(10000);
   // Archived / closed accounts live on the Accounts page's Archived tab only.
   const accounts = React.useMemo(() => acc.data?.accounts.filter((a) => !isArchived(a)) ?? null, [acc.data]);
@@ -476,7 +489,7 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
   const liveAccts = totals.live;
   const money2 = (a: EngineAccount, v: number) => `${curOf(a)}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const aiChips: AiChip[] = [
-    ...(on("wallet") ? [{ key: "deposit", label: t("dashboard.ai.chip.deposit"), extra: <AiLink href="/wallet/deposit">{t("common.deposit")}</AiLink> }] : []),
+    ...(open("/wallet/deposit") ? [{ key: "deposit", label: t("dashboard.ai.chip.deposit"), extra: <AiLink href="/wallet/deposit">{t("common.deposit")}</AiLink> }] : []),
     {
       key: "freeMargin",
       label: t("dashboard.ai.chip.freeMargin"),
@@ -529,18 +542,24 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
     { key: "support", label: t("shell.nav.support"), href: "/support", icon: <LifeBuoy /> },
   ];
 
+  // the strip without the cells hidden for this client (none left: no strip)
+  const strip = (all: React.ComponentProps<typeof BalanceStrip>["cells"]) => {
+    const cells = all.filter((c) => show(CELL_SECTION[c.key] ?? ""));
+    return cells.length ? <BalanceStrip cells={cells} /> : null;
+  };
+
   return (
     <div className="pb-16">
       {/* the hero: only the AI bar on the photo (founder 2026-10-10: no greeting, the name is already in the top bar) */}
       <PageHero
         page="dashboard"
         center
-        body={!readOnly && on("ai") ? <AskAi hero chips={aiChips} chat={on("support_chat")} /> : undefined}
+        body={!readOnly && show("dashboard.ask_ai") ? <AskAi hero chips={aiChips} chat={on("support_chat")} /> : undefined}
       />
 
       {/* the money summary, moved down from the hero */}
-      <BalanceStrip
-        cells={[
+      {strip(
+        [
           {
             key: "total", secret: true,
             big: true,
@@ -598,43 +617,47 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
                 },
               ]
             : []),
-        ]}
-      />
+        ],
+      )}
 
-      <BannerSlot placement="dashboard" />
+      {show("dashboard.banners") && <BannerSlot placement="dashboard" />}
 
       {/* Home, kept short (founder 2026-10-10): Ask Kalks AI with the shortcuts under it, your accounts beside them */}
       <div className="mt-8 grid grid-cols-1 items-start gap-6 xl:grid-cols-12">
         <div className="flex min-w-0 flex-col gap-6 xl:col-span-7">
-          <section>
-            <h2 className="k-display mb-3 text-[18px] font-semibold tracking-[-0.015em]">{t.dyn("dashboard.home.shortcuts", "Shortcuts")}</h2>
-            <Shortcuts items={shortcuts} />
-          </section>
+          {show("dashboard.shortcuts") && (
+            <section>
+              <h2 className="k-display mb-3 text-[18px] font-semibold tracking-[-0.015em]">{t.dyn("dashboard.home.shortcuts", "Shortcuts")}</h2>
+              <Shortcuts items={shortcuts.filter((x) => x.external || open(x.href))} />
+            </section>
+          )}
         </div>
-        <div className="min-w-0 xl:col-span-5">
-          <AccountsPanel
-            accounts={cards}
-            loading={!acc.data && !acc.error}
-            failed={!!acc.error}
-            onRetry={acc.reload}
-            extraCount={Math.max(0, ordered.length - 8)}
-            actions={
-              readOnly
-                ? undefined
-                : (c) => {
-                    const a = accounts?.find((x) => String(x.login) === c.login);
-                    if (!a) return null;
-                    return (
-                      <>
-                        <TradeButton a={a} size="md" className="flex-1" />
-                        {a.type === "live" ? !isPropAccount(a) && <FundButton a={a} size="md" /> : <RefillButton a={a} onDone={acc.reload} size="md" />}
-                        <AccountActions a={a} onChanged={acc.reload} />
-                      </>
-                    );
-                  }
-            }
-          />
-        </div>
+        {show("dashboard.accounts") && (
+          <div className="min-w-0 xl:col-span-5">
+            <AccountsPanel
+              accounts={cards}
+              loading={!acc.data && !acc.error}
+              failed={!!acc.error}
+              onRetry={acc.reload}
+              extraCount={Math.max(0, ordered.length - 8)}
+              actions={
+                readOnly
+                  ? undefined
+                  : (c) => {
+                      const a = accounts?.find((x) => String(x.login) === c.login);
+                      if (!a) return null;
+                      return (
+                        <>
+                          <TradeButton a={a} size="md" className="flex-1" />
+                          {a.type === "live" ? !isPropAccount(a) && <FundButton a={a} size="md" /> : <RefillButton a={a} onDone={acc.reload} size="md" />}
+                          <AccountActions a={a} onChanged={acc.reload} />
+                        </>
+                      );
+                    }
+              }
+            />
+          </div>
+        )}
       </div>
     </div>
   );

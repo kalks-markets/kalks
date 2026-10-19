@@ -26,6 +26,7 @@ mod marketing;
 mod owner;
 mod ratelimit;
 mod rbac;
+mod sections;
 mod shares;
 mod staff_admin;
 mod staff_auth;
@@ -253,6 +254,13 @@ fn router(st: AppState) -> Router {
         .route("/v1/admin/settings/maintenance", get(tenancy::get_maintenance).put(tenancy::set_maintenance))
         .route("/v1/admin/settings/features", get(tenancy::get_features))
         .route("/v1/admin/settings/features/{key}", put(tenancy::set_feature))
+        // Client Area sections and targeting rules (sections.rs)
+        .route("/v1/admin/settings/sections", get(sections::list))
+        .route("/v1/admin/settings/sections/preview", get(sections::preview))
+        .route("/v1/admin/settings/sections/rules/{id}", delete(sections::remove_rule))
+        .route("/v1/admin/settings/sections/{key}", put(sections::toggle))
+        .route("/v1/admin/settings/sections/{key}/rules", post(sections::set_rule))
+        .route("/v1/me/features", get(sections::me))
         .route("/v1/public/tenant-config", get(domains::tenant_config))
         .route("/v1/public/tenant-by-host", get(domains::tenant_by_host))
         .route("/v1/owner/tenants/{id}/domains", get(domains::owner_list).post(domains::owner_add))

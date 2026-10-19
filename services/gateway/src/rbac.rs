@@ -121,7 +121,7 @@ pub const PERMS: &[PermDef] = &[
     PermDef { key: "staff.write", module: "staff", action: "create", label: "Invite, edit, disable staff" },
     PermDef { key: "staff.roles", module: "staff", action: "edit", label: "Create and edit roles" },
     PermDef { key: "settings.read", module: "settings", action: "view", label: "View tenant settings" },
-    PermDef { key: "settings.write", module: "settings", action: "edit", label: "Maintenance mode and feature flags" },
+    PermDef { key: "settings.write", module: "settings", action: "edit", label: "Maintenance mode, feature flags and the Client Area layout" },
     PermDef { key: "owner.tenants", module: "owner", action: "edit", label: "Create, edit and suspend tenants" },
     PermDef { key: "owner.billing", module: "owner", action: "approve", label: "Tenant billing and invoices" },
     PermDef { key: "owner.system", module: "owner", action: "view", label: "Cross-tenant dashboard and system ops" },

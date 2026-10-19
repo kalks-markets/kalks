@@ -321,6 +321,7 @@ export const ADMIN_NAV: NavModule[] = [
       { href: "/settings/webhooks", label: "Webhooks" },
       { href: "/settings/maintenance", label: "Maintenance" },
       { href: "/settings/features", label: "Features & modules" },
+      { href: "/settings/layout", label: "Client Area layout" },
     ],
   },
 ];

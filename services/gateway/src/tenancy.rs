@@ -7,6 +7,7 @@
 //!   `/v1/internal/tenants/{slug}`, internal.rs, or `tenant_features` directly).
 //! * Feature flags are switched by the tenant (`settings.write`); the Platform Owner can add new flags.
 //! * Maintenance mode: clients see a maintenance page and can't sign in; staff keep working.
+//! * Sections (Client Area pages and dashboard blocks) and their targeting rules: sections.rs.
 //!
 //! `GET /v1/public/tenant-config` gives the apps everything they need in one call (internal token only),
 //! including the tenant's branding; the tenant is the one of the forwarded browser host (domains.rs).
@@ -89,6 +90,8 @@ pub async fn seed_catalogue(pool: &PgPool) -> anyhow::Result<()> {
             .await?;
         }
     }
+    // Client Area pages and dashboard blocks (sections.rs)
+    crate::sections::seed(pool).await?;
     Ok(())
 }
 
@@ -208,8 +211,14 @@ pub async fn public_config(State(st): State<AppState>, ctx: Ctx) -> ApiResult<Js
     let mut modules = Map::new();
     let mut flags = Map::new();
     for f in features(&st.pool, id).await? {
-        if f.kind == "module" { &mut modules } else { &mut flags }.insert(f.key, json!(f.enabled));
+        match f.kind.as_str() {
+            "module" => modules.insert(f.key, json!(f.enabled)),
+            "flag" => flags.insert(f.key, json!(f.enabled)),
+            _ => None,
+        };
     }
+    // sections for everyone (anonymous pages); a signed-in client's own come from /v1/me/features (sections.rs)
+    let sections = crate::sections::effective(&st.pool, id, None).await?.sections;
     let status: String = t.get("status");
     Ok(Json(json!({
         "tenant": { "slug": t.get::<String, _>("slug"), "name": t.get::<String, _>("name"), "status": status, "brand": t.get::<sqlx::types::Json<Value>, _>("brand").0 },
@@ -217,6 +226,9 @@ pub async fn public_config(State(st): State<AppState>, ctx: Ctx) -> ApiResult<Js
         "maintenance": if status == "active" { maintenance_json(&m) } else { json!({ "enabled": true, "active": true, "message": "This service is temporarily unavailable.", "until": null, "since": null }) },
         "modules": modules,
         "flags": flags,
+        "sections": sections,
+        // bumped on every switch: the apps reload their per-client switches when it moves
+        "features_version": crate::sections::version(&st.pool, id).await?,
         // name, logo, colours, support email and domains by kind (domains.rs)
         "branding": crate::domains::branding(&st, id).await?,
     })))
@@ -311,6 +323,11 @@ pub async fn write_feature(st: &AppState, ctx: &Ctx, me: &Staff, tenant_id: i64,
     if f.kind == "module" && !me.can("owner.tenants") {
         return Err(ApiError::Coded { status: StatusCode::FORBIDDEN, code: "forbidden", message: "Modules are switched by the platform owner." });
     }
+    // a section's switch for everyone is its `all` rule (sections.rs)
+    if f.kind == "section" {
+        crate::sections::write_rule(st, ctx, me, tenant_id, key, "all", "", value, reason).await?;
+        return Ok(json!({ "key": key, "enabled": value.unwrap_or(f.default_enabled), "overridden": value.is_some() }));
+    }
     match value {
         Some(v) => {
             sqlx::query(
@@ -328,6 +345,7 @@ pub async fn write_feature(st: &AppState, ctx: &Ctx, me: &Staff, tenant_id: i64,
             sqlx::query("DELETE FROM tenant_features WHERE tenant_id = $1 AND key = $2").bind(tenant_id).bind(key).execute(&st.pool).await?;
         }
     }
+    crate::sections::bump(&st.pool, tenant_id).await?;
     let after = value.unwrap_or(f.default_enabled);
     audit::record(&st.pool, ctx, Entry {
         tenant_id: me.tenant_id,
