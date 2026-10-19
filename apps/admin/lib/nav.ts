@@ -239,9 +239,14 @@ export const ADMIN_NAV: NavModule[] = [
     key: "content",
     label: "Content",
     icon: FileText,
+    // demo builds land on the News showcase (Pages and Media library are live-only); live builds land on the
+    // first live page (Pages, see lib/live.ts LIVE_NAV). `match` lights the module on every /content page.
     href: "/content/news",
+    match: ["/content"],
     section: "growth",
     sub: [
+      { href: "/content/pages", label: "Pages" },
+      { href: "/content/media", label: "Media library" },
       { href: "/content/news", label: "News" },
       { href: "/content/calendar", label: "Economic calendar" },
       { href: "/content/legal", label: "Legal documents" },

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import { useT } from "@kalks/i18n/react";
+import { ThemedImage, useContentImage, useContentText, type ContentImage } from "@kalks/ui/content";
 import { Delta, LanguageMenu, Logo, PriceText, SymbolAvatar, useBrand, useQuote } from "@/components/kit";
 
 /** The brand photo of the sign-in pages (founder 2026-10-10: the same photo heroes as the rest of the Client Area). */
@@ -12,21 +13,23 @@ const AUTH_PHOTO = "/heroes/dashboard.jpg";
  * Split auth layout: the form on the left, the brand photo on the right (the KALKS letters behind the figure, as on
  * Home) with the logo, the headline and live prices over it. Phones get the photo as a band above the form.
  * Pages render their own form as `children`, so every auth flow (sign in, sign up, reset) shares it.
- * A white-label broker sees its own logo over a plain dark panel (no Kalks photo).
+ * A white-label broker sees its own logo over a plain dark panel (no Kalks photo) unless it publishes its own photo.
+ * Editable (Back Office → Content → Pages, surface app, page auth): side.image, side.headline, side.body.
  */
 export function AuthSection({ children }: { children: ReactNode }) {
   const t = useT();
   const brand = useBrand();
+  const img = useContentImage("auth", "side.image");
+  const photo = !brand || !!img;
   return (
     <section className="min-h-dvh bg-bg p-3 text-fg antialiased [font-synthesis:none]">
       <div className="grid min-h-[calc(100dvh-1.5rem)] gap-3 lg:grid-cols-[0.94fr_1.06fr]">
         {/* Left — form */}
         <div className="relative flex flex-col overflow-hidden rounded-[28px] border border-line bg-surface">
           {/* phones: the photo as a band at the top */}
-          {!brand && (
+          {photo && (
             <div aria-hidden className="relative -mb-16 h-56 overflow-hidden lg:hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={AUTH_PHOTO} alt="" className="size-full object-cover" style={{ objectPosition: "50% 35%" }} />
+              <AuthPhoto img={img} className="size-full object-cover" position="50% 35%" />
               <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-surface" />
             </div>
           )}
@@ -58,21 +61,34 @@ export function AuthSection({ children }: { children: ReactNode }) {
   );
 }
 
+/** The side photo: the broker's published one (content slot app/auth/side.image), else the Kalks photo. */
+function AuthPhoto({ img, className, position }: { img: ContentImage | null; className: string; position: string }) {
+  if (img) {
+    const sizes = "(min-width: 1024px) 55vw, 100vw";
+    return <ThemedImage src={img.url} srcSet={img.srcset} darkSrc={img.dark?.url} darkSrcSet={img.dark?.srcset} sizes={sizes} alt="" aria-hidden priority className={className} style={{ objectPosition: position }} />;
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={AUTH_PHOTO} alt="" aria-hidden className={className} style={{ objectPosition: position }} />;
+}
+
 function BrandPanel() {
   const brand = useBrand();
   const t = useT();
+  const img = useContentImage("auth", "side.image");
+  const headline = useContentText("auth", "side.headline", t("auth.brand.headline"));
+  const body = useContentText("auth", "side.body", t("auth.brand.body"));
+  const photo = !brand || !!img;
   return (
     <div className="relative hidden min-h-[720px] flex-col justify-between overflow-hidden rounded-[28px] bg-black p-8 text-white sm:p-12 lg:flex lg:min-h-0 lg:p-14">
-      {!brand && (
+      {photo && (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={AUTH_PHOTO} alt="" aria-hidden className="absolute inset-0 size-full object-cover" style={{ objectPosition: "50% 38%" }} />
+          <AuthPhoto img={img} className="absolute inset-0 size-full object-cover" position="50% 38%" />
           {/* legibility: a soft top for the logo, a deep foot for the headline */}
           <div aria-hidden className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-black/55 to-transparent" />
           <div aria-hidden className="absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-t from-black via-black/75 to-transparent" />
         </>
       )}
-      {brand && <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_520px_at_15%_-10%,color-mix(in_oklab,var(--k-ember)_42%,transparent),transparent_62%)]" />}
+      {!photo && <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_520px_at_15%_-10%,color-mix(in_oklab,var(--k-ember)_42%,transparent),transparent_62%)]" />}
 
       <motion.div
         initial={{ opacity: 0, y: 12, filter: "blur(6px)" }}
@@ -90,7 +106,7 @@ function BrandPanel() {
           transition={{ duration: 0.8, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
           className="text-[30px] font-light leading-[1.08] tracking-[-0.035em] text-white lg:text-[40px]"
         >
-          {t("auth.brand.headline")}
+          {headline}
         </motion.h2>
         <motion.p
           initial={{ opacity: 0, y: 12 }}
@@ -98,7 +114,7 @@ function BrandPanel() {
           transition={{ duration: 0.7, delay: 0.2 }}
           className="mt-4 max-w-md text-[14.5px] leading-relaxed text-white/75"
         >
-          {t("auth.brand.body")}
+          {body}
         </motion.p>
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.28 }} className="mt-7 flex flex-wrap gap-2">
           {["XAUUSD", "EURUSD", "BTCUSD"].map((s) => (

@@ -175,6 +175,7 @@ function Inner() {
                 {!loading && list.length === 0 && active !== "archived" && (
                   <EmptyState
                     art="welcome"
+                    contentSlot={{ page: "empty", slot: "accounts.image" }}
                     title={active === "live" ? tt("accounts.empty.noLive") : tt("accounts.empty.noDemo")}
                     text={
                       active === "live"

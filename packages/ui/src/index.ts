@@ -24,3 +24,4 @@ export * from "./shell/app-shell";
 export * from "./shell/topbar-widgets";
 export * from "./shell/providers";
 export * from "./components/mode-gate";
+export * from "./content/react";

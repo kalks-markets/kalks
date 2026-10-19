@@ -16,6 +16,7 @@ import {
   type IllustrationName,
 } from "@/components/kit";
 import { useT } from "@kalks/i18n/react";
+import { ThemedImage, useContentImage } from "@kalks/ui/content";
 import type { ClientStatus, PartnerApiError } from "./api";
 
 /* ------------------------------------------------------------------ */
@@ -285,13 +286,17 @@ export function CardEmpty({
   art,
   className,
   children,
+  contentSlot,
 }: {
   title: string;
   text?: React.ReactNode;
   art?: IllustrationName;
   className?: string;
   children?: React.ReactNode;
+  /** an image slot (content service) that replaces the illustration once staff publish one */
+  contentSlot?: { page: string; slot: string };
 }) {
+  const custom = useContentImage(contentSlot?.page ?? "", contentSlot?.slot ?? "");
   return (
     <div
       className={cn(
@@ -299,7 +304,11 @@ export function CardEmpty({
         className,
       )}
     >
-      {art && <Illustration name={art} width={176} maxHeight={132} className="mb-4" />}
+      {custom ? (
+        <ThemedImage src={custom.url} srcSet={custom.srcset} darkSrc={custom.dark?.url} darkSrcSet={custom.dark?.srcset} alt={custom.alt} sizes="176px" className="mb-4 h-auto max-h-[132px] w-[176px] object-contain" />
+      ) : (
+        art && <Illustration name={art} width={176} maxHeight={132} className="mb-4" />
+      )}
       <div className="text-[13.5px] font-medium text-fg-2">{title}</div>
       {text && (
         <div className="mt-1 max-w-xs text-[12.5px] leading-snug text-fg-3">

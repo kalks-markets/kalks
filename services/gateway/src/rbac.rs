@@ -102,7 +102,8 @@ pub const PERMS: &[PermDef] = &[
     PermDef { key: "options.dealing", module: "options", action: "create", label: "Halt / close-only / freeze / manual vol, client limits, void option trades" },
     PermDef { key: "options.settle", module: "options", action: "approve", label: "Re-fix expiries and re-run option settlements (within 1 hour)" },
     PermDef { key: "content.read", module: "content", action: "view", label: "View content" },
-    PermDef { key: "content.write", module: "content", action: "edit", label: "Edit and publish content" },
+    PermDef { key: "content.write", module: "content", action: "edit", label: "Edit content, Academy and news; save page drafts, upload media" },
+    PermDef { key: "content.publish", module: "content", action: "approve", label: "Publish, roll back and delete website / app content and media" },
     PermDef { key: "marketing.read", module: "marketing", action: "view", label: "View campaigns and rewards" },
     PermDef { key: "marketing.write", module: "marketing", action: "edit", label: "Create and edit campaigns, bonuses" },
     PermDef { key: "marketing.approve", module: "marketing", action: "approve", label: "Approve bonuses and rewards" },
@@ -242,7 +243,7 @@ pub fn preset_perms(key: &str) -> Option<Vec<&'static str>> {
         ],
         "sales" => vec!["stats.read", "clients.read", "partners.read", "content.read", "marketing.read", "support.read", "reports.read"],
         "partner_manager" => vec!["stats.read", "clients.read", "partners.read", "partners.write", "partners.export", "content.read", "marketing.read", "reports.read"],
-        "marketing" => vec!["stats.read", "content.read", "content.write", "marketing.read", "marketing.write", "notifications.write", "reports.read"],
+        "marketing" => vec!["stats.read", "content.read", "content.write", "content.publish", "marketing.read", "marketing.write", "notifications.write", "reports.read"],
         "viewer" => vec!["stats.read", "spreads.read", "dealing.read", "accounts.read", "partners.read", "social.read", "prop.read", "algo.read", "content.read", "marketing.read"],
         "options_risk" => vec![
             "stats.read", "clients.read", "dealing.read", "accounts.read", "options.read", "options.config", "options.dealing", "options.settle",
@@ -447,7 +448,7 @@ mod tests {
             "kyc.review", "dealing.read", "dealing.write", "dealing.policy", "accounts.read", "accounts.write", "finance.adjust", "groups.write",
             "finance.credit", "finance.adjust_approve", "finance.adjust_force", "finance.read", "finance.write", "finance.approve", "finance.settings", "partners.read", "partners.write", "partners.approve",
             "social.read", "social.write", "social.approve", "prop.read", "prop.write", "prop.approve", "algo.read", "algo.write", "algo.settings",
-            "content.read", "content.write", "support.read", "support.write", "notifications.write", "marketing.read", "marketing.write",
+            "content.read", "content.write", "content.publish", "support.read", "support.write", "notifications.write", "marketing.read", "marketing.write",
             "options.read", "options.config", "options.dealing", "options.settle",
         ] {
             assert!(perm(k).is_some(), "missing {k}");
@@ -469,6 +470,9 @@ mod tests {
         assert!(!has("dealer", "finance.adjust") && !has("support", "finance.credit"));
         assert!(!has("admin", "owner.tenants") && has("platform_owner", "owner.tenants"));
         assert!(has("marketing", "content.write") && !has("marketing", "clients.read"));
+        // page content (services/content): Marketing and the admins publish; read-only roles only view
+        assert!(has("marketing", "content.publish") && has("admin", "content.publish") && has("super_admin", "content.publish"));
+        assert!(!has("viewer", "content.publish") && !has("support", "content.write") && has("platform_owner", "content.publish"));
         assert!(has("partner_manager", "partners.write") && !has("support", "partners.write"));
         assert!(!has("viewer", "dealing.write"));
         // account closures (C8): admins and Compliance request and approve; dealers and support don't

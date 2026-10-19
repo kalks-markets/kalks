@@ -40,6 +40,8 @@ import { KIND_LABEL } from "@/components/wallet-live/ui";
 import { useGrowth, type Rewards } from "@/components/growth/api";
 import { BannerSlot } from "@/components/growth/banner-slot";
 import { LevelStrip } from "@/components/growth/hub";
+import { ContentBanner } from "@/components/dashboard/home/content-banner";
+import { useContentText } from "@kalks/ui/content";
 import { LiveCalendarCard, LiveNewsCard, LiveWorldCard } from "@/components/news-live/dashboard";
 import { Trans, useFormat, useT } from "@kalks/i18n/react";
 import { AccountsPanel, type CardAccount } from "@/components/dashboard/home/accounts-panel";
@@ -415,6 +417,9 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
   const on = useModules();
   const show = useSections();
   const open = usePageOn();
+  // optional headline over the hero photo (content slots app/dashboard/hero.*; none by default, as before)
+  const heroTitle = useContentText("dashboard", "hero.title", "");
+  const heroLead = useContentText("dashboard", "hero.lead", "");
   const acc = useAccounts(10000);
   // Archived / closed accounts live on the Accounts page's Archived tab only.
   const accounts = React.useMemo(() => acc.data?.accounts.filter((a) => !isArchived(a)) ?? null, [acc.data]);
@@ -555,6 +560,8 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
       <PageHero
         page="dashboard"
         center
+        title={heroTitle || undefined}
+        lead={heroLead || undefined}
         body={!readOnly && show("dashboard.ask_ai") ? <AskAi hero chips={aiChips} chat={on("support_chat")} /> : undefined}
       />
 
@@ -621,7 +628,12 @@ export function LiveDashboard({ movers }: { movers: React.ReactNode }) {
         ],
       )}
 
-      {show("dashboard.banners") && <BannerSlot placement="dashboard" />}
+      {show("dashboard.banners") && (
+        <>
+          <ContentBanner />
+          <BannerSlot placement="dashboard" />
+        </>
+      )}
       {show("dashboard.level_strip") && <LevelStrip />}
 
       {/* Home, kept short (founder 2026-10-10): Ask Kalks AI with the shortcuts under it, your accounts beside them */}

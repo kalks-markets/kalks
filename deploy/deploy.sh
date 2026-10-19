@@ -26,6 +26,7 @@ cargo build --release -p growth
 cargo build --release -p reports
 cargo build --release -p news
 cargo build --release -p options
+cargo build --release -p content
 
 # trading engine secrets are generated on the server on first deploy (never committed, never printed)
 touch .env.local
@@ -176,6 +177,28 @@ for app in apps/crm apps/admin apps/terminal; do
   grep -q '^OPTIONS_URL=' "$f" || printf 'OPTIONS_URL=http://127.0.0.1:8104\n' >> "$f"
   grep -q '^OPTIONS_INTERNAL_TOKEN=' "$f" || printf 'OPTIONS_INTERNAL_TOKEN=%s\n' "$(grep '^OPTIONS_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
 done
+# content service (editable pages + media library): internal token generated once (never printed), database
+# kalks_content next to the gateway's; media files (public by design) under ~/.kalks-data/content. CONTENT_PUBLIC_URL is
+# where browsers load media (the edge exposes only the read-only /v1/public/content and /v1/public/media/* on the API
+# host). The Back Office uses the token for the editor; the Client Area and Kalks Trader read the public endpoint
+# server-side (CONTENT_URL); preview links open on each app's public URL. Cloudflare R2 instead of the disk:
+# CONTENT_STORAGE=r2 + R2_ENDPOINT / R2_BUCKET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY (docs/CONTENT.md).
+grep -q '^CONTENT_INTERNAL_TOKEN=' .env.local || printf 'CONTENT_INTERNAL_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env.local
+if ! grep -q '^CONTENT_DATABASE_URL=' .env.local && grep -q '^GATEWAY_DATABASE_URL=' .env.local; then
+  printf 'CONTENT_DATABASE_URL=%s\n' "$(grep '^GATEWAY_DATABASE_URL=' .env.local | cut -d= -f2- | sed -E 's#/[^/?]+([?].*)?$#/kalks_content\1#')" >> .env.local
+fi
+grep -q '^CONTENT_STORAGE_DIR=' .env.local || printf 'CONTENT_STORAGE_DIR=%s\n' "$HOME/.kalks-data/content" >> .env.local
+grep -q '^CONTENT_PUBLIC_URL=' .env.local || printf 'CONTENT_PUBLIC_URL=https://api.kalkstrade.com\n' >> .env.local
+install -d -m 755 "$(grep '^CONTENT_STORAGE_DIR=' .env.local | cut -d= -f2-)"
+for app in apps/crm apps/admin apps/terminal; do
+  f="$app/.env.production.local"; touch "$f"
+  grep -q '^CONTENT_URL=' "$f" || printf 'CONTENT_URL=http://127.0.0.1:8105\n' >> "$f"
+done
+f=apps/admin/.env.production.local
+grep -q '^CONTENT_INTERNAL_TOKEN=' "$f" || printf 'CONTENT_INTERNAL_TOKEN=%s\n' "$(grep '^CONTENT_INTERNAL_TOKEN=' .env.local | cut -d= -f2-)" >> "$f"
+grep -q '^CONTENT_PREVIEW_WEBSITE_URL=' "$f" || printf 'CONTENT_PREVIEW_WEBSITE_URL=https://kalkstrade.com\n' >> "$f"
+grep -q '^CONTENT_PREVIEW_APP_URL=' "$f" || printf 'CONTENT_PREVIEW_APP_URL=https://app.kalkstrade.com\n' >> "$f"
+grep -q '^CONTENT_PREVIEW_TRADER_URL=' "$f" || printf 'CONTENT_PREVIEW_TRADER_URL=https://trade.kalkstrade.com\n' >> "$f"
 # the Client Area's public URLs, inlined at build time: market-data at the public edge (live quotes in the browser)
 # and Kalks Trader (Trade links and sign-in hand-off)
 f=apps/crm/.env.production.local; touch "$f"
@@ -227,6 +250,7 @@ sudo systemctl enable kalks-growth >/dev/null && sudo systemctl restart kalks-gr
 sudo systemctl enable kalks-reports >/dev/null && sudo systemctl restart kalks-reports
 sudo systemctl enable kalks-news >/dev/null && sudo systemctl restart kalks-news
 sudo systemctl enable kalks-options >/dev/null && sudo systemctl restart kalks-options
+sudo systemctl enable kalks-content >/dev/null && sudo systemctl restart kalks-content
 sudo systemctl reload caddy || echo "caddy reload timed out (long-lived connections); config is validated, continuing"
 sleep 5
 for u in 127.0.0.1:8081/health 127.0.0.1:8080/health 127.0.0.1:8090/health 127.0.0.1:8096/health ${PROP:+127.0.0.1:8097/health} 127.0.0.1:3000/login 127.0.0.1:3001/login 127.0.0.1:3002/login; do
@@ -240,3 +264,4 @@ printf "%-26s %s\n" 127.0.0.1:8101/health "$(curl -s -o /dev/null -w '%{http_cod
 printf "%-26s %s\n" 127.0.0.1:8102/health "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8102/health)"
 printf "%-26s %s\n" 127.0.0.1:8103/health "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8103/health)"
 printf "%-26s %s\n" 127.0.0.1:8104/health "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8104/health)"
+printf "%-26s %s\n" 127.0.0.1:8105/health "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8105/health)"

@@ -10,7 +10,8 @@ const config: NextConfig = {
   images: { unoptimized: true },
   // Client router cache: pages here are client components whose server payload carries no user data, so a page
   // visited in the last minute opens without a server round trip (data still refetches on mount).
-  experimental: { staleTimes: { dynamic: 60 } },
+  // proxyClientMaxBodySize: lets a 10 MB media library upload (/api/content/media) through the proxy untruncated
+  experimental: { staleTimes: { dynamic: 60 }, proxyClientMaxBodySize: "11mb" },
   // Static images (public/assets: logos, coins, flags, photos) have no content hash: a day fresh, then served from
   // cache while revalidating for a week, instead of a revalidation round trip on every page load (max-age=0).
   async headers() {

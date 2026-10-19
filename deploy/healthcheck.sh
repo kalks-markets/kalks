@@ -61,6 +61,7 @@ run kalks-growth      "Rewards + marketing" http://127.0.0.1:8101/health "$OK an
 run kalks-reports     "Reports"           http://127.0.0.1:8102/health "$OK and d.get('db')"
 run kalks-news        "News + calendar"   http://127.0.0.1:8103/health "$OK and d.get('db')"
 run kalks-options     "Options service"   http://127.0.0.1:8104/health "$OK and d.get('db')"
+run kalks-content     "Content + media"   http://127.0.0.1:8105/health "$OK and d.get('db')"
 run kalks-crm         "Client Area"       http://127.0.0.1:3000/login ""
 run kalks-admin       "Back Office"       http://127.0.0.1:3001/login ""
 run kalks-terminal    "Kalks Trader"      http://127.0.0.1:3002/login ""

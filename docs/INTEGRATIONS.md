@@ -148,6 +148,8 @@ Stores KYC documents, statements, invoices, avatars and report exports. Encrypti
 
 **Where to get it:** AWS IAM (or the MinIO console). Create the bucket, then create an access key scoped to that bucket.
 
+**Website and app images (content service):** the media library (Back Office → Content → Media library) stores its images on the server's disk today (`CONTENT_STORAGE_DIR`). To move them to Cloudflare R2 (or any S3-compatible bucket), set in `~/kalks/.env.local`: `CONTENT_STORAGE=r2`, `R2_ENDPOINT` (`https://<account id>.r2.cloudflarestorage.com`), `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (an R2 API token with Object Read & Write on that bucket), optional `R2_REGION` (default `auto`). Copy the existing files into the bucket with the same keys before switching. Optional; disk works for launch. See docs/CONTENT.md.
+
 ## 7. AI assistant: Anthropic Claude · Recommended
 Powers three features:
 - The support bot, which answers first and hands over to human agents.

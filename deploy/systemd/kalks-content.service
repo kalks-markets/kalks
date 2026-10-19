@@ -1,0 +1,22 @@
+[Unit]
+Description=Kalks content + media library (:8105)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+User=kalks
+WorkingDirectory=/home/kalks/kalks/services/content
+EnvironmentFile=/home/kalks/kalks/.env.local
+Environment=RUST_LOG=info
+Environment=CONTENT_ENV=production
+Environment=CONTENT_BIND=127.0.0.1:8105
+ExecStart=/home/kalks/kalks/target/release/content
+Restart=always
+RestartSec=3
+KillSignal=SIGINT
+TimeoutStopSec=10
+NoNewPrivileges=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

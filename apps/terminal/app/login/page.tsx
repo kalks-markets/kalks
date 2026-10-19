@@ -7,6 +7,7 @@ import { ArrowRight, ArrowUpRight, CandlestickChart, Eye, EyeOff, KeyRound, Load
 import { toast } from "@/lib/notify";
 import { ACCOUNTS, ALL_INSTRUMENTS, ME } from "@kalks/mock";
 import { BrandName, LivePrice, LogoMark, SymbolAvatar, ThemeToggle, cn, useQuote } from "@kalks/ui";
+import { ContentImageView, useContentText } from "@kalks/ui/content";
 import { Trans, useT } from "@kalks/i18n/react";
 import type { MessageKey } from "@kalks/i18n";
 import { LanguageMenu } from "@/components/shell/language-menu";
@@ -90,8 +91,7 @@ function LoginForm() {
     <div className="relative flex min-h-dvh overflow-y-auto bg-page lg:h-dvh lg:overflow-hidden">
       {/* left: brand */}
       <aside className="relative hidden w-[46%] max-w-[720px] overflow-hidden border-e border-line lg:block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/photos/trading-screen.jpg" alt="" className="absolute inset-0 size-full object-cover opacity-45" />
+        <SidePhoto />
         <div className="absolute inset-0 bg-[linear-gradient(160deg,rgba(7,7,10,0.35),rgba(7,7,10,0.92)_62%),radial-gradient(700px_320px_at_20%_-80px,rgba(255,90,31,0.45),transparent_70%)]" />
         <div className="relative flex h-full flex-col p-10 text-white">
           <div className="flex items-center gap-2.5">
@@ -103,9 +103,7 @@ function LoginForm() {
             </span>
           </div>
           <div className="mt-auto max-w-[460px]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff8a3d]">{t("trader.login.brandEyebrow")}</div>
-            <h1 className="mt-3 text-[34px] font-medium leading-[1.12] tracking-tight">{t("trader.login.brandTitle")}</h1>
-            <p className="mt-3 text-[14px] leading-relaxed text-white/65">{t("trader.login.brandTextDemo")}</p>
+            <SideTexts text={t("trader.login.brandTextDemo")} />
             <div className="mt-7 grid grid-cols-2 gap-2">
               {["XAUUSD", "EURUSD", "NAS100", "BTCUSD"].map((s) => (
                 <Ticker key={s} symbol={s} />
@@ -394,12 +392,31 @@ function LiveLogin() {
   );
 }
 
+/** The side photo: the broker's published one (content slot trader/login/side.image, light + dark), else the stock photo. */
+function SidePhoto() {
+  return <ContentImageView page="login" slot="side.image" fallback="/assets/photos/trading-screen.jpg" alt="" sizes="46vw" priority className="absolute inset-0 size-full object-cover opacity-45" />;
+}
+
+/** Eyebrow, headline and line of the side panel (content slots trader/login/side.eyebrow|title|text; i18n defaults). */
+function SideTexts({ text }: { text: string }) {
+  const t = useT();
+  const eyebrow = useContentText("login", "side.eyebrow", t("trader.login.brandEyebrow"));
+  const title = useContentText("login", "side.title", t("trader.login.brandTitle"));
+  const line = useContentText("login", "side.text", text);
+  return (
+    <>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff8a3d]">{eyebrow}</div>
+      <h1 className="mt-3 text-[34px] font-medium leading-[1.12] tracking-tight">{title}</h1>
+      <p className="mt-3 text-[14px] leading-relaxed text-white/65">{line}</p>
+    </>
+  );
+}
+
 function Brand({ text }: { text: string }) {
   const t = useT();
   return (
     <aside className="relative hidden w-[46%] max-w-[720px] overflow-hidden border-e border-line lg:block">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/photos/trading-screen.jpg" alt="" className="absolute inset-0 size-full object-cover opacity-45" />
+      <SidePhoto />
       <div className="absolute inset-0 bg-[linear-gradient(160deg,rgba(7,7,10,0.35),rgba(7,7,10,0.92)_62%),radial-gradient(700px_320px_at_20%_-80px,rgba(255,90,31,0.45),transparent_70%)]" />
       <div className="relative flex h-full flex-col p-10 text-white">
         <div className="flex items-center gap-2.5">
@@ -411,9 +428,7 @@ function Brand({ text }: { text: string }) {
           </span>
         </div>
         <div className="mt-auto max-w-[460px]">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff8a3d]">{t("trader.login.brandEyebrow")}</div>
-          <h1 className="mt-3 text-[34px] font-medium leading-[1.12] tracking-tight">{t("trader.login.brandTitle")}</h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-white/65">{text}</p>
+          <SideTexts text={text} />
           <div className="mt-7 grid grid-cols-2 gap-2">
             {["XAUUSD", "EURUSD", "NAS100", "BTCUSD"].map((s) => (
               <Ticker key={s} symbol={s} />

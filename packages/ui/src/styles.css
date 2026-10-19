@@ -843,3 +843,10 @@
   .k-btn:active, .k-btn[data-pressed], .k-icb:active { transform: none !important; }
   .k-btn:not(:disabled):active { filter: brightness(0.92); }
 }
+
+/* ---------------- ThemedImage (content/react.tsx): both files are in the page, the theme shows one ----------------
+   No data-theme yet (nothing resolved) counts as light. */
+html:not([data-theme="dark"]) [data-k-theme-img="dark"],
+html[data-theme="dark"] [data-k-theme-img="light"] {
+  display: none !important;
+}

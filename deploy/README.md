@@ -15,11 +15,13 @@ One Ubuntu VPS runs everything. Only Caddy (ports 80/443) and SSH are reachable 
 | (internal only) | IB / referral programme (referral tree, commissions, payout batches → wallet; reached only by the app BFFs) | 8096 |
 | (internal only) | prop firm service (rule evaluator, challenges, payouts; reached only by the app BFFs) | 8097 |
 | (internal only) | Kalks FX Options (reference data, listings, TWAP fixings, chain REST + WS, engine snapshot; `/options/stream` on trade. and `/v1/public/options/*` on api. are its only public routes; module OFF per broker until switched on) | 8104 |
+| (internal only) | content + media library (editable pages, images with light / dark files; `/v1/public/content` and `/v1/public/media/*` on api. are its only public routes, GET only) | 8105 |
 | (internal only) | PostgreSQL | 5432 |
 
 - `deploy.sh` pulls `main`, builds, installs the units in `systemd/` and the `Caddyfile`, restarts, and checks health.
 - Secrets live only on the server: `~/kalks/.env.local` (services) and `apps/*/.env.production.local` (apps). They are generated there and never committed.
 - KYC documents: `deploy.sh` generates `KYC_ENCRYPTION_KEY` (AES-256-GCM, `openssl rand -hex 32`) and sets `KYC_STORAGE_DIR=~/.kalks-data/kyc` (0700) in `~/kalks/.env.local` on first deploy. Back up the key together with the directory: files can't be decrypted without it. Never serve that directory; staff read documents only through the Back Office (`/api/admin/kyc/documents/{id}/file`). Caddy caps `/api/kyc/documents` uploads at 12 MB. Optional: `KYC_SLA_HOURS` (review target, default 24).
+- Content and media: `deploy.sh` generates `CONTENT_INTERNAL_TOKEN`, sets `CONTENT_DATABASE_URL` (kalks_content), `CONTENT_STORAGE_DIR=~/.kalks-data/content` (public images, back it up with the database) and `CONTENT_PUBLIC_URL=https://api.kalkstrade.com`, and gives the apps `CONTENT_URL` (the Back Office also the token and the `CONTENT_PREVIEW_*_URL` bases). Caddy caps Back Office media uploads (`/api/content/media*`) at 11 MB. First fill of the website copy: `node scripts/seed-website-content.mjs --publish` (docs/CONTENT.md).
 - Caddy reads `SITE_LOCK_USER` / `SITE_LOCK_HASH` from `/etc/caddy/kalks.env` for the pre-launch lock.
 - Logs: `journalctl -u kalks-<name> -f`.
 

@@ -360,7 +360,7 @@ export function NotificationsBell() {
         )}
       </div>
       {all.length === 0 ? (
-        <EmptyState illustration="bell" title={t("dashboard.notifications.emptyTitle")} text={t("dashboard.notifications.emptyText")} className="py-10" />
+        <EmptyState illustration="bell" contentSlot={{ page: "empty", slot: "notifications.image" }} title={t("dashboard.notifications.emptyTitle")} text={t("dashboard.notifications.emptyText")} className="py-10" />
       ) : (
         <div className="max-h-[min(24rem,60vh)] overflow-y-auto p-1.5" data-testid="notifications-list">
           {all.map((n) => {
