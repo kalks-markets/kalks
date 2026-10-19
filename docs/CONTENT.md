@@ -147,7 +147,46 @@ The Client Area is dark only: images use their dark file when one exists.
 
 ### Website (`website`)
 
-WEBSITE_CATALOGUE_PLACEHOLDER
+The website (separate repo `kalks-website`, `apps/trader`) reads English only (other languages are translated in the
+browser); `src/lib/content.ts` fetches `surface=website&locale=en` server-side (`CONTENT_URL`, `CONTENT_TENANT`,
+revalidate 60 s, 3 s timeout, never throws) and merges it over the bundled copy. The full list with every default is
+generated from the website's own `src/content/manifest.ts` (`buildManifest()`, 349 slots on 24 pages today): the
+Back Office's `apps/admin/lib/content-catalogue-website.ts` is written by `node scripts/gen-website-catalogue.mjs`
+(`--check` fails when it is stale), and `node scripts/seed-website-content.mjs <website repo>` imports the same
+defaults and their image files. Re-run both after the website adds or renames a slot.
+
+| Page | Slot | Kind | Where | Default |
+|---|---|---|---|---|
+| global | nav.home, nav.more | text | menu: "Home", "More" | `NAV_COPY` in `src/content/site.ts` |
+| global | nav.`<key>` (options, markets, accounts, platforms, prop, copy-trading, partners, academy, white-label, about, contact) | link | menu links (key = the path) | `NAV_COPY.primary` / `moreItems` |
+| global | nav.`<key>`.note, nav.options.tag | text | the line under a "More" item; the "New" tag | `NAV_COPY` |
+| global | nav.login, nav.register, nav.demo | link | Log in, Open account, Try the demo | Client Area URLs |
+| global | nav.android | text | the Android tile in "More" | "Kalks for Android" |
+| global | footer.tagline, footer.cta | text, link | line under the footer wordmark; its button | `FOOTER_COPY` |
+| global | footer.col.`<trade\|accounts\|platforms\|company>`.title | text | footer column titles | `FOOTER_COPY.columns` |
+| global | footer.col.`<col>`.`<key>` | link | footer links (key = the path, `/accounts#cfd` → `accounts-cfd`) | `FOOTER_COPY.columns` |
+| global | footer.legal.`<key>` | link | legal links (risk-warning, risk, terms, privacy, …) | `FOOTER_COPY.legal` |
+| global | footer.risk.title / .text, footer.restricted.title / .text / .link | text, link | risk warning and restricted regions | `FOOTER_COPY` |
+| global | shots.`<key>` | image | every product screenshot (`SHOTS`, `PSHOTS`; e.g. shots.trader-workspace, shots.copy-leaderboard) | `public/site/shots/*.webp` |
+| home | hero.title, hero.subtitle | text | the line top-left; the small facts under it | `HERO_COPY.home` in `src/content/pages.ts` |
+| home | hero.cta | link | the round "Open account" button | register URL |
+| `<page>` | hero.eyebrow, hero.title, hero.title_accent, hero.subtitle | text | hero eyebrow, headline, its dimmer second half, lead | `HERO_COPY.<page>` |
+| `<page>` | hero.cta, hero.cta_secondary | link | the hero's two buttons (none on contact) | `HERO_COPY.<page>` |
+| `<page>`, home | hero.image | image | hero photo (light / dark files follow the site theme) | `HEROES` in `src/content/heroes.ts` |
+| `<page>`, home | hero.background | text (`#rrggbb`) | the hero's solid backdrop colour behind the photo | `HEROES.<key>.bg` |
+| `<page>`, home | cta.image | image | the figure in the closing orange band | the page's `HEROES` photo |
+| faq | hero.* (no image) | text | the FAQ page hero | `HERO_COPY.faq` |
+| faq | group.`<id>`.title | text | FAQ group titles (accounts, funding, trading, options, prop, copy, partners, platform) | `FAQ_GROUPS` in `src/content/faq.ts` |
+| faq | faq.`<item id>`.question, faq.`<item id>`.answer | text | every FAQ entry, on /faq and wherever it is picked (home, markets, prop, …) | `FAQ_GROUPS` (stable item ids, e.g. faq.account-types) |
+
+`<page>` is the route with `/` → `-`: options, markets, markets-forex, markets-metals-energies, markets-indices,
+markets-crypto, accounts, accounts-demo, accounts-funding, platforms, platforms-trader, platforms-client-area,
+platforms-android, platforms-api, copy-trading, prop, partners, white-label, about, academy, contact (preview paths:
+`PAGE_PATHS` in `src/content/pages.ts`; `global` previews at `/`). Each page has only the slots it shows by default.
+
+Preview: `/api/content-preview?token=…&path=/…` turns on Next draft mode and keeps the token in an HttpOnly cookie
+(drafts are fetched uncached while it is on, with a "Preview" badge and an Exit link: `/api/content-preview?exit=1`).
+The website follows the visitor's theme (Auto / Light / Dark toggle): images with a dark file switch with it.
 
 ## Adding a slot
 
