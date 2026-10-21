@@ -857,7 +857,8 @@ pub struct ProcessReq {
 }
 
 /// `POST /v1/admin/requests/{id}` `{status: in_progress|completed|rejected, note?}`. Completing a closure closes
-/// the client record (sign-in blocked, sessions and view-only logins ended); the data is retained.
+/// the client record (sign-in blocked, sessions and view-only logins ended); the data is retained until a Super
+/// Admin erases it (`POST /v1/admin/users/{id}/erase`, client_erase.rs).
 pub async fn admin_process_request(State(st): State<AppState>, ctx: Ctx, Path(id): Path<i64>, req: Result<Json<ProcessReq>, JsonRejection>) -> ApiResult<Json<Value>> {
     let r = body(req)?;
     let me = require_key(&st, &ctx, "clients.write").await?;

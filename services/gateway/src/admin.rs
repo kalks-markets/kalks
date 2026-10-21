@@ -230,6 +230,8 @@ fn user_row(r: &PgRow) -> Value {
         "referred_by": r.get::<Option<i64>, _>("referred_by"),
         "kyc_status": r.get::<String, _>("kyc_status"),
         "status": r.get::<String, _>("status"),
+        // personal data erased (client_erase.rs): the profile fields are placeholders
+        "erased_at": ts(r, "erased_at"),
         "email_verified": r.get::<Option<DateTime<Utc>>, _>("email_verified_at").is_some(),
         "email_verified_at": ts(r, "email_verified_at"),
         "locked": locked_until.is_some_and(|t| t > Utc::now()),
@@ -361,7 +363,7 @@ pub fn users_page_cap(export: bool) -> i64 {
 }
 
 const USER_COLS: &str = "u.id, u.email, u.first_name, u.last_name, u.phone_dial, u.phone, u.country, u.date_of_birth, u.referral_code,
-     u.referred_by, u.kyc_status, u.status, u.email_verified_at, u.locked_until, u.last_login_at, u.created_at, u.last_active_at,
+     u.referred_by, u.kyc_status, u.status, u.email_verified_at, u.locked_until, u.last_login_at, u.created_at, u.last_active_at, u.erased_at,
      (SELECT array_agg(cr.kind ORDER BY cr.kind) FROM client_restrictions cr
        WHERE cr.user_id = u.id AND cr.lifted_at IS NULL AND (cr.expires_at IS NULL OR cr.expires_at > now())) AS restrictions,
      CASE WHEN u.last_active_at > now() - interval '15 minutes' THEN array_remove(ARRAY[

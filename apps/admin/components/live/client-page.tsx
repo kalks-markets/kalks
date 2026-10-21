@@ -1,11 +1,13 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Card, EmptyState, PageHeader, Reveal, buttonVariants } from "@kalks/ui";
 import { ClientDetailView, ClientHeader } from "./client-detail";
 import { ClientControlsProvider, ClientControlsSection, ClientStaffActions } from "@/components/clients/client-controls";
+import { EraseClientButton } from "@/components/clients/erase-client";
 import { useApi } from "./kit";
 import { ClientScoreBlock } from "@/components/trading-live/risk-kit";
 import type { ClientDetail } from "./types";
@@ -13,7 +15,9 @@ import type { ClientDetail } from "./types";
 export function LiveClientPage() {
   const params = useParams<{ id: string }>();
   const id = /^\d{1,18}$/.test(params.id ?? "") ? Number(params.id) : null;
-  const { data } = useApi<ClientDetail>(id ? `/api/admin/users/${id}` : null);
+  const { data, reload } = useApi<ClientDetail>(id ? `/api/admin/users/${id}` : null);
+  // bumped after an erasure so the detail view below reads the anonymised record again
+  const [gen, setGen] = React.useState(0);
   const back = (
     <Link href="/clients" className={buttonVariants({ variant: "surface" })}>
       <ArrowLeft /> All clients
@@ -28,7 +32,14 @@ export function LiveClientPage() {
   return (
     <ClientControlsProvider id={id} name={data?.user.name ?? `Client #${id}`}>
       <div className="pb-10">
-        <PageHeader title="Client profile" subtitle={data ? `Client #${id} · ${data.user.email}` : `Client #${id}`} actions={<><ClientStaffActions />{back}</>} />
+        <PageHeader title="Client profile" subtitle={data ? `Client #${id} · ${data.user.email}` : `Client #${id}`} actions={
+            <>
+              <ClientStaffActions />
+              {data && <EraseClientButton user={data.user} onErased={() => (reload(), setGen((g) => g + 1))} />}
+              {back}
+            </>
+          }
+        />
         {data && (
           <Reveal>
             <Card className="mb-4 px-6 py-5">
@@ -43,7 +54,7 @@ export function LiveClientPage() {
           <ClientScoreBlock userId={String(id)} className="mb-4" />
         </Reveal>
         <Reveal delay={0.05}>
-          <ClientDetailView id={id} />
+          <ClientDetailView key={gen} id={id} />
         </Reveal>
       </div>
     </ClientControlsProvider>

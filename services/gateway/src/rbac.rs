@@ -63,6 +63,7 @@ pub const PERMS: &[PermDef] = &[
     PermDef { key: "clients.block", module: "clients", action: "approve", label: "Block and unblock client sign-in" },
     PermDef { key: "clients.impersonate", module: "clients", action: "create", label: "Open the Client Area as the client (read-only)" },
     PermDef { key: "clients.impersonate_full", module: "clients", action: "approve", label: "Full-access staff sessions as the client (Super Admin only)" },
+    PermDef { key: "clients.erase", module: "clients", action: "approve", label: "Erase a closed client's personal data (GDPR, Super Admin only)" },
     PermDef { key: "kyc.read", module: "kyc", action: "view", label: "View KYC cases and documents" },
     PermDef { key: "kyc.review", module: "kyc", action: "approve", label: "Approve / reject KYC" },
     PermDef { key: "dealing.read", module: "dealing", action: "view", label: "View positions, orders, routing" },
@@ -216,8 +217,8 @@ pub fn preset_perms(key: &str) -> Option<Vec<&'static str>> {
     let v: Vec<&'static str> = match key {
         "platform_owner" => all_perms(),
         "super_admin" => tenant_perms(),
-        // forcing a deduction past the free margin is a Super Admin power only
-        "admin" => tenant_perms().into_iter().filter(|k| *k != "finance.adjust_force").collect(),
+        // forcing a deduction past the free margin and erasing a client are Super Admin powers only
+        "admin" => tenant_perms().into_iter().filter(|k| !["finance.adjust_force", "clients.erase"].contains(k)).collect(),
         "dealer" => vec![
             "stats.read", "clients.read", "spreads.read", "spreads.write", "dealing.read", "dealing.write", "accounts.read", "accounts.write",
             "social.read", "prop.read", "prop.write", "algo.read", "algo.write", "options.read", "options.dealing",
@@ -255,7 +256,7 @@ pub fn preset_perms(key: &str) -> Option<Vec<&'static str>> {
 
 /// Permissions only the system roles (Super Admin, Platform Owner) hold: a preset (edited or not) or a custom role
 /// never gets them, whatever is stored.
-pub const SUPER_ADMIN_ONLY: &[&str] = &["clients.impersonate_full"];
+pub const SUPER_ADMIN_ONLY: &[&str] = &["clients.impersonate_full", "clients.erase"];
 
 /// Effective permissions of a stored role row.
 pub fn effective(kind: &str, key: &str, customised: bool, stored: &[String]) -> Vec<String> {
@@ -529,6 +530,14 @@ mod tests {
         assert!(!effective("preset", "admin", true, &[full.clone()]).contains(&full));
         assert_eq!(effective("custom", "c-x", false, &[full.clone(), "clients.impersonate".into()]), vec!["clients.impersonate"]);
         assert!(effective("preset", "dealer", false, &[]).contains(&"dealing.write".to_string()));
+        // erasing a client's personal data (client_erase.rs): Super Admin and Platform Owner only
+        let erase = "clients.erase".to_string();
+        assert!(effective("system", "super_admin", false, &[]).contains(&erase) && effective("system", "platform_owner", false, &[]).contains(&erase));
+        for r in ["admin", "compliance", "support", "finance", "dealer"] {
+            assert!(!preset_perms(r).unwrap().contains(&"clients.erase") && !effective("preset", r, false, &[]).contains(&erase), "{r}");
+        }
+        assert!(!effective("preset", "compliance", true, &[erase.clone()]).contains(&erase));
+        assert!(effective("custom", "c-x", false, &[erase]).is_empty());
     }
 
     #[test]

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpRight, Ban, Download, LogIn, MailCheck, RefreshCw, Search, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
-import { Avatar, Button, Card, DataTable, Dialog, EmptyState, Field, Flag, PageHeader, Reveal, Segmented, buttonVariants, type Column } from "@kalks/ui";
+import { Avatar, Button, Card, Chip, DataTable, Dialog, EmptyState, Field, Flag, PageHeader, Reveal, Segmented, buttonVariants, type Column } from "@kalks/ui";
 import { useCan } from "@/components/staff-session";
 import { Check } from "@/components/command/kit";
 import { TextArea } from "@/components/config/kit";
@@ -67,7 +67,7 @@ export function LiveClients() {
     downloadCsv(
       `clients-${new Date().toISOString().slice(0, 10)}`,
       ["ID", "First name", "Last name", "Email", "Phone", "Country", "Date of birth", "Email verified", "KYC", "Status", "Referral code", "Referred by ID", "Registered", "Last sign-in"],
-      rows.map((u) => [u.id, u.first_name, u.last_name, u.email, `${u.phone_dial} ${u.phone}`, u.country.toUpperCase(), u.date_of_birth, u.email_verified ? "yes" : "no", u.kyc_status, u.status, u.referral_code, u.referred_by, u.created_at, u.last_login_at]),
+      rows.map((u) => [u.id, u.first_name, u.last_name, u.email, `${u.phone_dial} ${u.phone}`, u.country.toUpperCase(), u.date_of_birth, u.email_verified ? "yes" : "no", u.kyc_status, u.erased_at ? "erased" : u.status, u.referral_code, u.referred_by, u.created_at, u.last_login_at]),
     );
   }
 
@@ -102,6 +102,11 @@ export function LiveClients() {
           <span className="min-w-0">
             <span className="flex min-w-0 items-center gap-2">
               <span className="truncate font-medium">{u.name}</span>
+              {u.erased_at ? (
+                <Chip size="sm" tone="down">Erased</Chip>
+              ) : u.status !== "active" ? (
+                <Chip size="sm" tone="down">{u.status === "blocked" ? "Blocked" : "Closed"}</Chip>
+              ) : null}
               <RestrictionChips kinds={u.restrictions} max={1} />
             </span>
             <span className="block truncate text-[12px] text-fg-3">{u.email}</span>

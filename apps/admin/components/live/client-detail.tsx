@@ -66,10 +66,16 @@ export function ClientHeader({ d }: { d: ClientDetail }) {
         <div className="mt-2 flex flex-wrap gap-1.5">
           <EmailChip verified={u.email_verified} />
           <KycChip status={u.kyc_status} />
-          {u.status !== "active" && (
+          {u.erased_at ? (
             <Chip size="sm" tone="down" dot>
-              {u.status === "blocked" ? "Blocked" : "Closed"}
+              <span title={`Personal data erased ${when(u.erased_at)}`}>Erased</span>
             </Chip>
+          ) : (
+            u.status !== "active" && (
+              <Chip size="sm" tone="down" dot>
+                {u.status === "blocked" ? "Blocked" : "Closed"}
+              </Chip>
+            )
           )}
           {u.locked && (
             <Chip size="sm" tone="down" dot>
@@ -127,9 +133,10 @@ export function ClientDetailView({ id, compact = false }: { id: number; compact?
         rows={[
           ["Client ID", <Mono key="id">{u.id}</Mono>],
           ["Email", <span key="e" className="inline-flex items-center gap-1"><Mail className="size-3.5 text-fg-3" />{u.email}</span>],
-          ["Phone", <span key="p" className="inline-flex items-center gap-1"><Phone className="size-3.5 text-fg-3" /><Mono>{u.phone_dial} {u.phone}</Mono><CopyButton value={`${u.phone_dial}${u.phone}`} label="Phone" /></span>],
+          ["Phone", u.erased_at ? <span key="p" className="text-fg-3">Erased</span> : <span key="p"className="inline-flex items-center gap-1"><Phone className="size-3.5 text-fg-3" /><Mono>{u.phone_dial} {u.phone}</Mono><CopyButton value={`${u.phone_dial}${u.phone}`} label="Phone" /></span>],
           ["Country", <span key="c" className="inline-flex items-center gap-2"><Flag country={u.country} className="size-4" />{countryName(u.country)}</span>],
-          ["Date of birth", `${day(u.date_of_birth)} · ${age(u.date_of_birth)} years`],
+          ["Date of birth", u.erased_at ? <span key="dob" className="text-fg-3">Erased</span> : `${day(u.date_of_birth)} · ${age(u.date_of_birth)} years`],
+          ...(u.erased_at ? ([["Personal data erased", <span key="er" className="text-down">{when(u.erased_at)}</span>]] as [string, React.ReactNode][]) : []),
           ["Registered", when(u.created_at)],
           ["Terms accepted", when(u.terms_accepted_at)],
           ["Email verified", u.email_verified_at ? when(u.email_verified_at) : <span key="v" className="text-warn">Not yet</span>],

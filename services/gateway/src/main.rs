@@ -8,6 +8,7 @@ mod admin;
 mod audit;
 mod client_auth;
 mod client_controls;
+mod client_erase;
 mod client_security;
 mod config;
 mod crypto;
@@ -210,6 +211,7 @@ fn router(st: AppState) -> Router {
         .route("/v1/admin/users/{id}/restrictions/{kind}/lift", post(client_controls::lift))
         .route("/v1/admin/restrictions/bulk", post(client_controls::bulk))
         .route("/v1/admin/users/{id}/impersonate", post(client_controls::impersonate))
+        .route("/v1/admin/users/{id}/erase", post(client_erase::erase))
         .route("/v1/admin/users/{id}/impersonate/trader", post(client_controls::impersonate_trader))
         .route("/v1/admin/impersonations/{id}/end", post(client_controls::end_impersonation))
         .route("/v1/auth/impersonate/redeem", post(client_controls::redeem))

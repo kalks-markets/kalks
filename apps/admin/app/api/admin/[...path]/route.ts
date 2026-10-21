@@ -23,6 +23,8 @@ const PATHS: Record<Method, RegExp[]> = {
     /^roles$/, new RegExp(`^roles/${ID}/reset$`), /^security\/ip$/,
     new RegExp(`^users/${ID}/sessions/revoke-all$`), new RegExp(`^users/${ID}/viewers/${ID}/revoke$`), new RegExp(`^requests/${ID}$`),
     new RegExp(`^settings/sections/${SECTION}/rules$`),
+    // erase a closed client's personal data (gateway client_erase.rs, clients.erase)
+    new RegExp(`^users/${ID}/erase$`),
   ],
   PATCH: [new RegExp(`^staff/${ID}$`), new RegExp(`^roles/${ID}$`)],
   PUT: [/^security\/ip\/settings$/, /^settings\/maintenance$/, /^settings\/features\/[a-z][a-z0-9_]{1,47}$/, /^settings\/sessions$/, new RegExp(`^settings/sections/${SECTION}$`)],

@@ -23,6 +23,8 @@ export type Client = {
   referred_by: number | null;
   kyc_status: "unverified" | "pending" | "verified" | "rejected";
   status: "active" | "blocked" | "closed";
+  /** Personal data erased (gateway client_erase.rs): the profile fields are placeholders. */
+  erased_at?: string | null;
   email_verified: boolean;
   email_verified_at: string | null;
   locked: boolean;
