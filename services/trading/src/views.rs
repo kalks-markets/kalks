@@ -349,6 +349,9 @@ pub fn desk_deal_json(d: &Deal, client_id: i64, reversed: bool) -> Value {
         "reversed": reversed,
         "staff": d.staff.clone().unwrap_or_else(|| "system".into()),
         "reasonCode": d.reason_code.clone().unwrap_or_default(),
+        // origin of the position (copy / mam / pamm / manual / dealer …), not of the closing order (the IB ledger)
+        "source": d.origin().as_str(),
+        "closeSource": d.source.as_str(),
     });
     merge(v, deal_option_json(d))
 }

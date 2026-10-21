@@ -453,7 +453,7 @@ pub async fn client_trades(State(st): State<AppState>, u: UserCtx, Path(id): Pat
         return Err(ApiError::NotFound);
     }
     let rows = sqlx::query(
-        "SELECT d.source, d.deal_id, d.login, d.symbol, d.side, d.volume, d.lots, d.instrument, d.contracts, d.open_time, d.close_time, d.qualified, d.reason, d.reversed,
+        "SELECT d.source, d.origin, d.deal_id, d.login, d.symbol, d.side, d.volume, d.lots, d.instrument, d.contracts, d.open_time, d.close_time, d.qualified, d.reason, d.reversed,
                 (SELECT coalesce(sum(k.amount), 0) FROM commissions k WHERE k.deal_source = d.source AND k.deal_id = d.deal_id AND k.beneficiary_id = $2 AND k.status NOT IN ('void','rejected')) AS earned
          FROM deals d WHERE d.user_id = $1 AND d.tenant = $3 ORDER BY d.close_time DESC LIMIT 200",
     )
@@ -463,7 +463,7 @@ pub async fn client_trades(State(st): State<AppState>, u: UserCtx, Path(id): Pat
     .fetch_all(&st.pool)
     .await?;
     Ok(Json(json!({"items": rows.iter().map(|r| json!({
-        "dealId": r.get::<i64, _>("deal_id"), "source": r.get::<String, _>("source"), "login": r.get::<Option<i64>, _>("login"), "symbol": r.get::<String, _>("symbol"),
+        "dealId": r.get::<i64, _>("deal_id"), "source": r.get::<String, _>("origin"), "feed": r.get::<String, _>("source"), "login": r.get::<Option<i64>, _>("login"), "symbol": r.get::<String, _>("symbol"),
         "side": r.get::<String, _>("side"), "volume": num(r.get("volume")), "lots": num(r.get("lots")),
         "instrument": r.get::<String, _>("instrument"), "contracts": num(r.get("contracts")),
         "openTime": r.get::<DateTime<Utc>, _>("open_time"), "closeTime": r.get::<DateTime<Utc>, _>("close_time"),
@@ -542,7 +542,7 @@ pub async fn commission_rows(st: &AppState, tenant: &str, me: i64, q: &CommQ, li
                     "id": r.get::<i64, _>("id"), "kind": r.get::<String, _>("kind"), "status": r.get::<String, _>("status"),
                     "amount": num(r.get("amount")), "tier": r.get::<i32, _>("tier"), "rate": num(r.get("rate")), "sharePct": num(r.get("share_pct")),
                     "lots": num(r.get("lots")), "contracts": num(r.get("contracts")), "symbol": r.get::<Option<String>, _>("symbol"), "symbolGroup": r.get::<Option<String>, _>("symbol_group"),
-                    "dealId": r.get::<Option<i64>, _>("deal_id"), "source": r.get::<Option<String>, _>("deal_source"), "levelKey": r.get::<Option<String>, _>("level_key"),
+                    "dealId": r.get::<Option<i64>, _>("deal_id"), "source": r.get::<Option<String>, _>("origin").or_else(|| r.get("deal_source")), "feed": r.get::<Option<String>, _>("deal_source"), "levelKey": r.get::<Option<String>, _>("level_key"),
                     "client": {
                         "id": r.get::<i64, _>("client_id"),
                         "name": if self_rebate { "You (rebate)".to_string() } else { shown_name(first.as_deref().unwrap_or(""), last.as_deref().unwrap_or(""), full) },

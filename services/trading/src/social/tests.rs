@@ -279,3 +279,25 @@ fn equity_stop_drawdown_and_close_all() {
     p.f.assert_ledger();
     let _ = risk::check_margin;
 }
+
+#[test]
+fn deal_origin_is_the_source_that_opened_the_position() {
+    // IB ledger (services/ib): a copied position closed by its own SL is a `system` close, but the trade is a copy
+    let kit = Kit::new();
+    kit.quote("EURUSD", "1.10000", "1.10010");
+    let mut p = Pair::new(&kit, "hedge", "10000", "2500", equity());
+    p.master(&kit, |tx, env| trade::place_order(tx, env, OrderReq { sl: Some(d("1.09")), ..OrderReq::market("EURUSD", Side::Buy, d("1")) }));
+    p.sync(&kit);
+    assert_eq!(p.fpos()[0].source, Source::Copy);
+    kit.quote("EURUSD", "1.08900", "1.08910");
+    p.f.tick(&kit, "EURUSD");
+    assert!(p.f.st.positions.is_empty(), "the copied position hit its SL");
+    let exit = p.f.log.iter().rev().find_map(|e| if let Event::PositionClosed { deal, .. } = e { Some(deal.clone()) } else { None }).unwrap();
+    assert_eq!((exit.reason, exit.source, exit.origin()), (crate::model::DealReason::Sl, Source::System, Source::Copy));
+    let v = crate::views::desk_deal_json(&exit, 1, false);
+    assert_eq!((v["source"].as_str(), v["closeSource"].as_str()), (Some("copy"), Some("system")));
+    // the master's own trade (closed by the same SL) is the client's: `manual`
+    p.m.tick(&kit, "EURUSD");
+    let own = p.m.log.iter().rev().find_map(|e| if let Event::PositionClosed { deal, .. } = e { Some(deal.clone()) } else { None }).unwrap();
+    assert_eq!(crate::views::desk_deal_json(&own, 1, false)["source"], "manual");
+}

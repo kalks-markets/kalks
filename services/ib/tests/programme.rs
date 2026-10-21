@@ -97,6 +97,7 @@ fn deal(id: i64, user: i64, symbol: &str, lots: &str, secs: i64) -> DealInput {
         reversed: false,
         account: Some(AccountInfo { login: 10_000_000 + user, user_id: user, kind: "live".into(), group: "standard".into(), cent: false }),
         option: false,
+        origin: "engine".into(),
     }
 }
 
@@ -173,7 +174,7 @@ async fn option_deals_earn_per_contract_at_the_options_rate_never_per_lot() {
     assert_eq!(ib::stats::network_lots(&e.st.pool, "kalks", 61, 3, m0 - Duration::days(1), m1).await.unwrap(), dec("1"));
     // an option series pushed through the PAMM / copy lots route is treated as contracts too
     let mut pushed = option_deal(9606, 62, "3", 600);
-    pushed.source = "copy".into();
+    (pushed.source, pushed.origin) = ("copy".into(), "copy".into());
     pushed.option = ib::model::is_option_series(&pushed.symbol);
     deals::ingest(&e.st, &pushed).await.unwrap();
     assert_eq!(e.sum("SELECT sum(lots) FROM deals WHERE deal_id = 9606").await, D::ZERO);
@@ -239,7 +240,7 @@ async fn multi_tier_commissions_are_idempotent_and_filtered() {
 
     // PAMM allocation lots count like the investor's own trades (D64), keyed separately from engine deals
     let mut pamm = deal(9001, 3, "XAUUSD", "1", 600);
-    pamm.source = "pamm".into();
+    (pamm.source, pamm.origin) = ("pamm".into(), "pamm".into());
     assert!(matches!(deals::ingest(&e.st, &pamm).await.unwrap(), Outcome::Recorded { qualified: true, .. }));
     assert_eq!(e.count("SELECT count(*) FROM commissions WHERE deal_source = 'pamm'").await, 4);
 
@@ -249,6 +250,61 @@ async fn multi_tier_commissions_are_idempotent_and_filtered() {
     e.member(5, Some(2), "bronze").await;
     deals::reprocess_unknown(&e.st, 5).await.unwrap();
     assert_eq!(e.sum("SELECT sum(amount) FROM commissions WHERE deal_id = 9007 AND beneficiary_id = 2 AND kind = 'lot'").await, dec("9"));
+    e.drop().await;
+}
+
+#[tokio::test]
+async fn engine_deals_are_labelled_with_their_origin() {
+    let Some(e) = env(None).await else { return };
+    e.member(70, None, "silver").await;
+    e.member(71, Some(70), "bronze").await;
+
+    // the engine feed's `source` (the order source that opened the position) becomes the ledger label;
+    // a feed without it, and every non-social source, is `engine`
+    let base = json!({"id": 9701, "login": 10000071, "clientId": 71, "symbol": "XAUUSD", "side": "buy", "volume": 1, "openTime": "2026-10-01T10:00:00Z", "closeTime": "2026-10-01T11:00:00Z"});
+    assert_eq!(ib::clients::parse_deal(&base).unwrap().origin, "engine", "older engines send no source");
+    for (src, label) in [("copy", "copy"), ("mam", "mam"), ("pamm", "pamm"), ("manual", "engine"), ("dealer", "engine"), ("system", "engine"), ("api", "engine")] {
+        let mut v = base.clone();
+        v["source"] = json!(src);
+        assert_eq!(ib::clients::parse_deal(&v).unwrap().origin, label, "{src}");
+    }
+
+    // a copy-trading follower fill: lines labelled `copy`, keyed by the `engine` feed (idempotency unchanged)
+    let mut v = base.clone();
+    v["source"] = json!("copy");
+    v["openTime"] = json!((Utc::now() - Duration::minutes(30)).to_rfc3339());
+    v["closeTime"] = json!((Utc::now() - Duration::minutes(5)).to_rfc3339());
+    let fill = ib::clients::parse_deal(&v).unwrap();
+    let acct = AccountInfo { login: 10_000_071, user_id: 71, kind: "live".into(), group: "copy".into(), cent: false };
+    let copy = DealInput::from_engine(&fill, "kalks", Some(acct.clone()));
+    assert!(matches!(deals::ingest(&e.st, &copy).await.unwrap(), Outcome::Recorded { qualified: true, .. }));
+    assert_eq!(e.count("SELECT count(*) FROM deals WHERE deal_id = 9701 AND source = 'engine' AND origin = 'copy'").await, 1);
+    assert_eq!(e.count("SELECT count(*) FROM commissions WHERE deal_id = 9701 AND deal_source = 'engine' AND origin = 'copy'").await, 1);
+    // the same deal read again without a source (overlap across an engine upgrade) is still a duplicate
+    let plain = ib::clients::parse_deal(&json!({"id": 9701, "login": 10000071, "clientId": 71, "symbol": "XAUUSD", "side": "buy", "volume": 1, "openTime": v["openTime"], "closeTime": v["closeTime"]})).unwrap();
+    assert_eq!(deals::ingest(&e.st, &DealInput::from_engine(&plain, "kalks", Some(acct.clone()))).await.unwrap(), Outcome::Duplicate);
+
+    // a MAM allocation fill and a plain client trade
+    let mut m = v.clone();
+    m["id"] = json!(9702);
+    m["source"] = json!("mam");
+    deals::ingest(&e.st, &DealInput::from_engine(&ib::clients::parse_deal(&m).unwrap(), "kalks", Some(acct.clone()))).await.unwrap();
+    let mut own = v.clone();
+    own["id"] = json!(9703);
+    own["source"] = json!("manual");
+    deals::ingest(&e.st, &DealInput::from_engine(&ib::clients::parse_deal(&own).unwrap(), "kalks", Some(acct.clone()))).await.unwrap();
+
+    // the ledgers show the origin as `source` (and the feed as `feed`)
+    let (rows, _) = ib::api::client::commission_rows(&e.st, "kalks", 70, &Default::default(), 50, 0, true).await.unwrap();
+    let label = |id: i64| rows.iter().find(|r| r["dealId"] == id).map(|r| (r["source"].as_str().unwrap().to_string(), r["feed"].as_str().unwrap().to_string()));
+    assert_eq!(label(9701), Some(("copy".into(), "engine".into())));
+    assert_eq!(label(9702), Some(("mam".into(), "engine".into())));
+    assert_eq!(label(9703), Some(("engine".into(), "engine".into())));
+
+    // a reopened copy deal's clawback keeps the label
+    sqlx::query("UPDATE commissions SET status = 'paid' WHERE deal_id = 9701").execute(&e.st.pool).await.unwrap();
+    deals::reverse_deal(&e.st, "kalks", "engine", 9701).await.unwrap();
+    assert_eq!(e.count("SELECT count(*) FROM commissions WHERE deal_id = 9701 AND kind = 'clawback' AND origin = 'copy'").await, 1);
     e.drop().await;
 }
 

@@ -572,7 +572,7 @@ pub async fn commissions(State(st): State<AppState>, s: StaffCtx, Query(q): Quer
                 "id": r.get::<i64, _>("id"), "kind": r.get::<String, _>("kind"), "status": r.get::<String, _>("status"), "amount": num(r.get("amount")),
                 "tier": r.get::<i32, _>("tier"), "rate": num(r.get("rate")), "sharePct": num(r.get("share_pct")), "lots": num(r.get("lots")),
                 "contracts": num(r.get("contracts")), "symbol": r.get::<Option<String>, _>("symbol"), "symbolGroup": r.get::<Option<String>, _>("symbol_group"), "levelKey": r.get::<Option<String>, _>("level_key"),
-                "dealId": r.get::<Option<i64>, _>("deal_id"), "source": r.get::<Option<String>, _>("deal_source"), "login": r.get::<Option<i64>, _>("login"),
+                "dealId": r.get::<Option<i64>, _>("deal_id"), "source": r.get::<Option<String>, _>("origin").or_else(|| r.get("deal_source")), "feed": r.get::<Option<String>, _>("deal_source"), "login": r.get::<Option<i64>, _>("login"),
                 "beneficiary": {"id": r.get::<i64, _>("beneficiary_id"), "name": nm(r.get("b_first"), r.get("b_last"))},
                 "client": {"id": r.get::<i64, _>("client_id"), "name": nm(r.get("c_first"), r.get("c_last"))},
                 "batchId": r.get::<Option<i64>, _>("batch_id"), "note": r.get::<Option<String>, _>("note"),

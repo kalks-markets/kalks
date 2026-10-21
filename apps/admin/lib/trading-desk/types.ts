@@ -74,6 +74,9 @@ export interface DeskDeal {
   reversed?: boolean;
   staff: string;
   reasonCode: string;
+  /* live desk only: order source of the position's open (manual / api / copy / mam / pamm / dealer / system …) and of the close */
+  source?: string;
+  closeSource?: string;
   /* live desk only: price P&L, swap and commission share of the deal, engine close reason, account currency */
   priceProfit?: number;
   swap?: number;

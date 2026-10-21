@@ -97,6 +97,19 @@ pub struct EngineDeal {
     pub reversed: bool,
     /// Kalks FX Options deal (`option` / `instrument` in the feed, or an option series symbol): volume = contracts.
     pub option: bool,
+    /// Ledger label of the trade's origin (`deal_origin`): `copy`, `mam`, `pamm` or `engine`.
+    pub origin: String,
+}
+
+/// Ledger label for the engine's `source` of a deal (the order source that opened the position): copy-trading
+/// and MAM fills keep their own label; every other source, and a feed without one, is `engine`.
+pub fn deal_origin(source: Option<&str>) -> &'static str {
+    match source.map(str::trim) {
+        Some(s) if s.eq_ignore_ascii_case("copy") => "copy",
+        Some(s) if s.eq_ignore_ascii_case("mam") => "mam",
+        Some(s) if s.eq_ignore_ascii_case("pamm") => "pamm",
+        _ => "engine",
+    }
 }
 
 /// Whether an engine deal JSON is a Kalks FX Options deal: the `option` object or `instrument: "option"`, with
@@ -126,6 +139,7 @@ pub fn parse_deal(v: &Value) -> Option<EngineDeal> {
         kind: v["kind"].as_str().unwrap_or("close").to_string(),
         reversed: v["reversed"].as_bool().unwrap_or(false),
         option: is_option_deal(v),
+        origin: deal_origin(v["source"].as_str()).to_string(),
     })
 }
 

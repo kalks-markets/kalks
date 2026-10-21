@@ -37,6 +37,9 @@ pub struct DealInput {
     pub account: Option<AccountInfo>,
     /// Kalks FX Options deal: `volume` is contracts, paid at the level's per-contract options rate (O34).
     pub option: bool,
+    /// Ledger label of where the trade came from: `copy` / `mam` / `pamm` / `engine` (`clients::deal_origin`).
+    /// Stored on the deal and its commission lines; `source` stays the feed (the idempotency key).
+    pub origin: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -62,6 +65,7 @@ impl DealInput {
             reversed: d.reversed,
             account,
             option: d.option,
+            origin: d.origin.clone(),
         }
     }
 }
@@ -150,8 +154,8 @@ pub async fn ingest(st: &AppState, d: &DealInput) -> anyhow::Result<Outcome> {
 
     let mut tx = st.pool.begin().await?;
     let inserted = sqlx::query(
-        "INSERT INTO deals (source, deal_id, user_id, tenant, login, symbol, symbol_group, side, volume, lots, open_time, close_time, qualified, reason, reversed, instrument, contracts)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) ON CONFLICT DO NOTHING",
+        "INSERT INTO deals (source, deal_id, user_id, tenant, login, symbol, symbol_group, side, volume, lots, open_time, close_time, qualified, reason, reversed, instrument, contracts, origin)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT DO NOTHING",
     )
     .bind(&d.source)
     .bind(d.deal_id)
@@ -170,6 +174,7 @@ pub async fn ingest(st: &AppState, d: &DealInput) -> anyhow::Result<Outcome> {
     .bind(d.reversed)
     .bind(if d.option { "option" } else { "cfd" })
     .bind(contracts)
+    .bind(&d.origin)
     .execute(&mut *tx)
     .await?
     .rows_affected();
@@ -184,8 +189,8 @@ pub async fn ingest(st: &AppState, d: &DealInput) -> anyhow::Result<Outcome> {
         let lines = calc::commission_lines(d.user_id, units, &ch, &settings.tiers, settings.max_rebate_pct, settings.max_split_pct);
         for l in &lines {
             n += sqlx::query(
-                "INSERT INTO commissions (tenant, beneficiary_id, kind, deal_source, deal_id, client_id, login, symbol, symbol_group, lots, tier, level_key, rate, share_pct, amount, available_at, contracts)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now(), $16) ON CONFLICT DO NOTHING",
+                "INSERT INTO commissions (tenant, beneficiary_id, kind, deal_source, deal_id, client_id, login, symbol, symbol_group, lots, tier, level_key, rate, share_pct, amount, available_at, contracts, origin)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now(), $16, $17) ON CONFLICT DO NOTHING",
             )
             .bind(&d.tenant)
             .bind(l.beneficiary)
@@ -203,6 +208,7 @@ pub async fn ingest(st: &AppState, d: &DealInput) -> anyhow::Result<Outcome> {
             .bind(l.share_pct)
             .bind(l.amount)
             .bind(contracts)
+            .bind(&d.origin)
             .execute(&mut *tx)
             .await?
             .rows_affected() as usize;
@@ -227,7 +233,7 @@ pub async fn ingest(st: &AppState, d: &DealInput) -> anyhow::Result<Outcome> {
 pub async fn reprocess_unknown(st: &AppState, user_id: i64) -> anyhow::Result<()> {
     let rows = sqlx::query(
         "DELETE FROM deals d WHERE d.user_id = $1 AND d.reason = 'unknown_client'
-         RETURNING d.source, d.deal_id, d.tenant, d.login, d.symbol, d.side, d.volume, d.open_time, d.close_time, d.reversed, d.instrument",
+         RETURNING d.source, d.deal_id, d.tenant, d.login, d.symbol, d.side, d.volume, d.open_time, d.close_time, d.reversed, d.instrument, d.origin",
     )
     .bind(user_id)
     .fetch_all(&st.pool)
@@ -253,6 +259,7 @@ pub async fn reprocess_unknown(st: &AppState, user_id: i64) -> anyhow::Result<()
             reversed: r.get("reversed"),
             account,
             option: r.get::<String, _>("instrument") == "option",
+            origin: r.get("origin"),
         };
         Box::pin(ingest(st, &d)).await?;
     }
@@ -560,7 +567,7 @@ pub async fn reverse_deal(st: &AppState, tenant: &str, source: &str, deal_id: i6
     .await?
     .rows_affected();
     let rows = sqlx::query(
-        "SELECT beneficiary_id, client_id, sum(amount) AS amount, min(symbol) AS symbol, min(login) AS login FROM commissions
+        "SELECT beneficiary_id, client_id, sum(amount) AS amount, min(symbol) AS symbol, min(login) AS login, min(origin) AS origin FROM commissions
          WHERE deal_source = $1 AND deal_id = $2 AND kind <> 'clawback' AND status <> 'void' AND status <> 'rejected'
          GROUP BY beneficiary_id, client_id",
     )
@@ -574,8 +581,8 @@ pub async fn reverse_deal(st: &AppState, tenant: &str, source: &str, deal_id: i6
             continue;
         }
         sqlx::query(
-            "INSERT INTO commissions (tenant, beneficiary_id, kind, deal_source, deal_id, client_id, login, symbol, amount, note)
-             VALUES ($1,$2,'clawback',$3,$4,$5,$6,$7,$8,'Deal reopened by the dealing desk') ON CONFLICT DO NOTHING",
+            "INSERT INTO commissions (tenant, beneficiary_id, kind, deal_source, deal_id, client_id, login, symbol, amount, note, origin)
+             VALUES ($1,$2,'clawback',$3,$4,$5,$6,$7,$8,'Deal reopened by the dealing desk',$9) ON CONFLICT DO NOTHING",
         )
         .bind(tenant)
         .bind(r.get::<i64, _>("beneficiary_id"))
@@ -585,6 +592,7 @@ pub async fn reverse_deal(st: &AppState, tenant: &str, source: &str, deal_id: i6
         .bind(r.get::<Option<i64>, _>("login"))
         .bind(r.get::<Option<String>, _>("symbol"))
         .bind(-amt)
+        .bind(r.get::<Option<String>, _>("origin"))
         .execute(&mut *tx)
         .await?;
     }

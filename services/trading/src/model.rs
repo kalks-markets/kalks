@@ -829,6 +829,15 @@ pub struct Deal {
     pub option: Option<DealOption>,
 }
 
+impl Deal {
+    /// Where the trade came from: the source of the order that OPENED the position (the snapshot an exit
+    /// deal keeps), so a copied position closed by its SL or a MAM trade the manager closed is still `copy` /
+    /// `mam`, not `system` / `manual`. Entry deals (and the few exits without a snapshot) carry their own source.
+    pub fn origin(&self) -> Source {
+        self.snapshot.as_ref().map_or(self.source, |p| p.source)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TxnKind {
