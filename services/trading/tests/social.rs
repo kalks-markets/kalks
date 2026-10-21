@@ -5,7 +5,8 @@
 //! - the copy allocation arrives through the wallet (`to-trading`) and moves the HWM; a performance fee is
 //!   charged above the HWM at settlement and recorded pending;
 //! - a PAMM fund: seed → invest request → rollover (units at NAV) → profit → rollover with fee + redemption;
-//!   units = Σ unit ledger, NAV unchanged by fee and redemption;
+//!   units = Σ unit ledger, NAV unchanged by fee and redemption; IB lots split by the units held at the deal's
+//!   open time (a later investor gets none, a later redemption keeps its share, shares add up to the volume);
 //! - replaying the `events` table rebuilds exactly the live state of every account (master, follower, fund),
 //!   and every ledger transaction balances.
 //!
@@ -273,9 +274,21 @@ async fn copy_and_pamm_end_to_end_with_replay() {
     let fl = creds["login"].as_i64().unwrap();
     let inv = social.invest_request(fund.id, 888, d("4000"), None).await.unwrap();
     assert_eq!(inv["status"], "pending");
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    let before_r1 = Utc::now();
+    tokio::time::sleep(Duration::from_millis(20)).await;
     let r1 = social.rollover(fund.id, "manual").await.unwrap();
     assert_eq!(r1["nav"].as_f64().unwrap(), 1.0);
     assert_eq!(r1["unitsAfter"].as_f64().unwrap(), 5000.0);
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    let after_r1 = Utc::now();
+    // IB lots (D64) follow the units held when the position OPENED: a deal opened before the investor's units
+    // were issued is the master's alone (the master's own units count), one opened after is split 1 000 : 4 000
+    assert_eq!(social.ib_lot_shares(fund.id, d("0.5"), before_r1).await, vec![(501, d("0.5"))], "the investor joined after the open");
+    let shares = social.ib_lot_shares(fund.id, d("0.37"), after_r1).await;
+    assert_eq!(shares, vec![(501, d("0.074")), (888, d("0.296"))]);
+    let tiny = social.ib_lot_shares(fund.id, d("0.0003"), after_r1).await;
+    assert_eq!(tiny.iter().map(|s| s.1).sum::<D>(), d("0.0003"), "shares add up to the deal volume: {tiny:?}");
     // the manager makes 10 %: +500 on 5 000
     set_btc(&quotes, "80000", "80000");
     exec(&hub, fl, Box::new(|tx, env| trade::place_order(tx, env, OrderReq::market("BTCUSD", Side::Buy, d("0.5"))).map(|_| Value::Null))).await;
@@ -292,6 +305,9 @@ async fn copy_and_pamm_end_to_end_with_replay() {
     assert_eq!(r2["feesTotal"].as_f64().unwrap(), 80.0);
     assert_eq!(r2["redeemed"].as_f64().unwrap(), 4320.0);
     assert_eq!(r2["unitsAfter"].as_f64().unwrap(), 1000.0);
+    // the investor has redeemed everything now, but a deal opened while they held units is still partly theirs
+    assert_eq!(social.ib_lot_shares(fund.id, d("0.37"), after_r1).await, shares, "redeemed after the open: still credited");
+    assert_eq!(social.ib_lot_shares(fund.id, d("0.37"), Utc::now()).await, vec![(501, d("0.37"))]);
     let b = social.account_brief(fl).await.unwrap();
     assert_eq!(trading::social::math::nav(b.equity, d("1000")), d("1.1"), "NAV unchanged by fee and redemption");
     // units = Σ unit ledger per investor

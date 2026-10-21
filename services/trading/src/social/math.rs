@@ -315,6 +315,42 @@ pub fn plan_rollover(equity: D, holdings: &[Holding], reqs: &[PlanReq], fee_pct:
     plan
 }
 
+/// Lots of a closed fund deal pushed to the IB service are kept to 4 decimals.
+pub const IB_LOTS_DP: u32 = 4;
+
+/// Splits a closed fund deal's volume across the fund's holders by units (IB lots, D64), largest remainder:
+/// every share is rounded down to 4 decimals, then the leftover 0.0001 steps go to the largest remainders
+/// (ties: more units, then the lower user id), so the shares always add up to the deal volume (to 4 dp).
+/// `holdings` = (user, units); holders without units and zero shares are left out.
+pub fn split_lots(volume: D, holdings: &[(i64, D)]) -> Vec<(i64, D)> {
+    let held: Vec<(i64, D)> = holdings.iter().copied().filter(|h| h.1 > ZERO).collect();
+    let total: D = held.iter().map(|h| h.1).sum();
+    if total <= ZERO || volume <= ZERO {
+        return vec![];
+    }
+    let step = D::new(1, IB_LOTS_DP);
+    let target = rdp(volume, IB_LOTS_DP);
+    let mut rows: Vec<(i64, D, D, D)> = held
+        .iter()
+        .map(|&(user, units)| {
+            let raw = volume * units / total;
+            let floor = raw.round_dp_with_strategy(IB_LOTS_DP, rust_decimal::RoundingStrategy::ToZero);
+            (user, units, floor, raw - floor)
+        })
+        .collect();
+    let mut left = ((target - rows.iter().map(|r| r.2).sum::<D>()) / step).round();
+    let mut order: Vec<usize> = (0..rows.len()).collect();
+    order.sort_by(|&a, &b| rows[b].3.cmp(&rows[a].3).then(rows[b].1.cmp(&rows[a].1)).then(rows[a].0.cmp(&rows[b].0)));
+    for i in order {
+        if left <= ZERO {
+            break;
+        }
+        rows[i].2 += step;
+        left -= ONE;
+    }
+    rows.into_iter().filter(|r| r.2 > ZERO).map(|r| (r.0, r.2.normalize())).collect()
+}
+
 /* ------------------------------------------------------------------ */
 /* Statistics (D72)                                                    */
 /* ------------------------------------------------------------------ */
@@ -483,6 +519,30 @@ mod tests {
         let w = copy_fee(d("20"), d("1200"), d("-200"), d("1100"));
         assert_eq!((w.fee, w.hwm_before, w.hwm_after), (d("20.00"), d("1000"), d("1080.00")));
         assert_eq!(split_fee(d("40.00"), d("20")), (d("8.00"), d("32.00")));
+    }
+
+    #[test]
+    fn ib_lots_split_adds_up_to_the_deal_volume() {
+        let sum = |v: &[(i64, D)]| v.iter().map(|x| x.1).sum::<D>();
+        // three equal holders of 1 lot: 0.3333 each would lose 0.0001; the largest remainder (tie → lower id) takes it
+        let s = split_lots(d("1"), &[(3, d("100")), (1, d("100")), (2, d("100"))]);
+        assert_eq!(s, vec![(3, d("0.3333")), (1, d("0.3334")), (2, d("0.3333"))]);
+        assert_eq!(sum(&s), d("1"));
+        // master 1 000 units, investors 4 000 and 2 000: 0.07 lots
+        let s = split_lots(d("0.07"), &[(1, d("1000")), (2, d("4000")), (3, d("2000"))]);
+        assert_eq!(s, vec![(1, d("0.01")), (2, d("0.04")), (3, d("0.02"))]);
+        // rounding every share independently (half up) would pay 0.0002 + 0.0002 + 0.0002 for a 0.0005 deal
+        let s = split_lots(d("0.0005"), &[(1, d("1")), (2, d("1")), (3, d("1"))]);
+        assert_eq!(sum(&s), d("0.0005"));
+        assert_eq!(s, vec![(1, d("0.0002")), (2, d("0.0002")), (3, d("0.0001"))]);
+        // a tiny holder whose share rounds to 0 is left out; holders without units never get anything
+        let s = split_lots(d("0.01"), &[(1, d("99999")), (2, d("1")), (3, ZERO)]);
+        assert_eq!(s, vec![(1, d("0.01"))]);
+        assert!(split_lots(d("1"), &[(1, ZERO)]).is_empty());
+        assert!(split_lots(ZERO, &[(1, d("5"))]).is_empty());
+        // many holders, odd volume: always exact
+        let many: Vec<(i64, D)> = (1..=37).map(|i| (i, D::from(i * 13 % 7 + 1))).collect();
+        assert_eq!(sum(&split_lots(d("2.37"), &many)), d("2.37"));
     }
 
     #[test]

@@ -551,21 +551,38 @@ impl Social {
         .unwrap_or(ZERO)
     }
 
-    /// Splits a closed fund deal across the fund's holders by units and pushes each share to the IB
+    /// Units each holder of a fund held at `at`: Σ of the unit ledger up to then. Units only move at rollovers
+    /// (invest / redeem / fee) and stop-loss redemptions, all written to the append-only `pamm_unit_ledger`, so
+    /// this is the holdings after the last move at or before `at`.
+    pub async fn units_at(&self, fund_id: i64, at: DateTime<Utc>) -> Vec<(i64, D)> {
+        sqlx::query_as(
+            "SELECT i.user_id, sum(l.units) FROM pamm_unit_ledger l JOIN pamm_investors i ON i.id = l.investor_id
+             WHERE l.fund_id = $1 AND l.at <= $2 GROUP BY i.user_id HAVING sum(l.units) > 0 ORDER BY i.user_id",
+        )
+        .bind(fund_id)
+        .bind(at)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default()
+    }
+
+    /// IB lots of a closed fund deal per holder (D64): the deal volume split by the units held when the position
+    /// OPENED (an investor who bought in after the open was not in the trade; one who redeemed while it was open
+    /// was), largest remainder so the shares add up to the volume exactly (`math::split_lots`).
+    /// The master's own units are included on purpose: the manager's capital is traded too, so the master's
+    /// referrer earns on that share like on any investor's. The fund account's own deal is never paid (the IB
+    /// service disqualifies group `pamm`), so the volume is counted once.
+    pub async fn ib_lot_shares(&self, fund_id: i64, volume: D, open_time: DateTime<Utc>) -> Vec<(i64, D)> {
+        math::split_lots(volume, &self.units_at(fund_id, open_time).await)
+    }
+
+    /// Splits a closed fund deal across the fund's holders (`ib_lot_shares`) and pushes each share to the IB
     /// service (`POST /v1/ib/events/lots`, idempotent on deal + user). Best effort with retries.
     async fn push_ib_lots(&self, fund_id: i64, tenant: i64, deal: crate::model::Deal) {
         let Some(ib) = self.ib.get().cloned() else { return };
-        let rows: Vec<(i64, D)> = sqlx::query_as("SELECT user_id, units FROM pamm_investors WHERE fund_id = $1 AND units > 0").bind(fund_id).fetch_all(&self.pool).await.unwrap_or_default();
-        let total: D = rows.iter().map(|r| r.1).sum();
-        if total <= ZERO {
-            return;
-        }
+        let shares = self.ib_lot_shares(fund_id, deal.volume, deal.open_time).await;
         let slug = self.slug(tenant);
-        for (user, units) in rows {
-            let lots = crate::money::rdp(deal.volume * units / total, 4);
-            if lots <= ZERO {
-                continue;
-            }
+        for (user, lots) in shares {
             let body = json!({"source": "pamm", "dealId": deal.id, "userId": user, "symbol": deal.symbol, "side": deal.position_side.as_str(), "lots": lots.normalize().to_string(),
                               "openTime": deal.open_time, "closeTime": deal.time, "login": deal.login});
             let (ib, slug) = (ib.clone(), slug.clone());
