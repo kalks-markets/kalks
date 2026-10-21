@@ -30,6 +30,10 @@ pub struct Config {
     /// Support / notifications service (`POST /v1/notify`). Empty = notifications stay in-app only.
     pub support_url: String,
     pub support_token: String,
+    /// IB service (`POST /v1/ib/events/deposit`: real deposits for first deposit / CPA). Empty = not reported
+    /// (development default; the events stay queued and are sent once it is set).
+    pub ib_url: String,
+    pub ib_token: String,
 }
 
 /// Masks the password in a connection URL (`postgres://user:secret@host` → `postgres://user:***@host`).
@@ -87,6 +91,8 @@ impl fmt::Debug for Config {
             .field("gateway_token", &redact(&self.gateway_token))
             .field("support_url", &self.support_url)
             .field("support_token", &redact(&self.support_token))
+            .field("ib_url", &self.ib_url)
+            .field("ib_token", &redact(&self.ib_token))
             .finish()
     }
 }
@@ -126,6 +132,8 @@ impl Config {
             gateway_token: var("GATEWAY_INTERNAL_TOKEN", ""),
             support_url: var("SUPPORT_URL", "http://127.0.0.1:8100").trim_end_matches('/').to_string(),
             support_token: var("SUPPORT_INTERNAL_TOKEN", ""),
+            ib_url: var("IB_URL", if dev_mode { "" } else { "http://127.0.0.1:8096" }).trim_end_matches('/').to_string(),
+            ib_token: var("IB_INTERNAL_TOKEN", ""),
         })
     }
 
@@ -153,6 +161,8 @@ impl Config {
             gateway_token: String::new(),
             support_url: String::new(),
             support_token: String::new(),
+            ib_url: String::new(),
+            ib_token: String::new(),
         }
     }
 }
@@ -170,7 +180,8 @@ mod tests {
         assert_eq!(redact_rpc("https://bsc-dataseed.binance.org"), "https://bsc-dataseed.binance.org");
         let mut c = Config::for_tests("postgres://u:pw@h/db");
         c.trongrid_api_key = "secret-key".into();
+        c.ib_token = "ib-secret".into();
         let dbg = format!("{c:?}");
-        assert!(!dbg.contains("pw@") && !dbg.contains("secret-key") && !dbg.contains("test-internal-token"));
+        assert!(!dbg.contains("pw@") && !dbg.contains("secret-key") && !dbg.contains("test-internal-token") && !dbg.contains("ib-secret"));
     }
 }

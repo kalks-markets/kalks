@@ -675,3 +675,125 @@ async fn a_new_broker_gets_its_wallet_rows_on_its_first_request() {
     assert_eq!(s, 400);
     t.drop_db().await;
 }
+
+/// Mock IB service: records every `POST /v1/ib/events/deposit` with its headers; answers 503 while `down` is
+/// set and 404 for users in `unknown` (not mirrored yet); replays by idempotency key like the real service.
+#[derive(Default)]
+struct MockIb {
+    calls: std::sync::Mutex<Vec<(String, String, Value)>>,
+    down: std::sync::atomic::AtomicBool,
+    unknown: std::sync::Mutex<Vec<i64>>,
+}
+
+async fn mock_ib() -> (Arc<MockIb>, String) {
+    use axum::extract::State;
+    use axum::http::{HeaderMap, StatusCode};
+    let m = Arc::new(MockIb::default());
+    let app = axum::Router::new()
+        .route(
+            "/v1/ib/events/deposit",
+            axum::routing::post(|State(m): State<Arc<MockIb>>, h: HeaderMap, axum::Json(b): axum::Json<Value>| async move {
+                if m.down.load(std::sync::atomic::Ordering::SeqCst) {
+                    return (StatusCode::SERVICE_UNAVAILABLE, axum::Json(json!({})));
+                }
+                if m.unknown.lock().unwrap().contains(&b["userId"].as_i64().unwrap_or_default()) {
+                    return (StatusCode::NOT_FOUND, axum::Json(json!({"error": {"code": "not_found"}})));
+                }
+                let hv = |k: &str| h.get(k).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+                let mut calls = m.calls.lock().unwrap();
+                let seen = calls.iter().any(|(_, _, c)| c["idempotencyKey"] == b["idempotencyKey"]);
+                let first = !calls.iter().any(|(_, _, c)| c["userId"] == b["userId"]);
+                calls.push((hv("x-kalks-tenant"), hv("x-kalks-internal"), b));
+                (StatusCode::OK, axum::Json(json!({"status": if seen { "duplicate" } else { "recorded" }, "firstDeposit": first})))
+            }),
+        )
+        .with_state(m.clone());
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", l.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(l, app).await.unwrap() });
+    (m, url)
+}
+
+#[tokio::test]
+async fn real_deposits_are_reported_to_the_ib_service_once() {
+    let Some(t) = T::new("ib deposit events").await else { return };
+    let (m, url) = mock_ib().await;
+    let http = reqwest::Client::new();
+    let count = |sql: &'static str| {
+        let pool = t.st.pool.clone();
+        async move { sqlx::query_scalar::<_, i64>(sql).fetch_one(&pool).await.unwrap() }
+    };
+    // not configured (development): events are queued, nothing is sent, the deposit is unaffected
+    assert!(t.st.cfg.ib_url.is_empty());
+    assert_eq!(wallet::ib::push_pending(&t.st, &http).await.unwrap(), (0, 0));
+
+    // 1. on-chain deposit credited
+    let (_, v) = t.post("/v1/deposits/intents", json!({"user_id": 7, "chain": "tron", "amount": "50"})).await;
+    t.tron.put(&hash(11), usdt_tx(ChainId::Tron, CLIENT_TRON, TRON_ADDR, "50", 1000));
+    t.tron.set_head(1100);
+    let (s, v) = t.post("/v1/deposits/submit", json!({"user_id": 7, "intent_id": v["intent"]["id"], "tx_hash": hash(11)})).await;
+    assert_eq!(s, 200, "{v}");
+    watcher::tick(&t.st).await.unwrap();
+    assert_eq!(t.balance(7).await.0, "50");
+    // 2. Back Office external deposit (manual_deposit) to the wallet
+    let adj = |key: &str, category: &str, amount: &str| {
+        json!({"idempotency_key": key, "user_id": 8, "target": "wallet", "currency": "USDT", "op": "add", "category": category, "amount": amount, "comment": "Bank wire ref 4471", "notify": false})
+    };
+    let (s, v) = t.staff("POST", "/v1/admin/adjustments", Some(adj("ib-a1", "deposit", "700"))).await;
+    assert_eq!((s, v["adjustment"]["ledger_kind"].as_str()), (200, Some("manual_deposit")), "{v}");
+    // not deposits: a bonus / compensation adjustment, a commission and an IB payout credit, money back from trading
+    let (s, _) = t.staff("POST", "/v1/admin/adjustments", Some(adj("ib-a2", "bonus", "20"))).await;
+    assert_eq!(s, 200);
+    t.credit(7, "5", "ib-c1").await;
+    let (s, _) = t.post("/v1/wallets/transfers", json!({"idempotency_key": "ib:payout:x", "user_id": 7, "currency": "USDT", "amount": "9", "direction": "credit", "kind": "ib_payout"})).await;
+    assert_eq!(s, 200);
+    let (s, v) = t.post("/v1/wallets/7/from-trading", json!({"login": 10000001, "amount": "3", "idempotency_key": "ft-ib"})).await;
+    assert_eq!(s, 200, "{v}");
+    assert_eq!(count("SELECT count(*) FROM ib_deposit_events").await, 2, "only the two real deposits are queued");
+    assert_eq!(count("SELECT count(*) FROM ib_deposit_events WHERE (kind, amount) IN (('deposit', 50), ('manual_deposit', 700))").await, 2);
+
+    // configured: the IB service is down → nothing lost, the row backs off
+    let mut st = t.st.clone();
+    let mut cfg = (*st.cfg).clone();
+    cfg.ib_url = url;
+    cfg.ib_token = "ib-token".into();
+    st.cfg = Arc::new(cfg);
+    m.down.store(true, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(wallet::ib::push_pending(&st, &http).await.unwrap(), (0, 1));
+    assert_eq!(count("SELECT count(*) FROM ib_deposit_events WHERE pushed_at IS NULL AND push_next_at > now()").await, 1);
+    // back up; client 8 isn't mirrored in the IB service yet (404): retried later, client 7 still goes through
+    m.down.store(false, std::sync::atomic::Ordering::SeqCst);
+    m.unknown.lock().unwrap().push(8);
+    sqlx::query("UPDATE ib_deposit_events SET push_next_at = NULL").execute(&st.pool).await.unwrap();
+    assert_eq!(wallet::ib::push_pending(&st, &http).await.unwrap(), (1, 1));
+    m.unknown.lock().unwrap().clear();
+    sqlx::query("UPDATE ib_deposit_events SET push_next_at = NULL").execute(&st.pool).await.unwrap();
+    assert_eq!(wallet::ib::push_pending(&st, &http).await.unwrap(), (1, 0));
+    assert_eq!(wallet::ib::push_pending(&st, &http).await.unwrap(), (0, 0), "each event is delivered once");
+    let calls = m.calls.lock().unwrap().clone();
+    assert_eq!(calls.len(), 2);
+    let (tenant, token, onchain) = calls.iter().find(|(_, _, b)| b["userId"] == 7).unwrap().clone();
+    assert_eq!((tenant.as_str(), token.as_str()), ("kalks", "ib-token"));
+    let txn: i64 = sqlx::query_scalar("SELECT txn_id FROM ib_deposit_events WHERE kind = 'deposit'").fetch_one(&st.pool).await.unwrap();
+    let tenant_id: i64 = sqlx::query_scalar("SELECT tenant_id FROM ib_deposit_events WHERE kind = 'deposit'").fetch_one(&st.pool).await.unwrap();
+    assert_eq!(onchain["idempotencyKey"], format!("wallet:deposit:{tenant_id}:{txn}"), "key derived from the wallet ledger txn");
+    assert_eq!((onchain["amount"].as_str(), onchain["currency"].as_str(), onchain["source"].as_str()), (Some("50"), Some("USDT"), Some("wallet")));
+    let at: chrono::DateTime<chrono::Utc> = sqlx::query_scalar("SELECT created_at FROM ledger_txns WHERE id = $1").bind(txn).fetch_one(&st.pool).await.unwrap();
+    assert_eq!(onchain["at"].as_str().unwrap().parse::<chrono::DateTime<chrono::Utc>>().unwrap(), at, "the ledger time, stable across retries");
+    let manual = &calls.iter().find(|(_, _, b)| b["userId"] == 8).unwrap().2;
+    assert_eq!((manual["amount"].as_str(), manual["kind"].as_str()), (Some("700"), Some("manual_deposit")));
+    assert_eq!(count("SELECT count(*) FROM ib_deposit_events WHERE pushed_at IS NOT NULL AND first_deposit").await, 2);
+
+    // reconciliation: a real deposit without an outbox row (booked before the outbox existed) is queued by the
+    // sweep, with the same idempotency key, and the sweep is a no-op afterwards
+    sqlx::query("DELETE FROM ib_deposit_events WHERE kind = 'manual_deposit'").execute(&st.pool).await.unwrap();
+    assert_eq!(wallet::ib::sweep(&st.pool).await.unwrap(), 1);
+    assert_eq!(wallet::ib::sweep(&st.pool).await.unwrap(), 0);
+    assert_eq!(wallet::ib::push_pending(&st, &http).await.unwrap(), (1, 0));
+    let calls = m.calls.lock().unwrap().clone();
+    assert_eq!(calls[2].2["idempotencyKey"], calls.iter().find(|(_, _, b)| b["userId"] == 8).unwrap().2["idempotencyKey"], "a resend reuses the key: the IB answers duplicate");
+    let (_, v) = t.staff("GET", "/v1/admin/reconciliation", None).await;
+    assert_eq!(v["ib_deposit_events"]["queued"], 0, "{v}");
+    t.invariants().await;
+    t.drop_db().await;
+}

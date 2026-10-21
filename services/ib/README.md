@@ -65,7 +65,7 @@ On first start the service creates the `kalks_ib` database, runs `migrations/`, 
 | Caps | Rebate and split are capped by `maxRebatePct` / `maxSplitPct`; splits and rebates only move money between lines, the total equals the sum of the tier amounts |
 | Suspended IB | Earns nothing, gives nothing |
 | CPA (D57) | Once per client, to the tier-1 IB: first live deposit ≥ `cpa.minFirstDeposit` and (if required) a first qualifying trade. Amount = the IB level's `cpaAmount`. Payable after `holdDays` |
-| First deposit | The oldest `deposit` / `transfer_in` on any of the client's live accounts (engine ledger), or a deposit event pushed by the wallet; the earliest wins |
+| First deposit | The earliest real-money deposit: the oldest `deposit` / `transfer_in` on any of the client's live accounts (engine ledger), or a deposit event pushed by the wallet (USDT credited to the wallet on chain, or a Back Office external deposit). Only one first deposit is kept (time + amount), never a sum, so wallet money later moved to a trading account (`transfer_in`) is not counted twice: the earlier wallet event wins |
 | Levels (D58) | On the 1st of each month: highest level whose `minActiveClients` (tier-1 clients with a qualifying deal that month) **and** `minMonthlyLots` (qualifying lots of the whole network, all tiers) are met. Promotions only unless `allowDemotion`; `levelLocked` members are skipped |
 | PAMM / copy (D64) | Lots allocated to a referred investor are pushed with `POST /v1/ib/events/lots` and earn like the investor's own trades |
 | Payouts (D56) | Pending lines available before the period end are grouped per payee into a batch (payees below `payout.minAmount` or net ≤ 0 carry over). Approve → lines `approved`, payouts `transfer_pending` → wallet credit (`kind: ib_payout`, idempotency key `ib:payout:<tenant>:<batch>:<user>`) → `paid`. Reject → lines back to the pending pool |
@@ -94,6 +94,7 @@ Database `kalks_ib` (`migrations/0001_ib.sql`). Every row has `tenant` (gateway 
 | `reassignments`, `level_history` | append-only history |
 | `audit_log` | append-only (trigger), every admin change and money decision |
 | `cursors` | poller cursors and once-per-period markers |
+| `deposit_events` | deposit events by `(tenant, idempotency_key)`: user, USD amount, currency, time, source, whether it became the first deposit |
 
 ## API
 
@@ -104,7 +105,7 @@ Every route except `GET /health` needs `X-Kalks-Internal: $IB_INTERNAL_TOKEN`. T
 | Method & path | Body | Response |
 |---|---|---|
 | `POST /v1/ib/clicks` | `{code, campaign?, ip, userAgent, referer?, landing?}` | `{valid, code, campaign, unique}` (the CRM proxy calls it) |
-| `POST /v1/ib/events/deposit` | `{userId, amount, at?}` | `{status, firstDeposit}` — confirmed real-money deposit (wallet) |
+| `POST /v1/ib/events/deposit` | `{userId, amount, currency?: USD\|USDT\|USC, at?, idempotencyKey?, source?}` | `{status: recorded\|duplicate, firstDeposit}` — confirmed real-money deposit (the wallet sends `idempotencyKey: wallet:deposit:<tenant>:<txn>` and `at` = its ledger time). A repeated key is `duplicate` and changes nothing; the same key with another user / amount / time is `409 exists`; an unknown client is `404` (not mirrored yet: the wallet retries). USDT is USD 1:1, USC ÷ 100 |
 | `POST /v1/ib/events/lots` | `{source: pamm\|copy, dealId, userId, symbol, side?, lots, openTime, closeTime, login?, reversed?}` | `{status: recorded\|duplicate, qualified, reason, lines}` |
 
 **Client Area** (`X-Kalks-User-Id: <gateway user id>`, set by the CRM BFF from the session)
@@ -147,7 +148,7 @@ Every route except `GET /health` needs `X-Kalks-Internal: $IB_INTERNAL_TOKEN`. T
 | **Gateway** | `GET /v1/internal/referrals/users?since&after_id&limit` (internal token) in `(changed_at, id)` order. Sign-up (`/v1/auth/register`, `/v1/auth/google/complete`) takes `referral_campaign` next to `referral_code` |
 | **Client Area** | `proxy.ts`: `/r/CODE[/campaign]` and any `?ref=CODE&c=campaign` record a click (`POST /v1/ib/clicks`, 1.5 s budget), set the first-party `kalks_ref` cookie and send signed-out visitors to `/register?ref=…`. The register and Google-complete BFFs add `referral_campaign` from the cookie when the code matches. `/api/partner/*` → `/v1/ib/me/*` |
 | **Back Office** | `/api/partners/*` → `/v1/ib/admin/*` with permissions `partners.read / write / approve` (`apps/admin/lib/partners-perms.ts`) |
-| **Wallet** | The IB service calls `POST /v1/wallets/transfers` (`direction: credit`, `kind: ib_payout`, `currency: USDT`). The wallet may call `POST /v1/ib/events/deposit` on confirmed deposits |
+| **Wallet** | The IB service calls `POST /v1/wallets/transfers` (`direction: credit`, `kind: ib_payout`, `currency: USDT`). The wallet calls `POST /v1/ib/events/deposit` for every real deposit credited to a wallet (on-chain `deposit`, Back Office `manual_deposit`), from an outbox written with the credit and retried with backoff (`services/wallet/src/ib.rs`); IB payouts, commissions, bonuses, refunds, other adjustments and transfers from trading are never reported |
 | **Support** | After each payout step, paid payouts not yet announced go to `POST $SUPPORT_URL/v1/notify` as `ib.commission_paid` (link `/partner/payouts`, `dedupeKey ib:payout:<id>:paid`): bell in the Client Area and Kalks Trader, email per the partner's `ib` preference. Retries back off (`payouts.notify_attempts`, `notify_error`) and never hold a payout back |
 | **Copy / PAMM** | Push investor allocations with `POST /v1/ib/events/lots` when the master deal closes (not for trades on the investor's own account, which are read from the engine) |
 | **Website** | Partner links should point to the Client Area (`https://app.<domain>/r/CODE/campaign`), or pass `?ref=&c=` through to it |
@@ -158,7 +159,7 @@ Every route except `GET /health` needs `X-Kalks-Internal: $IB_INTERNAL_TOKEN`. T
 |---|---|---|
 | `IB_BIND` | `127.0.0.1:8096` | |
 | `IB_DATABASE_URL` | `postgres://postgres@127.0.0.1:5433/kalks_ib` | created and migrated on first start |
-| `IB_INTERNAL_TOKEN` | – | required when `IB_ENV=production`; also set in the CRM and admin `.env*.local` |
+| `IB_INTERNAL_TOKEN` | – | required when `IB_ENV=production`; also set in the CRM and admin `.env*.local`, and read by the wallet (deposit events) from the shared `.env.local` |
 | `IB_ENV` | `development` | |
 | `GATEWAY_URL` / `GATEWAY_INTERNAL_TOKEN` | `http://127.0.0.1:8080` | referral feed |
 | `TRADING_URL` / `TRADING_INTERNAL_TOKEN` | `http://127.0.0.1:8090` | deals, accounts, ledgers |
@@ -178,12 +179,12 @@ cargo test -p ib
 ```
 
 - **Unit** (`calc`, `model`): option deals per contract and never lots, the options rate (default 0, validation, kept when absent), option series codes, per-lot amounts, three tiers with shares, rebate + split within the IB's own amount, caps, suspended IBs, rounding conservation, tiny deals, anti-abuse filters (demo, excluded group, reopened, price correction, minimum duration), cent lots, level evaluation (both targets, lock, demotion), wash-pair matching, payout periods, backoff, symbol groups, settings validation.
-- **Database** (`tests/programme.rs`, throw-away `kalks_ib_test_*` database, skipped without PostgreSQL): option deals paid per contract only (rate 0 by default = no lines; the Back Office rate card through `PUT levels`, kept when a PUT omits it; tier %, rebate; short / demo / reopened filters; 0 lots, so level upgrades ignore them; a series pushed as PAMM / copy lots; feed parsing), multi-tier lines with rebate and split, the same deal twice (no double pay), a three-tier chain, short / demo / prop / no-referrer deals, PAMM lots, deals that arrive before the client is mirrored; self-referral block and admin clearing, loopback IPs ignored, wash-pair flag; CPA only after a deposit ≥ minimum and a trade, once; batch creation with carry-over, approval, a wallet that fails once (pending transfer, same idempotency key on retry, then paid), clawback after a paid deal is reopened, void of an unpaid one; batch rejection releasing lines; click tracking (unique per visitor, unknown campaign, unknown code).
+- **Database** (`tests/programme.rs`, throw-away `kalks_ib_test_*` database, skipped without PostgreSQL): option deals paid per contract only (rate 0 by default = no lines; the Back Office rate card through `PUT levels`, kept when a PUT omits it; tier %, rebate; short / demo / reopened filters; 0 lots, so level upgrades ignore them; a series pushed as PAMM / copy lots; feed parsing), multi-tier lines with rebate and split, the same deal twice (no double pay), a three-tier chain, short / demo / prop / no-referrer deals, PAMM lots, deals that arrive before the client is mirrored; self-referral block and admin clearing, loopback IPs ignored, wash-pair flag; CPA only after a deposit ≥ minimum and a trade, once; wallet deposit events (recorded, a retry is `duplicate`, a reused key with another amount is refused, a later `transfer_in` of the same money neither replaces nor adds to the first deposit, CPA once, USC ÷ 100, other currencies refused, unknown client 404); batch creation with carry-over, approval, a wallet that fails once (pending transfer, same idempotency key on retry, then paid), clawback after a paid deal is reopened, void of an unpaid one; batch rejection releasing lines; click tracking (unique per visitor, unknown campaign, unknown code).
 
 ## Known gaps
 
 - **Engine feed.** See [How it works](#how-it-works): polling with overlap, per-login account lookups and a 14-day reversal re-scan instead of an ordered deals feed with account type and source.
-- **Deposits.** First deposits come from engine ledgers (`deposit`, `transfer_in`) or a wallet push. Until the wallet pushes `POST /v1/ib/events/deposit`, a deposit that stays in the wallet without reaching a trading account doesn't count toward CPA or FTD.
+- **Deposits.** First deposits come from engine ledgers (`deposit`, `transfer_in`) and from the wallet's `POST /v1/ib/events/deposit` push, so a deposit that stays in the wallet counts toward CPA and FTD. The wallet backfills deposits booked before the push existed (its sweep), which can move an older client's first deposit earlier and, if that deposit meets the minimum, earn a CPA that was missed (held `holdDays`, approved with the batch as usual).
 - **KYC identity.** The identity signal is a keyed hash of name + date of birth and of the phone number from the gateway, not the verified document number; the KYC service can add document hashes to the referral feed later.
 - **Order source.** Deals from the engine don't carry `source`, so copy-trading fills on an investor's own account aren't labelled as copy in the ledger (they do earn).
 - **Banners / landing pages.** Campaign links point to a Client Area path; tenant banner and landing-page assets are not managed here.

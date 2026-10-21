@@ -8,6 +8,7 @@ pub mod config;
 pub mod db;
 pub mod engine;
 pub mod error;
+pub mod ib;
 pub mod ledger;
 pub mod money;
 pub mod notifier;

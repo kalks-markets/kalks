@@ -365,6 +365,9 @@ pub async fn credit(st: &AppState, id: i64) -> anyhow::Result<()> {
             drop(tx);
             let t: Option<i64> = sqlx::query_scalar("SELECT id FROM ledger_txns WHERE tenant_id = $1 AND idempotency_key = $2").bind(tenant_id).bind(format!("deposit:{chain}:{hash}")).fetch_optional(&st.pool).await?;
             sqlx::query("UPDATE deposits SET status = 'credited', ledger_txn_id = $2, credited_at = COALESCE(credited_at, now()), updated_at = now() WHERE id = $1").bind(id).bind(t).execute(&st.pool).await?;
+            if let Some(t) = t {
+                crate::ib::record(&st.pool, t).await?;
+            }
             return Ok(());
         }
         Err(PostError::Insufficient) => anyhow::bail!("unexpected insufficient funds on a deposit credit"),
@@ -374,6 +377,8 @@ pub async fn credit(st: &AppState, id: i64) -> anyhow::Result<()> {
     if let Some(intent) = d.get::<Option<String>, _>("intent_id") {
         sqlx::query("UPDATE deposit_intents SET status = 'completed' WHERE id = $1").bind(intent).execute(&mut *tx).await?;
     }
+    // real money in: reported to the IB service after the commit (first deposit / CPA)
+    crate::ib::record(&mut *tx, txn).await?;
     notify(&mut tx, tenant_id, user_id, "deposit.credited", "Deposit credited", &format!("{} USDT was credited to your wallet.", s(credit)), json!({"deposit_id": id, "tx_hash": hash, "chain": chain})).await?;
     tx.commit().await?;
     tracing::info!(deposit = id, tenant_id, user_id, amount = %credit, %chain, "deposit credited");

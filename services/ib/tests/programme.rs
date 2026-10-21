@@ -469,3 +469,52 @@ async fn module_switch_refuses_the_partner_routes() {
     let r = http.post(format!("{base}/v1/ib/clicks")).header("x-kalks-tenant", "qa-ib-off").json(&json!({"code": "NOPE1234"})).send().await.unwrap();
     assert_ne!(r.status().as_u16(), 403, "tracking stays");
 }
+
+#[tokio::test]
+async fn wallet_deposit_events_are_idempotent_and_never_counted_twice() {
+    use ib::api::public::{DepositReq, deposit_event};
+    use ib::error::ApiError;
+    let Some(e) = env(None).await else { return };
+    e.member(40, None, "gold").await;
+    e.member(41, Some(40), "bronze").await;
+    let push = |body: Value| {
+        let st = e.st.clone();
+        async move {
+            let r: DepositReq = serde_json::from_value(body).unwrap();
+            deposit_event(State(st), Tenant("kalks".into()), Json(r)).await.map(|j| j.0)
+        }
+    };
+    let t1 = Utc::now() - Duration::hours(3);
+    let ev = json!({"userId": 41, "amount": "600.000000", "currency": "USDT", "at": t1, "idempotencyKey": "wallet:deposit:1:381", "source": "wallet"});
+    // a wallet deposit (money not moved to trading yet) is the first deposit
+    let v = push(ev.clone()).await.unwrap();
+    assert_eq!((v["status"].as_str(), v["firstDeposit"].as_bool()), (Some("recorded"), Some(true)));
+    let first = "SELECT count(*) FROM members WHERE user_id = 41 AND first_deposit_amount = 600 AND first_deposit_at = (SELECT at FROM deposit_events WHERE idempotency_key = 'wallet:deposit:1:381')";
+    assert_eq!(e.count(first).await, 1);
+    // a retry of the same event changes nothing
+    let v = push(ev.clone()).await.unwrap();
+    assert_eq!((v["status"].as_str(), v["firstDeposit"].as_bool()), (Some("duplicate"), Some(true)));
+    // the same key for another deposit is refused
+    let mut other = ev.clone();
+    other["amount"] = json!("700");
+    assert!(matches!(push(other).await, Err(ApiError::Conflict { code: "exists", .. })));
+    // the same money moved to a trading account later (engine transfer_in) neither replaces nor adds to it
+    assert!(!deals::record_deposit(&e.st, "kalks", 41, t1 + Duration::hours(1), dec("600")).await.unwrap());
+    assert_eq!(e.count(first).await, 1);
+    // a later wallet deposit is not a first deposit
+    let v = push(json!({"userId": 41, "amount": 50, "currency": "USDT", "at": t1 + Duration::hours(2), "idempotencyKey": "wallet:deposit:1:390"})).await.unwrap();
+    assert_eq!((v["status"].as_str(), v["firstDeposit"].as_bool()), (Some("recorded"), Some(false)));
+    assert_eq!(e.count(first).await, 1);
+    // first trade → one CPA for the IB, based on the wallet deposit; a replayed event adds nothing
+    deals::ingest(&e.st, &deal(9401, 41, "EURUSD", "1", 600)).await.unwrap();
+    assert_eq!(e.sum("SELECT sum(amount) FROM commissions WHERE kind = 'cpa' AND beneficiary_id = 40").await, dec("300"));
+    push(ev).await.unwrap();
+    assert_eq!(e.count("SELECT count(*) FROM commissions WHERE kind = 'cpa'").await, 1);
+    // currencies: USC is cents, others are refused; an unknown client is 404 (the wallet retries)
+    e.member(42, Some(40), "bronze").await;
+    push(json!({"userId": 42, "amount": 10000, "currency": "USC", "idempotencyKey": "k-usc"})).await.unwrap();
+    assert_eq!(e.count("SELECT count(*) FROM members WHERE user_id = 42 AND first_deposit_amount = 100").await, 1);
+    assert!(matches!(push(json!({"userId": 42, "amount": 1, "currency": "EUR"})).await, Err(ApiError::Validation { field: "currency", .. })));
+    assert!(matches!(push(json!({"userId": 999, "amount": 1, "currency": "USDT", "idempotencyKey": "k-x"})).await, Err(ApiError::NotFound)));
+    e.drop().await;
+}

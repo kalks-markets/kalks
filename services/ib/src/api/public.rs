@@ -99,22 +99,88 @@ pub struct DepositReq {
     user_id: i64,
     #[serde(deserialize_with = "de_dec")]
     amount: D,
+    /// `USD` (default), `USDT` (1:1) or `USC` (cents).
+    #[serde(default)]
+    currency: Option<String>,
     #[serde(default)]
     at: Option<DateTime<Utc>>,
+    /// Stable per deposit on the caller's side (the wallet sends `wallet:deposit:<tenant>:<txn>`).
+    #[serde(default)]
+    idempotency_key: Option<String>,
+    #[serde(default)]
+    source: Option<String>,
 }
 
-/// `POST /v1/ib/events/deposit {userId, amount, at?}`: a confirmed real-money deposit (e.g. from the wallet
-/// service). The earliest deposit is the client's first deposit for CPA (D57). Idempotent.
+/// Amount in USD for a deposit currency (USDT is USD 1:1, USC is cents); `None` for anything else.
+pub fn deposit_usd(amount: D, currency: Option<&str>) -> Option<D> {
+    match currency.map(|c| c.trim().to_ascii_uppercase()).as_deref() {
+        None | Some("") | Some("USD") | Some("USDT") => Some(amount),
+        Some("USC") => Some(amount / crate::money::HUNDRED),
+        _ => None,
+    }
+}
+
+/// `POST /v1/ib/events/deposit {userId, amount, currency?, at?, idempotencyKey?, source?}`: a confirmed
+/// real-money deposit (the wallet: on-chain deposit credited or a Back Office external deposit). The earliest
+/// deposit is the client's first deposit for CPA (D57), whether it came from an event or from the engine
+/// ledger, so wallet money later moved to a trading account (`transfer_in`) is never counted twice. With an
+/// `idempotencyKey` a repeat returns `duplicate` and changes nothing; the same key with another user, amount or
+/// time is `409 exists`. 404 while the client is not mirrored from the gateway yet (the caller retries).
 pub async fn deposit_event(State(st): State<AppState>, Tenant(tenant): Tenant, Json(r): Json<DepositReq>) -> ApiResult<Json<Value>> {
     if r.amount <= ZERO {
         return Err(invalid("amount", "Amount must be positive."));
     }
+    let currency = r.currency.as_deref().map(|c| c.trim().to_ascii_uppercase()).filter(|c| !c.is_empty()).unwrap_or_else(|| "USD".into());
+    let Some(usd) = deposit_usd(r.amount, Some(&currency)) else {
+        return Err(invalid("currency", "Currency must be USD, USDT or USC."));
+    };
+    let key = r.idempotency_key.as_deref().map(str::trim).filter(|k| !k.is_empty()).map(str::to_string);
+    if key.as_ref().is_some_and(|k| k.len() > 128) {
+        return Err(invalid("idempotencyKey", "At most 128 characters."));
+    }
+    let source: String = r.source.as_deref().unwrap_or("wallet").chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').take(32).collect();
+    // a deposit can't be in the future; the caller sends its own time so retries carry the same one
+    let at = r.at.unwrap_or_else(Utc::now).min(Utc::now());
     let known: Option<i64> = sqlx::query_scalar("SELECT user_id FROM members WHERE user_id = $1 AND tenant = $2").bind(r.user_id).bind(&tenant).fetch_optional(&st.pool).await?;
     if known.is_none() {
         return Err(ApiError::NotFound);
     }
-    let first = deals::record_deposit(&st, &tenant, r.user_id, r.at.unwrap_or_else(Utc::now), r.amount).await?;
-    Ok(Json(json!({"status": "ok", "firstDeposit": first})))
+    if let Some(k) = &key
+        && let Some(prev) = sqlx::query("SELECT user_id, amount, at, first_deposit FROM deposit_events WHERE tenant = $1 AND idempotency_key = $2").bind(&tenant).bind(k).fetch_optional(&st.pool).await?
+    {
+        let same = prev.get::<i64, _>("user_id") == r.user_id && prev.get::<D, _>("amount") == usd && (r.at.is_none() || prev.get::<DateTime<Utc>, _>("at") == at);
+        if !same {
+            return Err(ApiError::Conflict { code: "exists", message: "This idempotency key was used for another deposit.".into() });
+        }
+        return Ok(Json(json!({"status": "duplicate", "firstDeposit": prev.get::<bool, _>("first_deposit")})));
+    }
+    // earliest wins; the same (user, at) again changes nothing, so two racing retries are harmless
+    let first = deals::record_deposit(&st, &tenant, r.user_id, at, usd).await?;
+    let mut status = "recorded";
+    if let Some(k) = &key {
+        let n = sqlx::query(
+            "INSERT INTO deposit_events (tenant, idempotency_key, user_id, amount, currency, at, source, first_deposit)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING",
+        )
+        .bind(&tenant)
+        .bind(k)
+        .bind(r.user_id)
+        .bind(usd)
+        .bind(&currency)
+        .bind(at)
+        .bind(&source)
+        .bind(first)
+        .execute(&st.pool)
+        .await?
+        .rows_affected();
+        if n == 0 {
+            status = "duplicate";
+        }
+    }
+    if first {
+        tracing::info!(client = r.user_id, amount = %usd, %source, "first deposit recorded from a deposit event");
+    }
+    Ok(Json(json!({"status": status, "firstDeposit": first})))
 }
 
 #[derive(Deserialize)]

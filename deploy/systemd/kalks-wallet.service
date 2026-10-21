@@ -12,6 +12,8 @@ Environment=WALLET_ENV=production
 Environment=WALLET_BIND=127.0.0.1:8095
 # watcher / scanner / transfer recovery: this must be the only instance with workers on
 Environment=WALLET_WORKERS=true
+# real deposits reported to the IB service (IB_INTERNAL_TOKEN comes from .env.local, written by deploy.sh)
+Environment=IB_URL=http://127.0.0.1:8096
 ExecStart=/home/kalks/kalks/target/release/wallet
 Restart=always
 RestartSec=3

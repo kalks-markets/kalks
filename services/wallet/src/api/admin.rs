@@ -598,6 +598,17 @@ pub async fn reconciliation(State(st): State<AppState>, s_ctx: StaffCtx) -> ApiR
             "addresses": balances,
         }));
     }
+    // real deposits reported to the IB service (src/ib.rs outbox)
+    let ibq = sqlx::query(
+        "SELECT count(*) FILTER (WHERE pushed_at IS NOT NULL) AS reported,
+                count(*) FILTER (WHERE pushed_at IS NULL AND push_attempts < $2) AS queued,
+                count(*) FILTER (WHERE pushed_at IS NULL AND push_attempts >= $2) AS failed
+           FROM ib_deposit_events WHERE tenant_id = $1",
+    )
+    .bind(t)
+    .bind(crate::ib::MAX_ATTEMPTS)
+    .fetch_one(pool)
+    .await?;
     let problems = ledger::verify(pool).await?;
     Ok(ok(json!({
         "liabilities": {"available": s(avail), "locked": s(locked), "total": s(avail + locked)},
@@ -605,6 +616,7 @@ pub async fn reconciliation(State(st): State<AppState>, s_ctx: StaffCtx) -> ApiR
         "trading_net_in": s(get("sys:USDT:trading")),
         "fees_earned": s(get("sys:USDT:fees")),
         "chains": chains,
+        "ib_deposit_events": {"enabled": !st.cfg.ib_url.is_empty(), "reported": ibq.get::<i64, _>("reported"), "queued": ibq.get::<i64, _>("queued"), "failed": ibq.get::<i64, _>("failed")},
         "invariants": {"ok": problems.is_empty(), "problems": problems},
         "generated_at": Utc::now(),
     })))

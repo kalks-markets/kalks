@@ -511,6 +511,10 @@ pub async fn apply(st: &AppState, tenant_id: i64, id: i64, actor: Option<&StaffC
                     Some(w) => audit::staff(&mut tx, w, entry).await?,
                     None => audit::system(&mut tx, tenant_id, entry.action, entry.target_kind, entry.target_id, entry.after).await?,
                 }
+                if kind == "manual_deposit" {
+                    // an external payment received is real money in: reported to the IB service (first deposit / CPA)
+                    crate::ib::record(&mut *tx, txn).await?;
+                }
                 if notify_client {
                     client_notification(&mut tx, tenant_id, user_id, id, &op, amount, &ccy, None, client_note.as_deref()).await?;
                 }

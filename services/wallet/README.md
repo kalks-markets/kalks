@@ -157,6 +157,23 @@ The CRM BFF resolves the user from the session cookie and passes `user_id`. For 
 
 Deposit statuses: `pending` (submitted, not yet found on chain) → `confirming` (found, `confirmations`/`required_confirmations`) → `credited`. The other end states are `failed` (reverted, wrong token or recipient, not found after 24 h), `review`, `unmatched` and `rejected`.
 
+### IB deposit events
+
+The IB service decides a client's first deposit (FTD, CPA) from the engine ledgers and from deposit events. The wallet reports every **real** deposit credited to a wallet, so a client who deposits but has not moved the money to a trading account yet still counts:
+
+| Ledger kind | Source | Reported |
+|---|---|---|
+| `deposit` | on-chain USDT deposit credited (auto, or after staff assign / approve) | yes |
+| `manual_deposit` | Back Office add funds, reason "Deposit (external payment received)" | yes |
+| `adjustment_in`, `commission`, `ib_payout`, `refund`, prop / PAMM / copy kinds, transfers from trading | – | no |
+
+(A Back Office external deposit to a *trading account* is booked by the engine as `deposit`, which the IB service reads from the engine ledger.)
+
+- **Outbox.** `src/ib.rs`: an `ib_deposit_events` row (`migrations/0004_ib_deposit_events.sql`, unique per ledger txn) is written in the same transaction as the credit. A worker (`WALLET_WORKERS=true`) sends it after the commit: `POST $IB_URL/v1/ib/events/deposit` with `X-Kalks-Internal: $IB_INTERNAL_TOKEN`, `X-Kalks-Tenant`, `X-Kalks-Service: wallet` and `{userId, amount, currency: "USDT", at, idempotencyKey, source: "wallet", kind}`. It never blocks or rolls back a deposit.
+- **Idempotency.** `idempotencyKey = wallet:deposit:<tenant_id>:<ledger txn id>` and `at` = the ledger txn time, so a retry is answered `duplicate` by the IB service. The IB service keeps only the earliest deposit as the first one, so the later engine `transfer_in` of the same money is not counted again.
+- **Retries.** Timeouts, 5xx, 401 / 403 and 404 (client not mirrored in the IB service yet) back off 15 s doubling to 1 h, for 60 attempts (`push_attempts`, `push_next_at`, `push_error`); 400 / 409 / 422 are not retried. The IB answer `firstDeposit` is stored on the row.
+- **Reconciliation.** Every 10 minutes (and at start) the worker queues any `deposit` / `manual_deposit` ledger txn that has no row yet, which also backfills deposits booked before this existed. `GET /v1/admin/reconciliation` shows `ib_deposit_events: {enabled, reported, queued, failed}`; to resend failed rows, set `push_attempts = 0, push_next_at = NULL` on them (the key makes it safe).
+
 ## Withdrawals
 
 `requested` → `approved` / `rejected` (staff, reason) → `paid` (staff enter the payout tx hash) → `completed`. The client can `cancel` while the withdrawal is `requested`.
@@ -301,6 +318,7 @@ The admin BFF forwards the staff member's `finance.*` keys as `X-Kalks-Staff-Per
 | `TRADING_URL` / `TRADING_INTERNAL_TOKEN` | `http://127.0.0.1:8090` | engine |
 | `GATEWAY_URL` / `GATEWAY_INTERNAL_TOKEN` | `http://127.0.0.1:8080` | KYC status |
 | `SUPPORT_URL` / `SUPPORT_INTERNAL_TOKEN` | `http://127.0.0.1:8100` / – | notification push (bell, realtime, email); empty URL = in-app only |
+| `IB_URL` / `IB_INTERNAL_TOKEN` | empty in development, `http://127.0.0.1:8096` in production / – | real deposits reported to the IB service ([IB deposit events](#ib-deposit-events)); empty URL = not sent (events stay queued and go out once it is set) |
 
 The apps need `WALLET_URL` (default `http://127.0.0.1:8095`) and `WALLET_INTERNAL_TOKEN` (server-only) in `apps/crm` and `apps/admin`.
 
@@ -317,6 +335,7 @@ The apps need `WALLET_URL` (default `http://127.0.0.1:8095`) and `WALLET_INTERNA
   - unmatched scan and assign;
   - withdrawal limits, cooldown, KYC gate, approve → paid → verify → completed, reject and cancel unlock;
   - to-trading / from-trading with engine success, rejection and timeout recovery;
+  - real deposits reported to a mock IB service: only on-chain `deposit` and `manual_deposit` are queued (not bonuses, commissions, IB payouts or transfers from trading), nothing sent while `IB_URL` is empty, IB down → back-off, a 404 client retried without holding the others, each event delivered once with the key from the ledger txn and the ledger time, the sweep re-queuing a missing row with the same key, the reconciliation counts;
   - the ledger invariants after every flow (Σ postings = 0 per txn, balances = Σ postings, append-only).
 - **Balance & credit** (`tests/adjustments.rs`): wallet add / deduct with the balance and ledger after each step, the notification and history note, a double submit booking once and a key conflict, over-deduction refused and audited, the external kinds; four-eyes (threshold set by `finance.settings` only, pending books nothing, the requester can't approve, a second staff member approves, double approval, reject / cancel, an approval that can no longer be booked fails); permissions (403 without `finance.adjust` / `finance.credit` / `finance.adjust_force`, role fallback without the header); trading accounts through the mock engine (free-margin refusal, force, credit take-back limits, another client's account refused, a lost engine answer settled by recovery with one booking, four-eyes on credit).
 
