@@ -38,6 +38,7 @@ const MESSAGE_KEYS: Record<string, string> = {
   "Name is too long.": "auth.apiError.nameTooLong",
   "Use letters only.": "auth.apiError.nameLetters",
   "Referral code looks wrong. Leave it empty if you don't have one.": "auth.apiError.referral",
+  "This referral code doesn't exist. Check it or leave it empty.": "auth.apiError.referralUnknown",
   "Enter your password.": "auth.apiError.passwordRequired",
   "Please confirm you are over 18 and accept the terms.": "auth.apiError.terms",
   "This code was sent for a different change. Request a new code.": "auth.apiError.codeOtherChange",

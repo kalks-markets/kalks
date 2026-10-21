@@ -167,6 +167,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "Der Name ist zu lang.",
   "apiError.nameLetters": "Verwenden Sie nur Buchstaben.",
   "apiError.referral": "Der Empfehlungscode scheint falsch zu sein. Lassen Sie das Feld leer, wenn Sie keinen haben.",
+  "apiError.referralUnknown": "Diesen Empfehlungscode gibt es nicht. Prüfen Sie ihn oder lassen Sie das Feld leer.",
   "apiError.passwordRequired": "Geben Sie Ihr Passwort ein.",
   "apiError.terms": "Bitte bestätigen Sie, dass Sie über 18 sind, und akzeptieren Sie die Bedingungen.",
   "apiError.codeOtherChange": "Dieser Code wurde für eine andere Änderung gesendet. Fordern Sie einen neuen Code an.",

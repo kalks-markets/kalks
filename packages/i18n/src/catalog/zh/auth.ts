@@ -166,6 +166,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "姓名过长。",
   "apiError.nameLetters": "只能使用字母。",
   "apiError.referral": "推荐码似乎有误。如果没有，请留空。",
+  "apiError.referralUnknown": "该推荐码不存在。请核对，或留空。",
   "apiError.passwordRequired": "请输入密码。",
   "apiError.terms": "请确认您已年满 18 周岁并接受条款。",
   "apiError.codeOtherChange": "此验证码是为其他变更发送的。请重新获取验证码。",

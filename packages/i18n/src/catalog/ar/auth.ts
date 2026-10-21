@@ -166,6 +166,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "الاسم طويل جدًا.",
   "apiError.nameLetters": "استخدم الحروف فقط.",
   "apiError.referral": "يبدو أن رمز الإحالة غير صحيح. اتركه فارغًا إذا لم يكن لديك رمز.",
+  "apiError.referralUnknown": "رمز الإحالة هذا غير موجود. تحقّق منه أو اتركه فارغًا.",
   "apiError.passwordRequired": "أدخل كلمة المرور.",
   "apiError.terms": "يرجى تأكيد أن عمرك يزيد عن 18 عامًا والموافقة على الشروط.",
   "apiError.codeOtherChange": "أُرسل هذا الرمز لتغيير آخر. اطلب رمزًا جديدًا.",

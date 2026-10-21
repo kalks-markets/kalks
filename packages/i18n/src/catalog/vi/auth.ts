@@ -166,6 +166,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "Tên quá dài.",
   "apiError.nameLetters": "Chỉ dùng chữ cái.",
   "apiError.referral": "Mã giới thiệu có vẻ không đúng. Để trống nếu bạn không có.",
+  "apiError.referralUnknown": "Mã giới thiệu này không tồn tại. Hãy kiểm tra lại hoặc để trống.",
   "apiError.passwordRequired": "Nhập mật khẩu của bạn.",
   "apiError.terms": "Vui lòng xác nhận bạn trên 18 tuổi và chấp nhận các điều khoản.",
   "apiError.codeOtherChange": "Mã này được gửi cho một thay đổi khác. Hãy yêu cầu mã mới.",

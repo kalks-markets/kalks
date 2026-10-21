@@ -166,6 +166,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "ชื่อยาวเกินไป",
   "apiError.nameLetters": "ใช้ตัวอักษรเท่านั้น",
   "apiError.referral": "รหัสแนะนำดูเหมือนไม่ถูกต้อง หากไม่มี ให้เว้นว่างไว้",
+  "apiError.referralUnknown": "ไม่มีรหัสแนะนำนี้ ตรวจสอบอีกครั้งหรือเว้นว่างไว้",
   "apiError.passwordRequired": "กรอกรหัสผ่านของคุณ",
   "apiError.terms": "โปรดยืนยันว่าคุณมีอายุเกิน 18 ปีและยอมรับข้อกำหนด",
   "apiError.codeOtherChange": "รหัสนี้ถูกส่งมาสำหรับการเปลี่ยนแปลงอื่น โปรดขอรหัสใหม่",

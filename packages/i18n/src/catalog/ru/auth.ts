@@ -166,6 +166,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "Имя слишком длинное.",
   "apiError.nameLetters": "Используйте только буквы.",
   "apiError.referral": "Похоже, реферальный код неверен. Оставьте поле пустым, если у вас его нет.",
+  "apiError.referralUnknown": "Такого реферального кода нет. Проверьте его или оставьте поле пустым.",
   "apiError.passwordRequired": "Введите пароль.",
   "apiError.terms": "Подтвердите, что вам больше 18 лет, и примите условия.",
   "apiError.codeOtherChange": "Этот код был отправлен для другого изменения. Запросите новый код.",

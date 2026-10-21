@@ -167,6 +167,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "El nombre es demasiado largo.",
   "apiError.nameLetters": "Use solo letras.",
   "apiError.referral": "El código de referido no parece correcto. Déjelo en blanco si no tiene uno.",
+  "apiError.referralUnknown": "Este código de referido no existe. Revíselo o déjelo en blanco.",
   "apiError.passwordRequired": "Introduzca su contraseña.",
   "apiError.terms": "Confirme que es mayor de 18 años y acepte los términos.",
   "apiError.codeOtherChange": "Este código se envió para otro cambio. Solicite un código nuevo.",

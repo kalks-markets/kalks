@@ -168,6 +168,7 @@ const auth = {
   "apiError.nameTooLong": "Name is too long.",
   "apiError.nameLetters": "Use letters only.",
   "apiError.referral": "Referral code looks wrong. Leave it empty if you don't have one.",
+  "apiError.referralUnknown": "This referral code doesn't exist. Check it or leave it empty.",
   "apiError.passwordRequired": "Enter your password.",
   "apiError.terms": "Please confirm you are over 18 and accept the terms.",
   "apiError.codeOtherChange": "This code was sent for a different change. Request a new code.",

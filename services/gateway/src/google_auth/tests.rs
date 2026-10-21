@@ -160,6 +160,10 @@ async fn google_flows() {
     let mut no_terms = creq(&ticket_str, "1995-05-05");
     no_terms.accept_terms = false;
     assert_eq!(code(&complete(st(), ctx("device-aaaaaaaaaaaa"), Ok(Json(no_terms))).await.unwrap_err()), "accept_terms");
+    // the prefilled partner code matches nobody: refused on the field, so the visitor can fix or clear it
+    let mut unknown_ref = creq(&ticket_str, "1995-05-05");
+    unknown_ref.referral_code = Some("NOSUCHCODE1".into());
+    assert_eq!(code(&complete(st(), ctx("device-aaaaaaaaaaaa"), Ok(Json(unknown_ref))).await.unwrap_err()), "referral_code");
 
     // complete -> account created, verified, signed in, device trusted, audited
     let (status, Json(v)) = complete(st(), ctx("device-aaaaaaaaaaaa"), Ok(Json(creq(&ticket_str, "1995-05-05")))).await.unwrap();

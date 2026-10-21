@@ -166,6 +166,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "Jina ni refu mno.",
   "apiError.nameLetters": "Tumia herufi pekee.",
   "apiError.referral": "Msimbo wa rufaa unaonekana si sahihi. Uache wazi ikiwa huna.",
+  "apiError.referralUnknown": "Msimbo huu wa rufaa haupo. Uangalie au uache wazi.",
   "apiError.passwordRequired": "Weka nenosiri lako.",
   "apiError.terms": "Tafadhali thibitisha kuwa una zaidi ya miaka 18 na ukubali masharti.",
   "apiError.codeOtherChange": "Msimbo huu ulitumwa kwa mabadiliko mengine. Omba msimbo mpya.",

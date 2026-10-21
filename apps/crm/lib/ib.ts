@@ -66,7 +66,8 @@ export async function trackClick(req: NextRequest, res: NextResponse, ref: { cod
     body: { code: ref.code, campaign: ref.campaign, ip, userAgent: req.headers.get("user-agent") ?? "", referer: req.headers.get("referer"), landing: req.nextUrl.pathname },
     timeoutMs: 1500,
   });
-  // unknown codes are still kept (the gateway stores the raw code); a paused / unknown campaign is dropped
+  // unknown codes are still kept: the sign-up form shows the code pre-filled and the gateway refuses it on
+  // the referral field, so the visitor can fix or clear it; a paused / unknown campaign is dropped
   const campaign = r.status === 200 && r.data.valid ? (r.data.campaign ?? null) : ref.campaign;
   const value = campaign ? `${ref.code}:${campaign}` : ref.code;
   res.cookies.set(REF_COOKIE, value, { httpOnly: false, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: REF_MAX_AGE });

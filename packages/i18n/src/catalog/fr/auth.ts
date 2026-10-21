@@ -166,6 +166,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "Le nom est trop long.",
   "apiError.nameLetters": "Utilisez uniquement des lettres.",
   "apiError.referral": "Le code de parrainage semble incorrect. Laissez le champ vide si vous n'en avez pas.",
+  "apiError.referralUnknown": "Ce code de parrainage n'existe pas. Vérifiez-le ou laissez le champ vide.",
   "apiError.passwordRequired": "Saisissez votre mot de passe.",
   "apiError.terms": "Veuillez confirmer que vous avez plus de 18 ans et accepter les conditions.",
   "apiError.codeOtherChange": "Ce code a été envoyé pour une autre modification. Demandez un nouveau code.",

@@ -189,12 +189,14 @@ pub(crate) async fn insert_user(st: &AppState, u: NewUser<'_>) -> ApiResult<Opti
     Err(anyhow::anyhow!("could not allocate referral code").into())
 }
 
-/// Resolves a referral code to the referring client (unknown codes are kept raw, not rejected).
+const UNKNOWN_REFERRAL: &str = "This referral code doesn't exist. Check it or leave it empty.";
+
+/// Resolves a referral code to the referring client. A code that matches no client in the tenant is refused
+/// (field `referral_code`) rather than dropped, so the visitor can fix or clear it and the partner keeps the client.
 pub(crate) async fn referrer(st: &AppState, tenant_id: i64, code: Option<&str>) -> ApiResult<Option<i64>> {
-    Ok(match code {
-        Some(code) => sqlx::query_scalar("SELECT id FROM users WHERE tenant_id = $1 AND referral_code = $2").bind(tenant_id).bind(code).fetch_optional(&st.pool).await?,
-        None => None,
-    })
+    let Some(code) = code else { return Ok(None) };
+    let id: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE tenant_id = $1 AND referral_code = $2").bind(tenant_id).bind(code).fetch_optional(&st.pool).await?;
+    id.map(Some).ok_or(ApiError::Validation { field: "referral_code", message: UNKNOWN_REFERRAL })
 }
 
 pub async fn register(State(st): State<AppState>, ctx: Ctx, req: Result<Json<RegisterReq>, JsonRejection>) -> ApiResult<(StatusCode, Json<Value>)> {
@@ -453,3 +455,6 @@ pub async fn reset(State(st): State<AppState>, ctx: Ctx, req: Result<Json<ResetR
     audit::record(&st.pool, &ctx, Entry { tenant_id: v.tenant_id, actor_kind: "user", actor_id: Some(v.subject_id), action: "user.password_reset", target: Some(("user", v.subject_id)), meta: json!({}) }).await;
     Ok(Json(json!({ "status": "ok" })))
 }
+
+#[cfg(test)]
+mod tests;

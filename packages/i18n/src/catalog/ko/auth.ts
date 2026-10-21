@@ -166,6 +166,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "이름이 너무 깁니다.",
   "apiError.nameLetters": "문자만 사용하세요.",
   "apiError.referral": "추천 코드가 올바르지 않은 것 같습니다. 코드가 없으면 비워 두세요.",
+  "apiError.referralUnknown": "존재하지 않는 추천 코드입니다. 확인하거나 비워 두세요.",
   "apiError.passwordRequired": "비밀번호를 입력하세요.",
   "apiError.terms": "만 18세 이상임을 확인하고 약관에 동의하세요.",
   "apiError.codeOtherChange": "이 코드는 다른 변경을 위해 발송되었습니다. 새 코드를 요청하세요.",

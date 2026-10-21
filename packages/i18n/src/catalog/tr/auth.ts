@@ -167,6 +167,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "Ad çok uzun.",
   "apiError.nameLetters": "Yalnızca harf kullanın.",
   "apiError.referral": "Referans kodu hatalı görünüyor. Kodunuz yoksa boş bırakın.",
+  "apiError.referralUnknown": "Bu referans kodu mevcut değil. Kontrol edin veya boş bırakın.",
   "apiError.passwordRequired": "Şifrenizi girin.",
   "apiError.terms": "Lütfen 18 yaşından büyük olduğunuzu onaylayın ve koşulları kabul edin.",
   "apiError.codeOtherChange": "Bu kod farklı bir değişiklik için gönderildi. Yeni bir kod isteyin.",

@@ -167,6 +167,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "नाम बहुत लंबा है।",
   "apiError.nameLetters": "केवल अक्षरों का उपयोग करें।",
   "apiError.referral": "रेफ़रल कोड सही नहीं लग रहा है। अगर आपके पास नहीं है, तो इसे खाली छोड़ दें।",
+  "apiError.referralUnknown": "यह रेफ़रल कोड मौजूद नहीं है। इसे जाँचें या खाली छोड़ दें।",
   "apiError.passwordRequired": "अपना पासवर्ड डालें।",
   "apiError.terms": "कृपया पुष्टि करें कि आपकी उम्र 18 वर्ष से अधिक है और शर्तें स्वीकार करें।",
   "apiError.codeOtherChange": "यह कोड किसी दूसरे बदलाव के लिए भेजा गया था। नया कोड मंगाएँ।",

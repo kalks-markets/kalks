@@ -166,6 +166,7 @@ const auth: NsMessages<"auth"> = {
   "apiError.nameTooLong": "Nama terlalu panjang.",
   "apiError.nameLetters": "Gunakan huruf sahaja.",
   "apiError.referral": "Kod rujukan kelihatan salah. Biarkan kosong jika anda tiada kod.",
+  "apiError.referralUnknown": "Kod rujukan ini tidak wujud. Semak semula atau biarkan kosong.",
   "apiError.passwordRequired": "Masukkan kata laluan anda.",
   "apiError.terms": "Sila sahkan anda berumur lebih 18 tahun dan terima terma.",
   "apiError.codeOtherChange": "Kod ini dihantar untuk perubahan lain. Minta kod baharu.",
