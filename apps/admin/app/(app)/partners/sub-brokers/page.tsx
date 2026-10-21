@@ -3,13 +3,14 @@
 import * as React from "react";
 import { Download, Globe2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { Button, Card, CardHeader, DataTable, Money, PageHeader, Progress, Reveal, Segmented, StatusChip, type Column } from "@kalks/ui";
+import { Button, Card, CardHeader, DataTable, EmptyState, Money, PageHeader, Progress, Reveal, Segmented, StatusChip, type Column } from "@kalks/ui";
 import { SUB_BROKERS, type SubBroker } from "@kalks/mock/admin-partners";
+import { IS_DEMO } from "@kalks/mock/mode";
 import { ColumnChart, MiniStat, PersonCell } from "@/components/config/kit";
 import { fmtInt, fmtUsdK } from "@/components/partners/common";
 import { AddSubBrokerDialog, Flags, SubBrokerCard, SubBrokerDrawer } from "@/components/partners/sub-broker-parts";
 
-export default function SubBrokersPage() {
+function DemoSubBrokers() {
   const [rows, setRows] = React.useState(SUB_BROKERS);
   const [sel, setSel] = React.useState<string | null>(null);
   const [add, setAdd] = React.useState(false);
@@ -104,4 +105,24 @@ export default function SubBrokersPage() {
       <AddSubBrokerDialog open={add} onOpenChange={setAdd} />
     </div>
   );
+}
+
+// No backend yet: the IB service has partner uplines (sub-IBs, see Partners → Partners) but no regional sub-broker
+// desks with override commissions. Live builds say so instead of showing the demo's sample sub-brokers.
+function LiveSubBrokers() {
+  return (
+    <>
+      <PageHeader title="Sub-brokers" subtitle="Regional desks that recruit and manage IBs for an override commission." />
+      <Card>
+        <EmptyState
+          title="Not available yet"
+          text="Sub-broker desks aren't connected to the partner service yet. Partner uplines and sub-IBs are on Partners → Partners."
+        />
+      </Card>
+    </>
+  );
+}
+
+export default function SubBrokersPage() {
+  return IS_DEMO ? <DemoSubBrokers /> : <LiveSubBrokers />;
 }

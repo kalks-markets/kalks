@@ -5,11 +5,13 @@ import { Activity, Download, Gauge, KeyRound, MoreHorizontal, Power, ShieldOff, 
 import { toast } from "sonner";
 import { Button, Card, CardHeader, Chip, DataTable, Flag, Icon3D, IconButton, KpiCard, Menu, PageHeader, Reveal, Segmented, Sparkline, Starfield, StatusChip, Toggle, cn, type Column } from "@kalks/ui";
 import { API_KEYS, type ApiKey } from "@kalks/mock/admin-partners";
+import { IS_DEMO } from "@kalks/mock/mode";
+import { AlgoKeysPage } from "@/components/algo/admin";
 import { ColumnChart, PersonCell, auditToast, useReason } from "@/components/config/kit";
 import { ago, fmtInt } from "@/components/partners/common";
 import { STATUS_LABEL } from "@/components/social/common";
 
-export default function ApiKeysPage() {
+function DemoApiKeys() {
   const [rows, setRows] = React.useState(API_KEYS);
   const [halted, setHalted] = React.useState(false);
   const [filter, setFilter] = React.useState<"all" | ApiKey["status"] | "anomaly">("all");
@@ -166,4 +168,9 @@ export default function ApiKeysPage() {
       {reason.node}
     </div>
   );
+}
+
+// Live builds: client API keys on the algo service (/api/algo/keys), the same list as Algo & API → API keys.
+export default function ApiKeysPage() {
+  return IS_DEMO ? <DemoApiKeys /> : <AlgoKeysPage />;
 }

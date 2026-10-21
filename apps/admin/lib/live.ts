@@ -27,9 +27,7 @@ export const LIVE_EXCLUDED = [
   "/config/margin",
   "/config/sessions",
   "/config/demo",
-  // social: copy trading, PAMM, fee payouts and the social audit are live; the algo marketplace and API keys are not
-  "/social/marketplace",
-  "/social/api-keys",
+  // partners: sub-broker desks have no backend yet (the IB service has uplines, not regional desks)
   "/partners/sub-brokers",
   // owner panel: everything but the global symbol master
   "/brokers/symbols",
@@ -40,6 +38,12 @@ export const LIVE_EXCLUDED = [
   "/finance/conversion",
   // marketing: everything runs on the growth service (journeys included); UTM campaigns on the reports service
 ] as const;
+
+/**
+ * Live pages left out of the live nav because another nav entry opens the same live view: Social & Algo's
+ * marketplace and API keys render the algo service's pages, listed under Algo & API.
+ */
+export const LIVE_NAV_HIDDEN = ["/social/marketplace", "/social/api-keys"] as const;
 
 /** Next milestone: shown in the live nav with a "Soon" chip and a Coming soon page. */
 export const SOON_PAGES: Record<string, { title: string; text: string }> = {
@@ -63,7 +67,7 @@ export function soonFor(pathname: string): { title: string; text: string } | nul
  * without the demo's mock count badges. Pages that aren't live yet stay reachable by URL and say so.
  */
 export const LIVE_NAV: NavModule[] = ADMIN_NAV.flatMap((m) => {
-  const sub = m.sub?.filter((s) => isLivePath(s.href)).map((s) => ({ ...s, badge: undefined })); // demo badges are mock counts
+  const sub = m.sub?.filter((s) => isLivePath(s.href) && !pathAllowed(s.href, LIVE_NAV_HIDDEN)).map((s) => ({ ...s, badge: undefined })); // demo badges are mock counts
   if (m.sub ? !sub?.length : !isLivePath(m.href)) return [];
   // the rail lights the module on any of its pages (its landing page may move to the first live one)
   const match = m.match ?? [...new Set([m.href, ...(sub ?? []).map((s) => s.href)])];

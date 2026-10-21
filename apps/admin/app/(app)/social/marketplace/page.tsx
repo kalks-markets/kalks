@@ -5,12 +5,14 @@ import { BookOpen, Download, EyeOff, OctagonAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Card, Chip, DataTable, Money, PageHeader, Reveal, StatusChip, Tabs, type Column } from "@kalks/ui";
 import { LISTINGS, type Listing } from "@kalks/mock/admin-partners";
+import { IS_DEMO } from "@kalks/mock/mode";
+import { AlgoMarketplacePage } from "@/components/algo/admin";
 import { MiniStat, PersonCell, auditToast, useReason } from "@/components/config/kit";
 import { fmtInt, fmtUsdK } from "@/components/partners/common";
 import { EmergencyStopDialog, type StopTarget } from "@/components/social/common";
 import { CAT_TONE, ListingCard, Rating, priceLabel } from "@/components/social/listing-card";
 
-export default function MarketplacePage() {
+function DemoMarketplace() {
   const [rows, setRows] = React.useState(LISTINGS);
   const [tab, setTab] = React.useState<"queue" | "live" | "rejected">("queue");
   const [stop, setStop] = React.useState<StopTarget | null>(null);
@@ -136,4 +138,9 @@ export default function MarketplacePage() {
       {reason.node}
     </div>
   );
+}
+
+// Live builds: strategy listings on the algo service (/api/algo/listings), the same queue as Algo & API → Marketplace moderation.
+export default function MarketplacePage() {
+  return IS_DEMO ? <DemoMarketplace /> : <AlgoMarketplacePage />;
 }
