@@ -43,9 +43,9 @@ pub type Stop = watch::Receiver<bool>;
 pub fn spawn_all(cfg: &Config, market: Arc<Market>, stop: Stop) -> Vec<tokio::task::JoinHandle<()>> {
     let plans = spawn_planner(market.clone());
     if !cfg.upstream.is_empty() {
-        let (url, mk) = (cfg.upstream.clone(), market.clone());
+        let (url, mk, stall) = (cfg.upstream.clone(), market.clone(), Duration::from_secs(cfg.upstream_stall_secs));
         let all = plans.values().cloned().collect::<Vec<_>>();
-        return vec![tokio::spawn(async move { relay(url, mk, all, stop).await })];
+        return vec![tokio::spawn(async move { relay(url, mk, all, stall, stop).await })];
     }
     plans
         .into_iter()
@@ -432,10 +432,21 @@ fn handle(business: &str, text: &str, market: &Arc<Market>) -> bool {
     false
 }
 
+/// Relay: WebSocket ping to the upstream this often; its pong (and its own 5 s heartbeat) keep a healthy connection
+/// from ever going silent.
+const RELAY_PING_EVERY: Duration = Duration::from_secs(5);
+
+/// True once the upstream has sent no frame at all (quote, heartbeat or pong) for longer than `limit`: a
+/// half-dead connection (e.g. after sleep / wake) that never delivers a close frame or an error.
+fn stalled(last_frame: Instant, now: Instant, limit: Duration) -> bool {
+    now.saturating_duration_since(last_frame) > limit
+}
+
 /// Relay mode: mirror quotes from another Kalks market-data stream (`{"type":"quote","s","b","a","l","t"}`).
 /// Every catalogue symbol is subscribed passively (whatever the upstream streams arrives here); the symbols wanted
-/// locally (this service's own plan) are subscribed actively, so the upstream streams them too.
-async fn relay(url: String, market: Arc<Market>, mut plans: Vec<watch::Receiver<Arc<BTreeSet<String>>>>, mut stop: Stop) {
+/// locally (this service's own plan) are subscribed actively, so the upstream streams them too. `stall`: silence
+/// after which the connection counts as dead and is reconnected.
+async fn relay(url: String, market: Arc<Market>, mut plans: Vec<watch::Receiver<Arc<BTreeSet<String>>>>, stall: Duration, mut stop: Stop) {
     let mut backoff = 1u64;
     market.set_expected("relay", true);
     loop {
@@ -458,14 +469,28 @@ async fn relay(url: String, market: Arc<Market>, mut plans: Vec<watch::Receiver<
             tracing::info!(%url, active = active.len(), "relay connected");
             backoff = 1;
             let mut check = tokio::time::interval(Duration::from_secs(1));
+            let mut ping = tokio::time::interval(RELAY_PING_EVERY);
+            ping.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            ping.tick().await;
+            // a read timeout around rx.next() inside this select would restart on every 1 s check tick and never
+            // fire, so silence is measured from the last frame instead
+            let mut last_frame = Instant::now();
             loop {
                 let msg = tokio::select! {
                     _ = stop_in.changed() => {
                         let _ = tx.send(Message::Close(None)).await;
                         return Ok(());
                     }
-                    m = tokio::time::timeout(Duration::from_secs(30), rx.next()) => m?,
+                    m = rx.next() => m,
+                    _ = ping.tick() => {
+                        // a send into a dead socket may hang once its buffer is full
+                        tokio::time::timeout(RELAY_PING_EVERY, tx.send(Message::Ping(Vec::new().into()))).await.map_err(|_| anyhow::anyhow!("ping not sent within {}s", RELAY_PING_EVERY.as_secs()))??;
+                        continue;
+                    }
                     _ = check.tick() => {
+                        if stalled(last_frame, Instant::now(), stall) {
+                            anyhow::bail!("no frame from the upstream for {}s (stalled connection)", stall.as_secs());
+                        }
                         // the local plan changed: upstream demand follows it
                         if plans.iter_mut().any(|p| p.has_changed().unwrap_or(false)) {
                             for p in plans.iter_mut() {
@@ -488,6 +513,7 @@ async fn relay(url: String, market: Arc<Market>, mut plans: Vec<watch::Receiver<
                     }
                 };
                 let Some(msg) = msg else { return Ok(()) };
+                last_frame = Instant::now();
                 match msg? {
                     Message::Text(t) => {
                         let Ok(v) = serde_json::from_str::<Value>(&t) else { continue };
@@ -553,6 +579,20 @@ mod tests {
         assert_eq!(codes(&f).iter().map(|c| c.0).collect::<Vec<_>>(), vec![11000, 11001]);
         // nothing changed: nothing sent (every frame counts against the provider's 60 a minute)
         assert!(subscription_messages("common", &set(&["EURUSD"]), &set(&["EURUSD"])).is_empty());
+    }
+
+    #[test]
+    fn relay_counts_a_silent_upstream_as_stalled() {
+        let limit = Duration::from_secs(20);
+        let t0 = Instant::now();
+        // frames (quotes, heartbeats, pongs) within the limit: alive
+        assert!(!stalled(t0, t0, limit));
+        assert!(!stalled(t0, t0 + Duration::from_secs(20), limit));
+        // nothing for longer than the limit (e.g. after sleep / wake): dead, reconnect
+        assert!(stalled(t0, t0 + Duration::from_secs(21), limit));
+        assert!(stalled(t0, t0 + Duration::from_secs(6000), limit));
+        // a frame stamped after "now" (clock race) never counts as silence
+        assert!(!stalled(t0 + Duration::from_secs(1), t0, limit));
     }
 }
 

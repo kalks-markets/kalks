@@ -14,6 +14,9 @@ pub struct Config {
     /// e.g. wss://api.kalkstrade.com/v1/stream. The provider allows one connection per key, so only
     /// production connects to it. Backfill and reconciliation are off in relay mode.
     pub upstream: String,
+    /// Relay mode: no frame from the upstream for this long = dead connection, reconnect (it sends a heartbeat
+    /// every 5 s and is pinged every 5 s, so a healthy connection is never silent that long).
+    pub upstream_stall_secs: u64,
     /// Max provider REST requests per second (keep under the plan limit).
     pub provider_rps: f64,
     pub instruments_file: String,
@@ -79,6 +82,7 @@ impl fmt::Debug for Config {
             .field("infoway_rest", &self.infoway_rest)
             .field("infoway_ws", &self.infoway_ws)
             .field("upstream", &self.upstream)
+            .field("upstream_stall_secs", &self.upstream_stall_secs)
             .field("provider_rps", &self.provider_rps)
             .field("instruments_file", &self.instruments_file)
             .field("store_ticks", &self.store_ticks)
@@ -118,6 +122,7 @@ impl Config {
             infoway_rest: var("INFOWAY_REST_URL", "https://data.infoway.io"),
             infoway_ws: var("INFOWAY_WS_URL", "wss://data.infoway.io/ws"),
             upstream: var("MARKET_DATA_UPSTREAM", ""),
+            upstream_stall_secs: var("MARKET_DATA_UPSTREAM_STALL_SECS", "20").parse().unwrap_or(20).max(1),
             // Premium plan: 10 requests/s for the key; 3/s leaves room for the snapshot script and other tools
             provider_rps: var("INFOWAY_RPS", "3").parse().unwrap_or(3.0),
             instruments_file: var("INSTRUMENTS_FILE", concat!(env!("CARGO_MANIFEST_DIR"), "/../../config/instruments.json")),

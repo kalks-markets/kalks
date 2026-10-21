@@ -100,9 +100,12 @@ deep history.
 | `MARKET_DATA_ALWAYS_ON` | core | comma-separated symbols, or `none` |
 | `MARKET_DATA_IDLE_GRACE_SECS` | 300 | |
 | `MARKET_DATA_SNAPSHOT_SECS` | 900 | 0 = no periodic snapshots |
+| `MARKET_DATA_UPSTREAM_STALL_SECS` | 20 | relay mode: no frame from the upstream for this long = dead connection, reconnect |
 
 Relay mode (development) subscribes to the upstream passively for every symbol and actively for the symbols wanted
-locally; it has no provider REST, so catalogue charts need the upstream to have their history.
+locally; it has no provider REST, so catalogue charts need the upstream to have their history. It pings the
+upstream every 5 s (the upstream also sends its own heartbeat), so a connection left half-dead by sleep or a network
+change (no close frame, no error) is dropped and reconnected after `MARKET_DATA_UPSTREAM_STALL_SECS` of silence.
 
 ## API
 
