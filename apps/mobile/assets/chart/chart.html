@@ -664,8 +664,12 @@
           const b = toBar(raw);
           const last = data[data.length - 1];
           if (b.time < last.time) return;
-          if (b.time > last.time) data.push(b);
-          else data[data.length - 1] = b;
+          if (b.time > last.time) {
+            // the bar that closed is drawn at its real close: its glide may not have got there yet, and nothing
+            // draws it again once the next bar is the last one
+            main.update(mainPoint(last));
+            data.push(b);
+          } else data[data.length - 1] = b;
           // a new bar starts from its open; the same bar glides on from where its close is drawn now
           const same = gl.bar && gl.bar.time === b.time;
           gl.close = same && Number.isFinite(gl.close) ? gl.close : b.open;
