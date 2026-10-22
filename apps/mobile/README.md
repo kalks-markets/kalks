@@ -213,17 +213,35 @@ on the trade API (`trade/*`, docs/MOBILE-API.md §6) and the streams in `lib/cor
   one frame coalesce to the newest, at most one bridge call per frame; a tick is one `bar` / `quote` message, the page
   calls `series.update()`). History is kept for the session per market + timeframe (`chart/history_cache.dart`): a
   timeframe seen before draws and ticks at once, its refresh lands in place (`tail`, the view stays), and the strip's
-  neighbouring timeframes are fetched ahead. The Chart tab's SELL (bid) · volume · BUY (ask) panel floats over the top
-  of the plot like MT5's one-click panel and uses the same order path (one-click off: the order sheet). Indicators are the web's own
+  neighbouring timeframes are fetched ahead. The Chart tab fills everything under the terminal header: the symbol pill,
+  the timeframes and the chart menu float over the top of the plot (the legend shows only O H L C under them,
+  `init.title: false`), and ONE slim pill at the bottom centre trades, [S bid] − volume + [ask B], through the same
+  order path (one-click off: the order ticket). Indicators are the web's own
   code: `node apps/mobile/tool/build_chart_indicators.mjs` (from the repo root, after the web files change) bundles
   `apps/terminal/lib/indicators.ts` + `components/chart/indicators/{layer,band-fill}.ts` into
   `assets/chart/indicators.bundle.js` and writes the registry `assets/chart/indicators.json` for the menus
   (`cfd/chart_menu.dart`: chart type, indicators list, settings, templates; saved per symbol in the workspace).
-  Trade lines like the web: a position without SL / TP shows **S** / **T** handles after its P&L (drag one out to
+  Trade lines are compact tags (`ChartLine.tag`, `chipLabel`): a position "B 0.50 +12.30" filled with its side's
+  colour, a stop "S 1.11850" / "T 1.12600" (the page puts the price after the letter, also while dragged). A position
+  without SL / TP shows **S** / **T** handles after its P&L (drag one out to
   place that stop, tap for the order tickets' starting distance; `ChartLine.handles`, `lineForHandle`, `clampStop`,
   `defaultStop` in `chart_bridge.dart`, the same rules as the web's `components/chart/trade-handles.ts`). Kalks
-  Trader is blue for up / buy / profit / TP and red for down / sell / loss / SL (`KTokens.traderDark/Light`).
+  Trader is blue for up / buy / profit / TP and red for down / sell / loss / SL (`KTokens.traderDark/Light`); the
+  Account tab's Colours switch it to green / red (`traderSchemeProvider`, prefs `kalks.trader.scheme`,
+  `KTheme.trader(green:)`): quotes, buttons, P&L, the chart's candles and lines all follow.
+- The trade room's look (owner design 2026-10, `cfd/room.dart`): a near-black ground (#0b0b0f) under #121217 cards
+  (radius 16, 16 px side margins), Geist Mono tabular prices, compact "B 0.50" / "S 1.11850" / "T 1.12600" tags.
+  Quotes (`cfd/watchlist_tab.dart`): one card, every row on the header's column grid (`QuoteGrid`: icon · symbol with
+  today's change and the spread · the 24 h sparkline · SELL · BUY with MT5 big figures, `splitQuote`), Simple /
+  Advanced (low · high · last tick time). Sparklines are the last 24 hourly closes of `GET /v1/candles`, fetched only
+  for rows on screen and cached ~5 min (`core/sparklines.dart`). A row opens the symbol screen (`cfd/symbol_screen.dart`:
+  mid price, a small area chart of M15 candles, the order book of the depth stream, 5 asks · spread · 5 bids; no depth:
+  bid / ask only and "Depth unavailable · prices only"; Depth opens the full click-to-trade ladder; Specs the
+  specification sheet `cfd/spec_sheet.dart`). The Trade tab: the equity card, positions and pending orders as cards, ⋯
+  closes all / profitable / losing (`trade/bulk-close`). The order ticket: type chips, a ±0.01 / ±0.1 volume stepper,
+  S / T with one Price / Points toggle, big SELL / BUY by market or Place.
 - Previews (`KALKS_PREVIEW=true`): `preview/preview_server.dart` answers `trade/*` and plays the market-data and engine
   sockets (moving quotes, fills, pending triggers, SL / TP), so `?signedIn=1#/trader` works offline.
 - Tests: `test/terminal` (maths incl. cent / JPY, order rules, engine shapes, the stream, the chart codec, the S / T
-  handles, the order and position sheets).
+  handles, the order and position sheets, the trade room: quote figures and grid, the colour scheme, the order book's
+  depth fallback, sparklines, the Trade tab's tags and bulk close).

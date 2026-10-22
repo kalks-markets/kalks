@@ -153,19 +153,21 @@ class StopInput {
   const StopInput({this.on = false, this.mode = 'pips', this.value = ''});
   final bool on;
 
-  /// price | pips | money
+  /// price | points | pips | money (the order ticket types price or points; the risk calculator sets pips)
   final String mode;
   final String value;
 
   StopInput copyWith({bool? on, String? mode, String? value}) => StopInput(on: on ?? this.on, mode: mode ?? this.mode, value: value ?? this.value);
 }
 
-/// Distance in pips of a stop typed as pips or money (null for price mode). `pipValue` = USD per pip for the volume;
-/// money is typed in the account currency (USC on cent accounts).
-double? stopDistancePips(StopInput st, {required double pipValue, required bool cent}) {
+/// Distance in pips of a stop typed as points, pips or money (null for price mode). `pipValue` = USD per pip for the
+/// volume; `pipPoints` = points in a pip (pip size / point, 10 on 5-digit FX); money is typed in the account currency
+/// (USC on cent accounts).
+double? stopDistancePips(StopInput st, {required double pipValue, required bool cent, double pipPoints = 10}) {
   final n = double.tryParse(st.value);
   if (n == null || !(n > 0)) return null;
   if (st.mode == 'pips') return n;
+  if (st.mode == 'points') return n / (pipPoints <= 0 ? 1 : pipPoints);
   if (st.mode == 'money') return n / (cent ? 100 : 1) / (pipValue <= 0 ? 1e-9 : pipValue);
   return null;
 }
@@ -177,7 +179,7 @@ double? stopPrice(StopInput st, String which, String side, double entry, SymbolS
     final p = double.tryParse(st.value);
     return p != null && p > 0 ? p : null;
   }
-  final d = stopDistancePips(st, pipValue: pipValue, cent: cent);
+  final d = stopDistancePips(st, pipValue: pipValue, cent: cent, pipPoints: pipPointsOf(s));
   if (d == null) return null;
   final dir = (which == 'tp' ? 1 : -1) * (side == 'buy' ? 1 : -1);
   return roundPrice(s.digits, entry + dir * d * s.pipSize);
@@ -190,3 +192,6 @@ double riskLots({required double riskUsd, required double pips, required double 
   final lots = (riskUsd / per * 100).floorToDouble() / 100;
   return lots < 0.01 ? 0.01 : lots;
 }
+
+/// Points in one pip of a market (pip size / point: 10 on 5-digit FX, 1 when the pip is the point).
+double pipPointsOf(SymbolSpec s) => s.point > 0 && s.pipSize > 0 ? s.pipSize / s.point : 1;

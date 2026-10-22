@@ -1,7 +1,8 @@
-// The position sheet (web PositionDialog): floating profit, prices, swap / commission, source; close the whole
-// position or part of it (25 / 50 / 100 %); modify SL / TP with ±10 / 25 / 50 pip nudges and Clear, breakeven, the
-// trailing stop; Close By against an opposite position (hedging accounts). And the pending order sheet (web
-// PendingDialog): price, SL / TP, modify or delete.
+// The position sheet (web PositionDialog, owner design 2026-10): the "B 0.50" badge, the symbol and the floating
+// profit, prices, swap / commission; the stop loss and take profit as two fields labelled just S / T (±10 / 25 / 50 pip
+// nudges and Clear, the money at each), then Modify · Close ½ · Close; below, closing part of it (25 / 50 / 100 %), the
+// trailing stop and breakeven (sent with Modify), the source, and Close By against an opposite position (hedging
+// accounts). And the pending order sheet (web PendingDialog): price, SL / TP, modify or delete.
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -17,6 +18,7 @@ import '../core/terminal_controller.dart';
 import '../core/trade_actions.dart';
 import '../core/trade_math.dart';
 import '../widgets/kit.dart';
+import 'room.dart';
 
 Future<void> showPositionSheet(BuildContext context, String ticket) => showKSheet<void>(context, expand: true, builder: (_) => PositionForm(ticket: ticket));
 
@@ -81,6 +83,9 @@ class _PositionFormState extends ConsumerState<PositionForm> {
         final bidOf = ref.read(marketFeedProvider).bidOf;
         final v = math.min(p.volume, math.max(0.01, double.tryParse(_vol) ?? 0));
         final partial = v < p.volume - 1e-9;
+        // half of the position on the volume step (all of it when it can't be split)
+        final half = normalizeVolume(spec, p.volume / 2);
+        final canHalve = half >= spec.lotMin - 1e-9 && half < p.volume - 1e-9;
         String pipsFrom(double price) => ((p.buy ? price - p.openPrice : p.openPrice - price) / pip).toStringAsFixed(1);
         double? usdAt(String s) {
           final x = double.tryParse(s);
@@ -93,87 +98,180 @@ class _PositionFormState extends ConsumerState<PositionForm> {
           setState(() => which == 'sl' ? _sl = val : _tp = val);
         }
 
-        final trailPips = _trail == 'none' ? 0.0 : (_trail == 'custom' ? (double.tryParse(_trailCustom) ?? 0) : double.parse(_trail));
+        Future<void> close(double volume) async {
+          setState(() => _busy = true);
+          final ok = await ref.read(tradeActionsProvider).closePosition(p.ticket, volume: volume);
+          if (!mounted) return;
+          setState(() => _busy = false);
+          final whole = volume >= p.volume - 1e-9;
+          if (ok && whole && context.mounted) Navigator.of(context).maybePop();
+          if (ok && !whole) setState(() => _vol = fmtVol(math.max(0.01, p.volume - volume)));
+        }
+
+        Future<void> modify() async {
+          final sl = double.tryParse(_sl);
+          final tp = double.tryParse(_tp);
+          final trailPips = _trail == 'none' ? 0.0 : (_trail == 'custom' ? (double.tryParse(_trailCustom) ?? 0) : double.parse(_trail));
+          setState(() => _busy = true);
+          final ok = await ref
+              .read(tradeActionsProvider)
+              .modifyPosition(
+                p.ticket,
+                sl: sl,
+                tp: tp,
+                clearSl: _sl.isEmpty,
+                clearTp: _tp.isEmpty,
+                setTrailing: true,
+                trailingPoints: trailPips > 0 ? (trailPips * pip / spec.point).round() : null,
+              );
+          if (!mounted) return;
+          setState(() => _busy = false);
+          if (ok && context.mounted) Navigator.of(context).maybePop();
+        }
+
+        Widget action(String label, VoidCallback? onTap, {Color? fill, Color? fg, Key? key}) => Expanded(
+          child: KPressable(
+            key: key,
+            pressedScale: 0.97,
+            onTap: _busy ? null : onTap,
+            child: Container(
+              height: 50,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: BoxDecoration(color: fill ?? k.surface3, borderRadius: BorderRadius.circular(16)),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.label.copyWith(fontSize: 14, fontWeight: FontWeight.w700, color: fg ?? k.fg),
+              ),
+            ),
+          ),
+        );
+
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
           children: [
-            // title
+            // the side + volume badge, the symbol, the P&L
             Row(
               children: [
-                SymbolAvatar(p.symbol, size: 24),
-                const SizedBox(width: 10),
+                SideBadge(side: p.side, lots: p.volume),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: '#${p.ticket} ',
-                              style: context.text.mono(13, color: k.fg2),
-                            ),
-                            TextSpan(
-                              text: t('order.side.${p.side}'),
-                              style: context.text.headline.copyWith(color: p.buy ? k.up : k.down),
-                            ),
-                            TextSpan(text: ' ${fmtVol(p.volume)} ${p.symbol}', style: context.text.headline),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '${a.login} · ${t.dyn('order.mode.${a.mode}', fallback: a.mode)} · ${spec.name}',
-                        style: context.text.footnote.copyWith(color: k.fg3, fontSize: 11.5),
-                      ),
-                    ],
+                  child: Text(
+                    p.symbol,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.headline.copyWith(fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                 ),
-                TBadge(t('order.side.${p.side}'), tone: p.buy ? TBadgeTone.up : TBadgeTone.down),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(t('order.position.floatingProfit'), style: context.text.footnote.copyWith(color: k.fg3, fontSize: 11)),
+                    PnlText(profit, cent: a.cent, size: 22, weight: FontWeight.w800),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 12),
-            // floating profit
-            TPanel(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
+            const SizedBox(height: 6),
+            Text(
+              '#${p.ticket} · ${a.login} · ${t.dyn('order.mode.${a.mode}', fallback: a.mode)} · ${t('order.unit.pips', {'n': pipsFrom(cur)})}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.mono(11.5, color: k.fg3),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 2,
+              children: [
+                _kv(context, t('order.position.openPrice'), Text(fmtPrice(spec.digits, p.openPrice))),
+                _kv(context, t('order.position.current'), PriceText(cur, digits: spec.digits, size: 12, dir: q?.dir ?? 0)),
+                _kv(context, t('order.position.swapCommission'), Text('${accMoney(a.cent, p.swap)} · ${accMoney(a.cent, -p.commission)}')),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // S / T
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final which in ['sl', 'tp']) ...[
+                  if (which == 'tp') const SizedBox(width: 8),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(t('order.position.floatingProfit'), style: context.text.footnote.copyWith(color: k.fg3)),
-                        const SizedBox(height: 2),
-                        PnlText(profit, cent: a.cent, size: 22, suffix: accCcy(a.cent)),
-                        Text(t('order.unit.pips', {'n': pipsFrom(cur)}), style: context.text.mono(11.5, color: k.fg3)),
+                        StopField(
+                          key: ValueKey('pos-$which'),
+                          kind: which,
+                          value: which == 'sl' ? _sl : _tp,
+                          placeholder: t('order.ticket.notSet'),
+                          semanticLabel: which == 'sl' ? t('order.ticket.stopLoss') : t('order.ticket.takeProfit'),
+                          onChanged: (x) => setState(() => which == 'sl' ? _sl = x : _tp = x),
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 2,
+                          children: [
+                            for (final n in [10, 25, 50])
+                              KPressable(
+                                minSize: 32,
+                                onTap: () => nudge(which, n),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                                  child: Text(t('order.unit.pipsShort', {'n': n}), style: context.text.mono(11, color: k.fg3)),
+                                ),
+                              ),
+                            if ((which == 'sl' ? _sl : _tp).isNotEmpty)
+                              KPressable(
+                                minSize: 32,
+                                onTap: () => setState(() => which == 'sl' ? _sl = '' : _tp = ''),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                                  child: Text(t('order.position.clear'), style: context.text.caption.copyWith(color: k.fg3)),
+                                ),
+                              ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                (which == 'sl' ? _sl : _tp).isEmpty
+                                    ? '—'
+                                    : t('order.unit.pips', {'n': pipsFrom(double.tryParse(which == 'sl' ? _sl : _tp) ?? cur)}),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: context.text.mono(11, color: k.fg3),
+                              ),
+                            ),
+                            if (usdAt(which == 'sl' ? _sl : _tp) case final usd?)
+                              Text(
+                                accMoney(a.cent, usd + p.swap - p.commission, signed: true),
+                                style: context.text.mono(11, color: usd >= 0 ? k.up : k.down),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _kv(context, t('order.position.openPrice'), Text(fmtPrice(spec.digits, p.openPrice))),
-                      _kv(context, t('order.position.current'), PriceText(cur, digits: spec.digits, size: 12, dir: q?.dir ?? 0)),
-                      _kv(context, t('order.position.swapCommission'), Text('${accMoney(a.cent, p.swap)} · ${accMoney(a.cent, -p.commission)}')),
-                    ],
-                  ),
                 ],
-              ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
-              child: Row(
-                children: [
-                  Text(fmtServer(p.openTime), style: context.text.mono(11, color: k.fg3)),
-                  const Spacer(),
-                  Text(
-                    t.dyn('order.source.${p.source}', fallback: p.source),
-                    style: context.text.footnote.copyWith(color: k.fg3, fontSize: 11.5),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 10),
+            // Modify · Close ½ · Close
+            Row(
+              children: [
+                action(t('order.position.modify'), () => unawaited(modify()), key: const ValueKey('pos-modify')),
+                const SizedBox(width: 8),
+                action(t('app.trader.position.closeHalf'), () => unawaited(close(canHalve ? half : p.volume)), key: const ValueKey('pos-half')),
+                const SizedBox(width: 8),
+                action(t('desk.pos.close'), () => unawaited(close(p.volume)), fill: k.ember, fg: k.onEmber, key: const ValueKey('pos-close')),
+              ],
             ),
-            const SizedBox(height: 16),
-            // close (whole or part)
+            const SizedBox(height: 18),
+            // close part of it
             _title(context, LucideIcons.scissors, partial ? t('order.position.closePartially') : t('order.position.closePosition')),
             Row(
               children: [
@@ -198,10 +296,7 @@ class _PositionFormState extends ConsumerState<PositionForm> {
                       child: Container(
                         height: 34,
                         alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: k.line),
-                        ),
+                        decoration: BoxDecoration(color: k.surface3, borderRadius: BorderRadius.circular(17)),
                         child: Text('${(f * 100).round()}%', style: context.text.mono(12, color: k.fg2)),
                       ),
                     ),
@@ -212,20 +307,11 @@ class _PositionFormState extends ConsumerState<PositionForm> {
             ),
             const SizedBox(height: 8),
             KPressable(
-              onTap: _busy
-                  ? null
-                  : () async {
-                      setState(() => _busy = true);
-                      final ok = await ref.read(tradeActionsProvider).closePosition(p.ticket, volume: v);
-                      if (!mounted) return;
-                      setState(() => _busy = false);
-                      if (ok && !partial && context.mounted) Navigator.of(context).maybePop();
-                      if (ok && partial) setState(() => _vol = fmtVol(math.max(0.01, p.volume - v)));
-                    },
+              onTap: _busy ? null : () => unawaited(close(v)),
               child: Container(
                 height: 44,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(color: p.buy ? k.sellFill : k.buyFill, borderRadius: BorderRadius.circular(11)),
+                decoration: BoxDecoration(color: p.buy ? k.sellFill : k.buyFill, borderRadius: BorderRadius.circular(14)),
                 child: Row(
                   children: [
                     Expanded(
@@ -251,202 +337,97 @@ class _PositionFormState extends ConsumerState<PositionForm> {
               ),
             ),
             const SizedBox(height: 18),
-            // modify
-            _title(context, LucideIcons.pencil, t('order.position.modify')),
+            // trailing stop and breakeven (sent with Modify)
+            _title(context, LucideIcons.pencil, t('order.position.trailing')),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final which in ['sl', 'tp']) ...[
-                  if (which == 'tp') const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                KPressable(
+                  minSize: 36,
+                  semanticLabel: t('order.position.trailingAria'),
+                  onTap: () async {
+                    final v = await showKActionSheet<String>(
+                      context,
+                      title: t('order.position.trailing'),
+                      actions: [
+                        for (final o in _trailOptions)
+                          KAction(
+                            label: o == 'none'
+                                ? t('order.position.trailNone')
+                                : (o == 'custom' ? t('order.position.trailCustom') : t('order.unit.pips', {'n': o})),
+                            value: o,
+                          ),
+                      ],
+                    );
+                    if (v != null && mounted) setState(() => _trail = v);
+                  },
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(color: k.surface3, borderRadius: BorderRadius.circular(18)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          which == 'sl' ? t('order.position.stopLoss') : t('order.position.takeProfit'),
-                          style: context.text.label.copyWith(color: which == 'sl' ? k.down : k.up, fontWeight: FontWeight.w600),
+                          _trail == 'none'
+                              ? t('order.position.trailNone')
+                              : (_trail == 'custom' ? t('order.position.trailCustom') : t('order.unit.pips', {'n': _trail})),
+                          style: context.text.callout.copyWith(fontSize: 13),
                         ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 2,
-                          children: [
-                            for (final n in [10, 25, 50])
-                              KPressable(
-                                minSize: 30,
-                                onTap: () => nudge(which, n),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                                  child: Text(t('order.unit.pipsShort', {'n': n}), style: context.text.mono(11, color: k.fg3)),
-                                ),
-                              ),
-                            if ((which == 'sl' ? _sl : _tp).isNotEmpty)
-                              KPressable(
-                                minSize: 30,
-                                onTap: () => setState(() => which == 'sl' ? _sl = '' : _tp = ''),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                                  child: Text(t('order.position.clear'), style: context.text.caption.copyWith(color: k.fg3)),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        TStepper(
-                          value: which == 'sl' ? _sl : _tp,
-                          height: 36,
-                          step: pip,
-                          decimals: spec.digits,
-                          tone: which == 'sl' ? k.down : k.up,
-                          placeholder: t('order.ticket.notSet'),
-                          semanticLabel: which == 'sl' ? t('order.ticket.stopLoss') : t('order.ticket.takeProfit'),
-                          onChanged: (x) => setState(() => which == 'sl' ? _sl = x : _tp = x),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                (which == 'sl' ? _sl : _tp).isEmpty
-                                    ? '—'
-                                    : t('order.unit.pips', {'n': pipsFrom(double.tryParse(which == 'sl' ? _sl : _tp) ?? cur)}),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: context.text.mono(11.5, color: k.fg3),
-                              ),
-                            ),
-
-                            if (usdAt(which == 'sl' ? _sl : _tp) case final usd?)
-                              Text(
-                                accMoney(a.cent, usd + p.swap - p.commission, signed: true),
-                                style: context.text.mono(11.5, color: usd >= 0 ? k.up : k.down),
-                              ),
-                          ],
-                        ),
+                        const SizedBox(width: 4),
+                        Icon(LucideIcons.chevronDown, size: 14, color: k.fg3),
                       ],
                     ),
                   ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(t('order.position.trailing'), style: context.text.label.copyWith(color: k.fg2)),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          KPressable(
-                            minSize: 36,
-                            semanticLabel: t('order.position.trailingAria'),
-                            onTap: () async {
-                              final v = await showKActionSheet<String>(
-                                context,
-                                title: t('order.position.trailing'),
-                                actions: [
-                                  for (final o in _trailOptions)
-                                    KAction(
-                                      label: o == 'none'
-                                          ? t('order.position.trailNone')
-                                          : (o == 'custom' ? t('order.position.trailCustom') : t('order.unit.pips', {'n': o})),
-                                      value: o,
-                                    ),
-                                ],
-                              );
-                              if (v != null && mounted) setState(() => _trail = v);
-                            },
-                            child: Container(
-                              height: 36,
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              decoration: BoxDecoration(
-                                color: k.surface2,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: k.line),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _trail == 'none'
-                                        ? t('order.position.trailNone')
-                                        : (_trail == 'custom' ? t('order.position.trailCustom') : t('order.unit.pips', {'n': _trail})),
-                                    style: context.text.callout.copyWith(fontSize: 13),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Icon(LucideIcons.chevronDown, size: 14, color: k.fg3),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (_trail == 'custom') ...[
-                            const SizedBox(width: 6),
-                            SizedBox(
-                              width: 100,
-                              child: TStepper(
-                                value: _trailCustom,
-                                height: 36,
-                                step: 1,
-                                decimals: 0,
-                                min: 1,
-                                onChanged: (x) => setState(() => _trailCustom = x),
-                                semanticLabel: t('order.position.trailCustomAria'),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
+                ),
+                if (_trail == 'custom') ...[
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 100,
+                    child: TStepper(
+                      value: _trailCustom,
+                      height: 36,
+                      step: 1,
+                      decimals: 0,
+                      min: 1,
+                      onChanged: (x) => setState(() => _trailCustom = x),
+                      semanticLabel: t('order.position.trailCustomAria'),
+                    ),
                   ),
-                ),
-                KButton(
-                  label: t('order.position.modify'),
-                  onPressed: _busy
-                      ? null
-                      : () async {
-                          final sl = double.tryParse(_sl);
-                          final tp = double.tryParse(_tp);
-                          setState(() => _busy = true);
-                          final ok = await ref
-                              .read(tradeActionsProvider)
-                              .modifyPosition(
-                                p.ticket,
-                                sl: sl,
-                                tp: tp,
-                                clearSl: _sl.isEmpty,
-                                clearTp: _tp.isEmpty,
-                                setTrailing: true,
-                                trailingPoints: trailPips > 0 ? (trailPips * pip / spec.point).round() : null,
-                              );
-                          if (!mounted) return;
-                          setState(() => _busy = false);
-                          if (ok && context.mounted) Navigator.of(context).maybePop();
-                        },
-                ),
+                ],
+                const Spacer(),
               ],
             ),
             const SizedBox(height: 8),
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: KPressable(
-                minSize: 32,
+                minSize: 36,
                 onTap: () => setState(() => _sl = fmtPrice(spec.digits, p.openPrice)),
                 child: Container(
-                  height: 30,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: k.line),
-                  ),
-                  child: Text(
-                    t('order.position.breakeven', {'price': fmtPrice(spec.digits, p.openPrice)}),
-                    style: context.text.footnote.copyWith(color: k.fg2, fontSize: 12),
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(color: k.surface3, borderRadius: BorderRadius.circular(16)),
+                  child: Center(
+                    widthFactor: 1,
+                    child: Text(
+                      t('order.position.breakeven', {'price': fmtPrice(spec.digits, p.openPrice)}),
+                      style: context.text.footnote.copyWith(color: k.fg2, fontSize: 12),
+                    ),
                   ),
                 ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(2, 10, 2, 0),
+              child: Row(
+                children: [
+                  Text(fmtServer(p.openTime), style: context.text.mono(11, color: k.fg3)),
+                  const Spacer(),
+                  Text(
+                    t.dyn('order.source.${p.source}', fallback: p.source),
+                    style: context.text.footnote.copyWith(color: k.fg3, fontSize: 11.5),
+                  ),
+                ],
               ),
             ),
             if (hedging) ...[
@@ -455,10 +436,7 @@ class _PositionFormState extends ConsumerState<PositionForm> {
               if (opp.isEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: k.line),
-                  ),
+                  decoration: BoxDecoration(color: k.surface3, borderRadius: BorderRadius.circular(12)),
                   child: Text(
                     p.buy ? t('order.position.noOppositeSell', {'symbol': p.symbol}) : t('order.position.noOppositeBuy', {'symbol': p.symbol}),
                     style: context.text.footnote.copyWith(color: k.fg3),
@@ -467,16 +445,12 @@ class _PositionFormState extends ConsumerState<PositionForm> {
               else
                 for (final o in opp)
                   Container(
-                    margin: const EdgeInsets.only(bottom: 4),
+                    margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: k.surface2.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: k.line),
-                    ),
+                    decoration: BoxDecoration(color: k.surface3, borderRadius: BorderRadius.circular(12)),
                     child: Row(
                       children: [
-                        Text(t('order.side.${o.side}'), style: context.text.mono(12, color: o.buy ? k.up : k.down)),
+                        SideBadge(side: o.side, lots: o.volume, filled: false),
                         const SizedBox(width: 6),
                         Text('#${o.ticket}', style: context.text.mono(12)),
                         const SizedBox(width: 6),

@@ -1,8 +1,10 @@
-// The order sheet = the web order form (apps/terminal/components/order/order-ticket.tsx, dialog variant), exchange
-// style: Sell | Buy with live prices · order type (Market / Limit / Stop / Stop limit, each explained) · price, limit
-// price, expiry · volume with presets and sizing by risk · Stop loss and Take profit by price, pips or money · More
-// options (trailing stop, OCO, comment, max price change) · summary (margin, pip value, size, free margin after, swap
-// as % a year or points) · ONE confirm button that names the trade. With one-click trading on, Sell / Buy send at once.
+// The order ticket = the web order form (apps/terminal/components/order/order-ticket.tsx, dialog variant) in the trade
+// room's look (owner design 2026-10, MT5 mobile's "Sell by Market / Buy by Market"): the market and its spread · the
+// order type as chips (Market, Buy / Sell Limit, Buy / Sell Stop, Buy / Sell Stop limit, each explained) · price,
+// limit price, expiry · the volume stepper (±0.01 / ±0.1, presets, sizing by risk) · S and T with ONE Price / Points
+// toggle (the money at each, the side checks) · margin and free margin after · More options (trailing stop, OCO,
+// comment, max price change, the full summary) · then big SELL / BUY by market (each names the trade it sends) or
+// Place for a pending order. The same checks before sending (validateOrder), the same engine rules and banners.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -21,10 +23,11 @@ import '../core/trade_actions.dart';
 import '../core/trade_math.dart';
 import '../core/workspace.dart';
 import '../widgets/kit.dart';
+import 'room.dart';
 import 'symbol_search.dart';
 
-/// Opens the order sheet for `symbol` with an optional side / type / price filled in (chart Buy / Sell with one-click
-/// off, the ladder, a chart long-press, the watchlist).
+/// Opens the order ticket for `symbol` with an optional side / type / price filled in (SELL / BUY with one-click off,
+/// the ladder, a chart long-press, the quotes).
 Future<void> showOrderSheet(BuildContext context, {required String symbol, String? side, String type = 'market', double? price, double? volume}) =>
     showKSheet<void>(
       context,
@@ -33,6 +36,24 @@ Future<void> showOrderSheet(BuildContext context, {required String symbol, Strin
     );
 
 const List<double> _presets = [0.01, 0.1, 0.5, 1, 2];
+
+/// The ticket's order type chips: (type, side); Market takes its side from the SELL / BUY buttons.
+const List<(String, String?)> kTicketTypes = [
+  ('market', null),
+  ('limit', 'buy'),
+  ('limit', 'sell'),
+  ('stop', 'buy'),
+  ('stop', 'sell'),
+  ('stop-limit', 'buy'),
+  ('stop-limit', 'sell'),
+];
+
+/// A type chip's label: "Market", "Buy limit", "Sell stop limit" (the web's own words, first letter up).
+String ticketTypeLabel(T t, String type, String? side) {
+  if (type == 'market' || side == null) return t('order.type.market');
+  final s = t('order.pending.$side.$type');
+  return s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+}
 
 class OrderForm extends ConsumerStatefulWidget {
   const OrderForm({super.key, required this.symbol, this.side, this.type = 'market', this.price, this.volume, this.onDone});
@@ -52,10 +73,15 @@ class _OrderFormState extends ConsumerState<OrderForm> {
   late String _type = widget.type;
   late String? _side = widget.side;
   late String _volume = (widget.volume ?? ref.read(workspaceProvider).lot).toStringAsFixed(2);
+  late final TextEditingController _volC = TextEditingController(text: _volume);
+  final FocusNode _volFocus = FocusNode();
   String _price = '';
   String _stopLimit = '';
-  StopInput _sl = const StopInput();
-  StopInput _tp = const StopInput();
+
+  /// The stops' unit, one for both: price | points.
+  String _unit = 'price';
+  StopInput _sl = const StopInput(mode: 'price');
+  StopInput _tp = const StopInput(mode: 'price');
   bool _trailing = false;
   String _trailPips = '20';
   String _expiry = 'GTC';
@@ -77,6 +103,13 @@ class _OrderFormState extends ConsumerState<OrderForm> {
     if (widget.price != null && spec != null) _price = fmtPrice(spec.digits, widget.price!);
   }
 
+  @override
+  void dispose() {
+    _volC.dispose();
+    _volFocus.dispose();
+    super.dispose();
+  }
+
   static String _tomorrow() {
     final d = DateTime.now().add(const Duration(days: 1));
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -88,6 +121,21 @@ class _OrderFormState extends ConsumerState<OrderForm> {
     return v < 0.01 ? 0.01 : v;
   }
 
+  void _setVolume(String v) {
+    _volume = v;
+    if (_volC.text != v && !_volFocus.hasFocus) _volC.text = v;
+  }
+
+  /// ±0.01 / ±0.1 on the market's volume step, within its limits.
+  void _stepVolume(SymbolSpec s, double d) {
+    final next = normalizeVolume(s, _vol + d);
+    KHaptics.selection();
+    setState(() {
+      _volume = fmtVol(next);
+      _volC.text = _volume;
+    });
+  }
+
   void _changeSymbol(String s) {
     if (s == _symbol) return;
     setState(() {
@@ -95,9 +143,11 @@ class _OrderFormState extends ConsumerState<OrderForm> {
       _price = '';
       _stopLimit = '';
       _ocoPrice = '';
-      if (_sl.mode == 'price') _sl = _sl.copyWith(value: '');
-      if (_tp.mode == 'price') _tp = _tp.copyWith(value: '');
-      _side = null;
+      if (_unit == 'price') {
+        _sl = _sl.copyWith(value: '', on: false);
+        _tp = _tp.copyWith(value: '', on: false);
+      }
+      if (!_pending) _side = null;
     });
   }
 
@@ -111,7 +161,8 @@ class _OrderFormState extends ConsumerState<OrderForm> {
 
   double _pipValue(SymbolSpec s, TQuote q) => pipValuePerLot(s, q.bid, bidOf: ref.read(marketFeedProvider).bidOf) * _vol;
 
-  /// Money at a stop for the current volume (USD), signed: negative for a loss (web stopMoney).
+  /// Money at a stop for the current volume (USD), signed: negative for a loss (web stopMoney). By price it needs the
+  /// side (the entry); by points it doesn't.
   double? _stopMoney(StopInput st, String which, SymbolSpec s, TQuote q, bool cent) {
     if (!st.on) return null;
     final pv = _pipValue(s, q);
@@ -122,7 +173,7 @@ class _OrderFormState extends ConsumerState<OrderForm> {
       final d = (_side == 'buy' ? p - _entry(_side!, q) : _entry(_side!, q) - p) / s.pipSize;
       return d * pv;
     }
-    final d = stopDistancePips(st, pipValue: pv, cent: cent);
+    final d = stopDistancePips(st, pipValue: pv, cent: cent, pipPoints: pipPointsOf(s));
     if (d == null) return null;
     return (which == 'sl' ? -1 : 1) * d * pv;
   }
@@ -135,43 +186,36 @@ class _OrderFormState extends ConsumerState<OrderForm> {
     return which == 'sl' ? (_side == 'buy' ? !below : below) : (_side == 'buy' ? below : !below);
   }
 
-  void _toggleStop(String which, bool on, SymbolSpec s, TQuote q) {
-    // a starting distance: twice the spread, at least 10 pips; take profit twice the stop loss
-    final spreadPips = ((q.ask - q.bid) / s.pipSize).clamp(1, 1e9);
-    final base = (spreadPips * 2).round() < 10 ? 10 : (spreadPips * 2).round();
-    setState(() {
-      final st = which == 'sl' ? _sl : _tp;
-      final next = st.copyWith(
-        on: on,
-        mode: on && st.value.isEmpty ? 'pips' : st.mode,
-        value: on && st.value.isEmpty ? '${which == 'sl' ? base : base * 2}' : st.value,
-      );
-      if (which == 'sl') {
-        _sl = next;
-      } else {
-        _tp = next;
-      }
-    });
-  }
+  /// A stop typed in the S / T field: on while it has a value.
+  void _setStop(String which, String v) => setState(() {
+    final next = StopInput(on: v.trim().isNotEmpty, mode: _unit, value: v);
+    if (which == 'sl') {
+      _sl = next;
+    } else {
+      _tp = next;
+    }
+  });
 
-  void _changeMode(String which, String mode, SymbolSpec s, TQuote q, bool cent) {
-    final st = which == 'sl' ? _sl : _tp;
+  /// Price ⇄ Points for both stops: what is typed is converted (by the chosen side, else as a buy), else cleared.
+  void _flipUnit(SymbolSpec s, TQuote q, bool cent) {
+    final to = _unit == 'price' ? 'points' : 'price';
     final side = _side ?? 'buy';
     final pv = _pipValue(s, q);
-    final p = stopPrice(st, which, side, _entry(side, q), s, pipValue: pv, cent: cent);
-    final d = st.mode == 'price' ? (p == null ? null : (p - _entry(side, q)).abs() / s.pipSize) : stopDistancePips(st, pipValue: pv, cent: cent);
-    var value = '';
-    if (mode == 'price') {
-      value = p == null ? '' : fmtPrice(s.digits, p);
-    } else if (d != null) {
-      value = mode == 'pips' ? d.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '') : (d * pv * (cent ? 100 : 1)).toStringAsFixed(2);
+    final entry = _entry(side, q);
+    StopInput conv(StopInput st, String which) {
+      if (!st.on) return StopInput(mode: to);
+      final p = stopPrice(st, which, side, entry, s, pipValue: pv, cent: cent);
+      if (p == null) return StopInput(mode: to);
+      if (to == 'price') return StopInput(on: true, mode: to, value: fmtPrice(s.digits, p));
+      final pts = ((p - entry).abs() / s.point).round();
+      return pts > 0 ? StopInput(on: true, mode: to, value: '$pts') : StopInput(mode: to);
     }
+
+    KHaptics.selection();
     setState(() {
-      if (which == 'sl') {
-        _sl = StopInput(on: st.on, mode: mode, value: value);
-      } else {
-        _tp = StopInput(on: st.on, mode: mode, value: value);
-      }
+      _sl = conv(_sl, 'sl');
+      _tp = conv(_tp, 'tp');
+      _unit = to;
     });
   }
 
@@ -181,6 +225,7 @@ class _OrderFormState extends ConsumerState<OrderForm> {
     if (spec == null || q == null || _busy) return;
     final t = context.t;
     final st = ref.read(terminalProvider);
+    setState(() => _side = side);
     if (_pending && _price.isEmpty) {
       ref.read(notificationsProvider.notifier).toast(NotificationKind.error, t('order.toast.enterPendingPrice'));
       return;
@@ -227,28 +272,6 @@ class _OrderFormState extends ConsumerState<OrderForm> {
       widget.onDone?.call();
       if (widget.onDone == null) Navigator.of(context).maybePop();
     }
-  }
-
-  void _onSide(String s) {
-    setState(() => _side = s);
-    if (ref.read(workspaceProvider).oneClick) unawaited(_submit(s));
-  }
-
-  String _typeWord(T t, String ty) => switch (ty) {
-    'market' => t('desk.op.market'),
-    'limit' => t('desk.op.type.limit'),
-    'stop' => t('desk.op.type.stop'),
-    _ => t('desk.op.type.stopLimit'),
-  };
-
-  Future<void> _pickType() async {
-    final t = context.t;
-    final ty = await showKActionSheet<String>(
-      context,
-      title: t('desk.op.typeTitle'),
-      actions: [for (final x in kOrderTypes) KAction(label: '${_typeWord(t, x)} · ${x == 'market' ? t('desk.op.typeNow') : t('desk.op.typeLater')}', value: x)],
-    );
-    if (ty != null && mounted) setState(() => _type = ty);
   }
 
   Future<void> _pickExpiry() async {
@@ -306,27 +329,53 @@ class _OrderFormState extends ConsumerState<OrderForm> {
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
               child: Row(
                 children: [
-                  Icon(LucideIcons.shoppingCart, size: 16, color: k.fg3),
-                  const SizedBox(width: 8),
-                  Text(t('order.dialog.title'), style: context.text.title2.copyWith(fontSize: 16)),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      '${acc.login} · ${acc.server} · ${t.dyn('order.mode.${acc.mode}', fallback: acc.mode)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
-                      style: context.text.mono(11, color: k.fg3),
+                    child: KPressable(
+                      key: const ValueKey('ticket-symbol'),
+                      pressedScale: 1,
+                      semanticLabel: t('chart.toolbar.symbol'),
+                      onTap: () => showSymbolSearch(context, onPick: _changeSymbol),
+                      child: Row(
+                        children: [
+                          SymbolAvatar(_symbol),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(_symbol, style: context.text.headline.copyWith(fontSize: 18, fontWeight: FontWeight.w800)),
+                                    const SizedBox(width: 4),
+                                    Icon(LucideIcons.chevronDown, size: 14, color: k.fg3),
+                                  ],
+                                ),
+                                Text(
+                                  '${spec.name} · ${acc.login} · ${t.dyn('order.mode.${acc.mode}', fallback: acc.mode)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.text.footnote.copyWith(fontSize: 11, color: k.fg3),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${t('desk.op.spread')} ${t('order.unit.pts', {'n': spreadPoints(spec, q.bid, q.ask)})}',
+                    style: context.text.mono(12, color: k.fg3),
                   ),
                 ],
               ),
             ),
             Expanded(
-              child: ListView(padding: const EdgeInsets.fromLTRB(14, 0, 14, 12), children: _body(context, spec, acc, q, open)),
+              child: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12), children: _body(context, spec, acc, q, open)),
             ),
             _footer(context, spec, q, open, oneClick),
           ],
@@ -345,108 +394,63 @@ class _OrderFormState extends ConsumerState<OrderForm> {
     final slMoney = _stopMoney(_sl, 'sl', spec, q, cent);
     final tpMoney = _stopMoney(_tp, 'tp', spec, q, cent);
     final stepPrice = priceStep(spec);
+    final m = ref.watch(terminalProvider.select((s) => s.metrics));
+    final margin = marginRequired(spec, _vol, q.ask, acc.leverage, bidOf: ref.read(marketFeedProvider).bidOf);
+    final short = margin > m.free;
+    Widget volButton(String label, double d) => KPressable(
+      minSize: 40,
+      pressedScale: 0.94,
+      semanticLabel: t(d < 0 ? 'app.trader.ticket.less' : 'app.trader.ticket.more', {'n': d.abs() < 0.05 ? '0.01' : '0.1'}),
+      onTap: () => _stepVolume(spec, d),
+      child: Container(
+        width: 44,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: k.surface3, borderRadius: BorderRadius.circular(12)),
+        child: Text(label, style: context.text.mono(12, weight: FontWeight.w700, color: k.fg)),
+      ),
+    );
     return [
-      // symbol
-      KPressable(
-        pressedScale: 1,
-        onTap: () => showSymbolSearch(context, onPick: _changeSymbol),
-        child: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: k.surface2,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: k.line),
-          ),
-          child: Row(
-            children: [
-              SymbolAvatar(_symbol, size: 18),
-              const SizedBox(width: 8),
-              Text(_symbol, style: context.text.label.copyWith(fontWeight: FontWeight.w600, fontSize: 13.5)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  spec.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.footnote.copyWith(color: k.fg3),
+      // order type chips
+      SizedBox(
+        height: 44,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            for (final (ty, sd) in kTicketTypes)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 6),
+                child: RoomChip(
+                  key: ValueKey('ticket-type-$ty${sd == null ? '' : '-$sd'}'),
+                  height: 32,
+                  label: ticketTypeLabel(t, ty, sd),
+                  selected: _type == ty && (ty == 'market' || _side == sd),
+                  onTap: () {
+                    KHaptics.selection();
+                    setState(() {
+                      _type = ty;
+                      if (sd != null) _side = sd;
+                    });
+                  },
                 ),
               ),
-              Icon(LucideIcons.chevronDown, size: 15, color: k.fg3),
-            ],
-          ),
-        ),
-      ),
-      const SizedBox(height: 8),
-      // side: Sell | Buy with live prices
-      Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: k.surface2,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: k.line),
-        ),
-        child: Row(
-          children: [
-            for (final s in ['sell', 'buy']) ...[if (s == 'buy') const SizedBox(width: 4), Expanded(child: _sideButton(context, spec, s, open))],
           ],
         ),
       ),
-      const SizedBox(height: 8),
-      // order type and the spread
-      Row(
-        children: [
-          KPressable(
-            minSize: 34,
-            onTap: _pickType,
-            child: Container(
-              height: 30,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: k.surface2,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: k.line),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _typeWord(t, _type),
-                    style: context.text.label.copyWith(color: k.fg, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(LucideIcons.chevronDown, size: 14, color: k.fg3),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          THelp(title: t('desk.op.typeTitle'), text: explain),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(color: k.surface2, borderRadius: BorderRadius.circular(6)),
-            child: Text('${t('desk.op.spread')} ${spreadPoints(spec, q.bid, q.ask)}', style: context.text.mono(11.5, color: k.fg2)),
-          ),
-        ],
-      ),
       if (_pending) ...[
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(color: k.surface2.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(9)),
-          child: Text(explain, style: context.text.footnote.copyWith(color: k.fg2, fontSize: 12)),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(child: Text(explain, style: context.text.footnote.copyWith(color: k.fg2, fontSize: 12))),
+            THelp(title: t('desk.op.typeTitle'), text: explain),
+          ],
         ),
       ],
       if (!open) ...[
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: k.warnSoft,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: k.warn.withValues(alpha: 0.3)),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(color: k.warnSoft, borderRadius: BorderRadius.circular(12)),
           child: Row(
             children: [
               Icon(LucideIcons.lock, size: 13, color: k.warn),
@@ -512,19 +516,40 @@ class _OrderFormState extends ConsumerState<OrderForm> {
         ),
       ],
       const SizedBox(height: 8),
-      // volume
-      TFieldRow(
-        label: Text(t('desk.op.volume')),
-        help: THelp(title: t('desk.g.lot.t'), text: t('desk.g.lot')),
-        child: SizedBox(
-          width: 150,
-          child: TStepper(
-            value: _volume,
-            onChanged: (v) => setState(() => _volume = v),
-            step: spec.lotStep,
-            min: spec.lotMin,
-            max: spec.lotMax,
-            semanticLabel: t('order.ticket.volume'),
+      // volume: −0.1 −.01 [lots] +.01 +0.1
+      Container(
+        key: const ValueKey('ticket-volume'),
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(color: k.bg, borderRadius: BorderRadius.circular(16)),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Row(
+            children: [
+              volButton('−0.1', -0.1),
+              const SizedBox(width: 6),
+              volButton('−.01', -0.01),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: _volC,
+                      focusNode: _volFocus,
+                      textAlign: TextAlign.center,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: context.text.mono(20, weight: FontWeight.w800, color: k.fg),
+                      cursorColor: k.ember,
+                      decoration: const InputDecoration(isCollapsed: true, border: InputBorder.none),
+                      onChanged: (v) => setState(() => _volume = v),
+                    ),
+                    Text(t('desk.ob.lots'), style: context.text.caption.copyWith(fontSize: 10, color: k.fg3)),
+                  ],
+                ),
+              ),
+              volButton('+.01', 0.01),
+              const SizedBox(width: 6),
+              volButton('+0.1', 0.1),
+            ],
           ),
         ),
       ),
@@ -536,7 +561,7 @@ class _OrderFormState extends ConsumerState<OrderForm> {
               options: _presets,
               labels: [for (final p in _presets) p < 1 ? '$p' : p.toStringAsFixed(0)],
               selected: _presets.where((p) => (p - _vol).abs() < 1e-9).firstOrNull,
-              onPick: (v) => setState(() => _volume = v.toStringAsFixed(2)),
+              onPick: (v) => setState(() => _setVolume(v.toStringAsFixed(2))),
             ),
           ),
           const SizedBox(width: 6),
@@ -558,17 +583,77 @@ class _OrderFormState extends ConsumerState<OrderForm> {
         ],
       ),
       if (_calcOpen) ...[const SizedBox(height: 8), _calculator(context, spec, acc, q)],
-      const SizedBox(height: 8),
-      _stopRow(context, 'sl', spec, q, cent, slMoney),
-      const SizedBox(height: 6),
-      _stopRow(context, 'tp', spec, q, cent, tpMoney),
+      const SizedBox(height: 10),
+      // S · T · Price / Points
+      Row(
+        children: [
+          Expanded(
+            child: StopField(
+              key: const ValueKey('ticket-sl'),
+              kind: 'sl',
+              value: _sl.value,
+              placeholder: _unit == 'price' ? t('desk.op.mode.price') : t('news.instrument.swapType.points'),
+              semanticLabel: t('order.ticket.stopLoss'),
+              onChanged: (v) => _setStop('sl', v),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: StopField(
+              key: const ValueKey('ticket-tp'),
+              kind: 'tp',
+              value: _tp.value,
+              placeholder: _unit == 'price' ? t('desk.op.mode.price') : t('news.instrument.swapType.points'),
+              semanticLabel: t('order.ticket.takeProfit'),
+              onChanged: (v) => _setStop('tp', v),
+            ),
+          ),
+          const SizedBox(width: 6),
+          KPressable(
+            key: const ValueKey('ticket-unit'),
+            pressedScale: 0.95,
+            semanticLabel: t('app.trader.ticket.unitAria'),
+            onTap: () => _flipUnit(spec, q, cent),
+            child: Container(
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: k.surface3, borderRadius: BorderRadius.circular(14)),
+              child: Text(
+                _unit == 'price' ? t('desk.op.mode.price') : t('news.instrument.swapType.points'),
+                style: context.text.label.copyWith(fontSize: 11, fontWeight: FontWeight.w700, color: k.fg2),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _stopNote(context, 'sl', spec, q, cent, slMoney),
+      _stopNote(context, 'tp', spec, q, cent, tpMoney),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+        child: Text(
+          t('app.trader.ticket.marginFree', {'margin': accMoney(cent, margin), 'free': accMoney(cent, m.free - margin)}),
+          key: const ValueKey('ticket-margin'),
+          textAlign: TextAlign.end,
+          style: context.text.mono(11, color: short ? k.down : k.fg3),
+        ),
+      ),
+      if (short)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+          child: Text(
+            t('desk.op.notEnough'),
+            textAlign: TextAlign.end,
+            style: context.text.footnote.copyWith(color: k.down, fontWeight: FontWeight.w600, fontSize: 12),
+          ),
+        ),
       const SizedBox(height: 6),
       // more options
       KPressable(
         pressedScale: 1,
         onTap: () => setState(() => _more = !_more),
         child: SizedBox(
-          height: 34,
+          height: 40,
           child: Row(
             children: [
               Icon(_more ? LucideIcons.chevronDown : LucideIcons.chevronRight, size: 14, color: k.fg3),
@@ -688,228 +773,220 @@ class _OrderFormState extends ConsumerState<OrderForm> {
             );
           },
         ),
-      ],
-      const SizedBox(height: 10),
-      const KDivider(),
-      const SizedBox(height: 6),
-      _summary(context, spec, acc, q),
-      if (_sl.on && _tp.on && slMoney != null && tpMoney != null && slMoney < 0)
-        TSummaryRow(
-          label: t('desk.op.ratioLabel'),
-          value: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: accMoney(cent, slMoney, signed: true),
-                  style: TextStyle(color: k.down),
-                ),
-                TextSpan(
-                  text: ' / ',
-                  style: TextStyle(color: k.fg3),
-                ),
-                TextSpan(
-                  text: accMoney(cent, tpMoney, signed: true),
-                  style: TextStyle(color: k.up),
-                ),
-                TextSpan(
-                  text: '  · ${(tpMoney / slMoney.abs()).toStringAsFixed(1)}×',
-                  style: TextStyle(color: k.fg2),
-                ),
-              ],
+        const SizedBox(height: 10),
+        const KDivider(),
+        const SizedBox(height: 6),
+        _summary(context, spec, acc, q),
+        if (_sl.on && _tp.on && slMoney != null && tpMoney != null && slMoney < 0)
+          TSummaryRow(
+            label: t('desk.op.ratioLabel'),
+            value: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: accMoney(cent, slMoney, signed: true),
+                    style: TextStyle(color: k.down),
+                  ),
+                  TextSpan(
+                    text: ' / ',
+                    style: TextStyle(color: k.fg3),
+                  ),
+                  TextSpan(
+                    text: accMoney(cent, tpMoney, signed: true),
+                    style: TextStyle(color: k.up),
+                  ),
+                  TextSpan(
+                    text: '  · ${(tpMoney / slMoney.abs()).toStringAsFixed(1)}×',
+                    style: TextStyle(color: k.fg2),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
+      ],
     ];
   }
 
-  Widget _sideButton(BuildContext context, SymbolSpec spec, String s, bool open) {
+  /// Under S / T: the money at the stop, its price (points) or its distance (price), and the side checks.
+  Widget _stopNote(BuildContext context, String which, SymbolSpec spec, TQuote q, bool cent, double? money) {
     final t = context.t;
     final k = context.k;
-    final buy = s == 'buy';
-    final chosen = _side == s;
-    final armed = ref.watch(workspaceProvider.select((w) => w.oneClick));
-    final fixed = _pending ? double.tryParse(_price) : null;
-    final col = buy ? k.up : k.down;
-    return KPressable(
-      onTap: !open || _busy ? null : () => _onSide(s),
-      semanticLabel: buy ? t('desk.pos.buy') : t('desk.pos.sell'),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        height: 50,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: chosen ? (buy ? k.upSoft : k.downSoft) : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: chosen ? col.withValues(alpha: 0.45) : (armed ? col.withValues(alpha: 0.25) : Colors.transparent)),
-        ),
-        child: Opacity(
-          opacity: open ? 1 : 0.5,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  if (armed) Icon(LucideIcons.zap, size: 11, color: col),
-                  if (armed) const SizedBox(width: 3),
-                  Flexible(
-                    child: Text(
-                      buy ? t('desk.pos.buy') : t('desk.pos.sell'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.label.copyWith(color: col, fontWeight: FontWeight.w700, fontSize: 12.5),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Spacer(),
-                  if (fixed != null && fixed > 0)
-                    PriceText(fixed, digits: spec.digits, size: 13.5)
-                  else
-                    QuoteBuilder(
-                      symbol: _symbol,
-                      builder: (context, q) => PriceText(buy ? (q?.ask ?? 0) : (q?.bid ?? 0), digits: spec.digits, size: 13.5, dir: q?.dir ?? 0),
-                    ),
-                ],
+    final st = which == 'sl' ? _sl : _tp;
+    if (!st.on) return const SizedBox.shrink();
+    final tone = which == 'sl' ? k.down : k.up;
+    final pv = _pipValue(spec, q);
+    final at = _side == null ? null : stopPrice(st, which, _side!, _entry(_side!, q), spec, pipValue: pv, cent: cent);
+    final d = st.mode == 'price'
+        ? (at != null && _side != null ? (at - _entry(_side!, q)).abs() / spec.pipSize : null)
+        : stopDistancePips(st, pipValue: pv, cent: cent, pipPoints: pipPointsOf(spec));
+    final bad = _wrongSide(st, which, q);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 5, 4, 0),
+      child: Wrap(
+        spacing: 6,
+        children: [
+          Text(t(which == 'sl' ? 'chart.line.slHandle' : 'chart.line.tpHandle'), style: context.text.mono(11.5, weight: FontWeight.w800, color: tone)),
+          if (money != null)
+            Text(
+              which == 'sl'
+                  ? t('desk.op.risk', {'amount': accMoney(cent, money, signed: true)})
+                  : t('desk.op.reward', {'amount': accMoney(cent, money, signed: true)}),
+              style: context.text.mono(11.5, weight: FontWeight.w600, color: tone),
+            ),
+          if (at != null && st.mode != 'price')
+            Text('· ${t('desk.op.atPrice', {'price': fmtPrice(spec.digits, at)})}', style: context.text.mono(11.5, color: k.fg3))
+          else if (_side == null && st.mode == 'price')
+            Text('· ${t('desk.op.pickSideForPrice')}', style: context.text.footnote.copyWith(color: k.fg3, fontSize: 11.5)),
+          if (d != null) Text('· ${t('desk.op.pipsAway', {'n': d.toStringAsFixed(1)})}', style: context.text.footnote.copyWith(color: k.fg3, fontSize: 11.5)),
+          if (bad)
+            SizedBox(
+              width: double.infinity,
+              child: Text(
+                t.dyn('desk.op.check.$which${_side == 'buy' ? 'Buy' : 'Sell'}'),
+                style: context.text.footnote.copyWith(color: k.down, fontSize: 11.5),
               ),
-              const SizedBox(height: 2),
-              Text(
-                buy ? t('desk.op.buyHint') : t('desk.op.sellHint'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.text.footnote.copyWith(color: k.fg3, fontSize: 11.5),
-              ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _stopRow(BuildContext context, String which, SymbolSpec spec, TQuote q, bool cent, double? money) {
+  Widget _footer(BuildContext context, SymbolSpec spec, TQuote q, bool open, bool oneClick) {
     final t = context.t;
     final k = context.k;
-    final st = which == 'sl' ? _sl : _tp;
-    final name = which == 'sl' ? t('desk.op.sl') : t('desk.op.tp');
-    final tone = which == 'sl' ? k.down : k.up;
-    final pv = _pipValue(spec, q);
-    final at = _side == null ? null : stopPrice(st, which, _side!, _entry(_side!, q), spec, pipValue: pv, cent: cent);
-    final d = !st.on
-        ? null
-        : (st.mode == 'price'
-              ? (at != null && _side != null ? (at - _entry(_side!, q)).abs() / spec.pipSize : null)
-              : stopDistancePips(st, pipValue: pv, cent: cent));
-    final bad = _wrongSide(st, which, q);
-    final modeLabel = st.mode == 'price' ? t('desk.op.mode.price') : (st.mode == 'pips' ? t('desk.op.mode.pips') : accCcy(cent));
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TFieldRow(
-          tone: st.on ? tone : null,
-          label: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TSmallSwitch(value: st.on, onChanged: (v) => _toggleStop(which, v, spec, q), semanticLabel: name),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: st.on ? k.fg : k.fg2),
-                ),
-              ),
-            ],
-          ),
-          help: THelp(title: which == 'sl' ? t('desk.g.sl.t') : t('desk.g.tp.t'), text: which == 'sl' ? t('desk.op.slHint') : t('desk.op.tpHint')),
-          child: st.on
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 116,
-                      child: TStepper(
-                        value: st.value,
-                        tone: tone,
-                        step: st.mode == 'price' ? spec.pipSize : (st.mode == 'pips' ? 1 : ((pv * (cent ? 100 : 1)).round().clamp(1, 1 << 20)).toDouble()),
-                        decimals: st.mode == 'price' ? spec.digits : (st.mode == 'pips' ? 1 : 2),
-                        placeholder: st.mode == 'price' ? fmtPrice(spec.digits, _side == 'sell' ? q.ask : q.bid) : '0',
-                        semanticLabel: which == 'sl' ? t('order.ticket.stopLoss') : t('order.ticket.takeProfit'),
-                        onChanged: (v) => setState(() {
-                          if (which == 'sl') {
-                            _sl = _sl.copyWith(value: v);
-                          } else {
-                            _tp = _tp.copyWith(value: v);
-                          }
-                        }),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    KPressable(
-                      minSize: 32,
-                      onTap: () async {
-                        final m = await showKActionSheet<String>(
-                          context,
-                          title: name,
-                          actions: [
-                            KAction(label: t('desk.op.mode.price'), value: 'price'),
-                            KAction(label: t('desk.op.mode.pips'), value: 'pips'),
-                            KAction(label: '${t('desk.op.mode.money')} (${accCcy(cent)})', value: 'money'),
-                          ],
-                        );
-                        if (m != null && mounted) _changeMode(which, m, spec, q, cent);
-                      },
-                      child: Container(
-                        height: 26,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        decoration: BoxDecoration(
-                          color: k.surface,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: k.line),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(modeLabel, style: context.text.caption.copyWith(color: k.fg2)),
-                            Icon(LucideIcons.chevronDown, size: 12, color: k.fg3),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              : Text(t('desk.op.off'), style: context.text.footnote.copyWith(color: k.fg3)),
-        ),
-        if (st.on)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-            child: Wrap(
-              spacing: 6,
+    final delayed = q.delayed && !_pending;
+    String marketText(String side) =>
+        t('desk.op.confirm.market', {'side': side == 'buy' ? t('desk.pos.buy') : t('desk.pos.sell'), 'lots': fmtVol(_vol), 'symbol': _symbol});
+    // the line over the buttons says what will be sent (or why nothing can be)
+    final String caption;
+    if (delayed) {
+      caption = t('desk.side.delayedTip');
+    } else if (!open) {
+      caption = t('desk.op.confirm.closed');
+    } else if (_busy) {
+      caption = t('desk.op.confirm.sending');
+    } else if (_side == null) {
+      caption = t('desk.op.confirm.pickSide');
+    } else if (_pending && _price.isEmpty) {
+      caption = t('desk.op.confirm.enterPrice');
+    } else if (_pending) {
+      caption = t('desk.op.confirm.pending', {
+        'label': t('order.pending.$_side.$_type'),
+        'lots': fmtVol(_vol),
+        'symbol': _symbol,
+        'price': fmtPrice(spec.digits, double.tryParse(_price) ?? 0),
+      });
+    } else {
+      caption = marketText(_side!);
+    }
+    final canMarket = !delayed && open && !_busy;
+    final canPlace = open && !_busy && _side != null && _price.isNotEmpty;
+    Widget big(String side) {
+      final buy = side == 'buy';
+      final chosen = _side == side;
+      return Expanded(
+        child: KPressable(
+          key: ValueKey('ticket-$side'),
+          pressedScale: 0.97,
+          haptic: false,
+          semanticLabel: marketText(side),
+          onTap: canMarket
+              ? () {
+                  KHaptics.medium();
+                  unawaited(_submit(side));
+                }
+              : null,
+          child: Container(
+            height: 56,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: canMarket ? (buy ? k.buyFill : k.sellFill) : k.surface3,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: chosen && canMarket ? Colors.white.withValues(alpha: 0.7) : Colors.transparent, width: 1.5),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (money != null)
-                  Text(
-                    which == 'sl'
-                        ? t('desk.op.risk', {'amount': accMoney(cent, money, signed: true)})
-                        : t('desk.op.reward', {'amount': accMoney(cent, money, signed: true)}),
-                    style: context.text.mono(11.5, weight: FontWeight.w600, color: tone),
-                  ),
-                if (at != null)
-                  Text('· ${t('desk.op.atPrice', {'price': fmtPrice(spec.digits, at)})}', style: context.text.mono(11.5, color: k.fg3))
-                else if (_side == null)
-                  Text('· ${t('desk.op.pickSideForPrice')}', style: context.text.footnote.copyWith(color: k.fg3, fontSize: 11.5)),
-                if (d != null && st.mode != 'pips')
-                  Text('· ${t('desk.op.pipsAway', {'n': d.toStringAsFixed(1)})}', style: context.text.footnote.copyWith(color: k.fg3, fontSize: 11.5)),
-                if (bad)
-                  SizedBox(
-                    width: double.infinity,
-                    child: Text(
-                      t.dyn('desk.op.check.$which${_side == 'buy' ? 'Buy' : 'Sell'}'),
-                      style: context.text.footnote.copyWith(color: k.down, fontSize: 11.5),
-                    ),
-                  ),
+                Text(
+                  t(buy ? 'common.buy' : 'common.sell').toUpperCase(),
+                  style: context.text.micro.copyWith(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: canMarket ? Colors.white : k.fg3),
+                ),
+                PriceText(buy ? q.ask : q.bid, digits: spec.digits, size: 15, weight: FontWeight.w700, color: canMarket ? Colors.white : k.fg3),
               ],
             ),
           ),
-      ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: k.line, width: 0.6)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!_pending) ...[
+            Text(
+              caption,
+              key: const ValueKey('ticket-caption'),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.footnote.copyWith(color: k.fg2, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+          ],
+          if (_pending)
+            KPressable(
+              key: const ValueKey('ticket-place'),
+              semanticLabel: caption,
+              onTap: canPlace ? () => unawaited(_submit(_side!)) : null,
+              child: Container(
+                height: 56,
+                width: double.infinity,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: canPlace ? (_side == 'sell' ? k.sellFill : k.buyFill) : k.surface3,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: _busy
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator.adaptive(strokeWidth: 2))
+                    : Text(
+                        caption,
+                        key: const ValueKey('ticket-caption'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.headline.copyWith(fontSize: 15, fontWeight: FontWeight.w800, color: canPlace ? Colors.white : k.fg3),
+                      ),
+              ),
+            )
+          else
+            Row(children: [big('sell'), const SizedBox(width: 8), big('buy')]),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              TSmallSwitch(
+                value: oneClick,
+                semanticLabel: t('desk.op.oneClick'),
+                onChanged: (v) => ref.read(workspaceProvider.notifier).update((w) => w.copyWith(oneClick: v)),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                t('desk.op.oneClick'),
+                style: context.text.footnote.copyWith(color: k.fg2, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 4),
+              THelp(title: t('desk.op.oneClick'), text: oneClick ? t('desk.op.oneClickOn') : t('desk.op.oneClickOff')),
+              const Spacer(),
+              Text(oneClick ? t('trader.oneClick.on') : t('trader.oneClick.off'), style: context.text.caption.copyWith(color: oneClick ? k.ember : k.fg3)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -994,10 +1071,15 @@ class _OrderFormState extends ConsumerState<OrderForm> {
             size: KButtonSize.sm,
             expand: true,
             onPressed: () {
+              // the stops go in as points (the ticket's Price / Points toggle): the stop-loss distance and twice it
+              final pts = pipPointsOf(spec);
+              final slPts = ((double.tryParse(_riskPips) ?? 0) * pts).round();
               setState(() {
-                _volume = lots.toStringAsFixed(2);
-                _sl = StopInput(on: true, value: _riskPips);
-                _tp = StopInput(on: true, value: ((double.tryParse(_riskPips) ?? 0) * 2).toStringAsFixed(0));
+                _setVolume(lots.toStringAsFixed(2));
+                _volC.text = _volume;
+                _unit = 'points';
+                _sl = StopInput(on: slPts > 0, mode: 'points', value: slPts > 0 ? '$slPts' : '');
+                _tp = StopInput(on: slPts > 0, mode: 'points', value: slPts > 0 ? '${slPts * 2}' : '');
                 _calcOpen = false;
               });
               ref
@@ -1087,95 +1169,8 @@ class _OrderFormState extends ConsumerState<OrderForm> {
       ],
     );
   }
-
-  Widget _footer(BuildContext context, SymbolSpec spec, TQuote q, bool open, bool oneClick) {
-    final t = context.t;
-    final k = context.k;
-    final delayed = q.delayed && !_pending;
-    final String confirm;
-    if (delayed) {
-      confirm = t('desk.side.delayedTip');
-    } else if (!open) {
-      confirm = t('desk.op.confirm.closed');
-    } else if (_busy) {
-      confirm = t('desk.op.confirm.sending');
-    } else if (_side == null) {
-      confirm = t('desk.op.confirm.pickSide');
-    } else if (_pending && _price.isEmpty) {
-      confirm = t('desk.op.confirm.enterPrice');
-    } else if (_pending) {
-      confirm = t('desk.op.confirm.pending', {
-        'label': t('order.pending.$_side.$_type'),
-        'lots': fmtVol(_vol),
-        'symbol': _symbol,
-        'price': fmtPrice(spec.digits, double.tryParse(_price) ?? 0),
-      });
-    } else {
-      confirm = t('desk.op.confirm.market', {'side': _side == 'buy' ? t('desk.pos.buy') : t('desk.pos.sell'), 'lots': fmtVol(_vol), 'symbol': _symbol});
-    }
-    final canConfirm = !delayed && open && !_busy && _side != null && (!_pending || _price.isNotEmpty);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: k.line, width: 0.6)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (oneClick)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: k.ember.withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: k.ember.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(LucideIcons.zap, size: 13, color: k.ember),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(t('desk.op.oneClickNote'), style: context.text.footnote.copyWith(color: k.fg2, fontSize: 12)),
-                  ),
-                ],
-              ),
-            )
-          else
-            KButton(
-              label: confirm,
-              size: KButtonSize.lg,
-              expand: true,
-              loading: _busy,
-              variant: canConfirm
-                  ? (_side == 'sell' ? KButtonVariant.sell : (_side == 'buy' ? KButtonVariant.buy : KButtonVariant.ember))
-                  : KButtonVariant.surface,
-              onPressed: canConfirm ? () => unawaited(_submit(_side!)) : null,
-            ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              TSmallSwitch(
-                value: oneClick,
-                semanticLabel: t('desk.op.oneClick'),
-                onChanged: (v) => ref.read(workspaceProvider.notifier).update((w) => w.copyWith(oneClick: v)),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                t('desk.op.oneClick'),
-                style: context.text.footnote.copyWith(color: k.fg2, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(width: 4),
-              THelp(title: t('desk.op.oneClick'), text: oneClick ? t('desk.op.oneClickOn') : t('desk.op.oneClickOff')),
-              const Spacer(),
-              Text(oneClick ? t('trader.oneClick.on') : t('trader.oneClick.off'), style: context.text.caption.copyWith(color: oneClick ? k.ember : k.fg3)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
+
 
 /// "100,000" / "1,250.5" (the order summary's position size).
 abstract final class Fmt2 {
