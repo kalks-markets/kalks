@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button, Card, CardHeader, Chip, DataTable, Input, KpiCard, PageHeader, Reveal, Toggle, cn, type Column } from "@kalks/ui";
 import { FilterSelect, Pager, TableSkeleton, day, qs, useApi, useDebounced, when } from "@/components/live/kit";
 import { ErrorBanner } from "@/components/trading-desk/kit";
+import { AWAITING, FirstApproval, FourEyesDecide, fourEyesRule } from "./four-eyes";
 import { M, errText, mkSend, type AppliesTo, type CatalogueItem, type CatalogueKind, type EarnRule, type Member, type Overview, type Paged, type Redemption, type Settings, type Tier } from "./api";
 import {
   AreaF,
@@ -586,10 +587,11 @@ function RedemptionsCard({ canApprove, tick, ask }: { canApprove: boolean; tick:
   const [status, setStatus] = React.useState("all");
   const [page, setPage] = React.useState(1);
   React.useEffect(() => setPage(1), [status]);
-  const { data, error, loading, reload } = useApi<Paged<Redemption>>(`${M("redemptions")}${qs({ status, page, limit: PER })}`);
+  const { data, error, loading, reload } = useApi<Paged<Redemption> & { fourEyesThreshold?: number }>(`${M("redemptions")}${qs({ status, page, limit: PER })}`);
   React.useEffect(() => {
     if (tick) reload();
   }, [tick, reload]);
+  const threshold = data?.fourEyesThreshold;
   const retry = (r: Redemption) =>
     ask({
       title: `Retry redemption #${r.id}`,
@@ -607,7 +609,18 @@ function RedemptionsCard({ canApprove, tick, ask }: { canApprove: boolean; tick:
     { key: "i", header: "Reward", cell: (r) => <span className="block max-w-52"><span className="block truncate font-medium">{r.itemName}</span><span className="block text-[11.5px] text-fg-3">{KIND_LABEL[r.kind] ?? r.kind}{r.voucherCode ? ` · ${r.voucherCode}` : ""}{r.login ? ` · acc ${r.login}` : ""}</span></span>, csv: (r) => r.itemName },
     { key: "p", header: "Points", align: "right", cell: (r) => <span className="k-num">{int(r.points)}</span>, sort: (r) => r.points, csv: (r) => r.points },
     { key: "v", header: "Value", align: "right", cell: (r) => <span className="k-num">{r.kind === "fee_discount" ? `${num(r.value)}%` : usd(r.value)}</span>, csv: (r) => r.value },
-    { key: "s", header: "Status", cell: (r) => <span className="flex flex-col items-start gap-0.5"><StatusPill map={PAY_STATUS} status={r.status} />{r.error && <span className="max-w-40 truncate text-[10.5px] text-down" title={r.error}>{r.error}</span>}</span>, csv: (r) => r.status },
+    {
+      key: "s",
+      header: "Status",
+      cell: (r) => (
+        <span className="flex flex-col items-start gap-0.5">
+          <StatusPill map={PAY_STATUS} status={r.status} />
+          {r.status === AWAITING && <FirstApproval fe={r.fourEyes} className="flex max-w-56 items-center gap-1 text-[10.5px] text-warn" />}
+          {r.error && <span className={`max-w-40 truncate text-[10.5px] ${r.status === "rejected" ? "text-fg-3" : "text-down"}`} title={r.error}>{r.error}</span>}
+        </span>
+      ),
+      csv: (r) => r.status,
+    },
     ...(canApprove
       ? [
           {
@@ -615,7 +628,23 @@ function RedemptionsCard({ canApprove, tick, ask }: { canApprove: boolean; tick:
             header: "",
             align: "right" as const,
             cell: (r: Redemption) =>
-              r.status !== "completed" ? (
+              r.status === "approval" || r.status === AWAITING ? (
+                <FourEyesDecide<{ redemption?: Redemption }>
+                  act={{ ask }}
+                  what="redemption"
+                  status={r.status}
+                  amount={r.value}
+                  fe={r.fourEyes}
+                  threshold={threshold}
+                  approvePath={`redemptions/${r.id}/approve`}
+                  rejectPath={`redemptions/${r.id}/reject`}
+                  statusOf={(d) => d.redemption?.status}
+                  paidText="Redemption approved · cash credited to the wallet"
+                  describe={`${r.itemName}: ${usd(r.value)} cash to the client's wallet. Rejecting gives the ${int(r.points)} points back.`}
+                  onDone={reload}
+                  testId={`redemption-${r.id}`}
+                />
+              ) : r.status === "failed" ? (
                 <Button size="xs" variant="surface" onClick={() => retry(r)}>
                   Retry
                 </Button>
@@ -626,7 +655,7 @@ function RedemptionsCard({ canApprove, tick, ask }: { canApprove: boolean; tick:
   ];
   return (
     <Card>
-      <CardHeader title="Redemptions" subtitle="A failed wallet credit is retried, never refunded silently" />
+      <CardHeader title="Redemptions" subtitle={`A failed wallet credit is retried, never refunded silently.${threshold != null ? ` Cash redemptions: ${fourEyesRule(threshold)}` : ""}`} />
       <div className="mt-4 px-4 pb-5 sm:px-6">
         {error && !data ? (
           <MkError error={error} onRetry={reload} />
@@ -641,7 +670,15 @@ function RedemptionsCard({ canApprove, tick, ask }: { canApprove: boolean; tick:
               dense
               rowKey={(r) => String(r.id)}
               exportName="loyalty-redemptions"
-              toolbar={<FilterSelect label="Status" value={status} onChange={setStatus} options={[{ value: "all", label: "All" }, { value: "pending", label: "Pending" }, { value: "completed", label: "Completed" }, { value: "failed", label: "Failed" }]} />}
+              toolbar={<FilterSelect label="Status" value={status} onChange={setStatus} options={[
+                    { value: "all", label: "All" },
+                    { value: "open", label: "Needs approval" },
+                    { value: "awaiting_second_approval", label: "Awaiting 2nd approval" },
+                    { value: "pending", label: "Pending" },
+                    { value: "completed", label: "Completed" },
+                    { value: "failed", label: "Failed" },
+                    { value: "rejected", label: "Rejected" },
+                  ]} />}
               empty={<EmptyNote className="mt-3" title="No redemptions" />}
             />
             <Pager page={page} perPage={PER} total={data.total} onPage={setPage} />

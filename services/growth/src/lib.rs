@@ -15,6 +15,7 @@ pub mod contests;
 pub mod db;
 pub mod deals;
 pub mod error;
+pub mod four_eyes;
 pub mod journeys;
 pub mod leaderboard;
 pub mod loyalty;

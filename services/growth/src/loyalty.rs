@@ -7,6 +7,8 @@ use crate::calc;
 use crate::db;
 use crate::deals::{earned_12m, month_start};
 use crate::error::{ApiError, ApiResult};
+use crate::four_eyes;
+use crate::clients;
 use crate::model::Tier;
 use crate::money::{D, ZERO, num};
 use crate::state::AppState;
@@ -53,7 +55,27 @@ pub fn item_json(r: &sqlx::postgres::PgRow) -> Value {
     })
 }
 
+/// A redemption as the client sees it (a cashback redemption held for staff approval shows as `pending`).
 pub fn redemption_json(r: &sqlx::postgres::PgRow) -> Value {
+    let mut v = redemption_view(r);
+    if matches!(v["status"].as_str(), Some("approval" | "awaiting_second_approval")) {
+        v["status"] = json!("pending");
+    }
+    v
+}
+
+/// A redemption for the Back Office: the stored status, who decided and the four-eyes state.
+pub fn redemption_admin_json(r: &sqlx::postgres::PgRow, threshold: Option<D>) -> Value {
+    let mut v = redemption_view(r);
+    let status: String = r.get("status");
+    let value: D = r.get("value");
+    let money = r.get::<String, _>("kind") == "cashback";
+    v["decidedBy"] = json!(r.get::<Option<String>, _>("decided_by"));
+    v["fourEyes"] = four_eyes::json_of(r, money.then_some(value), &status, threshold);
+    v
+}
+
+fn redemption_view(r: &sqlx::postgres::PgRow) -> Value {
     json!({
         "id": r.get::<i64, _>("id"),
         "itemId": r.get::<i64, _>("item_id"),
@@ -225,7 +247,12 @@ pub async fn redeem(st: &AppState, tenant: &str, user_id: i64, item_id: i64, log
         .execute(&mut *tx)
         .await?;
     sqlx::query("UPDATE catalogue SET stock = stock - 1 WHERE id = $1 AND stock IS NOT NULL").bind(item_id).execute(&mut *tx).await?;
+    // four-eyes: a cashback redemption at or above the threshold waits for two staff members (no wallet credit yet)
+    let held = kind == "cashback" && four_eyes::needs_two(value, db::settings(&st.pool, tenant).await?.four_eyes_threshold);
     match kind.as_str() {
+        "cashback" if held => {
+            sqlx::query("UPDATE redemptions SET status = 'approval' WHERE id = $1").bind(rid).execute(&mut *tx).await?;
+        }
         "cashback" => {
             sqlx::query("INSERT INTO wallet_credits (tenant, user_id, idem_key, kind, amount, ref, note) VALUES ($1,$2,$3,'adjustment',$4,$5,$6)")
                 .bind(tenant)
@@ -260,7 +287,7 @@ pub async fn redeem(st: &AppState, tenant: &str, user_id: i64, item_id: i64, log
             sqlx::query("UPDATE redemptions SET voucher_code = $2, status = 'completed', completed_at = now() WHERE id = $1").bind(rid).bind(&code).execute(&mut *tx).await?;
         }
     }
-    audit::record(&mut *tx, tenant, &Actor { id: format!("user:{user_id}"), name: None }, "loyalty.redeem", Some(format!("redemption:{rid}")), None, Some(json!({"item": item_id, "points": cost, "kind": kind})), None).await?;
+    audit::record(&mut *tx, tenant, &Actor { id: format!("user:{user_id}"), name: None }, "loyalty.redeem", Some(format!("redemption:{rid}")), None, Some(json!({"item": item_id, "points": cost, "kind": kind, "heldForApproval": held})), None).await?;
     tx.commit().await?;
     st.wake.notify_one();
     let r = sqlx::query("SELECT * FROM redemptions WHERE id = $1").bind(rid).fetch_one(&st.pool).await?;
@@ -334,4 +361,77 @@ pub async fn queue_wallet_credit(tx: &mut sqlx::PgConnection, tenant: &str, user
         .execute(&mut *tx)
         .await?;
     Ok(())
+}
+
+/// Staff decision on a cashback redemption held for approval (`approval` or `awaiting_second_approval`). Four-eyes
+/// like the other payouts: at or above `fourEyesThreshold` the first approval only records it, the second (another
+/// staff member, else 409 `four_eyes_same_staff`) queues the wallet credit `growth:redeem:<redemption>`. Reject
+/// (reason required, either approver): `rejected`, the points go back to the client and the stock is restored.
+pub async fn decide_redemption(st: &AppState, tenant: &str, id: i64, approve: bool, actor: &Actor, note: &str) -> ApiResult<Value> {
+    let threshold = db::settings(&st.pool, tenant).await?.four_eyes_threshold;
+    let mut tx = st.pool.begin().await?;
+    let r = sqlx::query("SELECT * FROM redemptions WHERE id = $1 AND tenant = $2 FOR UPDATE").bind(id).bind(tenant).fetch_optional(&mut *tx).await?.ok_or(ApiError::NotFound)?;
+    let status: String = r.get("status");
+    if !matches!(status.as_str(), "approval" | four_eyes::AWAITING) {
+        return Err(ApiError::Conflict { code: "state", message: "This redemption isn't waiting for a decision.".into() });
+    }
+    let user: i64 = r.get("user_id");
+    let value: D = r.get("value");
+    let points: i64 = r.get("points");
+    let item_name: String = r.get("item_name");
+    let first_id: Option<String> = r.get("first_approved_by_id");
+    let first_name: Option<String> = r.get("first_approved_by_name");
+    let note_opt = Some(note.trim()).filter(|n| !n.is_empty());
+    let target = Some(format!("redemption:{id}"));
+    let mut release = false;
+    if approve {
+        if status == four_eyes::AWAITING {
+            if first_id.as_deref() == Some(four_eyes::staff_id(actor).as_str()) {
+                return Err(four_eyes::same_staff());
+            }
+            if !four_eyes::claim_second(&mut tx, "redemptions", "status", id, actor, "pending").await? {
+                return Err(ApiError::Conflict { code: "state", message: "This redemption isn't waiting for a decision.".into() });
+            }
+            let mut after = four_eyes::approvers(first_id.as_deref(), first_name.as_deref(), actor);
+            after["value"] = num(value);
+            audit::record(&mut *tx, tenant, actor, "redemption.approve", target, Some(json!({"status": status})), Some(after), note_opt).await?;
+            release = true;
+        } else if four_eyes::needs_two(value, threshold) && first_id.is_none() {
+            four_eyes::record_first(&mut tx, "redemptions", "status", id, &status, actor, note_opt, threshold).await?;
+            let after = json!({"value": num(value), "status": four_eyes::AWAITING, "fourEyesThreshold": num(threshold)});
+            audit::record(&mut *tx, tenant, actor, "redemption.approve_first", target, Some(json!({"status": status})), Some(after), note_opt).await?;
+        } else {
+            sqlx::query("UPDATE redemptions SET status = 'pending' WHERE id = $1 AND status = $2").bind(id).bind(&status).execute(&mut *tx).await?;
+            audit::record(&mut *tx, tenant, actor, "redemption.approve", target, Some(json!({"status": status})), Some(json!({"value": num(value)})), note_opt).await?;
+            release = true;
+        }
+        if release {
+            queue_wallet_credit(&mut tx, tenant, user, &format!("growth:redeem:{id}"), "adjustment", value, &format!("redemption:{id}"), &format!("Loyalty reward: {item_name}")).await?;
+            sqlx::query("UPDATE redemptions SET decided_by = $2 WHERE id = $1").bind(id).bind(actor.label()).execute(&mut *tx).await?;
+        }
+    } else {
+        lock_user(&mut tx, tenant, user).await?;
+        sqlx::query("UPDATE redemptions SET status = 'rejected', error = $2, decided_by = $3, completed_at = now() WHERE id = $1").bind(id).bind(note).bind(actor.label()).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO points_ledger (tenant, user_id, kind, points, ref, description) VALUES ($1,$2,'adjust',$3,$4,$5) ON CONFLICT DO NOTHING")
+            .bind(tenant)
+            .bind(user)
+            .bind(points)
+            .bind(format!("redemption:{id}:rejected"))
+            .bind(format!("Refund · {item_name} (not approved)"))
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE catalogue SET stock = stock + 1 WHERE id = $1 AND stock IS NOT NULL").bind(r.get::<i64, _>("item_id")).execute(&mut *tx).await?;
+        let before = json!({"status": status, "firstApprovedById": first_id, "firstApprovedBy": first_name});
+        let after = json!({"status": "rejected", "from": status, "value": num(value), "pointsReturned": points});
+        audit::record(&mut *tx, tenant, actor, "redemption.reject", target, Some(before), Some(after), Some(note)).await?;
+    }
+    tx.commit().await?;
+    if release {
+        st.wake.notify_one();
+        let _ = crate::payouts::wallet_tick(st).await;
+    } else if !approve {
+        clients::notify(st, tenant, user, "reward.rejected", "Reward not approved".into(), format!("{item_name} wasn't approved; {points} points are back in your balance."), "/rewards/loyalty");
+    }
+    let r = sqlx::query("SELECT * FROM redemptions WHERE id = $1").bind(id).fetch_one(&st.pool).await?;
+    Ok(json!({"redemption": redemption_admin_json(&r, Some(threshold))}))
 }

@@ -14,7 +14,9 @@
  * | marketing.write    | campaigns, promos, banners, contests (create, edit, finalize, disqualify), rules,     | platform_owner, super_admin, admin, marketing   |
  * |                    | tiers, catalogue, cashback programmes, settings, jobs                                 |                                                 |
  * | marketing.approve  | money out: pay contest prizes, manual bonus grants and cancellations, points           | platform_owner, super_admin, admin, finance     |
- * |                    | adjustments, run cashback payouts, retry redemptions                                  |                                                 |
+ * |                    | adjustments, run cashback payouts, retry redemptions; approve / reject prizes,        |                                                 |
+ * |                    | mission rewards, held cashback payouts and redemptions (four-eyes: at or above the    |                                                 |
+ * |                    | growth `fourEyesThreshold` two different staff members, enforced by the service)       |                                                 |
  */
 
 export const MARKETING_PERMS = ["marketing.read", "marketing.write", "marketing.approve"] as const;

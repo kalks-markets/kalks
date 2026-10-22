@@ -44,12 +44,20 @@ pub fn accrual_json(r: &sqlx::postgres::PgRow) -> Value {
     })
 }
 
+/// Clients see a payout held for staff approval (four-eyes) as `pending`.
+pub fn client_payout_status(s: &str) -> &str {
+    match s {
+        "approval" | "awaiting_second_approval" => "pending",
+        _ => s,
+    }
+}
+
 pub async fn me(st: &AppState, tenant: &str, user_id: i64) -> anyhow::Result<Value> {
     let ms = month_start(Utc::now());
     let progs = sqlx::query(
         "SELECT p.*, (e.user_id IS NOT NULL) AS enrolled,
-                COALESCE((SELECT sum(lots) FROM cashback_accruals a WHERE a.programme_id = p.id AND a.user_id = $2 AND a.status <> 'void' AND a.created_at >= $3), 0) AS lots_month,
-                COALESCE((SELECT sum(amount) FROM cashback_accruals a WHERE a.programme_id = p.id AND a.user_id = $2 AND a.status <> 'void' AND a.created_at >= $3), 0) AS earned_month
+                COALESCE((SELECT sum(lots) FROM cashback_accruals a WHERE a.programme_id = p.id AND a.user_id = $2 AND a.status NOT IN ('void', 'rejected') AND a.created_at >= $3), 0) AS lots_month,
+                COALESCE((SELECT sum(amount) FROM cashback_accruals a WHERE a.programme_id = p.id AND a.user_id = $2 AND a.status NOT IN ('void', 'rejected') AND a.created_at >= $3), 0) AS earned_month
          FROM cashback_programmes p LEFT JOIN cashback_enrolments e ON e.programme_id = p.id AND e.user_id = $2
          WHERE p.tenant = $1 AND p.active AND (p.ends_at IS NULL OR p.ends_at > now()) ORDER BY p.id",
     )
@@ -71,7 +79,7 @@ pub async fn me(st: &AppState, tenant: &str, user_id: i64) -> anyhow::Result<Val
         .collect();
     let t = sqlx::query(
         "SELECT COALESCE(sum(amount) FILTER (WHERE status = 'accrued'), 0) AS accrued, COALESCE(sum(amount) FILTER (WHERE status = 'paid'), 0) AS paid,
-                COALESCE(sum(amount) FILTER (WHERE status <> 'void' AND created_at >= $3), 0) AS month, COALESCE(sum(amount) FILTER (WHERE status <> 'void'), 0) AS lifetime
+                COALESCE(sum(amount) FILTER (WHERE status NOT IN ('void', 'rejected') AND created_at >= $3), 0) AS month, COALESCE(sum(amount) FILTER (WHERE status NOT IN ('void', 'rejected')), 0) AS lifetime
          FROM cashback_accruals WHERE tenant = $1 AND user_id = $2",
     )
     .bind(tenant)
@@ -88,7 +96,7 @@ pub async fn me(st: &AppState, tenant: &str, user_id: i64) -> anyhow::Result<Val
     .await?;
     let payouts = sqlx::query("SELECT * FROM cashback_payouts WHERE tenant = $1 AND user_id = $2 ORDER BY id DESC LIMIT 50").bind(tenant).bind(user_id).fetch_all(&st.pool).await?;
     let series = sqlx::query(
-        "SELECT to_char(d, 'YYYY-MM-DD') AS day, COALESCE((SELECT sum(amount) FROM cashback_accruals a WHERE a.tenant = $1 AND a.user_id = $2 AND a.status <> 'void'
+        "SELECT to_char(d, 'YYYY-MM-DD') AS day, COALESCE((SELECT sum(amount) FROM cashback_accruals a WHERE a.tenant = $1 AND a.user_id = $2 AND a.status NOT IN ('void', 'rejected')
             AND a.created_at >= d AND a.created_at < d + interval '1 day'), 0) AS amount
          FROM generate_series(date_trunc('day', now()) - interval '29 days', date_trunc('day', now()), interval '1 day') d ORDER BY d",
     )
@@ -101,7 +109,7 @@ pub async fn me(st: &AppState, tenant: &str, user_id: i64) -> anyhow::Result<Val
         "totals": {"accrued": num(t.get::<D, _>("accrued")), "paid": num(t.get::<D, _>("paid")), "month": num(t.get::<D, _>("month")), "lifetime": num(t.get::<D, _>("lifetime"))},
         "accruals": accruals.iter().map(accrual_json).collect::<Vec<_>>(),
         "payouts": payouts.iter().map(|p| json!({
-            "id": p.get::<i64, _>("id"), "amount": num(p.get("amount")), "status": p.get::<String, _>("status"),
+            "id": p.get::<i64, _>("id"), "amount": num(p.get("amount")), "status": client_payout_status(p.get::<&str, _>("status")),
             "createdAt": p.get::<DateTime<Utc>, _>("created_at"), "paidAt": p.get::<Option<DateTime<Utc>>, _>("paid_at"),
         })).collect::<Vec<_>>(),
         "series": series.iter().map(|s| json!({"day": s.get::<String, _>("day"), "amount": num(s.get("amount"))})).collect::<Vec<_>>(),

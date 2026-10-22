@@ -4,7 +4,9 @@ import * as React from "react";
 import { AlertTriangle, CalendarRange, Copy, Flag as FlagIcon, LayoutTemplate, Pencil, Plus, RefreshCw, Trophy, Users, Wallet } from "lucide-react";
 import { Button, Card, CardHeader, Chip, Dialog, KpiCard, PageHeader, Progress, Reveal, Segmented, cn } from "@kalks/ui";
 import { TableSkeleton, ago, countryName, useApi, useNow, when } from "@/components/live/kit";
-import { M, mkSend, type Contest, type ContestDetail, type ContestFlag, type ContestInstrument, type Overview, type Scoring, type Standing } from "./api";
+import { M, mkSend, type Contest, type ContestDetail, type ContestFlag, type ContestInstrument, type Overview, type PayResult, type Scoring, type Standing } from "./api";
+import { useStaff } from "@/components/staff-session";
+import { AWAITING, FirstApproval, FourEyesDecide, fourEyesRule } from "./four-eyes";
 import { ContestWizard } from "./contest-wizard";
 import { ChallengesTabs, type ChallengesTab } from "./challenges";
 import { CONTEST_STATUS, EmptyNote, MkError, PAY_STATUS, ReadOnlyNote, StatusPill, Tile, int, num, pct, usd, usdK, useAction, usePerms } from "./kit";
@@ -202,8 +204,18 @@ function ContestDrawer({ id, onClose, onOpen, perms, onChanged }: { id: string |
   const post = <T = unknown,>(path: string, body: object = {}) => mkSend<T>(`contests/${valid}/${path}`, body);
   const ended = c ? Date.parse(c.endsAt) <= now : false;
   const canFinalize = !!c && (c.status === "ended" || (c.status === "running" && ended));
-  const unpaid = board.filter((s) => s.status === "active" && s.prize && s.prizeStatus !== "paid");
-  const payTotal = unpaid.reduce((s, x) => s + (x.prize ?? 0), 0);
+  const me = String(useStaff().id);
+  const threshold = data?.fourEyesThreshold;
+  const unpaid = board.filter((s) => s.status === "active" && s.prize && ["pending", "approval", AWAITING, "failed"].includes(s.prizeStatus));
+  // what the bulk Pay does to each prize (four-eyes: at or above the threshold two different staff members)
+  const payStep = (s: Standing): "pay" | "first" | "second" | "same" => {
+    const first = s.fourEyes?.firstApprovedById ? String(s.fourEyes.firstApprovedById) : null;
+    if (s.prizeStatus === AWAITING) return first === me ? "same" : "second";
+    if (!first && threshold != null && (s.prize ?? 0) >= threshold) return "first";
+    return "pay";
+  };
+  const STEP_LABEL = { pay: "Pays now", second: "2nd approval · pays now", first: "1st approval · nothing paid yet", same: "You gave the 1st approval · waits for another staff member" } as const;
+  const payTotal = unpaid.filter((s) => ["pay", "second"].includes(payStep(s))).reduce((s, x) => s + (x.prize ?? 0), 0);
   const byEntry = new Map(board.map((s) => [s.entryId, s]));
 
   const refresh = async () => {
@@ -248,21 +260,22 @@ function ContestDrawer({ id, onClose, onOpen, perms, onChanged }: { id: string |
   const pay = () =>
     act.ask({
       title: `Pay prizes · ${c!.name}`,
-      description: "Pays every unpaid prize, including those waiting for approval above the auto-pay threshold. Wallet prizes are credited to the client's wallet; credit prizes go to the entered live account as engine credit. Each payout is idempotent.",
+      description: `Pays every unpaid prize, including those waiting for approval above the auto-pay threshold. ${fourEyesRule(threshold)} For those, this press is the first approval (nothing is paid) and another staff member's Pay releases them. Wallet prizes are credited to the client's wallet; credit prizes go to the entered live account as engine credit. Each payout is idempotent.`,
       body: (
         <div className="space-y-2">
           <div className="flex items-baseline justify-between rounded-[12px] border border-gold/30 bg-gold-soft px-4 py-3">
-            <span className="text-[13px] text-fg-2">Total to pay</span>
+            <span className="text-[13px] text-fg-2">Paid by this press</span>
             <span className="k-num text-[22px] font-semibold text-gold" data-testid="contest-pay-total">
-              {usd(payTotal || c!.prizePool)}
+              {usd(payTotal)}
             </span>
           </div>
           <div className="max-h-48 space-y-1 overflow-y-auto">
             {unpaid.map((s) => (
               <div key={s.entryId} className="flex items-center justify-between px-1 text-[12.5px]">
-                <span className="text-fg-2">
+                <span className="min-w-0 text-fg-2">
                   #{s.rank} · {s.name}
                   {s.login ? <span className="font-mono text-fg-3"> · {s.login}</span> : null}
+                  <span className={cn("block text-[11px]", payStep(s) === "pay" || payStep(s) === "second" ? "text-up" : "text-warn")}>{STEP_LABEL[payStep(s)]}</span>
                 </span>
                 <span className="k-num">{usd(s.prize)}</span>
               </div>
@@ -274,8 +287,16 @@ function ContestDrawer({ id, onClose, onOpen, perms, onChanged }: { id: string |
       confirmVariant: "buy",
       confirmTestId: "contest-pay-confirm",
       note: "none",
-      run: () => post<{ paid?: number; failed?: number; amount?: number }>("pay"),
-      success: (r: { paid?: number; failed?: number; amount?: number }) => `Paid ${int(r.paid ?? 0)} prize(s) · ${usd(r.amount ?? 0)}${r.failed ? ` · ${r.failed} failed, will retry` : ""}`,
+      run: () => post<PayResult>("pay"),
+      success: (r: PayResult) =>
+        [
+          `Paid ${int(r.paid ?? 0)} prize(s) · ${usd(r.amount ?? 0)}`,
+          r.failed ? `${r.failed} failed, will retry` : "",
+          r.firstApproved ? `${r.firstApproved} first approval(s) recorded · waiting for a second approver` : "",
+          r.skippedSameStaff ? `${r.skippedSameStaff} wait for another staff member (four-eyes)` : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
       onDone: done,
     });
   const cancel = () =>
@@ -461,6 +482,24 @@ function ContestDrawer({ id, onClose, onOpen, perms, onChanged }: { id: string |
                               <span className="flex flex-col items-end gap-0.5">
                                 <span className="k-num text-gold">{usd(s.prize, 0)}</span>
                                 {s.prizeStatus && s.prizeStatus !== "none" && <StatusPill map={PAY_STATUS} status={s.prizeStatus} />}
+                                {s.prizeStatus === AWAITING && <FirstApproval fe={s.fourEyes} className="flex max-w-56 items-center gap-1 text-[10.5px] text-warn" />}
+                                {perms.approve && ["finalized", "paid"].includes(c.status) && ["approval", AWAITING].includes(s.prizeStatus) && (
+                                  <FourEyesDecide<{ prize?: { status?: string } }>
+                                    act={act}
+                                    what="prize"
+                                    status={s.prizeStatus}
+                                    amount={s.prize}
+                                    fe={s.fourEyes}
+                                    threshold={threshold}
+                                    approvePath={`contests/${c.id}/prizes/${s.entryId}/approve`}
+                                    rejectPath={`contests/${c.id}/prizes/${s.entryId}/reject`}
+                                    statusOf={(d) => d.prize?.status}
+                                    paidText="Prize approved and paid"
+                                    describe={`Rank #${s.rank} · ${s.prizePayout === "credit" ? "trading credit on the entered live account" : "cash to the client's wallet"}.`}
+                                    onDone={done}
+                                    testId={`prize-${s.entryId}`}
+                                  />
+                                )}
                               </span>
                             ) : (
                               <span className="text-fg-3">—</span>

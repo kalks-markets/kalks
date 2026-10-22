@@ -1,15 +1,23 @@
 //! Cash out to client wallets: cashback payouts (`refund`), loyalty cashback redemptions and contest prizes
 //! (`adjustment`). Every transfer has a stable idempotency key; network errors and 5xx retry with backoff.
 
+use crate::audit::{self, Actor};
 use crate::clients::{self, WalletOutcome};
 use crate::db;
-use crate::money::{D, ZERO};
+use crate::error::{ApiError, ApiResult};
+use crate::four_eyes::{self, AWAITING};
+use crate::money::{D, ZERO, num};
 use crate::state::AppState;
+use chrono::{DateTime, Utc};
+use serde_json::{Value, json};
 use sqlx::Row;
 
-/// Groups accruals past the hold into one payout per client. Returns (payouts created, total).
+/// Groups accruals past the hold into one payout per client. Returns (payouts created, total). Four-eyes: a payout
+/// at or above `fourEyesThreshold` is created in `approval` (the payout loop pays only `pending`) and waits for two
+/// staff members (`decide_cashback`).
 pub async fn cashback_batch(st: &AppState, tenant: &str, ignore_hold: bool) -> anyhow::Result<(usize, D)> {
-    let hold = if ignore_hold { 0 } else { db::settings(&st.pool, tenant).await?.cashback_hold_hours };
+    let settings = db::settings(&st.pool, tenant).await?;
+    let hold = if ignore_hold { 0 } else { settings.cashback_hold_hours };
     let mut tx = st.pool.begin().await?;
     sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))").bind(format!("growth-cashback:{tenant}")).execute(&mut *tx).await?;
     let users: Vec<(i64, D)> = sqlx::query_as(
@@ -22,7 +30,18 @@ pub async fn cashback_batch(st: &AppState, tenant: &str, ignore_hold: bool) -> a
     .await?;
     let mut total = ZERO;
     for (user, amount) in &users {
-        let id: i64 = sqlx::query_scalar("INSERT INTO cashback_payouts (tenant, user_id, amount) VALUES ($1,$2,$3) RETURNING id").bind(tenant).bind(user).bind(amount).fetch_one(&mut *tx).await?;
+        let status = if four_eyes::needs_two(*amount, settings.four_eyes_threshold) { "approval" } else { "pending" };
+        let id: i64 = sqlx::query_scalar("INSERT INTO cashback_payouts (tenant, user_id, amount, status) VALUES ($1,$2,$3,$4) RETURNING id")
+            .bind(tenant)
+            .bind(user)
+            .bind(amount)
+            .bind(status)
+            .fetch_one(&mut *tx)
+            .await?;
+        if status == "approval" {
+            let after = json!({"user": user, "amount": num(*amount), "status": "approval", "fourEyesThreshold": num(settings.four_eyes_threshold)});
+            audit::record(&mut *tx, tenant, &Actor::system(), "cashback.hold", Some(format!("cashback_payout:{id}")), None, Some(after), None).await?;
+        }
         sqlx::query(
             "UPDATE cashback_accruals SET payout_id = $1 WHERE tenant = $2 AND user_id = $3 AND status = 'accrued' AND payout_id IS NULL AND created_at <= now() - make_interval(hours => $4)",
         )
@@ -149,4 +168,79 @@ pub async fn retry_credit(st: &AppState, reference: &str) -> anyhow::Result<bool
         st.wake.notify_one();
     }
     Ok(n > 0)
+}
+
+// ---------------------------------------------------------------- cashback four-eyes
+
+/// A cashback payout for the Back Office (`threshold` = the broker's current four-eyes threshold).
+pub fn cashback_payout_json(r: &sqlx::postgres::PgRow, threshold: Option<D>) -> Value {
+    let status: String = r.get("status");
+    json!({
+        "id": r.get::<i64, _>("id"), "userId": r.get::<i64, _>("user_id"), "amount": num(r.get("amount")), "status": status,
+        "attempts": r.get::<i32, _>("attempts"), "error": r.get::<Option<String>, _>("error"), "walletTxn": r.get::<Option<String>, _>("wallet_txn"),
+        "createdAt": r.get::<DateTime<Utc>, _>("created_at"), "paidAt": r.get::<Option<DateTime<Utc>>, _>("paid_at"),
+        "decidedBy": r.get::<Option<String>, _>("decided_by"), "decidedAt": r.get::<Option<DateTime<Utc>>, _>("decided_at"),
+        "rejectReason": r.get::<Option<String>, _>("reject_reason"),
+        "fourEyes": four_eyes::json_of(r, Some(r.get("amount")), &status, threshold),
+    })
+}
+
+/// Staff decision on a cashback payout held for approval (`approval` or `awaiting_second_approval`). Approve: at or
+/// above `fourEyesThreshold` the first approval only records it; the second approval (another staff member, else 409
+/// `four_eyes_same_staff`) or a single approval below the threshold makes it `pending`, and the payout loop pays it
+/// with its usual idempotent key `growth:cashback:<payout>`. Reject (reason required, either approver): the payout
+/// and its accruals become `rejected` (never paid, never batched again).
+pub async fn decide_cashback(st: &AppState, tenant: &str, id: i64, approve: bool, actor: &Actor, note: &str) -> ApiResult<Value> {
+    let threshold = db::settings(&st.pool, tenant).await?.four_eyes_threshold;
+    let mut tx = st.pool.begin().await?;
+    let r = sqlx::query("SELECT * FROM cashback_payouts WHERE id = $1 AND tenant = $2 FOR UPDATE").bind(id).bind(tenant).fetch_optional(&mut *tx).await?.ok_or(ApiError::NotFound)?;
+    let status: String = r.get("status");
+    if !matches!(status.as_str(), "approval" | AWAITING) {
+        return Err(ApiError::Conflict { code: "state", message: "This payout isn't waiting for a decision.".into() });
+    }
+    let amount: D = r.get("amount");
+    let first_id: Option<String> = r.get("first_approved_by_id");
+    let first_name: Option<String> = r.get("first_approved_by_name");
+    let note_opt = Some(note.trim()).filter(|n| !n.is_empty());
+    let target = Some(format!("cashback_payout:{id}"));
+    let mut release = false;
+    if approve {
+        if status == AWAITING {
+            if first_id.as_deref() == Some(four_eyes::staff_id(actor).as_str()) {
+                return Err(four_eyes::same_staff());
+            }
+            if !four_eyes::claim_second(&mut tx, "cashback_payouts", "status", id, actor, "pending").await? {
+                return Err(ApiError::Conflict { code: "state", message: "This payout isn't waiting for a decision.".into() });
+            }
+            let mut after = four_eyes::approvers(first_id.as_deref(), first_name.as_deref(), actor);
+            after["amount"] = num(amount);
+            after["status"] = json!("pending");
+            audit::record(&mut *tx, tenant, actor, "cashback.approve", target, Some(json!({"status": status})), Some(after), note_opt).await?;
+            release = true;
+        } else if four_eyes::needs_two(amount, threshold) && first_id.is_none() {
+            four_eyes::record_first(&mut tx, "cashback_payouts", "status", id, &status, actor, note_opt, threshold).await?;
+            let after = json!({"amount": num(amount), "status": AWAITING, "fourEyesThreshold": num(threshold)});
+            audit::record(&mut *tx, tenant, actor, "cashback.approve_first", target, Some(json!({"status": status})), Some(after), note_opt).await?;
+        } else {
+            sqlx::query("UPDATE cashback_payouts SET status = 'pending' WHERE id = $1 AND status = $2").bind(id).bind(&status).execute(&mut *tx).await?;
+            audit::record(&mut *tx, tenant, actor, "cashback.approve", target, Some(json!({"status": status})), Some(json!({"amount": num(amount), "status": "pending"})), note_opt).await?;
+            release = true;
+        }
+        if release {
+            sqlx::query("UPDATE cashback_payouts SET decided_by = $2, decided_at = now(), next_try_at = now() WHERE id = $1").bind(id).bind(actor.label()).execute(&mut *tx).await?;
+        }
+    } else {
+        sqlx::query("UPDATE cashback_payouts SET status = 'rejected', reject_reason = $2, decided_by = $3, decided_at = now() WHERE id = $1").bind(id).bind(note).bind(actor.label()).execute(&mut *tx).await?;
+        let n = sqlx::query("UPDATE cashback_accruals SET status = 'rejected' WHERE payout_id = $1 AND status = 'accrued'").bind(id).execute(&mut *tx).await?.rows_affected();
+        let before = json!({"status": status, "firstApprovedById": first_id, "firstApprovedBy": first_name});
+        let after = json!({"status": "rejected", "from": status, "amount": num(amount), "accrualsRejected": n});
+        audit::record(&mut *tx, tenant, actor, "cashback.reject", target, Some(before), Some(after), Some(note)).await?;
+    }
+    tx.commit().await?;
+    if release {
+        st.wake.notify_one();
+        let _ = cashback_tick(st).await;
+    }
+    let r = sqlx::query("SELECT * FROM cashback_payouts WHERE id = $1").bind(id).fetch_one(&st.pool).await?;
+    Ok(json!({"payout": cashback_payout_json(&r, Some(threshold))}))
 }

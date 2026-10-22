@@ -191,11 +191,17 @@ impl Env {
     }
 
     async fn staff(&self, method: reqwest::Method, path: &str, body: Option<Value>) -> (u16, Value) {
+        self.staff_as("1", method, path, body).await
+    }
+
+    /// A staff call as staff member `id` (with every marketing permission).
+    async fn staff_as(&self, id: &str, method: reqwest::Method, path: &str, body: Option<Value>) -> (u16, Value) {
         let mut r = self
             .http
             .request(method, format!("{}{path}", self.base))
             .header("x-kalks-internal", TOKEN)
-            .header("x-kalks-staff-id", "1")
+            .header("x-kalks-staff-id", id)
+            .header("x-kalks-staff-name", format!("Staff%20{id}"))
             .header("x-kalks-staff-role", "admin")
             .header("x-kalks-staff-perms", "marketing.read,marketing.write,marketing.approve");
         if let Some(b) = body {
@@ -614,5 +620,249 @@ async fn seeded_one_off_missions_complete_from_profile_facts() {
     let (_, hub) = e.client(81, reqwest::Method::GET, "/v1/growth/me/missions", None).await;
     let done = hub["items"].as_array().unwrap().iter().filter(|m| m["done"] == true).count();
     assert_eq!(done, 3, "{hub}");
+    e.drop().await;
+}
+
+// ---------------------------------------------------------------- four-eyes (maker-checker) on money out
+
+const SAME_STAFF: &str = "four_eyes_same_staff";
+
+fn wallet_count(e: &Env, key: &str) -> usize {
+    e.m.lock().unwrap().wallet.iter().filter(|w| w.0 == key).count()
+}
+
+#[tokio::test]
+async fn four_eyes_contest_prizes() {
+    let Some(e) = env().await else { return };
+    let post = reqwest::Method::POST;
+    // auto-pay up to 1000 but four-eyes from 250: the $300 prize is never auto-paid (clamped), the $50 ones are
+    e.settings(json!({"autoPayBelow": 1000, "fourEyesThreshold": 250})).await;
+    let c1 = ended_contest(&e, "fe", json!([{"rankFrom": 1, "rankTo": 1, "amount": 300, "payout": "wallet"}, {"rankFrom": 2, "rankTo": 3, "amount": 50, "payout": "wallet"}])).await;
+    contests::finalize(&e.st, c1, &system()).await.unwrap();
+    payouts::wallet_tick(&e.st).await.unwrap();
+    let rows: Vec<(i64, String)> = sqlx::query_as("SELECT user_id, prize_status FROM contest_entries WHERE contest_id = $1 ORDER BY user_id").bind(c1).fetch_all(&e.st.pool).await.unwrap();
+    assert_eq!(rows, vec![(51, "approval".into()), (52, "paid".into()), (53, "paid".into())], "below the threshold: one (system) approval pays");
+    let big: i64 = e.one(&format!("SELECT id FROM contest_entries WHERE contest_id = {c1} AND user_id = 51")).await;
+    let key = format!("growth:prize:{big}");
+
+    // first approval (bulk Pay by staff 1): nothing paid, waits for a second staff member
+    let (s, r) = e.staff_as("1", post.clone(), &format!("/v1/growth/admin/contests/{c1}/pay"), Some(json!({}))).await;
+    assert_eq!((s, r["paid"].as_i64(), r["firstApproved"].as_i64(), r["awaitingSecond"].as_i64()), (200, Some(0), Some(1), Some(1)), "{r}");
+    payouts::wallet_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &key), 0, "first approval moves no money");
+    assert_eq!(e.one::<String>(&format!("SELECT prize_status FROM contest_entries WHERE id = {big}")).await, "awaiting_second_approval");
+    assert_eq!(e.one::<String>(&format!("SELECT status FROM contests WHERE id = {c1}")).await, "finalized", "still waiting");
+    let (_, q) = e.staff(reqwest::Method::GET, "/v1/growth/admin/payouts?status=open", None).await;
+    let row = q["items"].as_array().unwrap().iter().find(|x| x["source"] == "contest" && x["id"] == big).cloned().unwrap();
+    assert_eq!((row["status"].as_str(), row["fourEyes"]["firstApprovedById"].as_str(), row["fourEyes"]["firstApprovedBy"].as_str()), (Some("awaiting_second_approval"), Some("1"), Some("Staff 1")));
+    assert_eq!(row["fourEyes"]["required"], true);
+    // the client only sees "approval"
+    let (_, mine) = e.client(51, reqwest::Method::GET, &format!("/v1/growth/me/contests/{c1}"), None).await;
+    assert_eq!(mine["myEntry"]["prizeStatus"], "approval", "{mine}");
+
+    // the same staff member can't give the second approval (bulk or per prize)
+    let (s, r) = e.staff_as("1", post.clone(), &format!("/v1/growth/admin/contests/{c1}/pay"), Some(json!({}))).await;
+    assert_eq!((s, r["error"]["code"].as_str()), (409, Some(SAME_STAFF)), "{r}");
+    let (s, r) = e.staff_as("1", post.clone(), &format!("/v1/growth/admin/contests/{c1}/prizes/{big}/approve"), Some(json!({}))).await;
+    assert_eq!((s, r["error"]["code"].as_str()), (409, Some(SAME_STAFF)), "{r}");
+    assert_eq!(wallet_count(&e, &key), 0);
+
+    // a second staff member releases it, exactly once
+    let (s, r) = e.staff_as("2", post.clone(), &format!("/v1/growth/admin/contests/{c1}/prizes/{big}/approve"), Some(json!({"note": "ok"}))).await;
+    assert_eq!(s, 200, "{r}");
+    assert_eq!(r["prize"]["status"], "paid", "{r}");
+    let (s, r) = e.staff_as("3", post.clone(), &format!("/v1/growth/admin/contests/{c1}/prizes/{big}/approve"), Some(json!({}))).await;
+    assert_eq!((s, r["error"]["code"].as_str()), (409, Some("state")), "decided once");
+    let (s, r) = e.staff_as("2", post.clone(), &format!("/v1/growth/admin/contests/{c1}/pay"), Some(json!({}))).await;
+    assert_eq!((s, r["paid"].as_i64()), (200, Some(0)), "nothing left to pay: {r}");
+    payouts::wallet_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &key), 1, "paid exactly once");
+    assert_eq!(e.one::<String>(&format!("SELECT status FROM contests WHERE id = {c1}")).await, "paid");
+    let first: i64 = e.one("SELECT count(*) FROM audit_log WHERE action = 'prize.approve_first' AND actor = 'staff:1'").await;
+    let second: i64 = e.one("SELECT count(*) FROM audit_log WHERE action = 'prize.approve' AND actor = 'staff:2' AND after->>'firstApprovedById' = '1'").await;
+    assert_eq!((first, second), (1, 1));
+
+    // auto-pay off: below the threshold one staff Pay pays at once; at or above, two staff; reject from the second step
+    e.settings(json!({"autoPayBelow": 0})).await;
+    let c2 = {
+        let cid: i64 = sqlx::query_scalar("INSERT INTO contests (tenant, slug, name, kind, starts_at, ends_at, scoring, prizes) VALUES ('kalks','fe2','FE2','live', now() - interval '2 hours', now() + interval '1 hour','profit',$1) RETURNING id")
+            .bind(sqlx::types::Json(json!([{"rankFrom": 1, "rankTo": 1, "amount": 400, "payout": "wallet"}, {"rankFrom": 2, "rankTo": 2, "amount": 100, "payout": "wallet"}])))
+            .fetch_one(&e.st.pool)
+            .await
+            .unwrap();
+        for (i, u) in [71, 72].iter().enumerate() {
+            let login = 51000000 + u;
+            e.add_account(login, *u, "live");
+            e.entry(cid, *u, login, &format!("T{u}"), 30 - i as i32).await;
+            e.deal(login, *u, "live", "EURUSD", "1", &format!("{}", 300 - i * 100), 600).await;
+        }
+        contests::refresh(&e.st, cid).await.unwrap();
+        sqlx::query("UPDATE contests SET ends_at = now() - interval '1 second' WHERE id = $1").bind(cid).execute(&e.st.pool).await.unwrap();
+        cid
+    };
+    contests::finalize(&e.st, c2, &system()).await.unwrap();
+    let (s, r) = e.staff_as("1", post.clone(), &format!("/v1/growth/admin/contests/{c2}/pay"), Some(json!({}))).await;
+    assert_eq!((s, r["paid"].as_i64(), r["firstApproved"].as_i64()), (200, Some(1), Some(1)), "{r}");
+    payouts::wallet_tick(&e.st).await.unwrap();
+    let small: i64 = e.one(&format!("SELECT id FROM contest_entries WHERE contest_id = {c2} AND user_id = 72")).await;
+    let large: i64 = e.one(&format!("SELECT id FROM contest_entries WHERE contest_id = {c2} AND user_id = 71")).await;
+    assert_eq!(wallet_count(&e, &format!("growth:prize:{small}")), 1, "below the threshold: a single approval pays");
+    assert_eq!(wallet_count(&e, &format!("growth:prize:{large}")), 0);
+    let (s, r) = e.staff_as("1", post.clone(), &format!("/v1/growth/admin/contests/{c2}/prizes/{large}/reject"), Some(json!({}))).await;
+    assert_eq!((s, r["error"]["field"].as_str()), (422, Some("note")), "a reason is required");
+    let (s, r) = e.staff_as("1", post.clone(), &format!("/v1/growth/admin/contests/{c2}/prizes/{large}/reject"), Some(json!({"note": "Shared account"}))).await;
+    assert_eq!((s, r["prize"]["status"].as_str()), (200, Some("rejected")), "the first approver may reject: {r}");
+    let (s, _) = e.staff_as("2", post.clone(), &format!("/v1/growth/admin/contests/{c2}/prizes/{large}/approve"), Some(json!({}))).await;
+    assert_eq!(s, 409, "rejected is final");
+    payouts::wallet_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &format!("growth:prize:{large}")), 0, "nothing paid");
+    assert_eq!(e.one::<String>(&format!("SELECT status FROM contests WHERE id = {c2}")).await, "paid", "nothing waits any more");
+    let rej: String = e.one("SELECT after->>'from' FROM audit_log WHERE action = 'prize.reject'").await;
+    assert_eq!(rej, "awaiting_second_approval");
+    e.drop().await;
+}
+
+#[tokio::test]
+async fn four_eyes_mission_rewards() {
+    let Some(e) = env().await else { return };
+    let post = reqwest::Method::POST;
+    sqlx::query("UPDATE missions SET active = false").execute(&e.st.pool).await.unwrap();
+    e.settings(json!({"autoPayBelow": 100, "fourEyesThreshold": 40})).await;
+    e.profile(91, "Ann", "Bay", "ann@example.com", "verified").await;
+    e.add_account(51000091, 91, "live");
+    let mut ids = vec![];
+    for (name, amount) in [("Small", 30), ("Big", 45), ("Bigger", 60)] {
+        let (_, r) = e.staff(post.clone(), "/v1/growth/admin/missions", Some(json!({"name": name, "kind": "join_contest", "schedule": "weekly", "target": 1, "xp": 0, "rewardAmount": amount}))).await;
+        ids.push(r["mission"]["id"].as_i64().unwrap());
+    }
+    let cid: i64 = sqlx::query_scalar("INSERT INTO contests (tenant, slug, name, kind, starts_at, ends_at, scoring) VALUES ('kalks','mj','MJ','live', now(), now() + interval '1 day','profit') RETURNING id").fetch_one(&e.st.pool).await.unwrap();
+    e.entry(cid, 91, 51000091, "A", 0).await;
+    missions::evaluate_user(&e.st, "kalks", 91).await.unwrap();
+    payouts::wallet_tick(&e.st).await.unwrap();
+    let pid = |m: i64| format!("SELECT id FROM mission_progress WHERE user_id = 91 AND mission_id = {m}");
+    let status = |p: i64| format!("SELECT reward_status FROM mission_progress WHERE id = {p}");
+    let (small, big, bigger) = (e.one::<i64>(&pid(ids[0])).await, e.one::<i64>(&pid(ids[1])).await, e.one::<i64>(&pid(ids[2])).await);
+    assert_eq!(e.one::<String>(&status(small)).await, "paid", "below both thresholds: auto-paid");
+    assert_eq!(e.one::<String>(&status(big)).await, "approval", "below auto-pay but at or above four-eyes: never auto-paid");
+    let key = format!("growth:mission:{big}");
+
+    let (s, r) = e.staff_as("1", post.clone(), &format!("/v1/growth/admin/missions/rewards/{big}/approve"), Some(json!({"note": "checked"}))).await;
+    assert_eq!((s, r["reward"]["rewardStatus"].as_str()), (200, Some("awaiting_second_approval")), "{r}");
+    assert_eq!(r["reward"]["fourEyes"]["firstApprovalNote"], "checked");
+    payouts::wallet_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &key), 0, "first approval moves no money");
+    let (s, r) = e.staff_as("1", post.clone(), &format!("/v1/growth/admin/missions/rewards/{big}/approve"), Some(json!({}))).await;
+    assert_eq!((s, r["error"]["code"].as_str()), (409, Some(SAME_STAFF)), "{r}");
+    let (s, r) = e.staff_as("2", post.clone(), &format!("/v1/growth/admin/missions/rewards/{big}/approve"), Some(json!({}))).await;
+    assert_eq!((s, r["reward"]["rewardStatus"].as_str()), (200, Some("paid")), "{r}");
+    let (s, _) = e.staff_as("3", post.clone(), &format!("/v1/growth/admin/missions/rewards/{big}/approve"), Some(json!({}))).await;
+    assert_eq!(s, 409, "decided once");
+    payouts::wallet_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &key), 1, "paid exactly once");
+
+    // reject from the second step (either approver)
+    e.staff_as("1", post.clone(), &format!("/v1/growth/admin/missions/rewards/{bigger}/approve"), Some(json!({}))).await;
+    let (s, r) = e.staff_as("2", post.clone(), &format!("/v1/growth/admin/missions/rewards/{bigger}/reject"), Some(json!({"note": "Duplicate account"}))).await;
+    assert_eq!((s, r["reward"]["rewardStatus"].as_str()), (200, Some("rejected")), "{r}");
+    payouts::wallet_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &format!("growth:mission:{bigger}")), 0);
+    e.drop().await;
+}
+
+#[tokio::test]
+async fn four_eyes_cashback_payouts() {
+    let Some(e) = env().await else { return };
+    let post = reqwest::Method::POST;
+    e.settings(json!({"fourEyesThreshold": 5, "cashbackHoldHours": 0})).await;
+    let prog: i64 = sqlx::query_scalar("INSERT INTO cashback_programmes (tenant, name, usd_per_lot) VALUES ('kalks','CB',2) RETURNING id").fetch_one(&e.st.pool).await.unwrap();
+    for (deal, user, amount) in [(1, 101, "1"), (2, 102, "4"), (3, 102, "6"), (4, 103, "8")] {
+        sqlx::query("INSERT INTO cashback_accruals (tenant, programme_id, user_id, deal_id, login, symbol, lots, amount) VALUES ('kalks',$1,$2,$3,1,'EURUSD',1,$4)")
+            .bind(prog)
+            .bind(user)
+            .bind(deal)
+            .bind(dec(amount))
+            .execute(&e.st.pool)
+            .await
+            .unwrap();
+    }
+    let (n, total) = payouts::cashback_batch(&e.st, "kalks", true).await.unwrap();
+    assert_eq!((n, total), (3, dec("19")));
+    payouts::cashback_tick(&e.st).await.unwrap();
+    let id_of = |u: i64| format!("SELECT id FROM cashback_payouts WHERE user_id = {u}");
+    let (small, big, other) = (e.one::<i64>(&id_of(101)).await, e.one::<i64>(&id_of(102)).await, e.one::<i64>(&id_of(103)).await);
+    assert_eq!(wallet_count(&e, &format!("growth:cashback:{small}")), 1, "below the threshold: paid by the worker as before");
+    assert_eq!(e.one::<String>(&format!("SELECT status FROM cashback_payouts WHERE id = {big}")).await, "approval", "at or above: held");
+    assert_eq!(wallet_count(&e, &format!("growth:cashback:{big}")), 0);
+    let (_, me) = e.client(102, reqwest::Method::GET, "/v1/growth/me/cashback", None).await;
+    assert_eq!(me["payouts"][0]["status"], "pending", "the client sees it as pending: {me}");
+    let (_, list) = e.staff(reqwest::Method::GET, "/v1/growth/admin/cashback/payouts?status=open", None).await;
+    assert_eq!(list["open"], 2, "{list}");
+
+    let path = |id: i64, a: &str| format!("/v1/growth/admin/cashback/payouts/{id}/{a}");
+    let (s, r) = e.staff_as("1", post.clone(), &path(big, "approve"), Some(json!({}))).await;
+    assert_eq!((s, r["payout"]["status"].as_str(), r["payout"]["fourEyes"]["firstApprovedById"].as_str()), (200, Some("awaiting_second_approval"), Some("1")), "{r}");
+    payouts::cashback_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &format!("growth:cashback:{big}")), 0, "first approval moves no money");
+    let (s, r) = e.staff_as("1", post.clone(), &path(big, "approve"), Some(json!({}))).await;
+    assert_eq!((s, r["error"]["code"].as_str()), (409, Some(SAME_STAFF)), "{r}");
+    let (s, r) = e.staff_as("2", post.clone(), &path(big, "approve"), Some(json!({}))).await;
+    assert_eq!(s, 200, "{r}");
+    let (s, _) = e.staff_as("3", post.clone(), &path(big, "approve"), Some(json!({}))).await;
+    assert_eq!(s, 409, "decided once");
+    payouts::cashback_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &format!("growth:cashback:{big}")), 1, "paid exactly once");
+    assert_eq!(e.one::<String>(&format!("SELECT status FROM cashback_payouts WHERE id = {big}")).await, "paid");
+    assert_eq!(e.one::<i64>("SELECT count(*) FROM cashback_accruals WHERE user_id = 102 AND status = 'paid'").await, 2);
+
+    // reject from the second step: the payout and its accruals are rejected, never paid or batched again
+    e.staff_as("1", post.clone(), &path(other, "approve"), Some(json!({}))).await;
+    let (s, r) = e.staff_as("1", post.clone(), &path(other, "reject"), Some(json!({"note": "Wash trading"}))).await;
+    assert_eq!((s, r["payout"]["status"].as_str()), (200, Some("rejected")), "{r}");
+    assert_eq!(e.one::<i64>("SELECT count(*) FROM cashback_accruals WHERE user_id = 103 AND status = 'rejected'").await, 1);
+    assert_eq!(payouts::cashback_batch(&e.st, "kalks", true).await.unwrap().0, 0);
+    payouts::cashback_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &format!("growth:cashback:{other}")), 0);
+    let audit: Vec<String> = sqlx::query_scalar("SELECT action FROM audit_log WHERE action LIKE 'cashback.%' ORDER BY id").fetch_all(&e.st.pool).await.unwrap();
+    assert_eq!(audit, vec!["cashback.hold", "cashback.hold", "cashback.approve_first", "cashback.approve", "cashback.approve_first", "cashback.reject"]);
+    e.drop().await;
+}
+
+#[tokio::test]
+async fn four_eyes_cashback_redemptions() {
+    let Some(e) = env().await else { return };
+    let post = reqwest::Method::POST;
+    e.settings(json!({"fourEyesThreshold": 40})).await;
+    let item: i64 = sqlx::query_scalar("INSERT INTO catalogue (tenant, name, kind, cost_points, value) VALUES ('kalks','$50 cash','cashback',100,50) RETURNING id").fetch_one(&e.st.pool).await.unwrap();
+    sqlx::query("INSERT INTO points_ledger (tenant, user_id, kind, points, ref, description) VALUES ('kalks',111,'adjust',1000,'seed','seed')").execute(&e.st.pool).await.unwrap();
+    let (s, r) = e.client(111, post.clone(), "/v1/growth/me/redeem", Some(json!({"itemId": item}))).await;
+    assert_eq!((s, r["redemption"]["status"].as_str()), (200, Some("pending")), "{r}");
+    let rid = r["redemption"]["id"].as_i64().unwrap();
+    let key = format!("growth:redeem:{rid}");
+    payouts::wallet_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &key), 0, "held for approval");
+    let path = |id: i64, a: &str| format!("/v1/growth/admin/redemptions/{id}/{a}");
+    let (s, r) = e.staff_as("1", post.clone(), &path(rid, "approve"), Some(json!({}))).await;
+    assert_eq!((s, r["redemption"]["status"].as_str()), (200, Some("awaiting_second_approval")), "{r}");
+    assert_eq!(wallet_count(&e, &key), 0);
+    let (s, r) = e.staff_as("1", post.clone(), &path(rid, "approve"), Some(json!({}))).await;
+    assert_eq!((s, r["error"]["code"].as_str()), (409, Some(SAME_STAFF)));
+    let (s, r) = e.staff_as("2", post.clone(), &path(rid, "approve"), Some(json!({}))).await;
+    assert_eq!((s, r["redemption"]["status"].as_str()), (200, Some("completed")), "{r}");
+    let (s, _) = e.staff_as("2", post.clone(), &path(rid, "approve"), Some(json!({}))).await;
+    assert_eq!(s, 409);
+    payouts::wallet_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &key), 1, "paid exactly once");
+
+    // reject from the second step gives the points back
+    let (_, r) = e.client(111, post.clone(), "/v1/growth/me/redeem", Some(json!({"itemId": item}))).await;
+    let rid2 = r["redemption"]["id"].as_i64().unwrap();
+    assert_eq!(r["balance"], 800);
+    e.staff_as("1", post.clone(), &path(rid2, "approve"), Some(json!({}))).await;
+    let (s, r) = e.staff_as("2", post.clone(), &path(rid2, "reject"), Some(json!({"note": "Abuse"}))).await;
+    assert_eq!((s, r["redemption"]["status"].as_str()), (200, Some("rejected")), "{r}");
+    let bal: i64 = e.one("SELECT sum(points)::bigint FROM points_ledger WHERE user_id = 111").await;
+    assert_eq!(bal, 900, "points returned");
+    payouts::wallet_tick(&e.st).await.unwrap();
+    assert_eq!(wallet_count(&e, &format!("growth:redeem:{rid2}")), 0);
     e.drop().await;
 }

@@ -32,6 +32,7 @@ import {
   usePerms,
   windowState,
 } from "./kit";
+import { AWAITING, FirstApproval, FourEyesDecide, fourEyesRule } from "./four-eyes";
 
 const ASSET_CLASSES = ["forex", "metals", "indices", "energies", "crypto", "stocks"].map((c) => ({ value: c, label: c[0]!.toUpperCase() + c.slice(1) }));
 const PER = 25;
@@ -177,7 +178,7 @@ export function LiveCashback() {
         <AccrualsCard programmes={items} tick={tick} />
       </Reveal>
       <Reveal delay={0.1} className="mt-4">
-        <PayoutsCard tick={tick} />
+        <PayoutsCard tick={tick} approve={perms.approve} onChanged={reloadAll} />
       </Reveal>
 
       <ProgrammeDialog open={open} onOpenChange={setOpen} programme={editing} onSaved={reloadAll} />
@@ -243,26 +244,69 @@ function AccrualsCard({ programmes, tick }: { programmes: Programme[]; tick: num
   );
 }
 
-function PayoutsCard({ tick }: { tick: number }) {
+type PayoutsPage = Paged<CashbackPayout> & { open?: number; fourEyesThreshold?: number };
+
+function PayoutsCard({ tick, approve, onChanged }: { tick: number; approve: boolean; onChanged: () => void }) {
   const [status, setStatus] = React.useState("all");
   const [page, setPage] = React.useState(1);
   React.useEffect(() => setPage(1), [status]);
-  const { data, error, loading, reload } = useApi<Paged<CashbackPayout>>(`${M("cashback/payouts")}${qs({ status, page, limit: PER })}`);
+  const { data, error, loading, reload } = useApi<PayoutsPage>(`${M("cashback/payouts")}${qs({ status, page, limit: PER })}`);
+  const act = useAction();
   React.useEffect(() => {
     if (tick) reload();
   }, [tick, reload]);
+  const threshold = data?.fourEyesThreshold;
   const cols: Column<CashbackPayout>[] = [
     { key: "id", header: "Payout", cell: (p) => <span className="font-mono text-[12.5px]">#{p.id}</span>, csv: (p) => p.id },
     { key: "c", header: "Client", cell: (p) => <ClientCell id={p.userId} name={p.name} />, csv: (p) => p.userId },
     { key: "a", header: "Amount", align: "right", cell: (p) => <span className="k-num font-medium">{usd(p.amount)}</span>, sort: (p) => p.amount, csv: (p) => p.amount },
-    { key: "s", header: "Status", cell: (p) => <span className="flex flex-col items-start gap-0.5"><StatusPill map={PAY_STATUS} status={p.status} />{p.error && <span className="max-w-48 truncate text-[10.5px] text-down" title={p.error}>{p.error}</span>}</span>, csv: (p) => p.status },
+    {
+      key: "s",
+      header: "Status",
+      cell: (p) => (
+        <span className="flex flex-col items-start gap-0.5">
+          <StatusPill map={PAY_STATUS} status={p.status} />
+          {p.status === AWAITING && <FirstApproval fe={p.fourEyes} className="flex max-w-56 items-center gap-1 text-[10.5px] text-warn" />}
+          {p.error && <span className="max-w-48 truncate text-[10.5px] text-down" title={p.error}>{p.error}</span>}
+          {p.status === "rejected" && p.rejectReason && <span className="max-w-48 truncate text-[10.5px] text-fg-3" title={p.rejectReason}>{p.rejectReason}</span>}
+        </span>
+      ),
+      csv: (p) => p.status,
+    },
     { key: "t", header: "Attempts", align: "right", hideOn: "md", cell: (p) => <span className="k-num text-fg-2">{int(p.attempts)}</span>, csv: (p) => p.attempts },
     { key: "cr", header: "Created", align: "right", cell: (p) => <span className="k-num text-[12.5px] text-fg-2">{when(p.createdAt)}</span>, csv: (p) => p.createdAt },
     { key: "pd", header: "Paid", align: "right", hideOn: "md", cell: (p) => <span className="k-num text-[12.5px] text-fg-3">{when(p.paidAt)}</span>, csv: (p) => p.paidAt ?? "" },
+    {
+      key: "act",
+      header: "",
+      align: "right",
+      cell: (p) =>
+        approve && (p.status === "approval" || p.status === AWAITING) ? (
+          <FourEyesDecide<{ payout?: CashbackPayout }>
+            act={act}
+            what="payout"
+            status={p.status}
+            amount={p.amount}
+            fe={p.fourEyes}
+            threshold={threshold}
+            approvePath={`cashback/payouts/${p.id}/approve`}
+            rejectPath={`cashback/payouts/${p.id}/reject`}
+            statusOf={(d) => d.payout?.status}
+            paidText="Payout approved · paid to the wallet by the payout run"
+            describe="One wallet refund to the client (idempotent, retried on failure). Rejecting marks its accruals rejected: they are never paid."
+            onDone={onChanged}
+            testId={`cashback-payout-${p.id}`}
+          />
+        ) : null,
+    },
   ];
   return (
     <Card>
-      <CardHeader title="Payouts" subtitle="One wallet refund per client per run" />
+      <CardHeader
+        title="Payouts"
+        subtitle={`One wallet refund per client per run. ${threshold != null ? `${fourEyesRule(threshold)} Larger payouts are held here until approved.` : ""}`}
+        action={data?.open ? <Chip size="sm" tone="warn">{int(data.open)} waiting for approval</Chip> : undefined}
+      />
       <div className="mt-4 px-4 pb-5 sm:px-6">
         {error && !data ? (
           <MkError error={error} onRetry={reload} />
@@ -277,13 +321,22 @@ function PayoutsCard({ tick }: { tick: number }) {
               dense
               rowKey={(p) => String(p.id)}
               exportName="cashback-payouts"
-              toolbar={<FilterSelect label="Status" value={status} onChange={setStatus} options={[{ value: "all", label: "All" }, { value: "pending", label: "Pending" }, { value: "paid", label: "Paid" }, { value: "failed", label: "Failed" }]} />}
+              toolbar={<FilterSelect label="Status" value={status} onChange={setStatus} options={[
+                    { value: "all", label: "All" },
+                    { value: "open", label: "Needs approval" },
+                    { value: "awaiting_second_approval", label: "Awaiting 2nd approval" },
+                    { value: "pending", label: "Pending" },
+                    { value: "paid", label: "Paid" },
+                    { value: "failed", label: "Failed" },
+                    { value: "rejected", label: "Rejected" },
+                  ]} />}
               empty={<EmptyNote className="mt-3" title="No payouts yet" text="Payouts run every 30 seconds for accruals past the hold." />}
             />
             <Pager page={page} perPage={PER} total={data.total} onPage={setPage} />
           </div>
         )}
       </div>
+      {act.node}
     </Card>
   );
 }

@@ -27,6 +27,7 @@ use crate::challenge_calc as cc;
 use crate::clients::{self, EngineOutcome};
 use crate::db;
 use crate::error::{ApiError, ApiResult};
+use crate::four_eyes;
 use crate::loyalty;
 use crate::model::opt_num;
 use crate::money::{D, ZERO, num, r2};
@@ -111,8 +112,14 @@ pub fn progress_json(r: &sqlx::postgres::PgRow) -> Value {
         "rewardAmount": opt_num(r.get("reward_amount")),
         "rewardPayout": r.get::<Option<String>, _>("reward_payout"),
         "rewardStatus": r.get::<String, _>("reward_status"),
+        "fourEyes": four_eyes::json_of(r, r.get("reward_amount"), r.get::<&str, _>("reward_status"), None),
         "updatedAt": r.get::<DateTime<Utc>, _>("updated_at"),
     })
+}
+
+/// Clients see a reward waiting for its second approval as waiting for approval.
+pub fn client_reward_status(s: &str) -> &str {
+    if s == four_eyes::AWAITING { "approval" } else { s }
 }
 
 /// Default missions seeded once per broker (XP only: a cash or credit reward is always the broker's choice):
@@ -342,7 +349,7 @@ pub async fn record(st: &AppState, m: &Mission, user_id: i64, period: &str, prog
     let status = match m.reward_amount {
         None => "none",
         Some(_) if m.kyc_required && !kyc_verified(&mut tx, tenant, user_id).await? => "kyc",
-        Some(a) => decide(a, settings.auto_pay_below),
+        Some(a) => decide(a, settings.auto_pay_below, settings.four_eyes_threshold),
     };
     sqlx::query(
         "UPDATE mission_progress SET progress = $2, target = $3, completed_at = now(), xp = $4, reward_amount = $5, reward_payout = $6, reward_status = $7, updated_at = now() WHERE id = $1",
@@ -369,9 +376,13 @@ pub async fn record(st: &AppState, m: &Mission, user_id: i64, period: &str, prog
     Ok(true)
 }
 
-/// Below the broker's threshold: paid at once (`pending`); otherwise staff approve it. 0 = always staff.
-pub fn decide(amount: D, auto_pay_below: D) -> &'static str {
-    if auto_pay_below > ZERO && amount < auto_pay_below { "pending" } else { "approval" }
+/// Below the broker's auto-pay threshold (and below the four-eyes threshold): paid at once (`pending`); otherwise
+/// staff approve it (two different staff members at or above the four-eyes threshold). Auto-pay 0 = always staff.
+pub fn decide(amount: D, auto_pay_below: D, four_eyes_threshold: D) -> &'static str {
+    match four_eyes::auto_pay_limit(auto_pay_below, four_eyes_threshold) {
+        Some(limit) if amount < limit => "pending",
+        _ => "approval",
+    }
 }
 
 async fn kyc_verified(tx: &mut sqlx::PgConnection, tenant: &str, user_id: i64) -> anyhow::Result<bool> {
@@ -425,23 +436,62 @@ pub async fn pay_reward(st: &AppState, progress_id: i64, actor: &Actor) -> anyho
     Ok(out)
 }
 
-/// Staff decision on a reward waiting for approval.
+/// Staff decision on a reward waiting for approval (`approval`, `awaiting_second_approval` or `failed`). Four-eyes:
+/// a reward at or above `fourEyesThreshold` without a first approval gets one (`awaiting_second_approval`, nothing
+/// paid); the second approval must come from another staff member (409 `four_eyes_same_staff`) and pays it. Below
+/// the threshold, or a reward that already had both approvals and failed, one approval pays. Either staff member may
+/// reject.
 pub async fn decide_reward(st: &AppState, tenant: &str, progress_id: i64, approve: bool, actor: &Actor, note: &str) -> ApiResult<Value> {
-    let r = sqlx::query("SELECT reward_status FROM mission_progress WHERE id = $1 AND tenant = $2").bind(progress_id).bind(tenant).fetch_optional(&st.pool).await?.ok_or(ApiError::NotFound)?;
+    let threshold = crate::db::settings(&st.pool, tenant).await?.four_eyes_threshold;
+    let mut tx = st.pool.begin().await?;
+    let r = sqlx::query("SELECT * FROM mission_progress WHERE id = $1 AND tenant = $2 FOR UPDATE").bind(progress_id).bind(tenant).fetch_optional(&mut *tx).await?.ok_or(ApiError::NotFound)?;
     let status: String = r.get("reward_status");
-    if !matches!(status.as_str(), "approval" | "failed") {
+    if !matches!(status.as_str(), "approval" | "failed" | four_eyes::AWAITING) {
         return Err(ApiError::Conflict { code: "state", message: "This reward isn't waiting for a decision.".into() });
     }
-    sqlx::query("UPDATE mission_progress SET decided_by = $2 WHERE id = $1").bind(progress_id).bind(actor.label()).execute(&st.pool).await?;
+    let amount: Option<D> = r.get("reward_amount");
+    let first_id: Option<String> = r.get("first_approved_by_id");
+    let first_name: Option<String> = r.get("first_approved_by_name");
+    let note_opt = Some(note.trim()).filter(|n| !n.is_empty());
+    let target = Some(format!("mission_progress:{progress_id}"));
+    let mut pay = false;
     if approve {
+        if status == four_eyes::AWAITING {
+            if first_id.as_deref() == Some(four_eyes::staff_id(actor).as_str()) {
+                return Err(four_eyes::same_staff());
+            }
+            if !four_eyes::claim_second(&mut tx, "mission_progress", "reward_status", progress_id, actor, "pending").await? {
+                return Err(ApiError::Conflict { code: "state", message: "This reward isn't waiting for a decision.".into() });
+            }
+            let mut after = four_eyes::approvers(first_id.as_deref(), first_name.as_deref(), actor);
+            after["amount"] = opt_num(amount);
+            audit::record(&mut *tx, tenant, actor, "mission.reward_approve", target, Some(json!({"status": status})), Some(after), note_opt).await?;
+            pay = true;
+        } else if amount.is_some_and(|a| four_eyes::needs_two(a, threshold)) && first_id.is_none() {
+            four_eyes::record_first(&mut tx, "mission_progress", "reward_status", progress_id, &status, actor, note_opt, threshold).await?;
+            let after = json!({"amount": opt_num(amount), "status": four_eyes::AWAITING, "fourEyesThreshold": num(threshold)});
+            audit::record(&mut *tx, tenant, actor, "mission.reward_approve_first", target, Some(json!({"status": status})), Some(after), note_opt).await?;
+        } else {
+            audit::record(&mut *tx, tenant, actor, "mission.reward_approve", target, Some(json!({"status": status})), Some(json!({"amount": opt_num(amount)})), note_opt).await?;
+            pay = true;
+        }
+        if pay {
+            sqlx::query("UPDATE mission_progress SET decided_by = $2, updated_at = now() WHERE id = $1").bind(progress_id).bind(actor.label()).execute(&mut *tx).await?;
+        }
+    } else {
+        sqlx::query("UPDATE mission_progress SET reward_status = 'rejected', reward_error = $2, decided_by = $3, updated_at = now() WHERE id = $1").bind(progress_id).bind(note).bind(actor.label()).execute(&mut *tx).await?;
+        let before = json!({"status": status, "firstApprovedById": first_id, "firstApprovedBy": first_name});
+        audit::record(&mut *tx, tenant, actor, "mission.reward_reject", target, Some(before), Some(json!({"status": "rejected", "from": status, "amount": opt_num(amount)})), Some(note)).await?;
+    }
+    tx.commit().await?;
+    if pay {
         pay_reward(st, progress_id, actor).await?;
         let _ = crate::payouts::wallet_tick(st).await;
-    } else {
-        sqlx::query("UPDATE mission_progress SET reward_status = 'rejected', reward_error = $2, updated_at = now() WHERE id = $1").bind(progress_id).bind(note).execute(&st.pool).await?;
-        audit::record(&st.pool, tenant, actor, "mission.reward_reject", Some(format!("mission_progress:{progress_id}")), None, None, Some(note)).await?;
     }
     let r = sqlx::query("SELECT * FROM mission_progress WHERE id = $1").bind(progress_id).fetch_one(&st.pool).await?;
-    Ok(json!({"reward": progress_json(&r)}))
+    let mut v = progress_json(&r);
+    v["fourEyes"] = four_eyes::json_of(&r, r.get("reward_amount"), r.get::<&str, _>("reward_status"), Some(threshold));
+    Ok(json!({"reward": v}))
 }
 
 /// The client's missions for the current periods (what the Rewards hub shows).
@@ -458,7 +508,7 @@ pub async fn me(st: &AppState, tenant: &str, user_id: i64) -> anyhow::Result<Vec
         v["resetsAt"] = if m.schedule == "once" { json!(m.ends_at) } else { json!(to) };
         v["progress"] = p.as_ref().map(|p| num(p.get("progress"))).unwrap_or(json!(0));
         v["completedAt"] = p.as_ref().map(|p| json!(p.get::<Option<DateTime<Utc>>, _>("completed_at"))).unwrap_or(Value::Null);
-        v["rewardStatus"] = p.as_ref().map(|p| json!(p.get::<String, _>("reward_status"))).unwrap_or(json!("none"));
+        v["rewardStatus"] = p.as_ref().map(|p| json!(client_reward_status(p.get::<&str, _>("reward_status")))).unwrap_or(json!("none"));
         v["done"] = json!(p.as_ref().is_some_and(|p| p.get::<Option<DateTime<Utc>>, _>("completed_at").is_some()));
         // a finished one-off mission stays listed as done; the rest are shown from not started to done
         out.push(v);
@@ -510,7 +560,7 @@ pub async fn tick(st: &AppState) -> anyhow::Result<usize> {
         .fetch_all(&st.pool)
         .await?;
         for (pid, amount) in waiting {
-            let s = decide(amount, settings.auto_pay_below);
+            let s = decide(amount, settings.auto_pay_below, settings.four_eyes_threshold);
             sqlx::query("UPDATE mission_progress SET reward_status = $2, updated_at = now() WHERE id = $1 AND reward_status = 'kyc'").bind(pid).bind(s).execute(&st.pool).await?;
             if s == "pending" {
                 pay_reward(st, pid, &Actor::system()).await?;

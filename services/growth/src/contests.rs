@@ -14,6 +14,7 @@ use crate::bonus::REASON_PRIZE;
 use crate::calc::{self, RankInput};
 use crate::clients::{self, EngineOutcome};
 use crate::error::{ApiError, ApiResult};
+use crate::four_eyes::{self, AWAITING};
 use crate::loyalty;
 use crate::model::{AntiCheat, Prize, contest_status, display_name, opt_num, prize_pool};
 use crate::money::{D, ZERO, num};
@@ -103,11 +104,17 @@ pub fn standing_json(r: &sqlx::postgres::PgRow, me: Option<i64>, staff: bool, mi
         "startEquity": if show { opt_num(r.get("start_equity")) } else { Value::Null },
         "prize": opt_num(r.get("prize_amount")),
         "prizePayout": r.get::<Option<String>, _>("prize_payout"),
-        "prizeStatus": r.get::<String, _>("prize_status"),
+        // clients see a prize waiting for its second approval as waiting for approval
+        "prizeStatus": if staff { json!(r.get::<String, _>("prize_status")) } else { json!(client_prize_status(r.get::<&str, _>("prize_status"))) },
+        "fourEyes": if staff { four_eyes::json_of(r, r.get("prize_amount"), r.get::<&str, _>("prize_status"), None) } else { Value::Null },
         "me": mine,
         "joinedAt": r.get::<DateTime<Utc>, _>("joined_at"),
         "updatedAt": r.get::<DateTime<Utc>, _>("updated_at"),
     })
+}
+
+pub fn client_prize_status(s: &str) -> &str {
+    if s == four_eyes::AWAITING { "approval" } else { s }
 }
 
 pub const ORDER: &str = "ORDER BY (rank IS NULL), rank, joined_at, id";
@@ -490,8 +497,11 @@ pub async fn finalize(st: &AppState, contest_id: i64, actor: &Actor) -> ApiResul
     let prizes = calc::allocate_prizes(&prizes_of(&c), &ranks);
     let tenant: String = c.get("tenant");
     // phase 4: prizes below the broker's auto-pay threshold are paid now, the rest wait for staff approval
-    // (threshold 0 = every prize waits for staff, as before)
-    let threshold = crate::db::settings(&st.pool, &tenant).await?.auto_pay_below;
+    // (threshold 0 = every prize waits for staff, as before). Four-eyes: auto-pay never releases a prize at or
+    // above `fourEyesThreshold` (it waits for two staff members).
+    let settings = crate::db::settings(&st.pool, &tenant).await?;
+    let threshold = settings.auto_pay_below;
+    let limit = four_eyes::auto_pay_limit(threshold, settings.four_eyes_threshold);
     let mut tx = st.pool.begin().await?;
     let locked: String = sqlx::query_scalar("SELECT status FROM contests WHERE id = $1 FOR UPDATE").bind(contest_id).fetch_one(&mut *tx).await?;
     if matches!(locked.as_str(), "finalized" | "paid" | "cancelled") {
@@ -502,106 +512,332 @@ pub async fn finalize(st: &AppState, contest_id: i64, actor: &Actor) -> ApiResul
     }
     let mut auto = 0;
     for (id, amount, payout) in &prizes {
-        let status = prize_decision(*amount, threshold);
-        if threshold > ZERO && status == "pending" {
+        let status = prize_decision(*amount, threshold, settings.four_eyes_threshold);
+        if limit.is_some() && status == "pending" {
             auto += 1;
         }
         sqlx::query("UPDATE contest_entries SET prize_amount = $2, prize_payout = $3, prize_status = $4 WHERE id = $1").bind(id).bind(amount).bind(payout).bind(status).execute(&mut *tx).await?;
     }
     sqlx::query("UPDATE contests SET status = 'finalized', finalized_at = now(), finalized_by = $2, updated_at = now() WHERE id = $1").bind(contest_id).bind(actor.label()).execute(&mut *tx).await?;
     let total: D = prizes.iter().map(|p| p.1).sum();
-    audit::record(&mut *tx, &tenant, actor, "contest.finalize", Some(format!("contest:{contest_id}")), None, Some(json!({"winners": prizes.len(), "prizes": num(total), "autoPay": auto, "autoPayBelow": num(threshold)})), None).await?;
+    audit::record(&mut *tx, &tenant, actor, "contest.finalize", Some(format!("contest:{contest_id}")), None, Some(json!({"winners": prizes.len(), "prizes": num(total), "autoPay": auto, "autoPayBelow": num(threshold), "fourEyesThreshold": num(settings.four_eyes_threshold)})), None).await?;
     tx.commit().await?;
-    if auto > 0 {
-        pay_with(st, contest_id, &Actor::system(), Some(threshold)).await?;
+    if let (true, Some(limit)) = (auto > 0, limit) {
+        pay_with(st, contest_id, &Actor::system(), Some(limit)).await?;
     }
     Ok(())
 }
 
 /// Prize status at finalize: `pending` (paid by the next payout run: at once when auto-pay applies, else when staff
-/// press Pay) or `approval` (at or above a non-zero threshold: staff with `marketing.approve` pay it).
-pub fn prize_decision(amount: D, auto_pay_below: D) -> &'static str {
+/// press Pay) or `approval` (at or above a non-zero auto-pay threshold, or at or above the four-eyes threshold: staff
+/// with `marketing.approve` pay it; at or above the four-eyes threshold two different staff members).
+pub fn prize_decision(amount: D, auto_pay_below: D, four_eyes_threshold: D) -> &'static str {
+    if four_eyes::needs_two(amount, four_eyes_threshold) {
+        return "approval";
+    }
     if auto_pay_below <= ZERO || amount < auto_pay_below { "pending" } else { "approval" }
 }
 
-/// Pays every unpaid prize (staff: pending, waiting for approval or failed): wallet credits, or trading credit on a
-/// live account.
+/// Staff Pay (bulk, `marketing.approve`): every unpaid prize of the contest (pending, waiting for approval or
+/// failed), with the four-eyes rule per prize:
+/// - below `fourEyesThreshold`: paid now (as before);
+/// - at or above it, not yet approved: this press is the first approval → `awaiting_second_approval` (nothing paid);
+/// - `awaiting_second_approval`: paid when the caller is not the first approver, otherwise left waiting and counted
+///   in `skippedSameStaff` (409 `four_eyes_same_staff` when that is all the press could do);
+/// - a prize that already had its two approvals and failed (or is queued at the wallet) is retried by anyone.
 pub async fn pay(st: &AppState, contest_id: i64, actor: &Actor) -> ApiResult<Value> {
     pay_with(st, contest_id, actor, None).await
 }
 
-/// `below` = auto-pay: only pending / failed prizes under that amount. Every payout is idempotent (wallet key
-/// `growth:prize:<entry>`, engine key `growth:prize:<entry>:c`).
-pub async fn pay_with(st: &AppState, contest_id: i64, actor: &Actor, below: Option<D>) -> ApiResult<Value> {
+/// Contest facts the payment of one prize needs.
+struct PayCtx {
+    tenant: String,
+    name: String,
+    kind: String,
+}
+
+async fn pay_ctx(st: &AppState, contest_id: i64) -> ApiResult<PayCtx> {
     let c = sqlx::query("SELECT * FROM contests WHERE id = $1").bind(contest_id).fetch_one(&st.pool).await?;
     let stored: String = c.get("status");
     if stored != "finalized" && stored != "paid" {
         return Err(ApiError::Conflict { code: "state", message: "Finalize the contest before paying prizes.".into() });
     }
-    let tenant: String = c.get("tenant");
-    let name: String = c.get("name");
-    let kind: String = c.get("kind");
-    let winners = match below {
-        None => sqlx::query("SELECT * FROM contest_entries WHERE contest_id = $1 AND prize_status IN ('pending','approval','failed') AND prize_amount > 0 ORDER BY rank").bind(contest_id).fetch_all(&st.pool).await?,
-        Some(t) => sqlx::query("SELECT * FROM contest_entries WHERE contest_id = $1 AND prize_status IN ('pending','failed') AND prize_amount > 0 AND prize_amount < $2 ORDER BY rank").bind(contest_id).bind(t).fetch_all(&st.pool).await?,
-    };
-    let (mut paid, mut failed, mut amount) = (0, 0, ZERO);
-    for w in winners {
-        let id: i64 = w.get("id");
-        let user: i64 = w.get("user_id");
-        let prize: D = w.get("prize_amount");
-        let rank: i32 = w.get::<Option<i32>, _>("rank").unwrap_or(0);
-        let note = format!("{name}: prize for rank #{rank}");
-        if w.get::<Option<String>, _>("prize_payout").as_deref() == Some("credit") {
-            let login = if kind == "live" {
-                Some(w.get::<i64, _>("login"))
-            } else {
-                clients::accounts_of(st, &tenant, user, Some("live")).await.ok().and_then(|v| v.first().map(|a| a.login))
-            };
-            let Some(login) = login else {
-                sqlx::query("UPDATE contest_entries SET prize_status = 'failed', prize_error = 'The client has no live account for a credit prize' WHERE id = $1").bind(id).execute(&st.pool).await?;
-                failed += 1;
-                continue;
-            };
-            let cent = clients::account(st, &tenant, login).await.ok().flatten().is_some_and(|a| a.cent);
-            match clients::post_balance(st, &tenant, login, cent, "credit", prize, &format!("growth:prize:{id}:c"), REASON_PRIZE, &note).await {
-                EngineOutcome::Booked => {
-                    sqlx::query("UPDATE contest_entries SET prize_status = 'paid', prize_ref = $2, prize_error = NULL WHERE id = $1").bind(id).bind(format!("credit:{login}")).execute(&st.pool).await?;
-                    clients::notify(st, &tenant, user, "contest.prize", format!("{name}: prize credited"), format!("${} trading credit on account {login}.", prize.normalize()), "/rewards");
-                    paid += 1;
-                    amount += prize;
-                }
-                EngineOutcome::Retry(m) | EngineOutcome::Fail(m) => {
-                    sqlx::query("UPDATE contest_entries SET prize_status = 'failed', prize_error = $2 WHERE id = $1").bind(id).bind(&m).execute(&st.pool).await?;
-                    failed += 1;
-                }
-            }
-        } else {
-            let mut tx = st.pool.begin().await?;
-            loyalty::queue_wallet_credit(&mut tx, &tenant, user, &format!("growth:prize:{id}"), "adjustment", prize, &format!("prize:{id}"), &note).await?;
-            sqlx::query("UPDATE wallet_credits SET status = 'pending', next_try_at = now() WHERE idem_key = $1 AND status = 'failed'").bind(format!("growth:prize:{id}")).execute(&mut *tx).await?;
-            sqlx::query("UPDATE contest_entries SET prize_status = 'pending', prize_error = NULL WHERE id = $1").bind(id).execute(&mut *tx).await?;
-            tx.commit().await?;
-            paid += 1;
-            amount += prize;
-        }
+    Ok(PayCtx { tenant: c.get("tenant"), name: c.get("name"), kind: c.get("kind") })
+}
+
+const PRIZE_SELECT: &str = "SELECT e.*, EXISTS (SELECT 1 FROM wallet_credits w WHERE w.idem_key = 'growth:prize:' || e.id AND w.status <> 'failed') AS queued FROM contest_entries e";
+
+/// What a staff approval does to one prize.
+enum Step {
+    /// pay it now (below the threshold, already approved twice, or this is the second approval)
+    Pay,
+    /// record the first approval (at or above the threshold)
+    First,
+    /// the caller gave the first approval
+    SameStaff,
+    /// nothing to do
+    Skip,
+}
+
+fn step_for(w: &sqlx::postgres::PgRow, me: &str, threshold: D) -> Step {
+    let status: String = w.get("prize_status");
+    let first: Option<String> = w.get("first_approved_by_id");
+    let prize: D = w.get::<Option<D>, _>("prize_amount").unwrap_or(ZERO);
+    if prize <= ZERO {
+        return Step::Skip;
     }
+    match status.as_str() {
+        AWAITING if first.as_deref() == Some(me) => Step::SameStaff,
+        AWAITING => Step::Pay,
+        "pending" | "approval" | "failed" => {
+            // approved twice already (released, then failed or queued at the wallet): retry without new approvals
+            let released = first.is_some() || w.get::<bool, _>("queued");
+            if four_eyes::needs_two(prize, threshold) && !released { Step::First } else { Step::Pay }
+        }
+        _ => Step::Skip,
+    }
+}
+
+/// Pays one prize (wallet credit queued with key `growth:prize:<entry>`, or engine credit `growth:prize:<entry>:c`).
+/// Returns whether it was paid / queued.
+async fn pay_entry(st: &AppState, cx: &PayCtx, w: &sqlx::postgres::PgRow) -> anyhow::Result<bool> {
+    let id: i64 = w.get("id");
+    let user: i64 = w.get("user_id");
+    let prize: D = w.get("prize_amount");
+    let rank: i32 = w.get::<Option<i32>, _>("rank").unwrap_or(0);
+    let (tenant, name) = (&cx.tenant, &cx.name);
+    let note = format!("{name}: prize for rank #{rank}");
+    if w.get::<Option<String>, _>("prize_payout").as_deref() == Some("credit") {
+        let login = if cx.kind == "live" {
+            Some(w.get::<i64, _>("login"))
+        } else {
+            clients::accounts_of(st, tenant, user, Some("live")).await.ok().and_then(|v| v.first().map(|a| a.login))
+        };
+        let Some(login) = login else {
+            sqlx::query("UPDATE contest_entries SET prize_status = 'failed', prize_error = 'The client has no live account for a credit prize' WHERE id = $1").bind(id).execute(&st.pool).await?;
+            return Ok(false);
+        };
+        let cent = clients::account(st, tenant, login).await.ok().flatten().is_some_and(|a| a.cent);
+        match clients::post_balance(st, tenant, login, cent, "credit", prize, &format!("growth:prize:{id}:c"), REASON_PRIZE, &note).await {
+            EngineOutcome::Booked => {
+                sqlx::query("UPDATE contest_entries SET prize_status = 'paid', prize_ref = $2, prize_error = NULL WHERE id = $1").bind(id).bind(format!("credit:{login}")).execute(&st.pool).await?;
+                clients::notify(st, tenant, user, "contest.prize", format!("{name}: prize credited"), format!("${} trading credit on account {login}.", prize.normalize()), "/rewards");
+                Ok(true)
+            }
+            EngineOutcome::Retry(m) | EngineOutcome::Fail(m) => {
+                sqlx::query("UPDATE contest_entries SET prize_status = 'failed', prize_error = $2 WHERE id = $1").bind(id).bind(&m).execute(&st.pool).await?;
+                Ok(false)
+            }
+        }
+    } else {
+        let mut tx = st.pool.begin().await?;
+        loyalty::queue_wallet_credit(&mut tx, tenant, user, &format!("growth:prize:{id}"), "adjustment", prize, &format!("prize:{id}"), &note).await?;
+        sqlx::query("UPDATE wallet_credits SET status = 'pending', next_try_at = now() WHERE idem_key = $1 AND status = 'failed'").bind(format!("growth:prize:{id}")).execute(&mut *tx).await?;
+        sqlx::query("UPDATE contest_entries SET prize_status = 'pending', prize_error = NULL WHERE id = $1").bind(id).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(true)
+    }
+}
+
+/// Moves one prize on its four-eyes path under a conditional UPDATE: the first approval, or the second approval's
+/// claim (`awaiting_second_approval` → `pending`). `Some(true)` = the caller may pay it now, `Some(false)` = first
+/// approval recorded, `None` = someone else decided it meanwhile.
+#[allow(clippy::too_many_arguments)]
+async fn advance(st: &AppState, tenant: &str, contest_id: i64, w: &sqlx::postgres::PgRow, step: &Step, actor: &Actor, note: Option<&str>, threshold: D) -> anyhow::Result<Option<bool>> {
+    let id: i64 = w.get("id");
+    let status: String = w.get("prize_status");
+    let amount = opt_num(w.get("prize_amount"));
     let mut tx = st.pool.begin().await?;
-    // paid once nothing waits for approval any more (auto-pay leaves the larger prizes to staff)
+    let out = match step {
+        Step::First => {
+            if !four_eyes::record_first(&mut tx, "contest_entries", "prize_status", id, &status, actor, note, threshold).await? {
+                return Ok(None);
+            }
+            audit::record(
+                &mut *tx,
+                tenant,
+                actor,
+                "prize.approve_first",
+                Some(format!("contest_entry:{id}")),
+                Some(json!({"status": status})),
+                Some(json!({"contest": contest_id, "amount": amount, "status": AWAITING, "fourEyesThreshold": num(threshold)})),
+                note,
+            )
+            .await?;
+            Some(false)
+        }
+        Step::Pay if status == AWAITING => {
+            if !four_eyes::claim_second(&mut tx, "contest_entries", "prize_status", id, actor, "pending").await? {
+                return Ok(None);
+            }
+            let mut after = four_eyes::approvers(w.get::<Option<&str>, _>("first_approved_by_id"), w.get::<Option<&str>, _>("first_approved_by_name"), actor);
+            after["contest"] = json!(contest_id);
+            after["amount"] = amount;
+            audit::record(&mut *tx, tenant, actor, "prize.approve", Some(format!("contest_entry:{id}")), Some(json!({"status": AWAITING})), Some(after), note).await?;
+            Some(true)
+        }
+        _ => Some(true),
+    };
+    tx.commit().await?;
+    Ok(out)
+}
+
+/// The contest is `paid` once no prize waits for an approval any more.
+async fn mark_paid(st: &AppState, contest_id: i64) -> anyhow::Result<()> {
     sqlx::query(
         "UPDATE contests SET status = 'paid', paid_at = COALESCE(paid_at, now()), updated_at = now()
-          WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM contest_entries e WHERE e.contest_id = $1 AND e.prize_status = 'approval')",
+          WHERE id = $1 AND status IN ('finalized', 'paid')
+            AND NOT EXISTS (SELECT 1 FROM contest_entries e WHERE e.contest_id = $1 AND e.prize_status IN ('approval', 'awaiting_second_approval'))",
     )
     .bind(contest_id)
-    .execute(&mut *tx)
+    .execute(&st.pool)
     .await?;
+    Ok(())
+}
+
+/// `below` = auto-pay (system): only pending / failed prizes under that amount and under the four-eyes threshold.
+/// Every payout is idempotent (wallet key `growth:prize:<entry>`, engine key `growth:prize:<entry>:c`).
+pub async fn pay_with(st: &AppState, contest_id: i64, actor: &Actor, below: Option<D>) -> ApiResult<Value> {
+    let cx = pay_ctx(st, contest_id).await?;
+    let tenant = cx.tenant.clone();
+    let threshold = crate::db::settings(&st.pool, &tenant).await?.four_eyes_threshold;
+    let me = four_eyes::staff_id(actor);
+    let candidates = match below {
+        None => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "{PRIZE_SELECT} WHERE e.contest_id = $1 AND e.prize_status IN ('pending','approval','awaiting_second_approval','failed') AND e.prize_amount > 0 ORDER BY e.rank"
+        )))
+        .bind(contest_id)
+        .fetch_all(&st.pool)
+        .await?,
+        Some(t) => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "{PRIZE_SELECT} WHERE e.contest_id = $1 AND e.prize_status IN ('pending','failed') AND e.prize_amount > 0 AND e.prize_amount < $2 AND e.prize_amount < $3 ORDER BY e.rank"
+        )))
+        .bind(contest_id)
+        .bind(t)
+        .bind(threshold)
+        .fetch_all(&st.pool)
+        .await?,
+    };
+    let (mut paid, mut failed, mut amount, mut first, mut same) = (0, 0, ZERO, 0, 0);
+    let mut winners = vec![];
+    for w in candidates {
+        let step = step_for(&w, &me, threshold);
+        if below.is_some() {
+            // auto-pay never gives an approval (the query already leaves four-eyes prizes out)
+            if matches!(step, Step::Pay) {
+                winners.push(w);
+            }
+            continue;
+        }
+        match step {
+            Step::SameStaff => same += 1,
+            Step::Skip => {}
+            Step::First | Step::Pay => match advance(st, &tenant, contest_id, &w, &step, actor, None, threshold).await? {
+                Some(true) => winners.push(w),
+                Some(false) => first += 1,
+                None => {}
+            },
+        }
+    }
+    if below.is_none() && winners.is_empty() && first == 0 && same > 0 {
+        return Err(four_eyes::same_staff());
+    }
+    for w in &winners {
+        let prize: D = w.get("prize_amount");
+        if pay_entry(st, &cx, w).await? {
+            paid += 1;
+            amount += prize;
+        } else {
+            failed += 1;
+        }
+    }
+    // paid once nothing waits for approval any more (auto-pay and four-eyes leave the larger prizes to staff)
+    mark_paid(st, contest_id).await?;
+    let awaiting: i64 = sqlx::query_scalar("SELECT count(*) FROM contest_entries WHERE contest_id = $1 AND prize_status = 'awaiting_second_approval'").bind(contest_id).fetch_one(&st.pool).await?;
     let action = if below.is_some() { "contest.autopay" } else { "contest.pay" };
-    audit::record(&mut *tx, &tenant, actor, action, Some(format!("contest:{contest_id}")), None, Some(json!({"paid": paid, "failed": failed, "amount": num(amount), "below": below.map(num)})), None).await?;
-    tx.commit().await?;
+    let summary = json!({"paid": paid, "failed": failed, "amount": num(amount), "below": below.map(num), "firstApproved": first, "skippedSameStaff": same, "awaitingSecond": awaiting});
+    audit::record(&st.pool, &tenant, actor, action, Some(format!("contest:{contest_id}")), None, Some(summary), None).await?;
     st.wake.notify_one();
     // wallet prizes are paid by the payout loop; run it now so the response reflects them
     let _ = crate::payouts::wallet_tick(st).await;
-    Ok(json!({"paid": paid, "failed": failed, "amount": num(amount)}))
+    Ok(json!({"paid": paid, "failed": failed, "amount": num(amount), "firstApproved": first, "skippedSameStaff": same, "awaitingSecond": awaiting, "fourEyesThreshold": num(threshold)}))
+}
+
+/// One prize as the approval queue shows it.
+pub async fn prize_json(st: &AppState, entry_id: i64) -> anyhow::Result<Value> {
+    let r = sqlx::query("SELECT * FROM contest_entries WHERE id = $1").bind(entry_id).fetch_one(&st.pool).await?;
+    let tenant: String = r.get("tenant");
+    let threshold = crate::db::settings(&st.pool, &tenant).await?.four_eyes_threshold;
+    let status: String = r.get("prize_status");
+    Ok(json!({
+        "entryId": entry_id,
+        "contestId": r.get::<i64, _>("contest_id"),
+        "userId": r.get::<i64, _>("user_id"),
+        "rank": r.get::<Option<i32>, _>("rank"),
+        "amount": opt_num(r.get("prize_amount")),
+        "payout": r.get::<Option<String>, _>("prize_payout"),
+        "status": status,
+        "error": r.get::<Option<String>, _>("prize_error"),
+        "fourEyes": four_eyes::json_of(&r, r.get("prize_amount"), &status, Some(threshold)),
+    }))
+}
+
+/// Staff approval of one prize (`marketing.approve`): the bulk Pay's four-eyes rule for one prize, answered with
+/// errors: 409 `four_eyes_same_staff` for the first approver, 409 `state` when it doesn't wait for a decision.
+pub async fn approve_prize(st: &AppState, contest_id: i64, entry_id: i64, actor: &Actor, note: Option<&str>) -> ApiResult<Value> {
+    let cx = pay_ctx(st, contest_id).await?;
+    let threshold = crate::db::settings(&st.pool, &cx.tenant).await?.four_eyes_threshold;
+    let w = sqlx::query(sqlx::AssertSqlSafe(format!("{PRIZE_SELECT} WHERE e.id = $1 AND e.contest_id = $2")))
+        .bind(entry_id)
+        .bind(contest_id)
+        .fetch_optional(&st.pool)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let step = step_for(&w, &four_eyes::staff_id(actor), threshold);
+    let state_err = || ApiError::Conflict { code: "state", message: "This prize isn't waiting for a decision.".into() };
+    match step {
+        Step::SameStaff => return Err(four_eyes::same_staff()),
+        Step::Skip => return Err(state_err()),
+        Step::First | Step::Pay => match advance(st, &cx.tenant, contest_id, &w, &step, actor, note, threshold).await? {
+            None => return Err(state_err()),
+            Some(false) => {}
+            Some(true) => {
+                let ok = pay_entry(st, &cx, &w).await?;
+                let summary = json!({"entry": entry_id, "paid": if ok { 1 } else { 0 }, "failed": if ok { 0 } else { 1 }, "amount": opt_num(w.get("prize_amount"))});
+                audit::record(&st.pool, &cx.tenant, actor, "contest.pay", Some(format!("contest:{contest_id}")), None, Some(summary), note).await?;
+                mark_paid(st, contest_id).await?;
+                st.wake.notify_one();
+                let _ = crate::payouts::wallet_tick(st).await;
+            }
+        },
+    }
+    Ok(json!({"prize": prize_json(st, entry_id).await?}))
+}
+
+/// Staff rejection of a prize that waits for a decision (approval, first approval given, failed, or pending and not
+/// yet queued at the wallet). Either approver may reject; the reason is required.
+pub async fn reject_prize(st: &AppState, contest_id: i64, entry_id: i64, actor: &Actor, note: &str) -> ApiResult<Value> {
+    let cx = pay_ctx(st, contest_id).await?;
+    let mut tx = st.pool.begin().await?;
+    let w = sqlx::query(sqlx::AssertSqlSafe(format!("{PRIZE_SELECT} WHERE e.id = $1 AND e.contest_id = $2 FOR UPDATE OF e")))
+        .bind(entry_id)
+        .bind(contest_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let status: String = w.get("prize_status");
+    let queued: bool = w.get("queued");
+    let open = matches!(status.as_str(), "approval" | AWAITING | "failed" | "pending") && !queued && w.get::<Option<D>, _>("prize_amount").is_some_and(|a| a > ZERO);
+    if !open {
+        return Err(ApiError::Conflict { code: "state", message: "This prize isn't waiting for a decision (it may already be on its way to the client).".into() });
+    }
+    sqlx::query("UPDATE contest_entries SET prize_status = 'rejected', prize_error = $2 WHERE id = $1").bind(entry_id).bind(note).execute(&mut *tx).await?;
+    let before = json!({"status": status, "firstApprovedById": w.get::<Option<String>, _>("first_approved_by_id"), "firstApprovedBy": w.get::<Option<String>, _>("first_approved_by_name")});
+    let after = json!({"contest": contest_id, "amount": opt_num(w.get("prize_amount")), "status": "rejected", "from": status});
+    audit::record(&mut *tx, &cx.tenant, actor, "prize.reject", Some(format!("contest_entry:{entry_id}")), Some(before), Some(after), Some(note)).await?;
+    tx.commit().await?;
+    mark_paid(st, contest_id).await?;
+    Ok(json!({"prize": prize_json(st, entry_id).await?}))
 }
 
 pub fn flag_json(r: &sqlx::postgres::PgRow) -> Value {

@@ -81,6 +81,20 @@ pub async fn overview(State(st): State<AppState>, s: StaffCtx) -> ApiResult<Json
     let liability: i64 = l.get("liability");
     let cb = sqlx::query("SELECT COALESCE(sum(amount) FILTER (WHERE status = 'accrued'), 0) AS accrued FROM cashback_accruals WHERE tenant = $1").bind(t).fetch_one(&st.pool).await?;
     let cbp: Option<D> = sqlx::query_scalar("SELECT sum(amount) FROM cashback_payouts WHERE tenant = $1 AND status = 'paid' AND paid_at > now() - interval '30 days'").bind(t).fetch_one(&st.pool).await?;
+    // money out waiting for staff (four-eyes: `approval` and `awaiting_second_approval`)
+    let w = sqlx::query(
+        "SELECT (SELECT count(*) FROM cashback_payouts WHERE tenant = $1 AND status IN ('approval','awaiting_second_approval')) AS cashback,
+                (SELECT count(*) FROM cashback_payouts WHERE tenant = $1 AND status = 'awaiting_second_approval') AS cashback_second,
+                (SELECT count(*) FROM contest_entries WHERE tenant = $1 AND prize_status IN ('approval','awaiting_second_approval')) AS prizes,
+                (SELECT count(*) FROM contest_entries WHERE tenant = $1 AND prize_status = 'awaiting_second_approval') AS prizes_second,
+                (SELECT count(*) FROM mission_progress WHERE tenant = $1 AND reward_status IN ('approval','awaiting_second_approval')) AS rewards,
+                (SELECT count(*) FROM mission_progress WHERE tenant = $1 AND reward_status = 'awaiting_second_approval') AS rewards_second,
+                (SELECT count(*) FROM redemptions WHERE tenant = $1 AND status IN ('approval','awaiting_second_approval')) AS redemptions,
+                (SELECT count(*) FROM redemptions WHERE tenant = $1 AND status = 'awaiting_second_approval') AS redemptions_second",
+    )
+    .bind(t)
+    .fetch_one(&st.pool)
+    .await?;
     let b = sqlx::query(
         "SELECT (SELECT count(*) FROM bonus_campaigns WHERE tenant = $1 AND status = 'active' AND created_by IS DISTINCT FROM 'system:loyalty') AS campaigns,
                 (SELECT count(*) FROM bonus_grants WHERE tenant = $1 AND status = 'active') AS grants,
@@ -121,6 +135,9 @@ pub async fn overview(State(st): State<AppState>, s: StaffCtx) -> ApiResult<Json
         "loyalty": {"members": l.get::<i64, _>("members"), "pointsIssued30d": l.get::<i64, _>("issued"), "pointsRedeemed30d": l.get::<i64, _>("redeemed"),
                     "liabilityPoints": liability, "liabilityUsd": num(D::from(liability) * settings.point_value)},
         "cashback": {"accrued": num(cb.get("accrued")), "paid30d": num(cbp.unwrap_or(ZERO))},
+        "approvals": {"cashback": w.get::<i64, _>("cashback"), "prizes": w.get::<i64, _>("prizes"), "rewards": w.get::<i64, _>("rewards"), "redemptions": w.get::<i64, _>("redemptions"),
+                      "awaitingSecond": w.get::<i64, _>("cashback_second") + w.get::<i64, _>("prizes_second") + w.get::<i64, _>("rewards_second") + w.get::<i64, _>("redemptions_second"),
+                      "fourEyesThreshold": num(settings.four_eyes_threshold)},
         "bonus": {"activeCampaigns": b.get::<i64, _>("campaigns"), "activeGrants": b.get::<i64, _>("grants"), "issued30d": num(b.get("issued")),
                   "released30d": num(b.get("released")), "forfeited30d": num(b.get("forfeited")), "outstanding": num(b.get("outstanding"))},
         "contests": {"running": c.get::<i64, _>("running"), "scheduled": c.get::<i64, _>("scheduled"), "entrants": c.get::<i64, _>("entrants")},
@@ -415,7 +432,12 @@ pub struct ListQ {
 }
 
 fn st_filter(v: &Option<String>) -> Option<String> {
-    v.as_ref().filter(|s| !s.is_empty() && *s != "all").cloned()
+    v.as_ref().filter(|s| !s.is_empty() && *s != "all" && *s != "open").cloned()
+}
+
+/// `status=open`: rows waiting for a staff decision (`approval` or `awaiting_second_approval`).
+fn open_filter(v: &Option<String>) -> bool {
+    v.as_deref() == Some("open")
 }
 
 fn with_name(mut v: Value, r: &sqlx::postgres::PgRow) -> Value {
@@ -436,21 +458,49 @@ pub async fn redemptions(State(st): State<AppState>, s: StaffCtx, Query(q): Quer
     let (page, limit, off) = paging(q.page, q.limit, 50, 200);
     let rows = sqlx::query(sqlx::AssertSqlSafe(format!(
         "SELECT x.*, pr.first_name, pr.last_name, pr.email, count(*) OVER () AS total FROM redemptions x {PROFILE_JOIN}
-         WHERE x.tenant = $1 AND ($2::text IS NULL OR x.status = $2) AND ($3::bigint IS NULL OR x.user_id = $3) ORDER BY x.id DESC OFFSET $4 LIMIT $5"
+         WHERE x.tenant = $1 AND ($2::text IS NULL OR x.status = $2) AND ($3::bigint IS NULL OR x.user_id = $3)
+           AND (NOT $6 OR x.status IN ('approval','awaiting_second_approval')) ORDER BY x.id DESC OFFSET $4 LIMIT $5"
     )))
     .bind(&s.tenant)
     .bind(st_filter(&q.status))
     .bind(q.user)
     .bind(off)
     .bind(limit)
+    .bind(open_filter(&q.status))
     .fetch_all(&st.pool)
     .await?;
     let total = rows.first().map(|r| r.get::<i64, _>("total")).unwrap_or(0);
-    Ok(Json(json!({"items": rows.iter().map(|r| with_name(loyalty::redemption_json(r), r)).collect::<Vec<_>>(), "total": total, "page": page, "limit": limit})))
+    let threshold = db::settings(&st.pool, &s.tenant).await?.four_eyes_threshold;
+    let items: Vec<Value> = rows.iter().map(|r| with_name(loyalty::redemption_admin_json(r, Some(threshold)), r)).collect();
+    Ok(Json(json!({"items": items, "total": total, "page": page, "limit": limit, "fourEyesThreshold": num(threshold)})))
 }
 
-pub async fn retry_redemption(State(st): State<AppState>, s: StaffCtx, Path(id): Path<i64>) -> ApiResult<Json<Value>> {
+#[derive(Deserialize, Default)]
+pub struct DecideNote {
+    #[serde(default)]
+    note: String,
+}
+
+/// `POST /admin/redemptions/{id}/retry|approve|reject` (marketing.approve). Approve / reject decide a cashback
+/// redemption held for approval (four-eyes); reject needs a reason.
+pub async fn redemption_action(State(st): State<AppState>, s: StaffCtx, Path((id, action)): Path<(i64, String)>, body: Option<Json<DecideNote>>) -> ApiResult<Json<Value>> {
     s.require(ROLES_APPROVE)?;
+    let note = body.map(|b| b.0.note).unwrap_or_default();
+    match action.as_str() {
+        "retry" => retry_redemption(st, s, id).await,
+        "approve" => Ok(Json(loyalty::decide_redemption(&st, &s.tenant, id, true, &s.actor(), &note).await?)),
+        "reject" => {
+            if note.trim().is_empty() {
+                return Err(invalid("note", "Say why the redemption is rejected."));
+            }
+            let note = text(&note, "note", 500, true)?;
+            Ok(Json(loyalty::decide_redemption(&st, &s.tenant, id, false, &s.actor(), &note).await?))
+        }
+        _ => Err(ApiError::NotFound),
+    }
+}
+
+async fn retry_redemption(st: AppState, s: StaffCtx, id: i64) -> ApiResult<Json<Value>> {
     let r = sqlx::query("SELECT * FROM redemptions WHERE id = $1 AND tenant = $2").bind(id).bind(&s.tenant).fetch_optional(&st.pool).await?.ok_or(ApiError::NotFound)?;
     if r.get::<String, _>("status") != "failed" {
         return Err(ApiError::Conflict { code: "state", message: "Only failed redemptions can be retried.".into() });
@@ -460,7 +510,8 @@ pub async fn retry_redemption(State(st): State<AppState>, s: StaffCtx, Path(id):
     audit::record(&st.pool, &s.tenant, &s.actor(), "redemption.retry", Some(format!("redemption:{id}")), None, None, None).await?;
     let _ = payouts::wallet_tick(&st).await;
     let r = sqlx::query("SELECT * FROM redemptions WHERE id = $1").bind(id).fetch_one(&st.pool).await?;
-    Ok(Json(json!({"redemption": loyalty::redemption_json(&r)})))
+    let threshold = db::settings(&st.pool, &s.tenant).await?.four_eyes_threshold;
+    Ok(Json(json!({"redemption": loyalty::redemption_admin_json(&r, Some(threshold))})))
 }
 
 pub async fn members(State(st): State<AppState>, s: StaffCtx, Query(q): Query<ListQ>) -> ApiResult<Json<Value>> {
@@ -652,27 +703,38 @@ pub async fn cashback_payouts(State(st): State<AppState>, s: StaffCtx, Query(q):
     let (page, limit, off) = paging(q.page, q.limit, 50, 500);
     let rows = sqlx::query(sqlx::AssertSqlSafe(format!(
         "SELECT x.*, pr.first_name, pr.last_name, pr.email, count(*) OVER () AS total FROM cashback_payouts x {PROFILE_JOIN}
-         WHERE x.tenant = $1 AND ($2::text IS NULL OR x.status = $2) ORDER BY x.id DESC OFFSET $3 LIMIT $4"
+         WHERE x.tenant = $1 AND ($2::text IS NULL OR x.status = $2) AND (NOT $5 OR x.status IN ('approval','awaiting_second_approval'))
+         ORDER BY CASE x.status WHEN 'awaiting_second_approval' THEN 0 WHEN 'approval' THEN 1 ELSE 2 END, x.id DESC OFFSET $3 LIMIT $4"
     )))
     .bind(&s.tenant)
     .bind(st_filter(&q.status))
     .bind(off)
     .bind(limit)
+    .bind(open_filter(&q.status))
     .fetch_all(&st.pool)
     .await?;
     let total = rows.first().map(|r| r.get::<i64, _>("total")).unwrap_or(0);
-    let items: Vec<Value> = rows
-        .iter()
-        .map(|r| {
-            with_name(
-                json!({"id": r.get::<i64, _>("id"), "userId": r.get::<i64, _>("user_id"), "amount": num(r.get("amount")), "status": r.get::<String, _>("status"),
-                   "attempts": r.get::<i32, _>("attempts"), "error": r.get::<Option<String>, _>("error"), "walletTxn": r.get::<Option<String>, _>("wallet_txn"),
-                   "createdAt": r.get::<DateTime<Utc>, _>("created_at"), "paidAt": r.get::<Option<DateTime<Utc>>, _>("paid_at")}),
-                r,
-            )
-        })
-        .collect();
-    Ok(Json(json!({"items": items, "total": total, "page": page, "limit": limit})))
+    let threshold = db::settings(&st.pool, &s.tenant).await?.four_eyes_threshold;
+    let items: Vec<Value> = rows.iter().map(|r| with_name(payouts::cashback_payout_json(r, Some(threshold)), r)).collect();
+    let open: i64 = sqlx::query_scalar("SELECT count(*) FROM cashback_payouts WHERE tenant = $1 AND status IN ('approval','awaiting_second_approval')").bind(&s.tenant).fetch_one(&st.pool).await?;
+    Ok(Json(json!({"items": items, "total": total, "page": page, "limit": limit, "open": open, "fourEyesThreshold": num(threshold)})))
+}
+
+/// `POST /admin/cashback/payouts/{id}/approve|reject` (marketing.approve): a payout held for approval (four-eyes).
+pub async fn decide_cashback(State(st): State<AppState>, s: StaffCtx, Path((id, action)): Path<(i64, String)>, body: Option<Json<DecideNote>>) -> ApiResult<Json<Value>> {
+    s.require(ROLES_APPROVE)?;
+    let note = body.map(|b| b.0.note).unwrap_or_default();
+    match action.as_str() {
+        "approve" => Ok(Json(payouts::decide_cashback(&st, &s.tenant, id, true, &s.actor(), &note).await?)),
+        "reject" => {
+            if note.trim().is_empty() {
+                return Err(invalid("note", "Say why the payout is rejected."));
+            }
+            let note = text(&note, "note", 500, true)?;
+            Ok(Json(payouts::decide_cashback(&st, &s.tenant, id, false, &s.actor(), &note).await?))
+        }
+        _ => Err(ApiError::NotFound),
+    }
 }
 
 pub async fn run_cashback(State(st): State<AppState>, s: StaffCtx) -> ApiResult<Json<Value>> {
@@ -1603,7 +1665,8 @@ pub async fn contest(State(st): State<AppState>, s: StaffCtx, Path(id): Path<i64
             e
         })
         .collect();
-    Ok(Json(json!({"contest": contests::contest_json(&c), "leaderboard": board, "flags": flag_json})))
+    let threshold = db::settings(&st.pool, &s.tenant).await?.four_eyes_threshold;
+    Ok(Json(json!({"contest": contests::contest_json(&c), "leaderboard": board, "flags": flag_json, "fourEyesThreshold": num(threshold)})))
 }
 
 pub async fn patch_contest(State(st): State<AppState>, s: StaffCtx, Path(id): Path<i64>, Json(body): Json<Value>) -> ApiResult<Json<Value>> {
@@ -1663,6 +1726,25 @@ pub async fn pay_contest(State(st): State<AppState>, s: StaffCtx, Path(id): Path
     s.require(ROLES_APPROVE)?;
     load_contest(&st, &s, id).await?;
     Ok(Json(contests::pay(&st, id, &s.actor()).await?))
+}
+
+/// `POST /admin/contests/{id}/prizes/{entry}/approve|reject` (marketing.approve): one prize, four-eyes (see
+/// `contests::approve_prize`); reject needs a reason.
+pub async fn prize_action(State(st): State<AppState>, s: StaffCtx, Path((id, entry, action)): Path<(i64, i64, String)>, body: Option<Json<DecideNote>>) -> ApiResult<Json<Value>> {
+    s.require(ROLES_APPROVE)?;
+    load_contest(&st, &s, id).await?;
+    let note = body.map(|b| b.0.note).unwrap_or_default();
+    match action.as_str() {
+        "approve" => Ok(Json(contests::approve_prize(&st, id, entry, &s.actor(), Some(note.trim()).filter(|n| !n.is_empty())).await?)),
+        "reject" => {
+            if note.trim().is_empty() {
+                return Err(invalid("note", "Say why the prize is rejected."));
+            }
+            let note = text(&note, "note", 500, true)?;
+            Ok(Json(contests::reject_prize(&st, id, entry, &s.actor(), &note).await?))
+        }
+        _ => Err(ApiError::NotFound),
+    }
 }
 
 pub async fn entry_action(State(st): State<AppState>, s: StaffCtx, Path((id, entry, action)): Path<(i64, i64, String)>, body: Option<Json<NoteBody>>) -> ApiResult<Json<Value>> {
@@ -1739,7 +1821,7 @@ pub async fn reports(State(st): State<AppState>, s: StaffCtx, Query(q): Query<Ra
     let released = ev("release").fetch_one(&st.pool).await?.unwrap_or(ZERO);
     let forfeited = ev("remove").fetch_one(&st.pool).await?.unwrap_or(ZERO);
     let cb_paid: Option<D> = sqlx::query_scalar("SELECT sum(amount) FROM cashback_payouts WHERE tenant = $1 AND status = 'paid' AND paid_at >= $2 AND paid_at < $3").bind(t).bind(from).bind(to).fetch_one(&st.pool).await?;
-    let cb_acc: Option<D> = sqlx::query_scalar("SELECT sum(amount) FROM cashback_accruals WHERE tenant = $1 AND status <> 'void' AND created_at >= $2 AND created_at < $3").bind(t).bind(from).bind(to).fetch_one(&st.pool).await?;
+    let cb_acc: Option<D> = sqlx::query_scalar("SELECT sum(amount) FROM cashback_accruals WHERE tenant = $1 AND status NOT IN ('void', 'rejected') AND created_at >= $2 AND created_at < $3").bind(t).bind(from).bind(to).fetch_one(&st.pool).await?;
     let prizes_wallet: Option<D> = sqlx::query_scalar("SELECT sum(amount) FROM wallet_credits WHERE tenant = $1 AND status = 'paid' AND ref LIKE 'prize:%' AND paid_at >= $2 AND paid_at < $3").bind(t).bind(from).bind(to).fetch_one(&st.pool).await?;
     let prizes_credit: Option<D> = sqlx::query_scalar(
         "SELECT sum(e.prize_amount) FROM contest_entries e JOIN contests c ON c.id = e.contest_id WHERE c.tenant = $1 AND e.prize_status = 'paid' AND e.prize_payout = 'credit' AND c.paid_at >= $2 AND c.paid_at < $3",
@@ -1770,7 +1852,7 @@ pub async fn reports(State(st): State<AppState>, s: StaffCtx, Query(q): Query<Ra
     .fetch_all(&st.pool)
     .await?;
     let by_prog = sqlx::query(
-        "SELECT p.id, p.name, COALESCE(sum(a.amount) FILTER (WHERE a.status <> 'void'), 0) AS accrued, COALESCE(sum(a.amount) FILTER (WHERE a.status = 'paid'), 0) AS paid,
+        "SELECT p.id, p.name, COALESCE(sum(a.amount) FILTER (WHERE a.status NOT IN ('void', 'rejected')), 0) AS accrued, COALESCE(sum(a.amount) FILTER (WHERE a.status = 'paid'), 0) AS paid,
                 COALESCE(sum(a.lots) FILTER (WHERE a.status <> 'void'), 0) AS lots
          FROM cashback_programmes p LEFT JOIN cashback_accruals a ON a.programme_id = p.id AND a.created_at >= $2 AND a.created_at < $3
          WHERE p.tenant = $1 GROUP BY p.id, p.name ORDER BY accrued DESC",

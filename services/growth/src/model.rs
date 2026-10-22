@@ -29,6 +29,10 @@ pub struct Settings {
     /// (finalize -> pay); the rest wait for staff approval (`marketing.approve`). 0 = every payout needs staff.
     #[serde(with = "rust_decimal::serde::float")]
     pub auto_pay_below: D,
+    /// Four-eyes (maker-checker): a prize, mission reward, cashback payout or cashback redemption at or above this
+    /// USD amount needs two different staff members to approve it; auto-pay never releases it. 0 = every payout.
+    #[serde(with = "rust_decimal::serde::float")]
+    pub four_eyes_threshold: D,
     /// Ended contests are finalized by the service once this long after the end, when no anti-cheat flag is open.
     pub auto_finalize: bool,
     pub auto_finalize_delay_minutes: i64,
@@ -56,6 +60,7 @@ impl Default for Settings {
             cashback_hold_hours: 24,
             demo_points: false,
             auto_pay_below: D::ZERO,
+            four_eyes_threshold: D::from(1000),
             auto_finalize: false,
             auto_finalize_delay_minutes: 60,
             public_leaderboards: true,
@@ -85,6 +90,9 @@ impl Settings {
         }
         if self.auto_pay_below < D::ZERO || self.auto_pay_below > dec("1000000") {
             return Err(("autoPayBelow", "Auto-pay threshold must be 0 – 1 000 000 USD.".into()));
+        }
+        if self.four_eyes_threshold < D::ZERO || self.four_eyes_threshold > dec("1000000") {
+            return Err(("fourEyesThreshold", "Four-eyes threshold must be 0 – 1 000 000 USD.".into()));
         }
         if !(0..=60 * 24 * 30).contains(&self.auto_finalize_delay_minutes) {
             return Err(("autoFinalizeDelayMinutes", "Delay must be 0–43200 minutes.".into()));

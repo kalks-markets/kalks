@@ -196,6 +196,17 @@ export type ContestInput = {
 
 export type Contest = Omit<ContestInput, "status" | "slug"> & { id: number; slug: string; status: ContestStatus; entrants: number; prizePool: number; updatedAt: string };
 
+/** Four-eyes (maker-checker) state of a payout: at or above `threshold` two different staff members approve it. */
+export type FourEyes = {
+  required: boolean;
+  threshold: number | null;
+  /** Staff id (as `useStaff().id`) of the first approver. */
+  firstApprovedById: string | null;
+  firstApprovedBy: string | null;
+  firstApprovedAt: string | null;
+  firstApprovalNote: string | null;
+};
+
 export type Standing = {
   entryId: number;
   userId: number | null;
@@ -216,7 +227,11 @@ export type Standing = {
   qualified: boolean;
   status: "active" | "disqualified";
   prize: number | null;
+  prizePayout?: "wallet" | "credit" | null;
+  /** none | pending | approval | awaiting_second_approval | paid | failed | rejected */
   prizeStatus: string;
+  /** Staff views only. */
+  fourEyes?: FourEyes | null;
   updatedAt: string;
   flags?: string[];
   disqualifyReason?: string | null;
@@ -238,7 +253,9 @@ export type ContestFlag = {
   login?: number | null;
 };
 
-export type ContestDetail = { contest: Contest; leaderboard: Standing[]; flags: ContestFlag[] };
+export type ContestDetail = { contest: Contest; leaderboard: Standing[]; flags: ContestFlag[]; fourEyesThreshold?: number };
+/** POST contests/{id}/pay */
+export type PayResult = { paid: number; failed: number; amount: number; firstApproved?: number; skippedSameStaff?: number; awaitingSecond?: number; fourEyesThreshold?: number };
 
 /* ------------------------------------------------------------------ */
 /* Loyalty                                                              */
@@ -252,6 +269,8 @@ export type Settings = {
   demoPoints?: boolean;
   // challenges (phase 4)
   autoPayBelow?: number;
+  /** Four-eyes: payouts at or above this USD amount need two different staff members (0 = every payout). */
+  fourEyesThreshold?: number;
   autoFinalize?: boolean;
   autoFinalizeDelayMinutes?: number;
   publicLeaderboards?: boolean;
@@ -284,9 +303,12 @@ export type Redemption = {
   kind: CatalogueKind;
   points: number;
   value: number;
-  status: "pending" | "completed" | "failed";
+  /** approval / awaiting_second_approval: a cashback redemption held for staff (four-eyes); rejected: points returned */
+  status: "approval" | "awaiting_second_approval" | "pending" | "completed" | "failed" | "rejected";
   login: number | null;
   voucherCode: string | null;
+  decidedBy?: string | null;
+  fourEyes?: FourEyes;
   grantId: number | null;
   error: string | null;
   createdAt: string;
@@ -315,7 +337,22 @@ export type ProgrammeInput = {
 };
 export type Programme = ProgrammeInput & { id: number; startsAt: string; endsAt: string | null; enrolled: number; accrued: number; paid: number; lots30d: number };
 export type Accrual = { id: number; programmeId: number; programme?: string; userId?: number; name?: string; dealId: number; login: number; symbol: string; lots: number; amount: number; status: "accrued" | "paid" | "void"; createdAt: string };
-export type CashbackPayout = { id: number; userId: number; name: string; amount: number; status: "pending" | "paid" | "failed"; attempts: number; error: string | null; createdAt: string; paidAt: string | null };
+export type CashbackPayout = {
+  id: number;
+  userId: number;
+  name: string;
+  amount: number;
+  /** approval / awaiting_second_approval: held at or above the four-eyes threshold; rejected: accruals rejected too */
+  status: "approval" | "awaiting_second_approval" | "pending" | "paid" | "failed" | "rejected";
+  attempts: number;
+  error: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  decidedBy?: string | null;
+  decidedAt?: string | null;
+  rejectReason?: string | null;
+  fourEyes?: FourEyes;
+};
 
 /* ------------------------------------------------------------------ */
 /* Reports                                                              */
@@ -417,6 +454,8 @@ export const FIELD_LABEL: Record<string, string> = {
   minHoldSeconds: "Minimum hold",
   pointsExpiryMonths: "Points expiry",
   cashbackHoldHours: "Cashback hold",
+  fourEyesThreshold: "Four-eyes threshold",
+  autoPayBelow: "Auto-pay threshold",
   userId: "Client ID",
   login: "Account",
   amount: "Amount",

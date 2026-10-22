@@ -47,8 +47,11 @@ const ROUTES: Route[] = [
   { method: "POST", re: R(`bonuses/grants/${ID}/cancel`), perm: "marketing.approve" },
   { method: "POST", re: /^points\/adjust$/, perm: "marketing.approve" },
   { method: "POST", re: /^cashback\/payouts\/run$/, perm: "marketing.approve" },
-  { method: "POST", re: R(`redemptions/${ID}/retry`), perm: "marketing.approve" },
+  { method: "POST", re: R(`redemptions/${ID}/(retry|approve|reject)`), perm: "marketing.approve" },
   { method: "POST", re: R(`missions/rewards/${ID}/(approve|reject)`), perm: "marketing.approve" },
+  // four-eyes: one prize, a held cashback payout
+  { method: "POST", re: R(`contests/${ID}/prizes/${ID}/(approve|reject)`), perm: "marketing.approve" },
+  { method: "POST", re: R(`cashback/payouts/${ID}/(approve|reject)`), perm: "marketing.approve" },
 ];
 
 const QUERY_KEYS = ["status", "campaign", "user", "promo", "programme", "page", "limit", "q", "from", "to", "placement", "country", "kyc", "accountType", "signupDays", "enrollment"];

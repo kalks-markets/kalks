@@ -1,7 +1,7 @@
 // Challenges (phase 4) shapes for the Back Office: contest templates, prize-pool splits, missions, payout approvals
 // and levels. Mirrors services/growth/README.md "Challenges"; money in USD.
 
-import type { AntiCheat, ContestInstrument, Prize, Scoring } from "./api";
+import type { AntiCheat, ContestInstrument, FourEyes, Prize, Scoring } from "./api";
 
 export type Band = { rankFrom: number; rankTo: number; pct: number };
 export type SplitPreset = { key: string; label: string; bands: Band[] };
@@ -69,14 +69,15 @@ export type PayoutRow = {
   name: string;
   amount: number;
   payout: "wallet" | "credit" | null;
-  /** approval | pending | failed | paid | kyc | rejected */
+  /** approval | awaiting_second_approval | pending | failed | paid | kyc | rejected */
   status: string;
   title: string;
   error: string | null;
   at: string | null;
+  fourEyes?: FourEyes;
 };
 
-export type PayoutsResp = { items: PayoutRow[]; total: number; autoPayBelow: number };
+export type PayoutsResp = { items: PayoutRow[]; total: number; autoPayBelow: number; fourEyesThreshold?: number };
 
 export type Level = { level: number; name: string; minXp: number; badge: string; clients?: number };
 export type LevelsResp = { levels: Level[]; badges: string[] };

@@ -95,7 +95,7 @@ async fn recent(st: &AppState, tenant: &str, user_id: i64) -> anyhow::Result<Vec
         out.push((
             at,
             json!({"kind": "prize", "title": format!("{} · rank #{}", r.get::<String, _>("name"), r.get::<Option<i32>, _>("rank").unwrap_or(0)), "xp": null,
-                   "amount": num(r.get("prize_amount")), "payout": r.get::<Option<String>, _>("prize_payout"), "status": r.get::<String, _>("prize_status"), "at": at}),
+                   "amount": num(r.get("prize_amount")), "payout": r.get::<Option<String>, _>("prize_payout"), "status": contests::client_prize_status(r.get::<&str, _>("prize_status")), "at": at}),
         ));
     }
     for r in sqlx::query(
@@ -108,7 +108,7 @@ async fn recent(st: &AppState, tenant: &str, user_id: i64) -> anyhow::Result<Vec
     .await?
     {
         let at: DateTime<Utc> = r.get("completed_at");
-        out.push((at, json!({"kind": "mission", "title": r.get::<String, _>("name"), "xp": null, "amount": num(r.get("reward_amount")), "payout": r.get::<Option<String>, _>("reward_payout"), "status": r.get::<String, _>("reward_status"), "at": at})));
+        out.push((at, json!({"kind": "mission", "title": r.get::<String, _>("name"), "xp": null, "amount": num(r.get("reward_amount")), "payout": r.get::<Option<String>, _>("reward_payout"), "status": missions::client_reward_status(r.get::<&str, _>("reward_status")), "at": at})));
     }
     out.sort_by(|a, b| b.0.cmp(&a.0));
     Ok(out.into_iter().take(15).map(|x| x.1).collect())
@@ -663,31 +663,37 @@ pub struct RewardsQ {
     limit: Option<i64>,
 }
 
-/// `GET /admin/payouts?status=approval|pending|failed|paid|all`: mission rewards and contest prizes in one list (what
-/// waits for approval first).
+/// `GET /admin/payouts?status=open|approval|awaiting_second_approval|pending|failed|paid|kyc|rejected|all`: mission
+/// rewards and contest prizes in one list (what waits for a second approval first, then approval). `open` = both
+/// waiting states. Each row carries `fourEyes` (first approver, threshold).
 pub async fn payouts(State(st): State<AppState>, s: StaffCtx, Query(q): Query<RewardsQ>) -> ApiResult<Json<Value>> {
     s.require(ROLES_READ)?;
     let (page, limit, off) = paging(q.page, q.limit, 50, 200);
-    let status = q.status.filter(|x| matches!(x.as_str(), "approval" | "pending" | "failed" | "paid" | "kyc" | "rejected"));
+    let open = q.status.as_deref() == Some("open");
+    let status = q.status.filter(|x| matches!(x.as_str(), "approval" | "awaiting_second_approval" | "pending" | "failed" | "paid" | "kyc" | "rejected"));
     let rows = sqlx::query(
         "SELECT x.*, f.first_name, f.last_name, count(*) OVER () AS total FROM (
            SELECT 'mission' AS source, p.id, p.user_id, p.reward_amount AS amount, p.reward_payout AS payout, p.reward_status AS status, p.completed_at AS at,
-                  m.name AS title, p.reward_error AS error, NULL::bigint AS contest_id
+                  m.name AS title, p.reward_error AS error, NULL::bigint AS contest_id,
+                  p.first_approved_by_id, p.first_approved_by_name, p.first_approved_at, p.first_approval_note, p.four_eyes_threshold
              FROM mission_progress p JOIN missions m ON m.id = p.mission_id WHERE p.tenant = $1 AND p.reward_amount > 0 AND p.completed_at IS NOT NULL
            UNION ALL
-           SELECT 'contest', e.id, e.user_id, e.prize_amount, e.prize_payout, e.prize_status, COALESCE(c.finalized_at, c.ends_at), c.name || ' · rank #' || COALESCE(e.rank, 0), e.prize_error, c.id
+           SELECT 'contest', e.id, e.user_id, e.prize_amount, e.prize_payout, e.prize_status, COALESCE(c.finalized_at, c.ends_at), c.name || ' · rank #' || COALESCE(e.rank, 0), e.prize_error, c.id,
+                  e.first_approved_by_id, e.first_approved_by_name, e.first_approved_at, e.first_approval_note, e.four_eyes_threshold
              FROM contest_entries e JOIN contests c ON c.id = e.contest_id WHERE e.tenant = $1 AND e.prize_amount > 0
          ) x LEFT JOIN profiles f ON f.tenant = $1 AND f.user_id = x.user_id
-         WHERE ($2::text IS NULL OR x.status = $2)
-         ORDER BY CASE x.status WHEN 'approval' THEN 0 WHEN 'failed' THEN 1 WHEN 'kyc' THEN 2 WHEN 'pending' THEN 3 ELSE 4 END, x.at DESC OFFSET $3 LIMIT $4",
+         WHERE ($2::text IS NULL OR x.status = $2) AND (NOT $5 OR x.status IN ('approval', 'awaiting_second_approval'))
+         ORDER BY CASE x.status WHEN 'awaiting_second_approval' THEN 0 WHEN 'approval' THEN 1 WHEN 'failed' THEN 2 WHEN 'kyc' THEN 3 WHEN 'pending' THEN 4 ELSE 5 END, x.at DESC OFFSET $3 LIMIT $4",
     )
     .bind(&s.tenant)
     .bind(&status)
     .bind(off)
     .bind(limit)
+    .bind(open)
     .fetch_all(&st.pool)
     .await?;
     let total = rows.first().map(|r| r.get::<i64, _>("total")).unwrap_or(0);
+    let settings = db::settings(&st.pool, &s.tenant).await?;
     let items: Vec<Value> = rows
         .iter()
         .map(|r| {
@@ -698,11 +704,11 @@ pub async fn payouts(State(st): State<AppState>, s: StaffCtx, Query(q): Query<Re
                 "name": format!("{} {}", first.unwrap_or_default(), last.unwrap_or_default()).trim(),
                 "amount": num(r.get("amount")), "payout": r.get::<Option<String>, _>("payout"), "status": r.get::<String, _>("status"),
                 "title": r.get::<String, _>("title"), "error": r.get::<Option<String>, _>("error"), "at": r.get::<Option<DateTime<Utc>>, _>("at"),
+                "fourEyes": crate::four_eyes::json_of(r, r.get("amount"), r.get::<&str, _>("status"), Some(settings.four_eyes_threshold)),
             })
         })
         .collect();
-    let settings = db::settings(&st.pool, &s.tenant).await?;
-    Ok(Json(json!({"items": items, "total": total, "page": page, "limit": limit, "autoPayBelow": num(settings.auto_pay_below)})))
+    Ok(Json(json!({"items": items, "total": total, "page": page, "limit": limit, "autoPayBelow": num(settings.auto_pay_below), "fourEyesThreshold": num(settings.four_eyes_threshold)})))
 }
 
 #[derive(Deserialize, Default)]

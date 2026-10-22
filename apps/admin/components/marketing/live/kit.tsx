@@ -255,6 +255,7 @@ export const PAY_STATUS: Record<string, { label: string; tone: ChipTone }> = {
   cleared: S("Cleared", "neutral"),
   disqualified: S("Disqualified", "down"),
   approval: S("Needs approval", "gold"),
+  awaiting_second_approval: S("Awaiting 2nd approval", "warn"),
   kyc: S("Waiting for KYC", "neutral"),
   rejected: S("Rejected", "neutral"),
 };

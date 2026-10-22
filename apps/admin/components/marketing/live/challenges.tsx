@@ -3,17 +3,19 @@
 /**
  * Challenges tabs on Marketing › Contests (phase 4): Templates (the wizard's starting points, editable), Missions
  * (daily / weekly / one-off goals with XP and optional cash or credit), Levels (XP thresholds and badges), Payouts
- * (mission rewards and contest prizes waiting for approval above the auto-pay threshold) and Settings (auto-pay,
- * auto-finalize, public leaderboards, streaks, mission anti-abuse, XP awards). Every change goes to the growth
+ * (mission rewards and contest prizes waiting for approval above the auto-pay threshold; at or above the four-eyes
+ * threshold two different staff members approve) and Settings (auto-pay, four-eyes threshold, auto-finalize, public
+ * leaderboards, streaks, mission anti-abuse, XP awards). Every change goes to the growth
  * service through /api/marketing (marketing.write; approvals marketing.approve) and is audited there.
  */
 import * as React from "react";
-import { Check, CircleDollarSign, Globe2, Layers, ListChecks, Medal, Pencil, Plus, Settings2, Trash2, Trophy, X } from "lucide-react";
+import { CircleDollarSign, Globe2, Layers, ListChecks, Medal, Pencil, Plus, Settings2, Trash2, Trophy } from "lucide-react";
 import { Button, Card, CardHeader, Chip, Segmented, cn } from "@kalks/ui";
 import { TableSkeleton, useApi, when } from "@/components/live/kit";
 import { M, mkSend, type Scoring, type Settings } from "./api";
-import { MISSION_KIND, SCHEDULE_LABEL, bandsOf, prizeTotal, splitPool, type ContestTemplate, type Level, type LevelsResp, type Mission, type MissionKind, type MissionsResp, type PayoutRow, type PayoutsResp, type TemplatesResp } from "./challenges-api";
+import { MISSION_KIND, SCHEDULE_LABEL, bandsOf, prizeTotal, splitPool, type ContestTemplate, type Level, type LevelsResp, type Mission, type MissionKind, type MissionsResp, type PayoutsResp, type TemplatesResp } from "./challenges-api";
 import { AreaF, AuditNotice, EmptyNote, FormDialog, MkError, NumF, PAY_STATUS, PillPicker, SelectF, StatusPill, TextF, ToggleRow, int, numOrNull, usd, useAction } from "./kit";
+import { FirstApproval, FourEyesDecide, fourEyesRule } from "./four-eyes";
 
 export type ChallengesTab = "contests" | "templates" | "missions" | "levels" | "payouts" | "settings";
 type Perms = { write: boolean; approve: boolean; loaded: boolean };
@@ -436,23 +438,20 @@ function LevelsPanel({ perms }: { perms: Perms }) {
 /* Payouts                                                              */
 /* ------------------------------------------------------------------ */
 
-type PF = "approval" | "failed" | "kyc" | "pending" | "paid" | "all";
+/** Auto-pay releases only amounts under min(autoPayBelow, fourEyesThreshold). */
+function autoPayText(autoPayBelow: number, fourEyes: number | undefined): string {
+  const limit = Math.min(autoPayBelow, fourEyes ?? autoPayBelow);
+  if (autoPayBelow <= 0) return "Auto-pay is off: every prize and mission reward waits for approval. Set a threshold under Settings.";
+  if (limit <= 0) return "Auto-pay releases nothing while the four-eyes threshold is 0.";
+  return `Prizes and mission rewards under ${usd(limit, 0)} are paid automatically; the rest wait here for marketing.approve.`;
+}
+
+type PF = "open" | "awaiting_second_approval" | "failed" | "kyc" | "pending" | "paid" | "rejected" | "all";
 
 function PayoutsPanel({ perms }: { perms: Perms }) {
-  const [f, setF] = React.useState<PF>("approval");
+  const [f, setF] = React.useState<PF>("open");
   const { data, error, reload } = useApi<PayoutsResp>(M(`payouts${f === "all" ? "" : `?status=${f}`}`), { refreshMs: 30_000 });
   const act = useAction();
-  const decide = (r: PayoutRow, approve: boolean) =>
-    act.ask({
-      title: approve ? `Pay ${usd(r.amount)} to ${r.name || `client #${r.userId}`}` : `Reject ${usd(r.amount)} for ${r.name || `client #${r.userId}`}`,
-      description: `${r.title} · ${r.payout === "credit" ? "trading credit on the client's live account" : "cash to the client's wallet"}`,
-      confirmLabel: approve ? "Approve and pay" : "Reject reward",
-      confirmVariant: approve ? "buy" : "sell",
-      note: approve ? "optional" : "required",
-      run: (note) => mkSend(`missions/rewards/${r.id}/${approve ? "approve" : "reject"}`, { note }),
-      success: approve ? "Reward paid" : "Reward rejected",
-      onDone: reload,
-    });
   const openContest = (id: number | null) => {
     if (!id) return;
     const u = new URL(window.location.href);
@@ -464,7 +463,11 @@ function PayoutsPanel({ perms }: { perms: Perms }) {
     <Card>
       <CardHeader
         title="Payouts"
-        subtitle={data ? (data.autoPayBelow > 0 ? `Prizes and mission rewards under ${usd(data.autoPayBelow, 0)} are paid automatically; the rest wait here for marketing.approve.` : "Auto-pay is off: every prize and mission reward waits for approval. Set a threshold under Settings.") : "Mission rewards and contest prizes"}
+        subtitle={
+          data
+            ? `${autoPayText(data.autoPayBelow, data.fourEyesThreshold)} ${fourEyesRule(data.fourEyesThreshold)}`
+            : "Mission rewards and contest prizes"
+        }
         icon={<CircleDollarSign />}
         action={
           <Segmented
@@ -472,11 +475,13 @@ function PayoutsPanel({ perms }: { perms: Perms }) {
             value={f}
             onChange={setF}
             options={[
-              { value: "approval", label: "Needs approval" },
+              { value: "open", label: "Needs approval" },
+              { value: "awaiting_second_approval", label: "Awaiting 2nd" },
               { value: "failed", label: "Failed" },
               { value: "kyc", label: "Waiting KYC" },
               { value: "pending", label: "Paying" },
               { value: "paid", label: "Paid" },
+              { value: "rejected", label: "Rejected" },
               { value: "all", label: "All" },
             ]}
           />
@@ -488,7 +493,7 @@ function PayoutsPanel({ perms }: { perms: Perms }) {
         ) : !data ? (
           <TableSkeleton rows={4} />
         ) : data.items.length === 0 ? (
-          <EmptyNote title={f === "approval" ? "Nothing waits for approval" : "No payouts here"} />
+          <EmptyNote title={f === "open" ? "Nothing waits for approval" : "No payouts here"} />
         ) : (
           data.items.map((r) => (
             <div key={`${r.source}-${r.id}`} className="k-row flex flex-wrap items-center gap-4 px-4 py-3">
@@ -503,23 +508,31 @@ function PayoutsPanel({ perms }: { perms: Perms }) {
                   {r.at ? ` · ${when(r.at)}` : ""}
                   {r.error ? ` · ${r.error}` : ""}
                 </div>
+                <FirstApproval fe={r.fourEyes} />
               </div>
               <div className="w-28 text-right">
                 <div className="k-num text-[14px] font-semibold text-gold">{usd(r.amount)}</div>
                 <div className="text-[11px] text-fg-3">{r.payout === "credit" ? "credit" : "wallet"}</div>
               </div>
               <StatusPill map={PAY_STATUS} status={r.status} />
-              {r.source === "mission" && perms.approve && ["approval", "failed"].includes(r.status) && (
-                <div className="flex gap-1.5">
-                  <Button size="xs" variant="buy" onClick={() => decide(r, true)} data-testid={`approve-${r.id}`}>
-                    <Check /> Approve
-                  </Button>
-                  <Button size="xs" variant="down-outline" onClick={() => decide(r, false)}>
-                    <X /> Reject
-                  </Button>
-                </div>
+              {perms.approve && (r.source === "mission" ? ["approval", "awaiting_second_approval", "failed"] : ["approval", "awaiting_second_approval"]).includes(r.status) && (
+                <FourEyesDecide<{ reward?: { rewardStatus?: string }; prize?: { status?: string } }>
+                  act={act}
+                  what={r.source === "mission" ? "reward" : "prize"}
+                  status={r.status}
+                  amount={r.amount}
+                  fe={r.fourEyes}
+                  threshold={data.fourEyesThreshold}
+                  approvePath={r.source === "mission" ? `missions/rewards/${r.id}/approve` : `contests/${r.contestId}/prizes/${r.id}/approve`}
+                  rejectPath={r.source === "mission" ? `missions/rewards/${r.id}/reject` : `contests/${r.contestId}/prizes/${r.id}/reject`}
+                  statusOf={(d) => d.reward?.rewardStatus ?? d.prize?.status}
+                  paidText={r.source === "mission" ? "Reward approved and paid" : "Prize approved and paid"}
+                  describe={`${r.title} · ${r.payout === "credit" ? "trading credit on the client's live account" : "cash to the client's wallet"}.`}
+                  onDone={reload}
+                  testId={`payout-${r.source}-${r.id}`}
+                />
               )}
-              {r.source === "contest" && ["approval", "failed", "pending"].includes(r.status) && (
+              {r.source === "contest" && ["approval", "awaiting_second_approval", "failed", "pending"].includes(r.status) && (
                 <Button size="xs" variant="surface" onClick={() => openContest(r.contestId)}>
                   Open contest
                 </Button>
@@ -547,6 +560,7 @@ function SettingsPanel({ perms }: { perms: Perms }) {
     if (!data) return;
     setF({
       autoPayBelow: String(data.autoPayBelow ?? 0),
+      fourEyesThreshold: String(data.fourEyesThreshold ?? 1000),
       autoFinalize: !!data.autoFinalize,
       autoFinalizeDelayMinutes: String(data.autoFinalizeDelayMinutes ?? 60),
       publicLeaderboards: data.publicLeaderboards ?? true,
@@ -571,6 +585,8 @@ function SettingsPanel({ perms }: { perms: Perms }) {
       "settings",
       {
         autoPayBelow: n("autoPayBelow") || 0,
+        // empty keeps the current threshold (0 would mean "every payout")
+        fourEyesThreshold: String(f.fourEyesThreshold).trim() === "" ? undefined : n("fourEyesThreshold"),
         autoFinalize: f.autoFinalize,
         autoFinalizeDelayMinutes: Math.round(n("autoFinalizeDelayMinutes") || 0),
         publicLeaderboards: f.publicLeaderboards,
@@ -593,7 +609,15 @@ function SettingsPanel({ perms }: { perms: Perms }) {
       <Card>
         <CardHeader title="Payouts" subtitle="Who approves money out" icon={<CircleDollarSign />} />
         <div className="space-y-3 px-6 pb-6 pt-3">
-          <NumF label="Pay automatically below" value={f.autoPayBelow as string} onChange={s("autoPayBelow")} prefix="$" disabled={!perms.write} hint="Contest prizes and mission rewards under this amount are paid when the results are final; larger ones wait for marketing.approve. 0 = staff approve every payout." />
+          <NumF label="Pay automatically below" value={f.autoPayBelow as string} onChange={s("autoPayBelow")} prefix="$" disabled={!perms.write} hint="Contest prizes and mission rewards under this amount (and under the four-eyes threshold) are paid when the results are final; larger ones wait for marketing.approve. 0 = staff approve every payout." />
+          <NumF
+            label="Four-eyes threshold (USD)"
+            value={f.fourEyesThreshold as string}
+            onChange={s("fourEyesThreshold")}
+            prefix="$"
+            disabled={!perms.write}
+            hint="Payouts at or above this amount need a second staff member to approve. 0 = every payout. Applies to contest prizes, mission rewards, cashback payouts and cashback redemptions; never paid automatically."
+          />
           <div className="k-row px-4">
             <ToggleRow label="Finalize contests automatically" hint="After the end, when no anti-cheat flag is open" checked={!!f.autoFinalize} onChange={b("autoFinalize")} disabled={!perms.write} />
           </div>
