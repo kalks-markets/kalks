@@ -64,7 +64,7 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
-struct ApiError(anyhow::Error);
+pub(crate) struct ApiError(anyhow::Error);
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": self.0.to_string()}))).into_response()
@@ -200,15 +200,15 @@ async fn quotes(State(s): State<AppState>, Query(q): Query<QuotesQ>) -> Json<Val
 }
 
 #[derive(Deserialize)]
-struct CandlesQ {
-    symbol: String,
-    tf: String,
-    limit: Option<i64>,
+pub(crate) struct CandlesQ {
+    pub symbol: String,
+    pub tf: String,
+    pub limit: Option<i64>,
     /// unix seconds (inclusive) — page back through history
-    to: Option<i64>,
+    pub to: Option<i64>,
 }
 
-async fn candles(State(s): State<AppState>, Query(q): Query<CandlesQ>) -> Result<Response, ApiError> {
+pub(crate) async fn candles(State(s): State<AppState>, Query(q): Query<CandlesQ>) -> Result<Response, ApiError> {
     let Some(tf) = Tf::parse(&q.tf) else { return Ok(bad("tf must be one of M1 M5 M15 M30 H1 H4 D1 W1 MN")) };
     let Some(inst) = s.market.cat.get(&q.symbol) else { return Ok(bad("unknown symbol")) };
     let limit = q.limit.unwrap_or(500).clamp(1, 5000);
@@ -229,22 +229,31 @@ async fn candles(State(s): State<AppState>, Query(q): Query<CandlesQ>) -> Result
     }
     // merge the live forming bar (newest data) when serving the latest page
     if to.is_none() {
-        if let Some(f) = s.market.forming(&q.symbol, tf) {
-            match bars.last_mut() {
-                Some(last) if last.t == f.t => {
-                    last.h = last.h.max(f.h);
-                    last.l = last.l.min(f.l);
-                    last.c = f.c;
-                    last.v = last.v.max(f.v);
-                }
-                Some(last) if last.t > f.t => {}
-                _ => bars.push(f),
-            }
-        }
+        merge_forming(&mut bars, s.market.forming(&q.symbol, tf), tf.bucket(Utc::now()));
     }
     // provider history can carry more decimals than the symbol trades with
     let bars: Vec<_> = bars.into_iter().map(|b| inst.round_bar(b)).collect();
     Ok(Json(json!({"symbol": q.symbol, "tf": tf.name(), "digits": inst.digits, "bars": bars})).into_response())
+}
+
+/// The live builder's bar into the latest page. Only a bar that is still forming (the current bucket) is merged into
+/// the stored row: once a bar has closed, the stored row is the final one (flushed within a second, then replaced by
+/// the provider's final OHLC by the reconciler), and the builder's copy of it — kept until the next tick of a quiet
+/// market — must not change it back. A bar the database does not have yet is appended.
+fn merge_forming(bars: &mut Vec<Bar>, forming: Option<Bar>, current: DateTime<Utc>) {
+    let Some(f) = forming else { return };
+    match bars.last_mut() {
+        Some(last) if last.t == f.t => {
+            if f.t >= current {
+                last.h = last.h.max(f.h);
+                last.l = last.l.min(f.l);
+                last.c = f.c;
+                last.v = last.v.max(f.v);
+            }
+        }
+        Some(last) if last.t > f.t => {}
+        _ => bars.push(f),
+    }
 }
 
 async fn history_status(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
