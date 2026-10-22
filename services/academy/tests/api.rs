@@ -452,3 +452,37 @@ async fn reorder_does_not_override_content() {
     pool.close().await;
     drop_db(&url).await;
 }
+
+/// A custom chapter (created in the Back Office, no platform version) can be deleted: every language of it and its
+/// order go, for learners and the CMS alike.
+#[tokio::test]
+async fn delete_custom_chapter() {
+    let Some((url, pool, _dir, c)) = setup("delete").await else { return };
+    let (s, r, _) = c.call("POST", "/v1/admin/chapters", S, Some(json!({"lang": "en", "section": "p1-technical", "title": "House rules"}))).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let slug = r["slug"].as_str().unwrap().to_string();
+    // translated into Arabic, and moved to the top
+    let (s, r, _) = c.call("PUT", &format!("/v1/admin/nodes/chapter/{slug}"), S, Some(json!({"lang": "ar", "data": {"title": "قواعد"}}))).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let mut order = vec![slug.clone()];
+    order.extend((1..=6).map(|i| format!("p1-t-c{i}")));
+    c.call("POST", "/v1/admin/reorder", S, Some(json!({"kind": "chapter", "parent": "p1-technical", "slugs": order}))).await;
+
+    let (s, r, _) = c.call("DELETE", &format!("/v1/admin/nodes/chapter/{slug}?lang=en"), S, None).await;
+    assert_eq!((s, r["removed"].clone()), (StatusCode::OK, json!(true)), "{r}");
+    for lang in ["en", "ar"] {
+        let (_, tree, _) = c.call("GET", &format!("/v1/admin/tree?lang={lang}"), S, None).await;
+        assert!(!tree_chapters(&tree, 0, 1).iter().any(|c| c["slug"] == slug.as_str()), "{lang}: still in the tree");
+        let (s, _, _) = c.call("GET", &format!("/v1/admin/nodes/chapter/{slug}?lang={lang}"), S, None).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{lang}");
+    }
+    let left: i64 = sqlx::query_scalar("SELECT count(*) FROM content_order WHERE slug = $1").bind(&slug).fetch_one(&pool).await.unwrap();
+    assert_eq!(left, 0);
+    // a platform chapter is never deleted, only reset (and without an override there is nothing to reset)
+    let (s, _, _) = c.call("DELETE", "/v1/admin/nodes/chapter/p1-t-c1?lang=en", S, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _, _) = c.call("GET", "/v1/chapters/p1-t-c1", U, None).await;
+    assert_eq!(s, StatusCode::OK);
+    pool.close().await;
+    drop_db(&url).await;
+}

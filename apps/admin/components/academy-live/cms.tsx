@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDown, ArrowUp, Award, BookOpen, ChevronDown, ChevronRight, Eye, FileText, GraduationCap, History, Plus, RotateCcw, RotateCw, Save, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, Award, BookOpen, ChevronDown, ChevronRight, Eye, FileText, GraduationCap, History, Plus, RotateCcw, RotateCw, Save, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Card, CardHeader, Chip, Dialog, EmptyState, KpiCard, PageHeader, Progress, Reveal, Segmented, Skeleton, Toggle, cn } from "@kalks/ui";
 import { useStaff } from "@/components/staff-session";
@@ -138,7 +138,7 @@ function CourseTree({ tree, sel, onSelect, canWrite, onReordered }: { tree: Tree
 
 type Draft = { data: NodeData; published: boolean };
 
-function Editor({ sel, lang, canWrite, onSaved }: { sel: Sel; lang: string; canWrite: boolean; onSaved: () => void }) {
+function Editor({ sel, lang, canWrite, onSaved, onDeleted }: { sel: Sel; lang: string; canWrite: boolean; onSaved: () => void; onDeleted: () => void }) {
   const [ask, confirmDialog] = useConfirm();
   const { data, error, reload } = useCms<{ node: NodeFull }>(`nodes/${sel.kind}/${sel.slug}?lang=${lang}`);
   const [draft, setDraft] = React.useState<Draft | null>(null);
@@ -200,6 +200,19 @@ function Editor({ sel, lang, canWrite, onSaved }: { sel: Sel; lang: string; canW
       setBusy(false);
     }
   };
+  // a custom chapter has no platform version to reset to: it is deleted (every language of it)
+  const remove = async () => {
+    if (!(await ask({ title: "Delete this chapter?", text: "It is removed for your brand in every language, together with its quiz. Learners no longer see it. This can't be undone.", confirm: "Delete", tone: "danger" }))) return;
+    setBusy(true);
+    try {
+      await cms(`nodes/${sel.kind}/${sel.slug}?lang=${lang}`, { method: "DELETE" });
+      toast.success("Chapter deleted");
+      onDeleted();
+    } catch (e) {
+      toast.error("Couldn't delete", { description: (e as Error).message });
+      setBusy(false);
+    }
+  };
 
   const title = sel.kind === "exam" ? "Final exam" : d.title || "Untitled";
   return (
@@ -234,6 +247,11 @@ function Editor({ sel, lang, canWrite, onSaved }: { sel: Sel; lang: string; canW
             {node.source === "override" && (
               <Button size="sm" variant="ghost" onClick={reset} disabled={busy}>
                 <RotateCcw /> Reset to default
+              </Button>
+            )}
+            {node.source === "custom" && (
+              <Button size="sm" variant="ghost" onClick={remove} disabled={busy} data-testid="cms-delete">
+                <Trash2 /> Delete
               </Button>
             )}
             <label className="flex items-center gap-2 rounded-full border border-line bg-surface-2 py-1 pl-3 pr-1.5 text-[12.5px] text-fg-2">
@@ -599,7 +617,17 @@ export function LiveAcademyCms() {
           </Card>
         </Reveal>
         <Reveal delay={0.05} className="min-w-0 xl:col-span-8">
-          {sel ? <Editor key={`${sel.kind}:${sel.slug}:${lang}`} sel={sel} lang={lang} canWrite={canWrite} onSaved={refresh} /> : <Skeleton className="h-[520px] w-full rounded-[18px]" />}
+          {sel ? <Editor
+              key={`${sel.kind}:${sel.slug}:${lang}`}
+              sel={sel}
+              lang={lang}
+              canWrite={canWrite}
+              onSaved={refresh}
+              onDeleted={() => {
+                setSel(null);
+                refresh();
+              }}
+            /> : <Skeleton className="h-[520px] w-full rounded-[18px]" />}
         </Reveal>
       </div>
 

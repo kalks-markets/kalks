@@ -9,7 +9,7 @@ import { academyAdmin } from "@/lib/academy-server";
 //   GET    tree?lang                         phases > sections > chapters (+ publish state, source, learner counts)
 //   GET    nodes/{kind}/{slug}?lang          full item incl. quiz answers; `default` = platform version when overridden
 //   PUT    nodes/{kind}/{slug}               {lang, data?, published?, order?, parent?}
-//   DELETE nodes/{kind}/{slug}?lang          reset to the platform default (drops this tenant's override)
+//   DELETE nodes/{kind}/{slug}?lang          reset to the platform default (drops this tenant's override); deletes a custom chapter
 //   POST   chapters                          {lang, section, title, summary?, body?}  new draft chapter
 //   POST   reorder                           {lang, kind, parent, slugs[]}
 //   GET    stats?lang · audit · glossary?lang

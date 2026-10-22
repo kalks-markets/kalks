@@ -962,18 +962,31 @@ async fn admin_reset(State(st): State<AppState>, h: HeaderMap, Path((kind, slug)
     if t == store::DEFAULT_TENANT {
         return Err(ApiError::bad("The platform default can't be reset."));
     }
-    let n = sqlx::query("DELETE FROM content_nodes WHERE tenant = $1 AND lang = $2 AND kind = $3 AND slug = $4")
+    let has_default: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM content_nodes WHERE tenant = '*' AND kind = $1 AND slug = $2)")
+        .bind(&kind)
+        .bind(&slug)
+        .fetch_one(&st.pool)
+        .await?;
+    // an override is reset in this language; a custom node (no platform version) is deleted in every language,
+    // or its translations would stay behind as a chapter of its own
+    let mut tx = st.pool.begin().await?;
+    let n = sqlx::query("DELETE FROM content_nodes WHERE tenant = $1 AND (lang = $2 OR NOT $5) AND kind = $3 AND slug = $4")
         .bind(&t)
         .bind(&lang)
         .bind(&kind)
         .bind(&slug)
-        .execute(&st.pool)
+        .bind(has_default)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
     if n == 0 {
         return Err(ApiError::not_found("Override"));
     }
-    store::audit(&st.pool, &t, &who, "reset", &kind, &slug, &lang, json!({})).await;
+    if !has_default {
+        sqlx::query("DELETE FROM content_order WHERE tenant = $1 AND kind = $2 AND slug = $3").bind(&t).bind(&kind).bind(&slug).execute(&mut *tx).await?;
+    }
+    tx.commit().await?;
+    store::audit(&st.pool, &t, &who, if has_default { "reset" } else { "delete" }, &kind, &slug, &lang, json!({})).await;
     let back = store::node(&st.pool, &t, &lang, &kind, &slug).await?;
     Ok(Json(json!({"reset": true, "removed": back.is_none()})))
 }
