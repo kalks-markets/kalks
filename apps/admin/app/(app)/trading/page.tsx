@@ -13,7 +13,7 @@ import { useCan } from "@/components/staff-session";
 import { BookChip, Checkbox } from "@/components/trading-desk/kit";
 import { BulkBar } from "@/components/trading-desk/bulk";
 import { CreateTradeDrawer } from "@/components/trading-desk/create-trade";
-import { PositionDrawer } from "@/components/trading-desk/position-drawer";
+import { PositionDrawer, type PositionDrawerView } from "@/components/trading-desk/position-drawer";
 
 export default function PositionsPage() {
   const { state } = useDesk();
@@ -27,6 +27,11 @@ export default function PositionsPage() {
   const [login, setLogin] = React.useState("");
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [open, setOpen] = React.useState<string | null>(null);
+  const [view, setView] = React.useState<PositionDrawerView | null>(null);
+  const openAt = (ticket: string | null, at: PositionDrawerView | null = null) => {
+    setView(at);
+    setOpen(ticket);
+  };
   const [create, setCreate] = React.useState(false);
 
   React.useEffect(() => {
@@ -153,12 +158,12 @@ export default function PositionsPage() {
           <Menu
             width={220}
             items={[
-              { label: "Open ticket", icon: <Crosshair />, onSelect: () => setOpen(r.ticket) },
-              { label: "Modify SL / TP", icon: <Crosshair />, onSelect: () => setOpen(r.ticket) },
-              { label: "Partial close", icon: <Scissors />, onSelect: () => setOpen(r.ticket) },
-              { label: `Move to ${r.route === "A" ? "B" : "A"}-book`, icon: <ArrowLeftRight />, onSelect: () => setOpen(r.ticket) },
+              { label: "Open ticket", icon: <Crosshair />, onSelect: () => openAt(r.ticket) },
+              { label: "Modify SL / TP", icon: <Crosshair />, onSelect: () => openAt(r.ticket, { tab: "modify" }) },
+              { label: "Partial close", icon: <Scissors />, onSelect: () => openAt(r.ticket, { tab: "close", closeMode: "partial" }) },
+              { label: `Move to ${r.route === "A" ? "B" : "A"}-book`, icon: <ArrowLeftRight />, onSelect: () => openAt(r.ticket, { tab: "book" }) },
               "sep",
-              { label: "Close / force close", icon: <XCircle />, danger: true, onSelect: () => setOpen(r.ticket) },
+              { label: "Close / force close", icon: <XCircle />, danger: true, onSelect: () => openAt(r.ticket, { tab: "close", closeMode: "full" }) },
             ]}
             trigger={
               <button className="grid size-7 place-items-center rounded-full text-fg-3 hover:bg-surface-3 hover:text-fg" aria-label={`Actions for #${r.ticket}`}>
@@ -221,7 +226,7 @@ export default function PositionsPage() {
             dense
             pageSize={14}
             rowKey={(r) => r.ticket}
-            onRowClick={(r) => setOpen(r.ticket)}
+            onRowClick={(r) => openAt(r.ticket)}
             exportName="open-positions"
             search={(r) => `${r.ticket} ${r.login} ${r.symbol} ${clientName(r.clientId, r.login)} ${r.parentTicket ?? ""}`}
             searchPlaceholder="Ticket, client…"
@@ -238,7 +243,7 @@ export default function PositionsPage() {
         </Card>
       </Reveal>
 
-      <PositionDrawer ticket={open} onOpenChange={(o) => !o && setOpen(null)} onSelectTicket={setOpen} />
+      <PositionDrawer ticket={open} view={view} onOpenChange={(o) => !o && openAt(null)} onSelectTicket={(t) => openAt(t)} />
       <CreateTradeDrawer open={create} onOpenChange={setCreate} />
     </div>
   );

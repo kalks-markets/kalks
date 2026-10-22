@@ -26,8 +26,20 @@ import { actionText } from "./labels";
 
 type Tab = "modify" | "close" | "book" | "adjust" | "timeline";
 type AdjustMode = "add" | "charges" | "price" | "void";
+/** Where a row action opens the drawer (e.g. "Partial close" → Close tab, partial). Omitted: the SL / TP tab. */
+export type PositionDrawerView = { tab: Tab; closeMode?: "partial" | "full" };
 
-export function PositionDrawer({ ticket, onOpenChange, onSelectTicket }: { ticket: string | null; onOpenChange: (o: boolean) => void; onSelectTicket?: (t: string) => void }) {
+export function PositionDrawer({
+  ticket,
+  view,
+  onOpenChange,
+  onSelectTicket,
+}: {
+  ticket: string | null;
+  view?: PositionDrawerView | null;
+  onOpenChange: (o: boolean) => void;
+  onSelectTicket?: (t: string) => void;
+}) {
   const { state, api } = useDesk();
   const live = ticket ? state.positions.find((p) => p.ticket === ticket) : undefined;
   const last = React.useRef<DeskPosition | null>(null);
@@ -93,6 +105,12 @@ export function PositionDrawer({ ticket, onOpenChange, onSelectTicket }: { ticke
       reset();
     }
   }, [ticket, reset]);
+  React.useEffect(() => {
+    // after the reset above: open on the tab the row action named
+    if (!ticket || !view) return;
+    setTab(view.tab);
+    if (view.closeMode) setCloseMode(view.closeMode);
+  }, [ticket, view]);
   const priceCorrectionPath = (tab === "close" && atPrice) || (tab === "adjust" && adjust === "price");
   React.useEffect(() => {
     if (priceCorrectionPath) r.setCode(REASON_ERROR_CORRECTION);
