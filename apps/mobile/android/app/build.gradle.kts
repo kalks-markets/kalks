@@ -6,12 +6,25 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// The release keystore (android/key.properties, git-ignored; the .jks lives outside the repo with the founder).
-// Without it a release build is debug-signed, which is fine for USB testing but never for the website or the store.
+// The release key lives OUTSIDE the repo (the founder's Mac: ~/.kalks-keys/kalks-release.jks + key.properties, see
+// README "Release signing"). android/key.properties (git-ignored) either holds the standard Flutter fields
+// (storeFile, storePassword, keyAlias, keyPassword) or only points at the file that does:
+//   keyProperties=~/.kalks-keys/key.properties
+// Without a usable key a release build is debug-signed, which is fine for USB testing but never for the website or
+// the store (an APK signed with another key can't update the installed app).
+fun homePath(p: String): String = if (p.startsWith("~/")) System.getProperty("user.home") + p.substring(1) else p
+
 val keyProps = Properties().apply {
     val f = rootProject.file("key.properties")
     if (f.exists()) f.inputStream().use { load(it) }
+    getProperty("keyProperties")?.let { path ->
+        val ext = File(homePath(path.trim()))
+        if (ext.exists()) ext.inputStream().use { load(it) } else logger.warn("Kalks: $ext not found, release builds are debug-signed")
+    }
 }
+val hasReleaseKey =
+    listOf("storeFile", "storePassword", "keyAlias", "keyPassword").all { !keyProps.getProperty(it).isNullOrBlank() } &&
+        File(homePath(keyProps.getProperty("storeFile").trim())).exists()
 
 android {
     namespace = "com.kalkstrade.app"
@@ -37,9 +50,9 @@ android {
     }
 
     signingConfigs {
-        if (keyProps.isNotEmpty()) {
+        if (hasReleaseKey) {
             create("release") {
-                storeFile = file(keyProps.getProperty("storeFile"))
+                storeFile = File(homePath(keyProps.getProperty("storeFile").trim()))
                 storePassword = keyProps.getProperty("storePassword")
                 keyAlias = keyProps.getProperty("keyAlias")
                 keyPassword = keyProps.getProperty("keyPassword")
@@ -49,7 +62,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (keyProps.isNotEmpty()) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
 }

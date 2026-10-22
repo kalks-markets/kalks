@@ -15,7 +15,22 @@ Kalks Trader is a full-screen **placeholder** with its final frame.
 
 ## Run
 
-Toolchain: `export PATH=$HOME/dev/flutter/bin:$PATH` (Flutter 3.47, JDK 17 in `~/dev/jdk17`).
+Toolchain (all in `~/dev`, nothing in the shell profile; set it per shell):
+
+```sh
+export PATH=$HOME/dev/flutter/bin:$HOME/dev/jdk17/bin:$PATH JAVA_HOME=$HOME/dev/jdk17 ANDROID_HOME=$HOME/dev/android-sdk
+```
+
+- Flutter 3.47.x stable (Dart 3.13.5): `git clone -b stable https://github.com/flutter/flutter.git ~/dev/flutter`.
+- JDK 17: Eclipse Temurin 17 (macOS tarball; its `Contents/Home` is `~/dev/jdk17`, so `~/dev/jdk17/bin/java`).
+- Android SDK: command-line tools in `~/dev/android-sdk/cmdline-tools/latest`, then
+  `sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"` and `sdkmanager --licenses` (Gradle
+  fetches the NDK and CMake it needs on the first build), then
+  `flutter config --android-sdk ~/dev/android-sdk --jdk-dir ~/dev/jdk17`.
+- macOS hosts where the Command Line Tools' linker is older than their newest SDK (`flutter test` fails building the
+  `objective_c` native asset with "tapi error: unknown architecture arm64e.x1"): put a shim first on `PATH` that
+  answers `xcrun --show-sdk-path --sdk macosx` with an older SDK (`~/dev/shims/xcrun` on the founder's Mac points at
+  `MacOSX26.5.sdk`). Android builds are unaffected.
 
 | What | Command (in `apps/mobile`) |
 |---|---|
@@ -23,7 +38,7 @@ Toolchain: `export PATH=$HOME/dev/flutter/bin:$PATH` (Flutter 3.47, JDK 17 in `~
 | Phone against a local stack | `adb reverse tcp:3000 tcp:3000` (+ 8081, 8090, 8104, 8100), then `flutter run --dart-define=KALKS_API_BASE=http://127.0.0.1:3000/api/mobile` |
 | Design preview in Chrome, sample data, no network | `flutter run -d chrome --dart-define=KALKS_PREVIEW=true` |
 | The same as a static build | `flutter build web --dart-define=KALKS_PREVIEW=true --no-web-resources-cdn`, serve `build/web` |
-| Release APK (debug-signed for USB testing) | `flutter build apk --release` |
+| Release APK (release-signed with the founder's key, else debug-signed: see "Release signing") | `flutter build apk --release` |
 | Checks | `flutter analyze` (must stay clean) · `flutter test` |
 
 Preview URL switches (preview builds only): `?signedIn=1` (open the Client Area as the sample client), `?locked=1`
@@ -39,6 +54,25 @@ The same sample data is the app's **demo**: "Try the demo" on the sign-in / sign
 brokers) switches `demoModeProvider` on (kept in prefs as `kalks.demo`, so a restart stays in the demo), seeds the
 sample client's session and opens the Dashboard in place, with a "Demo · Sample data · Exit demo" strip over the header.
 Log out (strip, profile menu, More, the terminal's Account tab) ends it and returns to the live transport.
+
+## Release signing and versions
+
+- **The key lives outside the repo**, on the founder's Mac: `~/.kalks-keys/kalks-release.jks` (PKCS12, alias `kalks`,
+  RSA 4096, valid until 2054) and its passwords in `~/.kalks-keys/key.properties` (folder 700, files 600). SHA-256 of
+  the signing certificate: `90:5A:8F:47:D5:9B:3A:98:57:CD:3F:C6:7E:7C:0F:94:BC:21:0C:17:18:D0:36:A0:3E:1F:AC:84:73:9E:81:8A`.
+- **Back up `~/.kalks-keys` (both files) offline now** (encrypted USB / password manager), and never commit or send
+  them. Android only installs an update signed with the same key: **losing the key means no installed user can ever
+  update Kalks again** (they would have to uninstall and lose their local settings); a leaked key lets anyone ship an
+  "update" in our name.
+- Gradle (`android/app/build.gradle.kts`) reads `android/key.properties` (git-ignored, also `*.jks` / `*.keystore`).
+  On the founder's Mac it only points at the key: `keyProperties=~/.kalks-keys/key.properties`; it may instead hold
+  the standard fields (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`). Without it (any other machine, CI)
+  `flutter build apk --release` still works, **debug-signed**: fine over USB, never for the website or a store.
+- Each release: bump `version:` in `pubspec.yaml` (`versionName+versionCode`, the code always goes up; the app sends
+  it as `X-Kalks-App-Version`, compared with `config.minAppVersion`), `flutter build apk --release`, then copy
+  `build/app/outputs/flutter-apk/app-release.apk` to `~/.kalks-local/releases/kalks-<version>+<build>.apk` and
+  update `~/.kalks-local/releases/latest.json` (`version`, `build`, `file`, `size`, `sha256`, `minAndroid`,
+  `releasedAt`). Check the signature with `~/dev/android-sdk/build-tools/36.0.0/apksigner verify --print-certs <apk>`.
 
 ## Regenerating generated files
 
@@ -157,9 +191,9 @@ The web is the source of truth: **same sections, same order, same buttons, same 
 - **Agent C2** (Markets / News / Calendar, Copy & PAMM, Partner, Prop, Rewards, Academy, Developer, Options intro).
 - **Agent D** (Kalks Trader CFD + Options): built in `features/terminal/` (see "Kalks Trader").
 - Push notifications, Google sign-in and refresh tokens are not part of this app version (docs/MOBILE-API.md).
-- Not verified on a device yet: the Android SDK wasn't installed when the foundation was built, so no APK was built.
-  The first `flutter build apk` will tell whether Gradle needs anything (AGP 9.1, Kotlin 2.4, appcompat for
-  local_auth's BiometricPrompt theme).
+- Release APKs build on the founder's Mac since 1.0.1+7 (~104 MB, the first build downloads the NDK and CMake and
+  takes ~13 min). Not yet verified on a device. Gradle setup: AGP 9.1, Kotlin 2.4, appcompat for
+  local_auth's BiometricPrompt theme.
 
 ## Kalks Trader (`lib/features/terminal`)
 
