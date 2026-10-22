@@ -121,3 +121,77 @@ async fn the_latest_page_serves_a_closed_bar_as_stored() {
     assert_eq!(page.last().copied(), Some((cur.timestamp(), 1.1, 1.102, 1.099, 1.1015)));
     drop_db(pool, &name).await;
 }
+
+/// Replays an hour of archived live ticks (`ticks` of a local market-data database, e.g. one run in relay mode)
+/// through the live builder with a flush every second of tick time (out of phase with the minute, like the service's
+/// 1-second flusher), and checks every stored bar of every timeframe
+/// against the same ticks bucketed independently (open = first tick, close = last, a tick older than the symbol's
+/// newest bar of that timeframe is late and ignored, like the builder).
+///   MARKET_DATA_REPLAY_URL=postgres://postgres@127.0.0.1:5433/kalks cargo test -p market-data replay -- --ignored
+#[tokio::test]
+#[ignore = "needs a database with archived ticks (MARKET_DATA_REPLAY_URL)"]
+async fn replayed_ticks_are_stored_as_the_bars_they_make() {
+    use crate::timeframes::Tf;
+    use sqlx::Row;
+    use std::collections::{BTreeMap, HashMap};
+    let src_url = std::env::var("MARKET_DATA_REPLAY_URL").expect("MARKET_DATA_REPLAY_URL");
+    let src = sqlx::postgres::PgPoolOptions::new().connect(&src_url).await.unwrap();
+    let end: DateTime<Utc> = sqlx::query_scalar("SELECT max(t) FROM ticks").fetch_one(&src).await.unwrap();
+    let from = end - chrono::Duration::hours(1);
+    let rows = sqlx::query("SELECT symbol, t, last FROM ticks WHERE t >= $1 AND last IS NOT NULL ORDER BY t").bind(from).fetch_all(&src).await.unwrap();
+    let ticks: Vec<(String, DateTime<Utc>, f64)> = rows.iter().map(|r| (r.get("symbol"), r.get("t"), r.get("last"))).collect();
+    assert!(!ticks.is_empty());
+
+    let (pool, name) = fresh_db("replay").await;
+    let mk = market(pool.clone());
+    // the flusher's clock: every second, 437 ms after the second turns
+    let phase = |ts: &DateTime<Utc>| (ts.timestamp_millis() - 437).div_euclid(1000);
+    let mut second = phase(&ticks[0].1);
+    // the oracle: per symbol and timeframe, the bars the ticks make
+    let mut want: BTreeMap<(String, i32, DateTime<Utc>), (f64, f64, f64, f64)> = BTreeMap::new();
+    let mut newest: HashMap<(String, Tf), DateTime<Utc>> = HashMap::new();
+    for (sym, ts, last) in &ticks {
+        if phase(ts) > second {
+            mk.flush().await.unwrap();
+            second = phase(ts);
+        }
+        mk.on_trade(sym, *last, 0.0, ts.timestamp_millis());
+        let Some(inst) = mk.cat.get(sym) else { continue };
+        if !inst.in_session(*ts) {
+            continue;
+        }
+        let p = inst.round(*last);
+        for tf in Tf::ALL {
+            let b = tf.bucket(*ts);
+            let n = newest.entry((sym.clone(), tf)).or_insert(b);
+            if b < *n {
+                continue; // late for a bar that has closed
+            }
+            *n = b;
+            want.entry((sym.clone(), tf.minutes(), b)).and_modify(|x| {
+                x.1 = x.1.max(p);
+                x.2 = x.2.min(p);
+                x.3 = p;
+            }).or_insert((p, p, p, p));
+        }
+    }
+    mk.flush().await.unwrap();
+    let stored = sqlx::query("SELECT symbol, tf, t, o, h, l, c FROM candles").fetch_all(&pool).await.unwrap();
+    let mut got: BTreeMap<(String, i32, DateTime<Utc>), (f64, f64, f64, f64)> = BTreeMap::new();
+    for r in stored {
+        got.insert((r.get("symbol"), r.get("tf"), r.get("t")), (r.get("o"), r.get("h"), r.get("l"), r.get("c")));
+    }
+    let mut wrong: BTreeMap<i32, (usize, usize)> = BTreeMap::new();
+    for (k, w) in &want {
+        let e = wrong.entry(k.1).or_default();
+        e.0 += 1;
+        if got.get(k) != Some(w) {
+            e.1 += 1;
+        }
+    }
+    eprintln!("replayed {} ticks ({} .. {}); bars per timeframe (minutes): (bars, wrong) {wrong:?}", ticks.len(), from, end);
+    drop_db(pool, &name).await;
+    src.close().await;
+    assert!(wrong.values().all(|w| w.1 == 0), "stored bars differ from the ticks: {wrong:?}");
+    assert_eq!(got.len(), want.len());
+}
