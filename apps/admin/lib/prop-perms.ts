@@ -14,7 +14,7 @@
  * |--------------|------------------------------------------------------------------------------------|-----------------------------------------------------|
  * | prop.read    | every prop page (overview, plans, challenges, payouts, violations, certificates…)  | every staff role except marketing, partner_manager  |
  * | prop.write   | plan builder, manual pass / fail, flag review, news calendar, scaling, certificate | platform_owner, super_admin, admin, risk_manager,   |
- * |              | revoke                                                                             | dealer                                              |
+ * |              | revoke, prop settings (four-eyes threshold)                                        | dealer                                              |
  * | prop.approve | payout approve / reject                                                            | platform_owner, super_admin, admin, finance,        |
  * |              |                                                                                    | risk_manager                                        |
  */

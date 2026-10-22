@@ -381,6 +381,148 @@ async fn phase_state_machine_and_payouts() {
     let _ = sqlx::query(sqlx::AssertSqlSafe(format!("DROP DATABASE IF EXISTS kalks_prop_test_{} WITH (FORCE)", std::process::id()))).execute(&admin).await;
 }
 
+/// Funded payout of `profit` on a fresh instant-funding challenge (one challenge per scenario keeps the payout
+/// schedule out of the way). Returns (challenge id, funded login, payout json).
+async fn funded_payout(app: &ops::App, m: &M, user: i64, key: &str, profit: &str) -> (i64, i64, Value) {
+    let p = ops::purchase(app, "kalks", user, "Four Eyes", "fe-instant", d("10000"), key).await.unwrap();
+    assert_eq!(p.challenge.status, "funded");
+    let a = store::phases_of(&app.pool, p.challenge.id).await.unwrap().into_iter().find(|a| a.funded).unwrap();
+    let login = a.login.unwrap();
+    {
+        let mut mm = m.lock().unwrap();
+        let acc = mm.accounts.get_mut(&login).unwrap();
+        acc.balance += d(profit);
+        acc.version += 1;
+    }
+    let po = ops::request_payout(app, "kalks", user, p.challenge.id, Some("verified")).await.unwrap();
+    assert_eq!(po["status"], "pending");
+    (p.challenge.id, login, po)
+}
+
+fn staff(id: &str, name: &str) -> store::Actor {
+    store::Actor { id: format!("staff:{id}"), name: name.into(), role: "finance".into() }
+}
+
+async fn audits(pool: &sqlx::PgPool, action: &str, id: i64) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM audit_log WHERE action = $1 AND entity = 'payout' AND entity_id = $2").bind(action).bind(id.to_string()).fetch_one(pool).await.unwrap()
+}
+
+/// Four-eyes on payouts: below the threshold one approval pays; at / above it the first approval moves nothing,
+/// the same staff member can't give the second, a different one pays exactly once; reject works from the
+/// second-approval state; the reconciler leaves it alone; threshold 0 = every payout.
+#[tokio::test]
+async fn payout_four_eyes() {
+    let db = format!("postgres://postgres@127.0.0.1:5433/kalks_prop_test_4e_{}", std::process::id());
+    let pool = match store::connect(&db).await {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("skipping: Postgres unavailable ({e})");
+            return;
+        }
+    };
+    let m: M = Arc::new(Mutex::new(Mock::default()));
+    let url = start_mock(m.clone()).await;
+    let app = Arc::new(Svc::new(config(&db, &url), pool.clone(), None));
+    let t = "kalks";
+    let mut p = plans::get(&pool, t, "instant-funding").await.unwrap();
+    p.id = "fe-instant".into();
+    p.name = "Four-eyes Instant".into();
+    p.first_payout_days = 0;
+    p.consistency = D::ZERO;
+    p.min_payout = d("10");
+    p.validate().unwrap();
+    plans::save(&pool, t, &p, "test", true).await.unwrap();
+    let user = 9;
+    m.lock().unwrap().wallet.insert(user, d("10000"));
+    let (alice, bob) = (staff("11", "Alice"), staff("12", "Bob"));
+
+    // default threshold
+    assert_eq!(ops::settings_json(&pool, t).await.unwrap()["fourEyesThreshold"], json!(1000));
+
+    // --- below the threshold (70% of 1000 = 700): one approval pays, as before
+    let (_, _, po) = funded_payout(&app, &m, user, "fe1", "1000").await;
+    assert_eq!(po["total"], json!(700.0));
+    let id = po["id"].as_i64().unwrap();
+    let before = m.lock().unwrap().wallet[&user];
+    let done = ops::approve_payout(&app, t, id, &alice, None, Some("verified")).await.unwrap();
+    assert_eq!(done["status"], "paid");
+    assert_eq!(done["fourEyes"]["required"], json!(false));
+    assert_eq!(m.lock().unwrap().wallet[&user], before + d("700"));
+    assert_eq!(audits(&pool, "payout.approve_first", id).await, 0);
+
+    // --- at / above the threshold (70% of 2000 = 1400): the first approval moves no money
+    let (_, _, po) = funded_payout(&app, &m, user, "fe2", "2000").await;
+    let id = po["id"].as_i64().unwrap();
+    assert_eq!(po["fourEyes"]["required"], json!(true));
+    let before = m.lock().unwrap().wallet[&user];
+    let first = ops::approve_payout(&app, t, id, &alice, Some("checked trades"), Some("verified")).await.unwrap();
+    assert_eq!(first["status"], "awaiting_second_approval");
+    assert_eq!(first["fourEyes"]["firstApprovedById"], "11");
+    assert_eq!(first["fourEyes"]["firstApprovedBy"], "Alice");
+    assert_eq!(first["fourEyes"]["firstApprovalNote"], "checked trades");
+    assert_eq!(first["fourEyes"]["threshold"], json!(1000.0));
+    assert!(first["fourEyes"]["firstApprovedAt"].is_string());
+    assert_eq!(m.lock().unwrap().wallet[&user], before, "no credit on the first approval");
+    assert!(!m.lock().unwrap().wallet_keys.contains_key(&format!("prop-payout-{id}")), "wallet not called");
+    assert_eq!(audits(&pool, "payout.approve_first", id).await, 1);
+    // the trader still sees it as in review, without staff details
+    let c = ops::client_payout(first.clone());
+    assert_eq!(c["status"], "pending");
+    assert!(c.get("fourEyes").is_none());
+    // the reconciler has nothing to finish
+    ops::reconcile(&app).await;
+    let st: String = sqlx::query_scalar("SELECT status FROM payouts WHERE id = $1").bind(id).fetch_one(&pool).await.unwrap();
+    assert_eq!(st, "awaiting_second_approval");
+    // the same staff member can't give the second approval
+    let e = ops::approve_payout(&app, t, id, &alice, None, Some("verified")).await.unwrap_err();
+    assert!(matches!(e, prop::error::ApiError::Conflict { code: "four_eyes_same_staff", .. }), "{e:?}");
+    assert_eq!(m.lock().unwrap().wallet[&user], before);
+    // KYC is checked again on the releasing approval
+    let e = ops::approve_payout(&app, t, id, &bob, None, Some("pending")).await.unwrap_err();
+    assert!(format!("{e:?}").contains("kyc_required"));
+    // a different staff member releases it, exactly once
+    let done = ops::approve_payout(&app, t, id, &bob, Some("second look ok"), Some("verified")).await.unwrap();
+    assert_eq!(done["status"], "paid");
+    assert_eq!(m.lock().unwrap().wallet[&user], before + d("1400"));
+    let e = ops::approve_payout(&app, t, id, &bob, None, Some("verified")).await.unwrap_err();
+    assert!(matches!(e, prop::error::ApiError::Conflict { code: "already_decided", .. }), "{e:?}");
+    let e = ops::approve_payout(&app, t, id, &staff("13", "Carol"), None, Some("verified")).await.unwrap_err();
+    assert!(matches!(e, prop::error::ApiError::Conflict { .. }), "{e:?}");
+    assert_eq!(m.lock().unwrap().wallet[&user], before + d("1400"), "paid once");
+    let after: Value = sqlx::query_scalar("SELECT after FROM audit_log WHERE action = 'payout.approved' AND entity_id = $1").bind(id.to_string()).fetch_one(&pool).await.unwrap();
+    assert_eq!(after["firstApprover"]["id"], "11");
+    assert_eq!(after["secondApprover"]["id"], "12");
+
+    // --- reject from awaiting_second_approval (by the first approver): the profit goes back, nothing is paid
+    let (_, login, po) = funded_payout(&app, &m, user, "fe3", "1500").await;
+    let id = po["id"].as_i64().unwrap();
+    assert_eq!(m.lock().unwrap().accounts[&login].balance, d("10000"), "profit held");
+    let before = m.lock().unwrap().wallet[&user];
+    assert_eq!(ops::approve_payout(&app, t, id, &alice, None, Some("verified")).await.unwrap()["status"], "awaiting_second_approval");
+    let r = ops::reject_payout(&app, t, id, &alice, "Second look found a copy-trading pattern").await.unwrap();
+    assert_eq!(r["status"], "rejected");
+    assert_eq!(m.lock().unwrap().accounts[&login].balance, d("11500"), "profit returned");
+    assert_eq!(m.lock().unwrap().wallet[&user], before);
+    assert!(ops::approve_payout(&app, t, id, &bob, None, Some("verified")).await.is_err());
+    let before_json: Value = sqlx::query_scalar("SELECT before FROM audit_log WHERE action = 'payout.rejected' AND entity_id = $1").bind(id.to_string()).fetch_one(&pool).await.unwrap();
+    assert_eq!(before_json["status"], "awaiting_second_approval");
+
+    // --- threshold 0: every payout needs two approvals (the change is audited)
+    let s = ops::set_four_eyes_threshold(&app, t, &bob, D::ZERO, "Tighter control").await.unwrap();
+    assert_eq!(s["fourEyesThreshold"], json!(0.0));
+    assert!(ops::set_four_eyes_threshold(&app, t, &bob, d("-1"), "x").await.is_err());
+    let a: Value = sqlx::query_scalar("SELECT after FROM audit_log WHERE action = 'settings.four_eyes_threshold'").fetch_one(&pool).await.unwrap();
+    assert_eq!(a["fourEyesThreshold"], json!(0.0));
+    let (_, _, po) = funded_payout(&app, &m, user, "fe4", "100").await;
+    let id = po["id"].as_i64().unwrap();
+    assert_eq!(ops::approve_payout(&app, t, id, &alice, None, Some("verified")).await.unwrap()["status"], "awaiting_second_approval");
+    assert_eq!(ops::approve_payout(&app, t, id, &bob, None, Some("verified")).await.unwrap()["status"], "paid");
+
+    pool.close().await;
+    let admin = sqlx::PgPool::connect("postgres://postgres@127.0.0.1:5433/postgres").await.unwrap();
+    let _ = sqlx::query(sqlx::AssertSqlSafe(format!("DROP DATABASE IF EXISTS kalks_prop_test_4e_{} WITH (FORCE)", std::process::id()))).execute(&admin).await;
+}
+
 /// Module switches (gateway): while a broker has `prop` off, its client routes answer 403 module_disabled before any
 /// handler runs; public certificate checks and the Back Office routes stay; another broker is unaffected.
 #[tokio::test]

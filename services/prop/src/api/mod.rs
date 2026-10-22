@@ -58,6 +58,7 @@ pub fn router(app: App) -> Router {
         .route("/v1/admin/payouts", get(admin::payouts))
         .route("/v1/admin/payouts/{id}/approve", post(admin::approve_payout))
         .route("/v1/admin/payouts/{id}/reject", post(admin::reject_payout))
+        .route("/v1/admin/settings", get(admin::settings).put(admin::update_settings))
         .route("/v1/admin/certificates", get(admin::certificates))
         .route("/v1/admin/certificates/{code}/revoke", post(admin::revoke_certificate))
         .route("/v1/admin/flags", get(admin::flags))
@@ -150,7 +151,7 @@ impl<S: Send + Sync> FromRequestParts<S> for User {
 /// | permission | allows | roles |
 /// |---|---|---|
 /// | `prop.read` | plans, challenges, rule events, payouts, certificates, flags, news, audit | every staff role except marketing, partner_manager |
-/// | `prop.write` | plan builder, manual pass/fail, flag review, news calendar, scaling, certificate revoke | platform_owner, super_admin, admin, risk_manager, dealer |
+/// | `prop.write` | plan builder, manual pass/fail, flag review, news calendar, scaling, certificate revoke, settings (four-eyes threshold) | platform_owner, super_admin, admin, risk_manager, dealer |
 /// | `prop.approve` | payout approve / reject | platform_owner, super_admin, admin, finance, risk_manager |
 pub const PERMS: &[(&str, &[&str])] = &[
     ("prop.read", &["platform_owner", "super_admin", "admin", "dealer", "risk_manager", "compliance", "finance", "support", "viewer"]),

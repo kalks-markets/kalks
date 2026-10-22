@@ -41,7 +41,7 @@ On first start the service creates the `kalks_prop` database, runs `migrations/`
 2. **Evaluator.** Every active phase account is polled (see [latency](#latency)). Each observation runs the pure rule functions in `src/rules.rs`, stores the live state for the dashboards and writes rule events.
 3. **Breach** → the phase account is claimed as `failed`, then on the engine: status `close_only`, every position force-closed and every pending order cancelled (dealing bulk close, `PRP-02`), status `disabled`. The challenge fails, the trader is notified. If the engine can't confirm (for example a closed market), the reconciler retries until it does.
 4. **Pass** (target + minimum days + consistency) → the account is flattened and set `read_only`, a certificate is issued, and the next account opens: Phase 2, or the funded account (with a "Funded trader" certificate).
-5. **Payouts** on the funded account: request after `firstPayoutDays` (then every payout cycle) → the profit is taken off the account at once (so it can't be traded away while in review) → staff approve → wallet credit of the trader's split (`kind: prop_payout`) plus the fee refund on the first payout when the plan refunds fees → payout certificate → scaling review. A rejection puts the profit back on the account.
+5. **Payouts** on the funded account: request after `firstPayoutDays` (then every payout cycle) → the profit is taken off the account at once (so it can't be traded away while in review) → staff approve (two different staff members at or above the [four-eyes threshold](#four-eyes-approval)) → wallet credit of the trader's split (`kind: prop_payout`) plus the fee refund on the first payout when the plan refunds fees → payout certificate → scaling review. A rejection puts the profit back on the account.
 
 Every write is idempotent (wallet and engine keys derived from row ids), every decision is in `audit_log`, and a reconciler (every 20 s) finishes anything a crash or an unavailable upstream left half-way: unconfirmed wallet charges, unopened accounts, unenforced fails/passes, unconfirmed payout credits.
 
@@ -80,7 +80,7 @@ Late first look of a day (service restart): the balance at the reset is reconstr
 
 ## Data model
 
-Database `kalks_prop` (`migrations/0001_prop.sql`). Every table has `tenant` and an RLS policy on `current_setting('kalks.tenant')`; money is `NUMERIC` / `rust_decimal`.
+Database `kalks_prop` (`migrations/0001_prop.sql`, `0002_support_push.sql`, `0003_four_eyes.sql`). Every table has `tenant` and an RLS policy on `current_setting('kalks.tenant')`; money is `NUMERIC` / `rust_decimal`.
 
 | Table | Contents |
 |---|---|
@@ -90,7 +90,8 @@ Database `kalks_prop` (`migrations/0001_prop.sql`). Every table has `tenant` and
 | `equity_points` | equity curve samples (≤ 1 per minute, plus every trade) |
 | `rule_events` | breaches, violations, warnings, passes (deduplicated per account) |
 | `strategy_flags` | banned-strategy heuristics and their review |
-| `payouts` | requests, split, fee refund, KYC status at request, decision, wallet reference |
+| `payouts` | requests, split, fee refund, KYC status at request, decision, wallet reference; four-eyes first approver (`first_approved_by_id` / `_name` / `_at`, `first_approval_note`) and the threshold snapshot (`four_eyes_threshold`) |
+| `settings` | per-tenant prop settings: `four_eyes_threshold` (USD, default 1000; no row = defaults) |
 | `scaling_events` | scale-ups |
 | `certificates` | public code, kind (`pass` / `funded` / `payout`), public trader name (first name + initial), amounts, revoked |
 | `news_events` | admin calendar for the news rule |
@@ -100,7 +101,7 @@ Database `kalks_prop` (`migrations/0001_prop.sql`). Every table has `tenant` and
 
 ## API
 
-Base `http://127.0.0.1:8097`, JSON, camelCase. Every route except `GET /health` needs `X-Kalks-Internal: $PROP_INTERNAL_TOKEN`. Tenant: `X-Kalks-Tenant` (default `kalks`). Errors: `{"error": {"code", "message", "field"?}}` — `400 bad_request`, `401 unauthorized`, `403 forbidden`, `404 not_found`, `409 exists | already_decided | idempotency_conflict | not_active`, `422 validation | insufficient_funds | payment_failed | plan_unavailable | kyc_required | not_yet_eligible | below_minimum | positions_open | payout_pending | consistency | not_funded | account_unavailable | wallet_rejected`, `502 payment_pending | provisioning | wallet_pending | engine_*`.
+Base `http://127.0.0.1:8097`, JSON, camelCase. Every route except `GET /health` needs `X-Kalks-Internal: $PROP_INTERNAL_TOKEN`. Tenant: `X-Kalks-Tenant` (default `kalks`). Errors: `{"error": {"code", "message", "field"?}}` — `400 bad_request`, `401 unauthorized`, `403 forbidden`, `404 not_found`, `409 exists | already_decided | four_eyes_same_staff | idempotency_conflict | not_active`, `422 validation | insufficient_funds | payment_failed | plan_unavailable | kyc_required | not_yet_eligible | below_minimum | positions_open | payout_pending | consistency | not_funded | account_unavailable | wallet_rejected`, `502 payment_pending | provisioning | wallet_pending | engine_*`.
 
 Money is a JSON number (requests also accept numeric strings).
 
@@ -164,7 +165,7 @@ The BFF forwards the signed-in gateway user: `X-Kalks-User-Id` (required), `X-Ka
 
 Payout quote: `{eligibleFrom, profit, split, traderAmount, firmAmount, feeRefund, total, minPayout, blockers: ["not_yet_eligible" | "below_minimum" | "positions_open" | "payout_pending" | "consistency"], eligible}`.
 
-Payout: `{id, challengeId, accountId, userId, login, profit, split, traderAmount, firmAmount, feeRefund, total, status (pending | approved | paid | rejected | failed), kycStatus, requestedAt, decidedAt, decidedBy, note, error, planName, size, traderName}`.
+Payout: `{id, challengeId, accountId, userId, login, profit, split, traderAmount, firmAmount, feeRefund, total, status (pending | awaiting_second_approval | approved | paid | rejected | failed), kycStatus, requestedAt, decidedAt, decidedBy, note, error, planName, size, traderName, fourEyes}`. `fourEyes: {required, threshold, firstApprovedById, firstApprovedBy, firstApprovedAt, firstApprovalNote}` is staff-only: the client routes drop it and report `awaiting_second_approval` as `pending` (in review).
 
 Certificate: `{code, kind (pass | funded | payout), title, traderName, planName, size, amount, phase, issuedAt, revoked, challengeId, userId, verifyUrl}`.
 
@@ -182,7 +183,7 @@ The BFF forwards the verified staff session: `X-Kalks-Staff-Id`, `X-Kalks-Staff-
 | permission | allows | roles |
 |---|---|---|
 | `prop.read` | every GET | every staff role except marketing, partner_manager |
-| `prop.write` | plan builder, manual pass/fail, flag review, news calendar, scaling, certificate revoke | platform_owner, super_admin, admin, risk_manager, dealer |
+| `prop.write` | plan builder, manual pass/fail, flag review, news calendar, scaling, certificate revoke, settings (four-eyes threshold) | platform_owner, super_admin, admin, risk_manager, dealer |
 | `prop.approve` | payout approve / reject | platform_owner, super_admin, admin, finance, risk_manager |
 
 | Method & path | Body / query | Response |
@@ -198,9 +199,11 @@ The BFF forwards the verified staff session: `X-Kalks-Staff-Id`, `X-Kalks-Staff-
 | `POST /v1/admin/challenges/{id}/override` | `{action: "pass" \| "fail", reason, note}` | Challenge (audited `override.pass` / `override.fail`) |
 | `POST /v1/admin/accounts/{phaseAccountId}/scale` | `{toSize?, reason}` | `{scaledTo}` |
 | `GET /v1/admin/events?severity=&rule=&login=&limit=&before=` | – | `{events: [event + challengeId, userId, traderName, planName, size, phase]}` (breaches log) |
-| `GET /v1/admin/payouts?status=` | – | `{payouts: Payout[]}` (open ones first) |
-| `POST /v1/admin/payouts/{id}/approve` | `{note?, kycStatus?}` | `{payout}` (KYC must be `verified`) |
-| `POST /v1/admin/payouts/{id}/reject` | `{note}` | `{payout}` |
+| `GET /v1/admin/payouts?status=` | – | `{payouts: Payout[], fourEyesThreshold}` (open ones first) |
+| `POST /v1/admin/payouts/{id}/approve` | `{note?, kycStatus?}` | `{payout}` (KYC must be `verified`; at / above the threshold the first call returns `awaiting_second_approval`, see [four-eyes](#four-eyes-approval)) |
+| `POST /v1/admin/payouts/{id}/reject` | `{note}` | `{payout}` (from `pending`, `awaiting_second_approval` or `failed`) |
+| `GET /v1/admin/settings` | – | `{settings: {fourEyesThreshold, updatedAt, updatedBy}}` |
+| `PUT /v1/admin/settings` | `{fourEyesThreshold, reason}` | `{settings}` (`prop.write`; audited `settings.four_eyes_threshold`) |
 | `GET /v1/admin/certificates` | – | `{certificates}` |
 | `POST /v1/admin/certificates/{code}/revoke` | `{reason}` | `{certificate}` |
 | `GET /v1/admin/flags?status=open\|cleared\|confirmed` | – | `{flags: [{id, accountId, challengeId, userId, login, kind, score, summary, evidence, relatedLogin, status, createdAt, updatedAt, reviewedBy, reviewedAt, reviewNote, traderName, planName, phase, accountStatus}]}` |
@@ -214,6 +217,19 @@ curl -s localhost:8097/v1/plans $H -H x-kalks-user-id:42
 curl -s -X POST localhost:8097/v1/challenges $H -H x-kalks-user-id:42 -d '{"planId":"classic-2-step","size":10000,"idempotencyKey":"buy-1"}'
 curl -s -X POST localhost:8097/v1/admin/payouts/1/approve $H -H x-kalks-staff-id:1 -H x-kalks-staff-role:finance -d '{"note":"ok"}'
 ```
+
+### Four-eyes approval
+
+Maker-checker on payouts, the same contract as the wallet adjustments and IB payouts.
+
+- **Setting**: `fourEyesThreshold` per tenant (USD, ≥ 0, default **1000**; `0` = every payout), table `settings`. Read with `GET /v1/admin/settings` (`prop.read`), changed with `PUT /v1/admin/settings {fourEyesThreshold, reason}` (`prop.write`, reason required), audited `settings.four_eyes_threshold` with before / after. Back Office: Prop Firm → Payouts → **Four-eyes**.
+- **Amount compared**: the payout `total`, i.e. the USD credited to the wallet (trader share + fee refund).
+- **Below the threshold**: unchanged, one approval (`prop.approve`) credits the wallet.
+- **At or above**: `pending` → first approval → `awaiting_second_approval` (stores the first approver's raw staff id, name, time, note and the threshold snapshot; no wallet call; audited `payout.approve_first`). A second approval by the **same** staff id → `409 four_eyes_same_staff` ("Four-eyes rule: another staff member must give the second approval."), nothing changes. A different staff member with `prop.approve` releases it exactly like a single approval did (`approved` → wallet credit → `paid`), audited `payout.approved` with `firstApprover` and `secondApprover` in `after`. KYC must be `verified` on both approvals.
+- **Once only**: the release is a conditional `UPDATE … WHERE status = 'awaiting_second_approval'`, so concurrent or repeated second approvals pay once; a later approve answers `409 already_decided`. Wallet idempotency keys are unchanged (`prop-payout-<id>`).
+- **Reject** works from `pending` and `awaiting_second_approval` (either staff member, including the first approver; note required); the profit goes back on the funded account. The audit `before` has the state rejected from and the first approver.
+- **Reconciler** only retries `approved` rows; `awaiting_second_approval` is never finished automatically. An open request (`pending`, `awaiting_second_approval`, `approved`) still blocks a new request on the account (`payout_pending`), and the overview's pending counts include it.
+- **Client Area**: the trader sees `pending` (in review); staff details are not exposed.
 
 ## Integrations
 
@@ -256,6 +272,7 @@ cargo test -p prop
 - **Heuristics**: tick scalping, latency arbitrage, HFT bursts, cross-account copying and hedging with thresholds.
 - **Plans**: JSON round trip and validation.
 - **Flow test** (`tests/flow.rs`): runs the real service logic against a throw-away database `kalks_prop_test_<pid>` with an in-process mock engine and mock wallet (skipped when Postgres is unreachable): purchase → daily-loss breach → close-all + disabled; purchase → profit target → Phase 2 opened → Funded opened; funded payout request → approval → wallet credit with the fee refund; rejected payout returns the profit; insufficient wallet funds.
+- **Four-eyes** (`tests/flow.rs` `payout_four_eyes`, database `kalks_prop_test_4e_<pid>`): below the threshold one approval pays; at / above it the first approval moves no money (no wallet call, reconciler leaves it); the same staff member gets `409 four_eyes_same_staff`; KYC rechecked on the second approval; a different staff member pays exactly once and a repeat approve is `409`; reject from `awaiting_second_approval` returns the profit and pays nothing; threshold 0 (audited setting change) makes every payout need two approvals.
 
 ## Known gaps
 

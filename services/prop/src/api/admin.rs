@@ -35,8 +35,8 @@ pub async fn overview(State(app): State<App>, s: Staff) -> ApiResult<Json<Value>
            (SELECT COALESCE(sum(fee), 0) FROM challenges WHERE tenant = $1 AND status NOT IN ('pending_payment','payment_failed') AND created_at > now() - interval '30 days') AS fees_30d,
            (SELECT count(*) FROM challenges WHERE tenant = $1 AND status NOT IN ('pending_payment','payment_failed') AND created_at > now() - interval '30 days') AS sold_30d,
            (SELECT COALESCE(sum(trader_amount + fee_refund), 0) FROM payouts WHERE tenant = $1 AND status = 'paid' AND decided_at > now() - interval '30 days') AS paid_30d,
-           (SELECT count(*) FROM payouts WHERE tenant = $1 AND status IN ('pending','failed')) AS payouts_pending,
-           (SELECT COALESCE(sum(trader_amount + fee_refund), 0) FROM payouts WHERE tenant = $1 AND status IN ('pending','approved','failed')) AS payouts_pending_amount,
+           (SELECT count(*) FROM payouts WHERE tenant = $1 AND status IN ('pending','awaiting_second_approval','failed')) AS payouts_pending,
+           (SELECT COALESCE(sum(trader_amount + fee_refund), 0) FROM payouts WHERE tenant = $1 AND status IN ('pending','awaiting_second_approval','approved','failed')) AS payouts_pending_amount,
            (SELECT count(*) FROM strategy_flags WHERE tenant = $1 AND status = 'open') AS flags_open,
            (SELECT count(*) FROM rule_events WHERE tenant = $1 AND severity = 'breach' AND at > now() - interval '24 hours') AS breaches_24h,
            (SELECT COALESCE(sum(initial_balance), 0) FROM phase_accounts WHERE tenant = $1 AND funded AND status = 'active') AS funded_capital",
@@ -218,7 +218,11 @@ pub async fn challenge(State(app): State<App>, s: Staff, Path(id): Path<i64>) ->
     let flags = sqlx::query("SELECT * FROM strategy_flags WHERE challenge_id = $1 ORDER BY id DESC").bind(c.id).fetch_all(&app.pool).await?;
     v["flags"] = json!(flags.iter().map(ops::flag_json).collect::<Vec<_>>());
     let pays = sqlx::query("SELECT p.*, c.plan_name, c.size, c.trader_name FROM payouts p JOIN challenges c ON c.id = p.challenge_id WHERE p.challenge_id = $1 ORDER BY p.id DESC").bind(c.id).fetch_all(&app.pool).await?;
-    v["payouts"] = json!(pays.iter().map(ops::payout_row_json).collect::<Vec<_>>());
+    let threshold = ops::four_eyes_threshold(&app.pool, &s.tenant).await?;
+    v["payouts"] = json!(pays.iter().map(ops::payout_row_json).map(|mut p| {
+        ops::with_threshold(&mut p, threshold);
+        p
+    }).collect::<Vec<_>>());
     let audit = sqlx::query(
         "SELECT * FROM audit_log WHERE tenant = $1 AND ((entity = 'challenge' AND entity_id = $2) OR (entity = 'phase_account' AND entity_id = ANY($3))) ORDER BY id DESC LIMIT 100",
     )
@@ -331,14 +335,23 @@ pub async fn payouts(State(app): State<App>, s: Staff, Query(q): Query<PayoutsQ>
     s.require("prop.read")?;
     let rows = sqlx::query(
         "SELECT p.*, c.plan_name, c.size, c.trader_name FROM payouts p JOIN challenges c ON c.id = p.challenge_id
-         WHERE p.tenant = $1 AND ($2::text IS NULL OR p.status = $2) ORDER BY (p.status IN ('pending','failed','approved')) DESC, p.requested_at DESC LIMIT $3",
+         WHERE p.tenant = $1 AND ($2::text IS NULL OR p.status = $2) ORDER BY (p.status IN ('pending','awaiting_second_approval','failed','approved')) DESC, p.requested_at DESC LIMIT $3",
     )
     .bind(&s.tenant)
     .bind(&q.status)
     .bind(q.limit.unwrap_or(200).clamp(1, 500))
     .fetch_all(&app.pool)
     .await?;
-    Ok(Json(json!({"payouts": rows.iter().map(ops::payout_row_json).collect::<Vec<_>>()})))
+    let threshold = ops::four_eyes_threshold(&app.pool, &s.tenant).await?;
+    let items: Vec<Value> = rows
+        .iter()
+        .map(|r| {
+            let mut p = ops::payout_row_json(r);
+            ops::with_threshold(&mut p, threshold);
+            p
+        })
+        .collect();
+    Ok(Json(json!({"payouts": items, "fourEyesThreshold": num(threshold)})))
 }
 
 #[derive(Deserialize)]
@@ -364,6 +377,30 @@ pub async fn reject_payout(State(app): State<App>, s: Staff, Path(id): Path<i64>
         return Err(ApiError::Validation { field: "note", message: "Tell the trader why the payout is rejected".into() });
     }
     Ok(Json(json!({"payout": ops::reject_payout(&app, &s.tenant, id, &s.actor, b.note.trim()).await?})))
+}
+
+/* ---------------- settings (four-eyes) ---------------- */
+
+pub async fn settings(State(app): State<App>, s: Staff) -> ApiResult<Json<Value>> {
+    s.require("prop.read")?;
+    Ok(Json(json!({"settings": ops::settings_json(&app.pool, &s.tenant).await?})))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsBody {
+    #[serde(default, with = "jnum_opt")]
+    four_eyes_threshold: Option<D>,
+    #[serde(default)]
+    reason: String,
+}
+
+/// `PUT /v1/admin/settings` `{fourEyesThreshold, reason}` (prop.write; audited `settings.four_eyes_threshold`).
+pub async fn update_settings(State(app): State<App>, s: Staff, Body(b): Body<SettingsBody>) -> ApiResult<Json<Value>> {
+    s.require("prop.write")?;
+    need_reason(&b.reason)?;
+    let t = b.four_eyes_threshold.ok_or(ApiError::Validation { field: "fourEyesThreshold", message: "Enter a threshold in USD (0 = every payout)".into() })?;
+    Ok(Json(json!({"settings": ops::set_four_eyes_threshold(&app, &s.tenant, &s.actor, t, b.reason.trim()).await?})))
 }
 
 /* ---------------- certificates ---------------- */

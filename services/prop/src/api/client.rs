@@ -151,7 +151,7 @@ pub async fn trades(State(app): State<App>, u: User, Path(id): Path<i64>, Query(
 
 pub async fn request_payout(State(app): State<App>, u: User, Path(id): Path<i64>) -> ApiResult<Json<Value>> {
     let p = ops::request_payout(&app, &u.tenant, u.id, id, u.kyc.as_deref()).await?;
-    Ok(Json(json!({"payout": p})))
+    Ok(Json(json!({"payout": ops::client_payout(p)})))
 }
 
 pub async fn payouts(State(app): State<App>, u: User) -> ApiResult<Json<Value>> {
@@ -178,7 +178,7 @@ pub async fn payouts(State(app): State<App>, u: User) -> ApiResult<Json<Value>> 
         }
     }
     let kyc = app.kyc_status(u.id, u.kyc.as_deref()).await;
-    Ok(Json(json!({"payouts": rows.iter().map(ops::payout_row_json).collect::<Vec<_>>(), "funded": accounts, "kycStatus": kyc})))
+    Ok(Json(json!({"payouts": rows.iter().map(|r| ops::client_payout(ops::payout_row_json(r))).collect::<Vec<_>>(), "funded": accounts, "kycStatus": kyc})))
 }
 
 pub async fn certificates(State(app): State<App>, u: User) -> ApiResult<Json<Value>> {

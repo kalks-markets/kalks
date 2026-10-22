@@ -372,11 +372,92 @@ pub async fn payout_json(pool: &PgPool, id: i64) -> ApiResult<Value> {
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| ApiError::NotFound("Payout not found".into()))?;
-    Ok(payout_row_json(&r))
+    let mut v = payout_row_json(&r);
+    let threshold = four_eyes_threshold(pool, &r.get::<String, _>("tenant")).await?;
+    with_threshold(&mut v, threshold);
+    Ok(v)
+}
+
+/* ---------------- four-eyes settings ---------------- */
+
+/// Default `fourEyesThreshold` (USD) for a tenant without a settings row.
+pub const DEFAULT_FOUR_EYES_THRESHOLD: i64 = 1000;
+
+/// The tenant's four-eyes threshold: payouts whose USD total (trader share + fee refund) is at or above it need a
+/// second approver. 0 = every payout.
+pub async fn four_eyes_threshold(pool: &PgPool, tenant: &str) -> ApiResult<D> {
+    let t: Option<D> = sqlx::query_scalar("SELECT four_eyes_threshold FROM settings WHERE tenant = $1").bind(tenant).fetch_optional(pool).await?;
+    Ok(t.unwrap_or_else(|| D::from(DEFAULT_FOUR_EYES_THRESHOLD)))
+}
+
+pub async fn settings_json(pool: &PgPool, tenant: &str) -> ApiResult<Value> {
+    let r = sqlx::query("SELECT four_eyes_threshold, updated_at, updated_by FROM settings WHERE tenant = $1").bind(tenant).fetch_optional(pool).await?;
+    Ok(match r {
+        Some(r) => json!({"fourEyesThreshold": num(r.get("four_eyes_threshold")), "updatedAt": r.get::<chrono::DateTime<Utc>, _>("updated_at"), "updatedBy": r.get::<Option<String>, _>("updated_by")}),
+        None => json!({"fourEyesThreshold": DEFAULT_FOUR_EYES_THRESHOLD, "updatedAt": null, "updatedBy": null}),
+    })
+}
+
+/// Sets the tenant's four-eyes threshold (audited `settings.four_eyes_threshold` with before / after).
+pub async fn set_four_eyes_threshold(app: &App, tenant: &str, staff: &Actor, threshold: D, reason: &str) -> ApiResult<Value> {
+    if threshold < ZERO {
+        return Err(ApiError::Validation { field: "fourEyesThreshold", message: "The threshold can't be negative".into() });
+    }
+    let threshold = r2(threshold);
+    let before = four_eyes_threshold(&app.pool, tenant).await?;
+    sqlx::query(
+        "INSERT INTO settings (tenant, four_eyes_threshold, updated_at, updated_by) VALUES ($1, $2, now(), $3)
+         ON CONFLICT (tenant) DO UPDATE SET four_eyes_threshold = EXCLUDED.four_eyes_threshold, updated_at = now(), updated_by = EXCLUDED.updated_by",
+    )
+    .bind(tenant)
+    .bind(threshold)
+    .bind(format!("{} ({})", staff.name, staff.id))
+    .execute(&app.pool)
+    .await?;
+    store::audit(&app.pool, tenant, staff, "settings.four_eyes_threshold", "settings", tenant, Some(json!({"fourEyesThreshold": num(before)})), Some(json!({"fourEyesThreshold": num(threshold)})), Some(reason), None).await;
+    settings_json(&app.pool, tenant).await
+}
+
+/// Fills `fourEyes.required` / `threshold` of a payout that has no snapshot yet (open requests) from the current
+/// tenant threshold, so the Back Office knows whether an approval will be the first of two.
+pub fn with_threshold(v: &mut Value, threshold: D) {
+    if v["fourEyes"]["threshold"].is_null() {
+        let total = crate::money::dec_of(&v["total"]).unwrap_or(ZERO);
+        let open = matches!(v["status"].as_str(), Some("pending"));
+        v["fourEyes"]["required"] = json!(open && total >= threshold);
+        v["fourEyes"]["threshold"] = num(threshold);
+    }
+}
+
+/// A payout as the trader sees it: the internal four-eyes step is still "pending" (in review), staff details stay
+/// in the Back Office.
+pub fn client_payout(mut v: Value) -> Value {
+    if v["status"] == "awaiting_second_approval" {
+        v["status"] = json!("pending");
+    }
+    if let Some(o) = v.as_object_mut() {
+        o.remove("fourEyes");
+    }
+    v
+}
+
+/// Staff id as the BFF sent it (`X-Kalks-Staff-Id`), without the `staff:` actor prefix.
+fn raw_staff_id(staff: &Actor) -> &str {
+    staff.id.strip_prefix("staff:").unwrap_or(&staff.id)
 }
 
 pub fn payout_row_json(r: &sqlx::postgres::PgRow) -> Value {
+    let first_at = r.try_get::<Option<chrono::DateTime<Utc>>, _>("first_approved_at").ok().flatten();
+    let snapshot = r.try_get::<Option<D>, _>("four_eyes_threshold").ok().flatten();
+    let four_eyes = json!({
+        // required = this payout went (or goes) through two approvals; set at the first approval
+        "required": snapshot.is_some(), "threshold": snapshot.map(num),
+        "firstApprovedById": r.try_get::<Option<String>, _>("first_approved_by_id").ok().flatten(),
+        "firstApprovedBy": r.try_get::<Option<String>, _>("first_approved_by_name").ok().flatten(),
+        "firstApprovedAt": first_at, "firstApprovalNote": r.try_get::<Option<String>, _>("first_approval_note").ok().flatten(),
+    });
     json!({
+        "fourEyes": four_eyes,
         "id": r.get::<i64, _>("id"), "challengeId": r.get::<i64, _>("challenge_id"), "accountId": r.get::<i64, _>("account_id"),
         "userId": r.get::<i64, _>("user_id"), "login": r.get::<i64, _>("login"),
         "profit": num(r.get("profit")), "split": num(r.get("split_pct")), "traderAmount": num(r.get("trader_amount")),
@@ -397,7 +478,7 @@ pub async fn payout_quote(app: &App, c: &Challenge, a: &PhaseAccount) -> ApiResu
     let (trader, firm) = rules::split(profit.max(ZERO), c.split_pct);
     let paid_before: i64 = sqlx::query_scalar("SELECT count(*) FROM payouts WHERE challenge_id = $1 AND status = 'paid'").bind(c.id).fetch_one(&app.pool).await?;
     let refund = if plan.refund_fee && !c.fee_refunded && paid_before == 0 { c.fee } else { ZERO };
-    let pending: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM payouts WHERE account_id = $1 AND status IN ('pending','approved'))").bind(a.id).fetch_one(&app.pool).await?;
+    let pending: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM payouts WHERE account_id = $1 AND status IN ('pending','awaiting_second_approval','approved'))").bind(a.id).fetch_one(&app.pool).await?;
     let consistency_ok = a.stats.pointer("/rules/consistencyOk").and_then(Value::as_bool).unwrap_or(true);
     let mut blockers: Vec<&str> = vec![];
     if Utc::now() < from {
@@ -500,22 +581,108 @@ pub async fn request_payout(app: &App, tenant: &str, user_id: i64, challenge_id:
 }
 
 /// Approves (or retries) a payout: wallet credit of the trader share (+ fee refund on the first payout).
+///
+/// Four-eyes: when the USD total is at or above the tenant threshold, the first approval only moves the request to
+/// `awaiting_second_approval`; a different staff member's approval releases the credit. KYC is checked on both.
 pub async fn approve_payout(app: &App, tenant: &str, id: i64, staff: &Actor, note: Option<&str>, forwarded_kyc: Option<&str>) -> ApiResult<Value> {
-    let r = sqlx::query("SELECT status, user_id, challenge_id, account_id, trader_amount, fee_refund, profit FROM payouts WHERE id = $1 AND tenant = $2")
-        .bind(id)
-        .bind(tenant)
-        .fetch_optional(&app.pool)
-        .await?
-        .ok_or_else(|| ApiError::NotFound("Payout not found".into()))?;
+    let r = sqlx::query(
+        "SELECT status, user_id, challenge_id, account_id, trader_amount, fee_refund, profit, first_approved_by_id, first_approved_by_name, first_approved_at, first_approval_note, four_eyes_threshold
+         FROM payouts WHERE id = $1 AND tenant = $2",
+    )
+    .bind(id)
+    .bind(tenant)
+    .fetch_optional(&app.pool)
+    .await?
+    .ok_or_else(|| ApiError::NotFound("Payout not found".into()))?;
     let status: String = r.get("status");
     let user_id: i64 = r.get("user_id");
-    if !["pending", "approved", "failed"].contains(&status.as_str()) {
+    if !["pending", "awaiting_second_approval", "approved", "failed"].contains(&status.as_str()) {
         return Err(ApiError::Conflict { code: "already_decided", message: format!("This payout is already {status}") });
     }
-    if status == "pending" {
+    let me = raw_staff_id(staff);
+    if status == "awaiting_second_approval" {
+        let first_id: Option<String> = r.get("first_approved_by_id");
+        if first_id.as_deref() == Some(me) {
+            return Err(ApiError::Conflict { code: "four_eyes_same_staff", message: "Four-eyes rule: another staff member must give the second approval.".into() });
+        }
         let kyc = app.kyc_status(user_id, forwarded_kyc).await;
         if kyc != "verified" {
             return Err(ApiError::rule("kyc_required", "The client's identity isn't verified: approve after KYC is complete"));
+        }
+        // conditional claim: concurrent / repeated second approvals release once
+        let n = sqlx::query(
+            "UPDATE payouts SET status = 'approved', decided_at = now(), decided_by = $2, note = COALESCE($3, note), kyc_status = $4
+             WHERE id = $1 AND status = 'awaiting_second_approval' AND first_approved_by_id IS DISTINCT FROM $5",
+        )
+        .bind(id)
+        .bind(format!("{} ({})", staff.name, staff.id))
+        .bind(note)
+        .bind(&kyc)
+        .bind(me)
+        .execute(&app.pool)
+        .await?
+        .rows_affected();
+        if n == 0 {
+            return Err(ApiError::Conflict { code: "already_decided", message: "Another reviewer decided this payout".into() });
+        }
+        let first = json!({
+            "id": first_id, "name": r.get::<Option<String>, _>("first_approved_by_name"),
+            "at": r.get::<Option<chrono::DateTime<Utc>>, _>("first_approved_at"), "note": r.get::<Option<String>, _>("first_approval_note"),
+        });
+        let second = json!({"id": me, "name": staff.name, "note": note});
+        store::audit(
+            &app.pool,
+            tenant,
+            staff,
+            "payout.approved",
+            "payout",
+            &id.to_string(),
+            Some(json!({"status": "awaiting_second_approval"})),
+            Some(json!({"status": "approved", "fourEyes": true, "threshold": r.get::<Option<D>, _>("four_eyes_threshold").map(num), "firstApprover": first, "secondApprover": second})),
+            None,
+            note,
+        )
+        .await;
+    } else if status == "pending" {
+        let kyc = app.kyc_status(user_id, forwarded_kyc).await;
+        if kyc != "verified" {
+            return Err(ApiError::rule("kyc_required", "The client's identity isn't verified: approve after KYC is complete"));
+        }
+        let total: D = r.get::<D, _>("trader_amount") + r.get::<D, _>("fee_refund");
+        let threshold = four_eyes_threshold(&app.pool, tenant).await?;
+        if total >= threshold {
+            // first of two approvals: record the approver, move nothing
+            let n = sqlx::query(
+                "UPDATE payouts SET status = 'awaiting_second_approval', first_approved_by_id = $2, first_approved_by_name = $3, first_approved_at = now(),
+                        first_approval_note = $4, four_eyes_threshold = $5, kyc_status = $6
+                 WHERE id = $1 AND status = 'pending'",
+            )
+            .bind(id)
+            .bind(me)
+            .bind(&staff.name)
+            .bind(note)
+            .bind(threshold)
+            .bind(&kyc)
+            .execute(&app.pool)
+            .await?
+            .rows_affected();
+            if n == 0 {
+                return Err(ApiError::Conflict { code: "already_decided", message: "Another reviewer decided this payout".into() });
+            }
+            store::audit(
+                &app.pool,
+                tenant,
+                staff,
+                "payout.approve_first",
+                "payout",
+                &id.to_string(),
+                Some(json!({"status": "pending"})),
+                Some(json!({"status": "awaiting_second_approval", "total": num(total), "threshold": num(threshold), "firstApprover": {"id": me, "name": staff.name}})),
+                None,
+                note,
+            )
+            .await;
+            return payout_json(&app.pool, id).await;
         }
         let n = sqlx::query("UPDATE payouts SET status = 'approved', decided_at = now(), decided_by = $2, note = COALESCE($3, note), kyc_status = $4 WHERE id = $1 AND status = 'pending'")
             .bind(id)
@@ -577,20 +744,20 @@ pub async fn pay(app: &App, tenant: &str, id: i64) -> ApiResult<()> {
 
 /// Rejects a payout: the withdrawn profit goes back on the funded account.
 pub async fn reject_payout(app: &App, tenant: &str, id: i64, staff: &Actor, note: &str) -> ApiResult<Value> {
-    let r = sqlx::query("SELECT status, account_id, profit, login, user_id, challenge_id FROM payouts WHERE id = $1 AND tenant = $2")
+    let r = sqlx::query("SELECT status, account_id, profit, login, user_id, challenge_id, first_approved_by_id, first_approved_by_name FROM payouts WHERE id = $1 AND tenant = $2")
         .bind(id)
         .bind(tenant)
         .fetch_optional(&app.pool)
         .await?
         .ok_or_else(|| ApiError::NotFound("Payout not found".into()))?;
     let status: String = r.get("status");
-    if status != "pending" && status != "failed" {
+    if !["pending", "awaiting_second_approval", "failed"].contains(&status.as_str()) {
         return Err(ApiError::Conflict { code: "already_decided", message: format!("This payout is already {status}") });
     }
     let (account_id, profit, login, user_id, challenge_id): (i64, D, i64, i64, i64) = (r.get("account_id"), r.get("profit"), r.get("login"), r.get("user_id"), r.get("challenge_id"));
     let lock = app.lock(account_id);
     let _g = lock.lock().await;
-    let n = sqlx::query("UPDATE payouts SET status = 'rejected', decided_at = now(), decided_by = $2, note = $3 WHERE id = $1 AND status IN ('pending','failed')")
+    let n = sqlx::query("UPDATE payouts SET status = 'rejected', decided_at = now(), decided_by = $2, note = $3 WHERE id = $1 AND status IN ('pending','awaiting_second_approval','failed')")
         .bind(id)
         .bind(format!("{} ({})", staff.name, staff.id))
         .bind(note)
@@ -606,7 +773,7 @@ pub async fn reject_payout(app: &App, tenant: &str, id: i64, staff: &Actor, note
         t.rebase(profit);
         store::save_tracker(&app.pool, a.id, &t).await?;
     }
-    store::audit(&app.pool, tenant, staff, "payout.rejected", "payout", &id.to_string(), Some(json!({"status": status})), Some(json!({"status": "rejected", "returned": num(profit)})), None, Some(note)).await;
+    store::audit(&app.pool, tenant, staff, "payout.rejected", "payout", &id.to_string(), Some(json!({"status": status, "firstApprover": r.get::<Option<String>, _>("first_approved_by_id").map(|id| json!({"id": id, "name": r.get::<Option<String>, _>("first_approved_by_name")}))})), Some(json!({"status": "rejected", "rejectedFrom": status, "returned": num(profit)})), None, Some(note)).await;
     store::notify(&app.pool, tenant, user_id, Some(challenge_id), "payout_rejected", "Payout not approved", &format!("{note}. The profit was returned to account #{login}.")).await;
     payout_json(&app.pool, id).await
 }

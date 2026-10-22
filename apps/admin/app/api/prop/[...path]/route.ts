@@ -16,7 +16,7 @@ const PLAN = "[a-z0-9-]{2,48}";
 const CODE = "[A-Za-z0-9_-]{4,40}";
 const ROUTES: Route[] = [
   // reads
-  { method: "GET", re: /^(overview|plans|engine-groups|challenges|events|payouts|certificates|flags|news|audit)$/, perm: "prop.read" },
+  { method: "GET", re: /^(overview|plans|engine-groups|challenges|events|payouts|certificates|flags|news|audit|settings)$/, perm: "prop.read" },
   { method: "GET", re: new RegExp(`^challenges/${ID}$`), perm: "prop.read" },
   // plan builder, overrides, scaling, flag review, news calendar, certificates
   { method: "POST", re: /^plans$/, perm: "prop.write" },
@@ -28,7 +28,9 @@ const ROUTES: Route[] = [
   { method: "POST", re: /^news$/, perm: "prop.write" },
   { method: "DELETE", re: new RegExp(`^news/${ID}$`), perm: "prop.write" },
   { method: "POST", re: new RegExp(`^certificates/${CODE}/revoke$`), perm: "prop.write" },
-  // payouts
+  // prop settings (four-eyes threshold; audited by the service)
+  { method: "PUT", re: /^settings$/, perm: "prop.write" },
+  // payouts (four-eyes: the service enforces the second approver)
   { method: "POST", re: new RegExp(`^payouts/${ID}/(approve|reject)$`), perm: "prop.approve" },
 ];
 

@@ -7,6 +7,7 @@ import { MiniStat, NumInput } from "@/components/config/kit";
 import { ago, useApi, useNow, when } from "@/components/live/kit";
 import {
   BLOCKER_LABEL,
+  FirstApproval,
   JsonView,
   KycStatus,
   PlanTypeChip,
@@ -382,7 +383,8 @@ export function ChallengeDrawer({ id, open, onOpenChange, onChanged, funded }: {
                     <li key={p.id} className="flex items-center justify-between gap-3 py-2.5 text-[12.5px]">
                       <span>
                         <span className="font-mono">#{p.id}</span> · {when(p.requestedAt)}
-                        {p.note && <span className="block text-[11.5px] text-fg-3">{p.note}</span>}
+                        <FirstApproval p={p} now={tick} className="block text-[11.5px] text-fg-3" />
+                        {p.note && p.status !== "awaiting_second_approval" && <span className="block text-[11.5px] text-fg-3">{p.note}</span>}
                       </span>
                       <span className="flex items-center gap-2">
                         <span className="k-num font-medium">{usd(p.total)}</span>

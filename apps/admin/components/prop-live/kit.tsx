@@ -10,7 +10,7 @@ import { AlertTriangle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Card, Chip, Dialog, DialogClose, cn, formatNumber, type ChipTone } from "@kalks/ui";
 import { IS_DEMO } from "@kalks/mock/mode";
-import { ErrorState, type ApiErr } from "@/components/live/kit";
+import { ErrorState, ago, when, type ApiErr } from "@/components/live/kit";
 import { MiniField, Select } from "@/components/config/kit";
 import { useStaff } from "@/components/staff-session";
 import { propAllows, type PropPerm } from "@/lib/prop-perms";
@@ -167,7 +167,16 @@ export type PayoutQuote = {
   blockers: string[];
   eligible: boolean;
 };
-export type PayoutStatus = "pending" | "approved" | "paid" | "rejected" | "failed";
+export type PayoutStatus = "pending" | "awaiting_second_approval" | "approved" | "paid" | "rejected" | "failed";
+/** Four-eyes state of a payout: `required` = it needs (or needed) two approvals; ids are raw staff ids. */
+export type PayoutFourEyes = {
+  required: boolean;
+  threshold: number | null;
+  firstApprovedById: string | null;
+  firstApprovedBy: string | null;
+  firstApprovedAt: string | null;
+  firstApprovalNote: string | null;
+};
 export type Payout = {
   id: number;
   challengeId: number;
@@ -190,7 +199,9 @@ export type Payout = {
   planName: string;
   size: number;
   traderName: string;
+  fourEyes?: PayoutFourEyes;
 };
+export type PropSettings = { fourEyesThreshold: number; updatedAt: string | null; updatedBy: string | null };
 export type RuleEvent = {
   id: number;
   accountId: number;
@@ -538,6 +549,7 @@ const STATUS: Record<string, { tone: ChipTone; label: string }> = {
   archived: { tone: "neutral", label: "Archived" },
   // payouts
   pending: { tone: "warn", label: "Pending" },
+  awaiting_second_approval: { tone: "info", label: "Awaiting 2nd approval" },
   approved: { tone: "info", label: "Approved" },
   paid: { tone: "up", label: "Paid" },
   rejected: { tone: "down", label: "Rejected" },
@@ -576,6 +588,26 @@ export function KycStatus({ status }: { status: string | null | undefined }) {
     <Chip size="sm" tone={s.tone} dot>
       {s.label}
     </Chip>
+  );
+}
+
+/* Four-eyes on payouts */
+
+export const SECOND_APPROVER_NEEDED = "You gave the first approval. Another staff member must give the second approval (four-eyes).";
+
+/** Whether `staffId` gave the first (four-eyes) approval of the payout. */
+export const isFirstApprover = (p: Payout, staffId: string | number) => p.fourEyes?.firstApprovedById != null && String(p.fourEyes.firstApprovedById) === String(staffId);
+
+/** "First approval by <name> · <when>" (+ note) for a payout waiting for its second approval. */
+export function FirstApproval({ p, now, className }: { p: Payout; now: number; className?: string }) {
+  const f = p.fourEyes;
+  if (p.status !== "awaiting_second_approval" || !f?.firstApprovedBy) return null;
+  return (
+    <span className={className ?? "block max-w-56 text-[10.5px] leading-snug text-fg-3"}>
+      First approval by {f.firstApprovedBy}
+      {f.firstApprovedAt && <span title={when(f.firstApprovedAt)}> · {ago(f.firstApprovedAt, now)}</span>}
+      {f.firstApprovalNote && <span className="block truncate" title={f.firstApprovalNote}>“{f.firstApprovalNote}”</span>}
+    </span>
   );
 }
 
