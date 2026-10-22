@@ -18,6 +18,9 @@ export interface EngineAccountExtra {
   spreadGroup: string;
   groupCode: string;
   leverages: number[];
+  /** Leverage new trades get after the broker's risk leverage caps (≤ `leverage`), and per asset class where lower. */
+  effectiveLeverage?: number;
+  leverageByClass?: Record<string, number>;
   controls?: EngAccount["controls"];
   marginCallLevel?: number;
   stopOutLevel?: number;
@@ -76,6 +79,8 @@ export function mapAccount(a: EngAccount): EngineTradingAccount {
       spreadGroup: a.spreadGroup || a.group,
       groupCode: a.group,
       leverages: a.leverages ?? [],
+      effectiveLeverage: a.effectiveLeverage,
+      leverageByClass: a.effectiveLeverageByClass,
       controls: a.controls,
       marginCallLevel: a.marginCallLevel,
       stopOutLevel: a.stopOutLevel,

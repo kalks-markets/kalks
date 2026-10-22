@@ -13,6 +13,7 @@ use super::{ApiError, ApiResult, AppState, Body, ROLES_CONFIG, ROLES_DEALING, St
 use crate::engine::dealing::{BookMove, transfer_book};
 use crate::model::{AccountKind, Book};
 use crate::persist;
+use crate::risk::leverage::{self, AppliesTo, CapReq, CapScope, CapSpec};
 use crate::risk::{self, RiskLimits, RoutingMode};
 use crate::rules::{RoutingAction, RoutingCondition, RoutingRule};
 use crate::shard::{ExecError, Op};
@@ -335,4 +336,177 @@ pub async fn reject(State(st): State<AppState>, s: StaffCtx, Path(id): Path<Stri
     let a = row(&s, &r, "routing.suggestion", view["ticket"].as_str().map(|t| vec![t.to_string()]).unwrap_or_default(), Some(sug.get("login")), view["symbol"].as_str().map(str::to_string), Some(json!({"suggestion": sid.to_string(), "kind": view["kind"], "from": view["from"], "to": view["to"]})), Some(json!({"status": "rejected"})), vec!["rejected".into()]);
     let entry = dealing::audit_now(&st, a).await?;
     Ok(reply(json!({"suggestion": view}), vec![entry]))
+}
+
+/* ---------------- leverage caps (Leverage control) ---------------- */
+
+/// `GET /v1/dealing/risk/leverage-caps`: every cap (disabled ones too), the asset classes and the CFD groups with
+/// their leverage lists (dealing.read).
+pub async fn leverage_caps(s: StaffCtx) -> ApiResult<Json<Value>> {
+    let t = &s.ctx.tenant;
+    let mut groups: Vec<Value> = t.groups.values().filter(|g| g.product == crate::rules::Product::Cfd).map(|g| json!({"code": g.code, "name": g.name, "leverages": g.leverages, "defaultLeverage": g.default_leverage})).collect();
+    groups.sort_by(|a, b| a["code"].as_str().cmp(&b["code"].as_str()));
+    Ok(Json(json!({"caps": t.risk.leverage_caps, "assetClasses": leverage::ASSET_CLASSES, "groups": groups, "maxCap": leverage::MAX_CAP})))
+}
+
+fn cap_spec(st: &AppState, s: &StaffCtx, r: &CapReq) -> ApiResult<CapSpec> {
+    let t = s.ctx.tenant.clone();
+    let spec = leverage::validate(r, |g| t.groups.contains_key(g)).map_err(|(field, message)| ApiError::Validation { field, message })?;
+    if spec.scope == CapScope::Account {
+        let login: i64 = spec.target.parse().unwrap_or_default();
+        if st.hub.meta(login).is_none_or(|m| m.tenant_id != t.tenant_id) {
+            return Err(ApiError::Validation { field: "target", message: format!("Unknown account {login}") });
+        }
+    }
+    Ok(spec)
+}
+
+/// Every account of the tenant against the engine as it is and with `spec` applied (the same `metrics` the margin
+/// check uses), summarised.
+async fn cap_preview(st: &AppState, tenant_id: i64, spec: &CapSpec, staff: &str) -> ApiResult<Value> {
+    let cfg = st.hub.shared.registry.get(tenant_id).ok_or_else(|| ApiError::BadRequest("Unknown tenant".into()))?;
+    let mut after = (*cfg).clone();
+    after.risk.leverage_caps = spec.applied_to(&cfg.risk.leverage_caps, staff, Utc::now());
+    let after = std::sync::Arc::new(after);
+    let spec2 = spec.clone();
+    let f: crate::shard::ScanFn = std::sync::Arc::new(move |acc, env| {
+        let e2 = crate::engine::Env { tenant: &after, ..*env };
+        leverage::preview_account(env, &e2, acc, &spec2).into_iter().collect()
+    });
+    let rows = st.hub.scan(tenant_id, f).await;
+    let mut v = leverage::preview_summary(spec, rows, 500);
+    v["current"] = json!(cfg.risk.leverage_caps.iter().find(|c| c.scope == spec.scope && c.target == spec.target));
+    Ok(v)
+}
+
+/// `POST /v1/dealing/risk/leverage-caps/preview {scope, target?, maxLeverage, appliesTo}`: what applying the cap would
+/// do; nothing is changed (dealing.write).
+pub async fn preview_leverage_cap(State(st): State<AppState>, s: StaffCtx, Body(b): Body<CapReq>) -> ApiResult<Json<Value>> {
+    s.require_perm("dealing.write", ROLES_DEALING)?;
+    let spec = cap_spec(&st, &s, &b)?;
+    Ok(Json(cap_preview(&st, s.ctx.tenant.tenant_id, &spec, &s.staff.name).await?))
+}
+
+#[derive(Deserialize)]
+pub struct CapBody {
+    #[serde(flatten)]
+    cap: CapReq,
+    #[serde(flatten)]
+    reason: Reason,
+}
+
+fn check_cap_reason(r: &Reason) -> ApiResult<()> {
+    check_reason(r)?;
+    if r.note.trim().is_empty() {
+        return Err(ApiError::Validation { field: "note", message: "Add a note: why the leverage is capped".into() });
+    }
+    Ok(())
+}
+
+/// Margin check of every account in the cap's scope holding a CFD position of the scope (an `all_positions` cap
+/// changed their margin): margin call and stop-out happen now, not at the next tick. Returns (accounts, margin calls,
+/// stop-outs).
+async fn recheck(st: &AppState, s: &StaffCtx, r: &Reason, spec: &CapSpec) -> (usize, usize, usize) {
+    let spec2 = spec.clone();
+    let f: crate::shard::ScanFn = std::sync::Arc::new(move |acc, env| {
+        let a = &acc.account;
+        let hit = acc.positions.values().any(|p| p.option.is_none() && env.specs.get(&p.symbol).is_some_and(|sp| leverage::scope_matches(spec2.scope, &spec2.target, a, Some(&sp.asset_class))));
+        if hit { vec![json!(a.login)] } else { vec![] }
+    });
+    let logins: Vec<i64> = st.hub.scan(s.ctx.tenant.tenant_id, f).await.iter().filter_map(Value::as_i64).collect();
+    let (mut calls, mut stops) = (0, 0);
+    for login in &logins {
+        let op: Op = Box::new(|tx, env| {
+            crate::engine::risk::check_margin(tx, env);
+            Ok(Value::Null)
+        });
+        match st.hub.exec(*login, &format!("staff:{}", s.staff.id), Some(s.staff.clone()), &r.reason_code, r.note.trim(), None, op).await {
+            Ok(d) => {
+                calls += d.notes.iter().filter(|n| n.kind == "margin_call").count();
+                stops += d.notes.iter().filter(|n| n.kind == "stop_out").count();
+            }
+            Err(e) => tracing::warn!(login, error = ?e, "margin re-check after a leverage cap failed"),
+        }
+    }
+    (logins.len(), calls, stops)
+}
+
+async fn reload_caps(st: &AppState, tenant_id: i64) -> ApiResult<()> {
+    let caps = leverage::load(&st.pool, tenant_id).await?;
+    st.hub.shared.registry.update(tenant_id, |cfg| cfg.risk.leverage_caps = caps);
+    Ok(())
+}
+
+/// `POST /v1/dealing/risk/leverage-caps {scope, target?, maxLeverage, appliesTo, reasonCode, note}`: creates the cap of
+/// the scope or replaces it (dealing.write; audited `risk.leverage_cap`). `all_positions` re-margins open positions at
+/// once and runs the margin check (margin call / stop-out) on the accounts concerned.
+pub async fn apply_leverage_cap(State(st): State<AppState>, s: StaffCtx, Body(b): Body<CapBody>) -> ApiResult<Json<Value>> {
+    s.require_perm("dealing.write", ROLES_DEALING)?;
+    check_cap_reason(&b.reason)?;
+    let spec = cap_spec(&st, &s, &b.cap)?;
+    let t = s.ctx.tenant.tenant_id;
+    let impact = cap_preview(&st, t, &spec, &s.staff.name).await?;
+    let before = s.ctx.tenant.risk.leverage_caps.iter().find(|c| c.scope == spec.scope && c.target == spec.target).cloned();
+    let was_all = before.as_ref().is_some_and(|c| c.enabled && c.applies_to == AppliesTo::AllPositions);
+    let mut tx = st.pool.begin().await?;
+    let cap = leverage::upsert(&mut tx, t, &spec, b.reason.reason_code.trim(), b.reason.note.trim(), &s.staff.name).await?;
+    let login = (spec.scope == CapScope::Account).then(|| spec.target.parse::<i64>().ok()).flatten();
+    let flags = vec![spec.applies_to.as_str().to_string(), if before.is_some() { "update".into() } else { "new".into() }];
+    let a = row(&s, &b.reason, "risk.leverage_cap", vec![], login, None, before.as_ref().map(|c| json!(c)), Some(json!({"cap": cap, "impact": impact["totals"]})), flags);
+    let id = persist::insert_audit(&mut *tx, &a).await?;
+    tx.commit().await?;
+    reload_caps(&st, t).await?;
+    let (checked, calls, stops) = if spec.applies_to == AppliesTo::AllPositions || was_all { recheck(&st, &s, &b.reason, &spec).await } else { (0, 0, 0) };
+    let all = spec.applies_to == AppliesTo::AllPositions;
+    let recheck_json = json!({"accounts": checked, "marginCalls": calls, "stopOuts": stops});
+    risk::alerts::raise(
+        &st,
+        t,
+        risk::alerts::AlertSpec {
+            key: format!("leverage_cap:{}", cap.id),
+            kind: "leverage_cap",
+            level: if all { risk::alerts::Level::Amber } else { risk::alerts::Level::Info },
+            title: format!("Leverage capped at 1:{} · {}", cap.max_leverage, cap.label()),
+            message: format!(
+                "{} set by {} ({}). {}",
+                if all { "All open positions re-margined" } else { "New positions only" },
+                s.staff.name,
+                cap.reason_code,
+                if all { format!("{checked} account(s) re-checked: {calls} margin call, {stops} stop-out.") } else { "Open positions keep their margin.".into() }
+            ),
+            symbol: None,
+            login,
+            data: json!({"cap": cap, "impact": impact["totals"], "recheck": recheck_json}),
+        },
+    )
+    .await;
+    let entry = persist::audit_json(id, &a);
+    push_audit(&st, t, &entry);
+    Ok(reply(json!({"cap": cap, "impact": impact["totals"], "recheck": recheck_json}), vec![entry]))
+}
+
+/// `DELETE /v1/dealing/risk/leverage-caps/{id}` `{reasonCode, note}`: disables the cap (the row stays). New positions
+/// get the normal leverage again; positions opened under a `new_positions` cap keep theirs; an `all_positions` cap's
+/// accounts are re-checked at once (dealing.write; audited `risk.leverage_cap`).
+pub async fn disable_leverage_cap(State(st): State<AppState>, s: StaffCtx, Path(id): Path<String>, Body(r): Body<Reason>) -> ApiResult<Json<Value>> {
+    s.require_perm("dealing.write", ROLES_DEALING)?;
+    check_cap_reason(&r)?;
+    let id: i64 = id.trim().parse().map_err(|_| ApiError::BadRequest(format!("Invalid cap id {id}")))?;
+    let t = s.ctx.tenant.tenant_id;
+    let before = s.ctx.tenant.risk.leverage_caps.iter().find(|c| c.id == id).cloned();
+    let mut tx = st.pool.begin().await?;
+    let Some(cap) = leverage::disable(&mut tx, t, id, r.reason_code.trim(), r.note.trim(), &s.staff.name).await? else {
+        return Err(ApiError::NotFound(format!("Leverage cap {id} not found")));
+    };
+    let login = (cap.scope == CapScope::Account).then(|| cap.target.parse::<i64>().ok()).flatten();
+    let a = row(&s, &r, "risk.leverage_cap", vec![], login, None, before.as_ref().map(|c| json!(c)), Some(json!({"cap": cap})), vec!["disabled".into()]);
+    let aid = persist::insert_audit(&mut *tx, &a).await?;
+    tx.commit().await?;
+    reload_caps(&st, t).await?;
+    let spec = CapSpec { scope: cap.scope, target: cap.target.clone(), max_leverage: cap.max_leverage, applies_to: cap.applies_to };
+    let (checked, calls, stops) = if before.is_some_and(|c| c.enabled && c.applies_to == AppliesTo::AllPositions) { recheck(&st, &s, &r, &spec).await } else { (0, 0, 0) };
+    risk::alerts::resolve_key(&st, t, &format!("leverage_cap:{id}")).await;
+    let entry = persist::audit_json(aid, &a);
+    push_audit(&st, t, &entry);
+    Ok(reply(json!({"cap": cap, "recheck": {"accounts": checked, "marginCalls": calls, "stopOuts": stops}}), vec![entry]))
 }

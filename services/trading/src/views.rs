@@ -76,6 +76,10 @@ pub fn account_json(env: &Env, st: &AccountState) -> Value {
     if let (Value::Object(o), Value::Object(mj)) = (&mut v, metrics_json(&m)) {
         o.extend(mj);
     }
+    // risk leverage caps: effectiveLeverage, leverageCap, effectiveLeverageByClass (src/risk/leverage.rs)
+    if let (Value::Object(o), Value::Object(lj)) = (&mut v, crate::risk::leverage::client_json(&env.tenant.risk.leverage_caps, a)) {
+        o.extend(lj);
+    }
     v
 }
 

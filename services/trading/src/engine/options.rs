@@ -727,6 +727,7 @@ fn book(tx: &mut Tx, env: &Env, legs: &[Priced], meta: &FillMeta) -> Filled {
             combo_id,
             premium: l.cash,
             venue: None,
+            margin_leverage: None,
         };
         let deal = Deal {
             id: deal_id,

@@ -3,7 +3,7 @@
 Kalks launches 100 % B-book: there is no liquidity provider yet, so the house is the counterparty of every client
 trade. The risk desk gives the dealers the standard broker tools for that: server-side exposure, risk limits, client
 profiling, A/B routing recommendations and alerts. It lives in the trading engine (`services/trading/src/risk`,
-`src/api/risk.rs`) and the Back Office (Trading › Exposure, Risk limits, Client scores, Routing suggestions, the live
+`src/api/risk.rs`) and the Back Office (Trading › Exposure, Risk limits, Leverage control, Client scores, Routing suggestions, the live
 monitor on the Dealer desk, Command Center › Live risk).
 
 **Out of scope, by design.** Nothing in the risk desk changes, delays or synthesises prices, quotes or candles. Every
@@ -47,6 +47,79 @@ grouped per code and symbol). In alert mode the dealers see exactly what enforce
 Notes: the margin multiplier applies to new exposure only (existing positions' margin level is not changed, so a news
 window never margin-calls anyone); the exposure check uses the book the order would be routed to (A-book trades are
 not house exposure); demo accounts are not house exposure.
+
+## Leverage control
+
+Back Office › Trading › Leverage control (`/trading/leverage`); `src/risk/leverage.rs`, table `leverage_caps`
+(migration `20261024120000_leverage_caps.sql`). When the house is at risk the desk caps the leverage clients get, so they
+trade mostly on their own capital as margin (for example 1:10 for everyone).
+
+**Before caps**, CFD margin was notional × `margin_pct` / min(account leverage, symbol `max_leverage`) (account leverage
+from the group's `leverages` / `defaultLeverage`; symbol max from `config/trading-specs.json`, e.g. crypto 20, stocks 10),
+recomputed on every tick at the mid, hedged volume at the group's `hedgedMarginPct`. There was no tiered or dynamic
+leverage and no margin mode; the only margin lever on the desk was the news-window multiplier on new exposure.
+
+**A cap** has a scope, a max leverage (1–1000), what it applies to, an enabled flag, a reason code + note and who / when:
+
+| Scope | `target` | Applies to |
+|---|---|---|
+| `all` | – | every account (live and demo) |
+| `group` | group code | the group's accounts |
+| `asset_class` | `forex`, `metals`, `indices`, `energies`, `crypto`, `stocks` (the engine's `asset_class`) | that class's symbols on every account; it does not limit the account leverage a client picks |
+| `account` | login | one account (a dealer override) |
+
+One cap per scope (applying again replaces it). Every enabled matching cap applies and **the most restrictive wins**:
+
+- margin of an open position: min(account leverage, symbol max, every matching `all_positions` cap, the position's own
+  `margin_leverage`);
+- new exposure (market orders, pending fills, dealer trades and added volume, the free-margin check): the same plus every
+  matching `new_positions` cap.
+
+**`appliesTo`**
+
+- `new_positions`: new trades are margined at the cap and keep that leverage for their whole life (the position's
+  `margin_leverage`, carried in the `position_opened` event so replay rebuilds it; netting adds and dealer "add volume"
+  keep each part's margin through the volume-weighted harmonic mean, rounded down). Open positions keep their margin, so
+  nobody is margin-called by the cap itself. Disabling the cap gives new positions the normal leverage again; positions
+  opened under it keep theirs. Hedged pairs with mixed leverages: the net lots at the dominant side's volume-weighted
+  1/leverage, each hedged leg at its own side's.
+- `all_positions`: open positions are re-margined at the cap at once, and the margin check (margin call, stop-out) runs
+  right after the change on every account holding a position in scope, not at the next tick. This can stop accounts
+  out, so the Back Office requires a preview of the exact settings and the word APPLY before it sends it. Disabling an
+  `all_positions` cap re-checks the same accounts (margin calls clear).
+
+Caps are tenant configuration (`TenantConfig::risk.leverage_caps`, loaded with the tenant and reloaded after every
+change): they apply to the next margin computation, no restart. Options accounts are not affected (option margin is
+scenario based).
+
+**Clients.** The account view (terminal, Client Area, Back Office) carries `effectiveLeverage` (min of the account leverage
+and the account-wide caps: all / group / account), `leverageCap` (that cap or null) and `effectiveLeverageByClass` (asset
+classes where a class cap is lower). The leverage of a new trade on a symbol = min(`effectiveLeverageByClass[class]` ??
+`effectiveLeverage`, the symbol's `maxLeverage` from `/v1/symbols`). Kalks Trader's order ticket margin and its account
+labels use it; the Client Area leverage picker disables the options above `leverageCap`. A client's leverage change above
+the account-wide cap is refused with `leverage_capped` (422; the CRM BFF checks it before the emailed code is spent);
+staff can still set any group leverage (margin stays capped).
+
+**Audit and alerts.** Every apply / disable is audited as `risk.leverage_cap` (before / after, flags `new_positions` |
+`all_positions`, `new` | `update` | `disabled`, the predicted impact) and raises a risk alert `leverage_cap:{id}` (amber
+for `all_positions`, so it also goes to Telegram; info for `new_positions`), resolved when the cap is disabled.
+
+**Preview** (`POST …/leverage-caps/preview`): every account of the tenant is valued with the engine's own `metrics` as it
+is and with the cap applied (same code as the margin check, so the preview equals the applied result). Accounts in scope
+= matching the scope (asset class: holding a position of the class). Response:
+
+```json
+{"scope":"asset_class","target":"crypto","label":"Asset class crypto","maxLeverage":8,"appliesTo":"all_positions",
+ "totals":{"accountsInScope":2,"accountsAffected":2,"positionsAffected":2,"marginBeforeUsd":8001.0,"marginAfterUsd":20002.5,
+           "marginIncreaseUsd":12001.5,"marginCall":1,"stopOut":0},
+ "live":{…same for live accounts…},
+ "marginCallAccounts":[Row], "stopOutAccounts":[Row], "accounts":[Row…, lowest margin level after first, ≤ 500],
+ "truncated":false, "generatedAt":"…", "current": LeverageCap | null}
+```
+
+Row: `login, userId, type, group, currency, leverage, positions, equity, marginBefore, marginAfter, freeMarginAfter,
+marginLevelBefore, marginLevelAfter, marginCallLevel, stopOutLevel, status (ok|margin_call|stop_out), changed` (account
+currency; the `*Usd` totals convert cent accounts).
 
 ## News calendar
 
@@ -138,12 +211,19 @@ netting and cent accounts).
 | `GET /v1/dealing/risk/scores/{login}` | – | `{current, history}` |
 | `POST /v1/dealing/risk/scores/run` | `{login?}` | `{data:{queued}, audit:[]}` |
 | `GET /v1/dealing/risk/news` | – | `{windows[], configured, lastOkAt}` |
+| `GET /v1/dealing/risk/leverage-caps` | – | `{caps: LeverageCap[], assetClasses, groups[{code,name,leverages,defaultLeverage}], maxCap}` |
+| `POST /v1/dealing/risk/leverage-caps/preview` | `{scope, target?, maxLeverage, appliesTo}` | the preview above (nothing changes) |
+| `POST /v1/dealing/risk/leverage-caps` | `{scope, target?, maxLeverage, appliesTo, reasonCode, note}` (note required) | `{data:{cap, impact, recheck:{accounts, marginCalls, stopOuts}}, audit}` |
+| `DELETE /v1/dealing/risk/leverage-caps/{id}` | `{reasonCode, note}` (note required) | `{data:{cap, recheck}, audit}` (disables; the row stays) |
 | `GET /v1/dealing/routing/suggestions?status=` | – | `RoutingSuggestion[]` |
 | `POST /v1/dealing/routing/suggestions/{id}/approve` | `{reasonCode, note}` | `{data:{suggestion, done, failed}, audit}` |
 | `POST /v1/dealing/routing/suggestions/{id}/reject` | `{reasonCode, note}` | `{data:{suggestion}, audit}` |
 
-Permissions follow the dealing permissions: reads dealing.read; limits, alerts, scores runs and suggestions
-dealing.write (dealer, risk manager, admins); the routing mode dealing.policy.
+Permissions follow the dealing permissions: reads dealing.read; limits, alerts, scores runs, suggestions and leverage
+caps (preview, apply, disable) dealing.write (dealer, risk manager, admins); the routing mode dealing.policy.
+
+`LeverageCap`: `{id, scope: all|group|asset_class|account, target, maxLeverage, appliesTo: new_positions|all_positions,
+enabled, reasonCode, note, createdBy, createdAt, updatedBy, updatedAt}`.
 
 ## Environment
 
@@ -162,3 +242,7 @@ dealing.write (dealer, risk manager, admins); the routing mode dealing.policy.
   launch volume, an index or a materialised feed later.
 - IB source: the gateway's internal user endpoint does not return the referrer yet.
 - Daily loss and news windows are alert / margin / pending-order actions only; there is no automatic close-only.
+- Leverage caps: the preview and the apply are separate calls, so prices and positions can move in between; the apply
+  recomputes the impact and audits it. The "preview first / type APPLY" rule for `all_positions` is enforced by the Back
+  Office, not by the engine. Opening a new account at a group leverage above an account-wide cap is not refused (its
+  margin is capped anyway); only a later leverage change is.

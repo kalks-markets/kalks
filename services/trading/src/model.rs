@@ -360,6 +360,11 @@ pub struct Position {
     /// account). Absent on every event written before the order book existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub venue: Option<Venue>,
+    /// Risk leverage cap (`new_positions`, src/risk/leverage.rs): the leverage this position's margin was fixed at
+    /// when it opened under a cap below the live leverage. Its margin uses min(live leverage, this); disabling the cap
+    /// later does not raise it. None = the live leverage (positions opened without such a cap, older events).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub margin_leverage: Option<u32>,
 }
 
 impl Position {

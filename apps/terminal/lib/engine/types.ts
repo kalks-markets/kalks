@@ -11,6 +11,11 @@ export interface EngAccount {
   currency: "USD" | "USC";
   leverage: number;
   leverages?: number[];
+  /** Risk leverage caps (engine src/risk/leverage.rs): the leverage new trades get, the account-wide cap, and the
+   *  asset classes where a class cap makes it lower. Absent on older engines = `leverage`. */
+  effectiveLeverage?: number;
+  leverageCap?: number | null;
+  effectiveLeverageByClass?: Record<string, number>;
   status: string;
   name?: string;
   marginCall?: boolean;

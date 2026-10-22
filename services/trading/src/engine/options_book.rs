@@ -913,6 +913,7 @@ fn book_fill(tx: &mut Tx, env: &Env, fill: &Fill, role: Role, bust: bool) -> Res
                         combo_id: fill.combo,
                         premium: cash,
                         venue: Some(Venue::Book),
+                        margin_leverage: None,
                     },
                     true,
                 )

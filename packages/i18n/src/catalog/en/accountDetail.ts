@@ -362,6 +362,9 @@ const accountDetail = {
     other: "Close your {count} open positions to change leverage. This prevents sudden margin changes on running trades.",
   },
   "leverage.hint": "Higher leverage lowers the margin required per trade and increases risk.",
+  "leverage.capped": "Your broker currently limits leverage to {value}. Higher options are unavailable for now.",
+  "leverage.cappedClasses": "Lower limits apply to some markets: {list}.",
+  "leverage.effective": "Effective {value}",
   // <v>…</v> wraps the amount
   "leverage.marginRequired": "Margin required on 1 lot EURUSD: <v>{amount}</v>",
   "leverage.confirmTitle": "Confirm leverage change",

@@ -16,6 +16,7 @@ import {
   accMoney,
   fmtPrice,
   fmtVol,
+  accountLeverage,
   marginRequired,
   nextTicket,
   pointSize,
@@ -759,7 +760,7 @@ export function TerminalProvider({ initialSession, engineSessions, children, onL
       // margin check
       const c0 = coreRef.current;
       const m = computeMetrics(acc, c0.balances[acc.login] ?? 0, c0.positions.filter((p) => p.login === acc.login), {});
-      const need = marginRequired(o.symbol, vol, o.side === "buy" ? q.ask : q.bid, acc.leverage);
+      const need = marginRequired(o.symbol, vol, o.side === "buy" ? q.ask : q.bid, accountLeverage(acc, o.symbol));
       if (o.type === "market" && need > m.free) return fail(desc, "Not enough money");
 
       if (o.type === "market") {

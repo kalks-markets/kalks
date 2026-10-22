@@ -255,6 +255,8 @@ pub struct RiskConfig {
     pub settings: RiskSettings,
     pub updated_at: Option<DateTime<Utc>>,
     pub updated_by: Option<String>,
+    /// Risk leverage caps (`leverage_caps`, src/risk/leverage.rs), disabled ones included (history).
+    pub leverage_caps: Vec<super::leverage::LeverageCap>,
 }
 
 impl RiskConfig {

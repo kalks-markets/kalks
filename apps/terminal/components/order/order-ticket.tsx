@@ -15,7 +15,7 @@ import { PriceText, SymbolAvatar, cn, useQuote } from "@kalks/ui";
 import { useMetrics, useTerminal } from "@/lib/store";
 import { useMarketOpen } from "@/lib/market-hours";
 import { useSlowQuote } from "@/lib/market";
-import { accCcy, accMoney, fmtPrice, fmtVol, marginRequired, pendingLabelKey, pipSize, pipValuePerLot, splitSymbol, type Expiry, type OrderType, type PendingOrder, swapSummary } from "@/lib/trading";
+import { accCcy, accMoney, accountLeverage, fmtPrice, fmtVol, marginRequired, pendingLabelKey, pipSize, pipValuePerLot, splitSymbol, type Expiry, type OrderType, type PendingOrder, swapSummary } from "@/lib/trading";
 import { TInput, TSelect } from "@/components/ui/primitives";
 import { Button, FieldRow, HelpTip, InlineNumber, QuickStrip, Segmented, SummaryRow, Switch, Tip } from "@/components/ui/kit";
 import { DropMenu } from "@/components/ui/menu";
@@ -546,7 +546,7 @@ function LiveSummary({ symbol, volume, unitLabel }: { symbol: string; volume: nu
   const q = useSlowQuote(symbol);
   const acc = T.account;
   const inst = getInstrument(symbol);
-  const margin = marginRequired(symbol, volume, q.ask, acc.leverage);
+  const margin = marginRequired(symbol, volume, q.ask, accountLeverage(acc, symbol));
   const pipV = pipValuePerLot(symbol, q.bid) * volume;
   const pct = m.free > 0 ? (margin / m.free) * 100 : Infinity;
   const short = margin > m.free;

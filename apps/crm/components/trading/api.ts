@@ -28,6 +28,11 @@ export interface EngineAccount {
   baseCurrency: string;
   leverage: number;
   leverages: number[];
+  /** Broker risk leverage caps (engine src/risk/leverage.rs; absent on older engines): the leverage new trades get,
+   *  the account-wide cap a leverage change may not exceed, and asset classes where a class cap is lower. */
+  effectiveLeverage?: number;
+  leverageCap?: number | null;
+  effectiveLeverageByClass?: Record<string, number>;
   status: "active" | "close_only" | "read_only" | "disabled" | "expired" | "archived" | "closed";
   name: string;
   /** When the account was archived / closed (engine; absent on older engines). */

@@ -87,6 +87,27 @@ export function effectiveLeverage(symbol: string, leverage: number) {
   return Math.min(leverage, 100);
 }
 
+/** Leverage the engine extras carry (lib/engine/map.ts) for the broker's risk leverage caps. */
+type LeverageExtras = { engine?: { effectiveLeverage?: number; leverageByClass?: Record<string, number> } };
+
+/**
+ * The leverage a new trade on `symbol` gets on this account: the engine's effective leverage after the broker's risk
+ * leverage caps (per asset class where a class cap is lower), else the account leverage. `marginRequired` then applies
+ * the symbol's own maximum.
+ */
+export function accountLeverage(acc: TradingAccount & LeverageExtras, symbol: string): number {
+  const e = acc.engine;
+  if (!e?.effectiveLeverage) return acc.leverage;
+  const cls = getInstrument(symbol).assetClass;
+  return Math.min(e.leverageByClass?.[cls] ?? e.effectiveLeverage, e.effectiveLeverage);
+}
+
+/** "1:500", or "1:10 (capped from 1:500)" when the broker's risk leverage cap is lower than the account leverage. */
+export function leverageLabel(acc: TradingAccount & LeverageExtras): string {
+  const eff = acc.engine?.effectiveLeverage;
+  return eff && eff < acc.leverage ? `1:${eff} (capped from 1:${acc.leverage})` : `1:${acc.leverage}`;
+}
+
 /** USD margin required for `lots` at `leverage`. */
 export function marginRequired(symbol: string, lots: number, price: number, leverage: number): number {
   const inst = getInstrument(symbol);

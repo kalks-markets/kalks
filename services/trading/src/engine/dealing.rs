@@ -44,7 +44,7 @@ pub fn add_volume(tx: &mut Tx, env: &Env, ticket: i64, volume: D, dealer: &Deale
     let book_avg = rdp((p.book_price * p.volume + px * volume) / total, spec.digits + 3);
     let deal_id = env.ids.deal();
     let txn = if comm.is_zero() { None } else { tx.post(env, TxnKind::Commission, format!("deal:{deal_id}:commission"), "balance", "commission", -comm, Some(format!("deal:{deal_id}")), Some(dealer.reason_code.clone()), None) };
-    let np = Position { volume: total, open_price: avg, book_price: book_avg, commission: p.commission + comm, ..p.clone() };
+    let np = Position { volume: total, open_price: avg, book_price: book_avg, commission: p.commission + comm, margin_leverage: super::added_margin_leverage(env, &tx.st.account, &spec, &p, volume), ..p.clone() };
     let deal = Deal {
         id: deal_id,
         login: p.login,

@@ -289,18 +289,128 @@ pub fn pnl(env: &Env, acc: &Account, spec: &Spec, side: Side, volume: D, open: D
     env.to_usd(acc, &spec.quote_ccy, q, (&spec.symbol, close)).unwrap_or(q) * acc.usd_factor()
 }
 
-/// Margin in account currency for `long` / `short` lots of one symbol at `price` (D14 hedged margin).
-pub fn symbol_margin(env: &Env, acc: &Account, spec: &Spec, long: D, short: D, price: D) -> D {
+/// Leverage of `spec` for this account: `live` for open positions, `new` for new exposure (min of the account
+/// leverage, the symbol's max leverage and the risk leverage caps, src/risk/leverage.rs).
+pub fn symbol_leverage(env: &Env, acc: &Account, spec: &Spec) -> crate::risk::leverage::SymLev {
+    crate::risk::leverage::symbol_leverage(&env.tenant.risk.leverage_caps, acc, spec)
+}
+
+/// The leverage a new position on `spec` keeps for its margin: Some when a `new_positions` cap is below the live
+/// leverage (the position stays margined at it), else None (live leverage).
+pub fn open_margin_leverage(env: &Env, acc: &Account, spec: &Spec) -> Option<u32> {
+    let l = symbol_leverage(env, acc, spec);
+    (l.new < l.live).then_some(l.new)
+}
+
+/// `p` grows by `add` lots of new exposure (netting add, dealer add volume): the leverage the whole position keeps,
+/// so that its old part keeps its margin and the new part is margined at today's leverage for new exposure
+/// (volume-weighted harmonic mean, rounded down). None = live leverage.
+pub fn added_margin_leverage(env: &Env, acc: &Account, spec: &Spec, p: &crate::model::Position, add: D) -> Option<u32> {
+    let l = symbol_leverage(env, acc, spec);
+    let old = p.margin_leverage.map_or(l.live, |s| s.min(l.live)).max(1);
+    if old >= l.live && l.new >= l.live {
+        return None;
+    }
+    let total = p.volume + add;
+    let w = p.volume / D::from(old) + add / D::from(l.new);
+    if w <= ZERO {
+        return None;
+    }
+    let lev = (total / w).floor().to_string().parse::<u32>().unwrap_or(1).max(1);
+    (lev < l.live).then_some(lev)
+}
+
+/// Lots of one CFD symbol per side, each part with the leverage its margin uses.
+#[derive(Clone, Debug, Default)]
+struct Legs {
+    long: Vec<(D, u32)>,
+    short: Vec<(D, u32)>,
+}
+
+impl Legs {
+    fn sum(v: &[(D, u32)]) -> D {
+        v.iter().map(|x| x.0).sum()
+    }
+}
+
+/// CFD legs per symbol (option positions and `exclude` left out), with an optional hypothetical trade margined at the
+/// leverage for new exposure. A position's leverage is min(live, its own `margin_leverage`).
+fn legs(env: &Env, st: &AccountState, extra: Option<(&str, Side, D)>, exclude: &BTreeSet<i64>) -> BTreeMap<String, Legs> {
+    let acc = &st.account;
+    let mut m: BTreeMap<String, Legs> = Default::default();
+    for p in st.positions.values().filter(|p| p.option.is_none() && !exclude.contains(&p.ticket)) {
+        let Some(spec) = env.specs.get(&p.symbol) else { continue };
+        let live = symbol_leverage(env, acc, spec).live;
+        let lev = p.margin_leverage.map_or(live, |s| s.min(live)).max(1);
+        let e = m.entry(p.symbol.clone()).or_default();
+        match p.side {
+            Side::Buy => e.long.push((p.volume, lev)),
+            Side::Sell => e.short.push((p.volume, lev)),
+        }
+    }
+    if let Some((sym, side, v)) = extra
+        && let Some(spec) = env.specs.get(sym)
+    {
+        let lev = symbol_leverage(env, acc, spec).new;
+        let e = m.entry(sym.to_string()).or_default();
+        match side {
+            Side::Buy => e.long.push((v, lev)),
+            Side::Sell => e.short.push((v, lev)),
+        }
+        if acc.mode == crate::model::Mode::Netting {
+            // one position per symbol: the surviving side keeps its parts pro rata (a reversal leaves the new trade)
+            let (l, s) = (Legs::sum(&e.long), Legs::sum(&e.short));
+            let scale = |parts: &mut Vec<(D, u32)>, keep: D, of: D| {
+                for x in parts.iter_mut() {
+                    x.0 = x.0 * keep / of;
+                }
+            };
+            if l > s {
+                scale(&mut e.long, l - s, l);
+                e.short.clear();
+            } else if s > l {
+                scale(&mut e.short, s - l, s);
+                e.long.clear();
+            } else {
+                e.long.clear();
+                e.short.clear();
+            }
+        }
+    }
+    m
+}
+
+/// Margin in account currency of one symbol's legs at `price` (D14 hedged margin). Every part at the same leverage:
+/// notional × margin % / leverage × (net + 2 × hedged × hedged %); mixed leverages (a cap on new positions): the net
+/// lots at the dominant side's volume-weighted 1 / leverage, each hedged leg at its own side's.
+fn legs_margin(env: &Env, acc: &Account, spec: &Spec, lg: &Legs, price: D) -> D {
+    let (long, short) = (Legs::sum(&lg.long), Legs::sum(&lg.short));
     if long.is_zero() && short.is_zero() {
         return ZERO;
     }
-    let lev = D::from(acc.leverage.min(spec.max_leverage).max(1));
     let per_lot_quote = spec.contract_size * price;
     let per_lot_usd = env.to_usd(acc, &spec.quote_ccy, per_lot_quote, (&spec.symbol, price)).unwrap_or(per_lot_quote);
     let hedged = long.min(short);
     let net = (long - short).abs();
-    let lots = net + D::TWO * hedged * env.group.hedged_margin_pct / HUNDRED;
-    per_lot_usd * spec.margin_pct / HUNDRED / lev * lots * acc.usd_factor()
+    let hpct = env.group.hedged_margin_pct / HUNDRED;
+    let mut levs = lg.long.iter().chain(lg.short.iter()).map(|x| x.1);
+    let first = levs.next().unwrap_or(1);
+    if levs.all(|l| l == first) {
+        let lots = net + D::TWO * hedged * hpct;
+        return per_lot_usd * spec.margin_pct / HUNDRED / D::from(first.max(1)) * lots * acc.usd_factor();
+    }
+    let inv = |parts: &[(D, u32)], tot: D| if tot.is_zero() { ZERO } else { parts.iter().map(|(v, l)| *v / D::from((*l).max(1))).sum::<D>() / tot };
+    let (il, is) = (inv(&lg.long, long), inv(&lg.short, short));
+    let dominant = if long >= short { il } else { is };
+    let lots = net * dominant + hedged * hpct * (il + is);
+    per_lot_usd * spec.margin_pct / HUNDRED * lots * acc.usd_factor()
+}
+
+/// Margin in account currency for `long` / `short` lots of one symbol at `price`, at the leverage for new exposure.
+pub fn symbol_margin(env: &Env, acc: &Account, spec: &Spec, long: D, short: D, price: D) -> D {
+    let lev = symbol_leverage(env, acc, spec).new;
+    let lg = Legs { long: vec![(long, lev)], short: vec![(short, lev)] };
+    legs_margin(env, acc, spec, &lg, price)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -366,16 +476,16 @@ fn exposure(st: &AccountState, extra: Option<(&str, Side, D)>, exclude: &BTreeSe
     m
 }
 
-fn cfd_margin(env: &Env, st: &AccountState, exp: &BTreeMap<String, (D, D)>) -> D {
+fn cfd_margin(env: &Env, st: &AccountState, extra: Option<(&str, Side, D)>, exclude: &BTreeSet<i64>) -> D {
     let acc = &st.account;
     let mut margin = ZERO;
-    for (sym, (long, short)) in exp {
-        let Some(spec) = env.specs.get(sym) else { continue };
-        let price = match env.quote(acc, sym) {
+    for (sym, lg) in legs(env, st, extra, exclude) {
+        let Some(spec) = env.specs.get(&sym) else { continue };
+        let price = match env.quote(acc, &sym) {
             Some(q) => q.mid(),
-            None => st.positions.values().find(|p| &p.symbol == sym).map(|p| p.open_price).unwrap_or(ZERO),
+            None => st.positions.values().find(|p| p.symbol == sym).map(|p| p.open_price).unwrap_or(ZERO),
         };
-        margin += symbol_margin(env, acc, spec, *long, *short, price);
+        margin += legs_margin(env, acc, spec, &lg, price);
     }
     margin
 }
@@ -384,13 +494,13 @@ fn cfd_margin(env: &Env, st: &AccountState, exp: &BTreeMap<String, (D, D)>) -> D
 pub fn total_margin(env: &Env, st: &AccountState, extra: Option<(&str, Side, D)>) -> D {
     let none = BTreeSet::new();
     let exp = exposure(st, extra, &none);
-    cfd_margin(env, st, &exp) + options::margin(env, st, &exp, &[], &none)
+    cfd_margin(env, st, extra, &none) + options::margin(env, st, &exp, &[], &none)
 }
 
 /// Margin of the account without the positions in `exclude` (what closing them would free).
 pub fn margin_without(env: &Env, st: &AccountState, exclude: &BTreeSet<i64>) -> D {
     let exp = exposure(st, None, exclude);
-    cfd_margin(env, st, &exp) + options::margin(env, st, &exp, &[], exclude)
+    cfd_margin(env, st, None, exclude) + options::margin(env, st, &exp, &[], exclude)
 }
 
 pub fn metrics(env: &Env, st: &AccountState) -> Metrics {
@@ -417,7 +527,7 @@ pub fn metrics(env: &Env, st: &AccountState) -> Metrics {
     }
     let none = BTreeSet::new();
     let exp = exposure(st, None, &none);
-    let cfd = cfd_margin(env, st, &exp);
+    let cfd = cfd_margin(env, st, None, &none);
     let option_margin = options::margin(env, st, &exp, &[], &none);
     let margin = cfd + option_margin;
     let equity = st.balance + st.credit + st.bonus + profit + swap + option_value;
@@ -472,3 +582,6 @@ mod tests_corporate;
 
 #[cfg(test)]
 mod tests_risk;
+
+#[cfg(test)]
+mod tests_leverage;

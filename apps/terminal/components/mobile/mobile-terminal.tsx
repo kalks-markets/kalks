@@ -12,7 +12,7 @@ import { useMetrics, usePositionProfit, useTerminal } from "@/lib/store";
 import { useT } from "@kalks/i18n/react";
 import { LanguageMenu } from "@/components/shell/language-menu";
 import { useMarketOpen } from "@/lib/market-hours";
-import { PENDING_LABEL, TIMEFRAMES, accCcy, accMoney, fmtPrice, fmtServer, fmtVol, marginState } from "@/lib/trading";
+import { PENDING_LABEL, TIMEFRAMES, accCcy, accMoney, fmtPrice, fmtServer, fmtVol, leverageLabel, marginState } from "@/lib/trading";
 import { Badge, LiveMoney, MiniSwitch, Pnl, Stepper } from "@/components/ui/primitives";
 import { ChartView } from "@/components/chart/chart-view";
 import { CLIENT_AREA } from "@/components/shell/title-bar";
@@ -439,7 +439,7 @@ function MAccountRow({ login }: { login: string }) {
       </Badge>
       <div className="min-w-0 flex-1">
         <div className="font-mono text-[12.5px]">{a.login}</div>
-        <div className="text-[10.5px] text-fg-3">{productOf((a as Partial<EngineTradingAccount>).engine) === "options" ? `${t("accounts.product.chipOptions")} · ${a.group}` : `${a.group} · ${a.mode} · 1:${a.leverage}`}</div>
+        <div className="text-[10.5px] text-fg-3">{productOf((a as Partial<EngineTradingAccount>).engine) === "options" ? `${t("accounts.product.chipOptions")} · ${a.group}` : `${a.group} · ${a.mode} · ${leverageLabel(a)}`}</div>
       </div>
       <div className="text-right font-mono text-[12px]">
         {accMoney(a, m.equity)} <span className="text-[10px] text-fg-3">{accCcy(a)}</span>

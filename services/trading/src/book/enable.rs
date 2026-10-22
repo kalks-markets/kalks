@@ -373,6 +373,7 @@ fn novate_mm(tx: &mut crate::engine::Tx, env: &crate::engine::Env, idem: &str, t
         combo_id: None,
         premium: cash,
         venue: Some(Venue::Book),
+        margin_leverage: None,
     };
     let deal = Deal {
         id: deal_id,

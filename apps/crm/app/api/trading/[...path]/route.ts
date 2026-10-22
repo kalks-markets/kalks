@@ -296,10 +296,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     }
     case "leverage": {
       if (!Number.isInteger(body.leverage)) return error(422, "validation", "Invalid leverage.");
-      const acct = await engine<{ account?: { leverage?: number; leverages?: number[]; positions?: number } }>(`/v1/accounts/${login}`, { user, req });
+      const acct = await engine<{ account?: { leverage?: number; leverages?: number[]; positions?: number; leverageCap?: number | null } }>(`/v1/accounts/${login}`, { user, req });
       if (acct.status !== 200 || !acct.data.account) return reply(acct.status === 200 ? 404 : acct.status, acct.data);
       const a = acct.data.account;
       if (Array.isArray(a.leverages) && !a.leverages.includes(body.leverage as number)) return error(422, "invalid_leverage", "This leverage isn't available for the account's group.");
+      // the broker's risk leverage cap (the engine refuses it too): checked before the emailed code is spent
+      if (typeof a.leverageCap === "number" && (body.leverage as number) > a.leverageCap) return error(422, "leverage_capped", `Leverage is limited to 1:${a.leverageCap} for now by the broker's risk policy.`);
       if ((a.positions ?? 0) > 0) return error(409, "positions_open", "Close all open positions before changing leverage.");
       if (a.leverage === body.leverage) return error(422, "validation", "The account already uses this leverage.");
       const denied = await stepup(req, user, body, "leverage", login);

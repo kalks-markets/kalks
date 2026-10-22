@@ -648,6 +648,7 @@ pub fn fill(tx: &mut Tx, env: &Env, f: Fill) -> Result<FillOut, Reject> {
             np.open_price = avg;
             np.book_price = book_avg;
             np.commission += comm;
+            np.margin_leverage = super::added_margin_leverage(env, &tx.st.account, &spec, &p, f.volume);
             if f.sl.is_some() {
                 np.sl = f.sl;
             }
@@ -712,7 +713,7 @@ fn entry_deal(env: &Env, st: &AccountState, id: i64, p: &Position, f: &Fill, vol
 }
 
 #[allow(clippy::too_many_arguments)]
-fn open_position(tx: &mut Tx, env: &Env, _spec: &Spec, f: &Fill, volume: D, comm: D, book: Book, route_reason: &str, reversed_from: Option<i64>) -> (i64, i64) {
+fn open_position(tx: &mut Tx, env: &Env, spec: &Spec, f: &Fill, volume: D, comm: D, book: Book, route_reason: &str, reversed_from: Option<i64>) -> (i64, i64) {
     // MT5 convention: the position takes the ticket of the order that opened it
     let ticket = if tx.st.positions.contains_key(&f.order_ticket) { env.ids.ticket() } else { f.order_ticket };
     let deal_id = env.ids.deal();
@@ -750,6 +751,7 @@ fn open_position(tx: &mut Tx, env: &Env, _spec: &Spec, f: &Fill, volume: D, comm
         combo_id: None,
         premium: ZERO,
         venue: None,
+        margin_leverage: super::open_margin_leverage(env, &tx.st.account, spec),
     };
     let deal = entry_deal(env, &tx.st, deal_id, &p, f, volume, comm, txn);
     tx.emit(Event::PositionOpened { position: p, deal: Some(deal) });

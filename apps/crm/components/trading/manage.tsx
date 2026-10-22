@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Eye, Globe, Lock, Pencil, RefreshCcw, TriangleAlert, Users } from "lucide-react";
+import { Eye, Globe, Lock, Pencil, RefreshCcw, ShieldAlert, TriangleAlert, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Card, CardHeader, Chip, Dialog, Field, KeyValue, Money, Reveal, cn } from "@/components/kit";
 import { PasswordInput } from "@/components/accounts/security";
@@ -235,6 +235,10 @@ function LeverageCard({ a, onChanged }: { a: EngineAccount; onChanged: () => voi
   React.useEffect(() => setLev(a.leverage), [a.leverage]);
   const locked = a.positions > 0;
   const fmt = (l: number) => `1:${l.toLocaleString("en-US")}`;
+  // the broker's risk leverage cap: options above it are refused by the engine (leverage_capped), so they are disabled
+  const cap = a.leverageCap ?? null;
+  const above = (l: number) => cap !== null && l > cap;
+  const classCaps = Object.entries(a.effectiveLeverageByClass ?? {});
   // runs after the emailed code is confirmed (D20)
   const apply = async (token: string) => {
     try {
@@ -247,7 +251,7 @@ function LeverageCard({ a, onChanged }: { a: EngineAccount; onChanged: () => voi
   };
   return (
     <Card>
-      <CardHeader title={t("accountDetail.leverage.title")} subtitle={t("accountDetail.leverage.available", { group: a.groupName, list: a.leverages.map((l) => `1:${l.toLocaleString("en-US")}`).join(" · ") })} action={<Chip tone="ember">{t("accountDetail.leverage.current", { value: `1:${a.leverage.toLocaleString("en-US")}` })}</Chip>} />
+      <CardHeader title={t("accountDetail.leverage.title")} subtitle={t("accountDetail.leverage.available", { group: a.groupName, list: a.leverages.map((l) => `1:${l.toLocaleString("en-US")}`).join(" · ") })} action={<span className="flex flex-wrap gap-1.5"><Chip tone="ember">{t("accountDetail.leverage.current", { value: `1:${a.leverage.toLocaleString("en-US")}` })}</Chip>{a.effectiveLeverage !== undefined && a.effectiveLeverage < a.leverage && <Chip tone="warn">{t("accountDetail.leverage.effective", { value: fmt(a.effectiveLeverage) })}</Chip>}</span>} />
       <div className="px-4 pb-6 pt-4 sm:px-6">
         {locked && (
           <div className="mb-4 flex items-start gap-3 rounded-[14px] border border-warn/25 bg-warn-soft px-4 py-3 text-[13px]">
@@ -260,15 +264,24 @@ function LeverageCard({ a, onChanged }: { a: EngineAccount; onChanged: () => voi
             </div>
           </div>
         )}
+        {(cap !== null || classCaps.length > 0) && (
+          <div className="mb-4 flex items-start gap-3 rounded-[14px] border border-warn/25 bg-warn-soft px-4 py-3 text-[13px]">
+            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warn" />
+            <div className="text-fg-2">
+              {cap !== null && <div>{t("accountDetail.leverage.capped", { value: fmt(cap) })}</div>}
+              {classCaps.length > 0 && <div>{t("accountDetail.leverage.cappedClasses", { list: classCaps.map(([c, v]) => `${c} ${fmt(v)}`).join(" · ") })}</div>}
+            </div>
+          </div>
+        )}
         <div className={cn("flex flex-wrap gap-2", locked && "pointer-events-none opacity-45")}>
           {a.leverages.map((l) => (
             <button
               key={l}
               type="button"
-              disabled={locked}
+              disabled={locked || above(l)}
               aria-pressed={lev === l}
               onClick={() => setLev(l)}
-              className={cn("k-num h-10 min-w-20 rounded-full border px-4 text-[13.5px] font-semibold transition-colors", lev === l ? "border-ember/60 bg-ember-soft text-ember" : "border-line bg-surface-2 text-fg-2 hover:text-fg")}
+              className={cn("k-num h-10 min-w-20 rounded-full border px-4 text-[13.5px] font-semibold transition-colors disabled:cursor-not-allowed", lev === l ? "border-ember/60 bg-ember-soft text-ember" : "border-line bg-surface-2 text-fg-2 hover:text-fg", above(l) && "opacity-40 line-through")}
             >
               1:{l.toLocaleString("en-US")}
             </button>
@@ -276,7 +289,7 @@ function LeverageCard({ a, onChanged }: { a: EngineAccount; onChanged: () => voi
         </div>
         <div className="mt-4 flex items-center justify-between gap-3">
           <span className="text-[12.5px] text-fg-3">{t("accountDetail.leverage.hint")}</span>
-          <Button size="sm" variant="ember" disabled={locked || lev === a.leverage || confirming} onClick={() => setConfirming(true)}>
+          <Button size="sm" variant="ember" disabled={locked || lev === a.leverage || above(lev) || confirming} onClick={() => setConfirming(true)}>
             {t("common.apply")}
           </Button>
         </div>

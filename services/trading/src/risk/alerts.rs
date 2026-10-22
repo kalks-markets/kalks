@@ -175,6 +175,18 @@ pub async fn resolve_missing(st: &AppState, tenant_id: i64, kinds: &[&str], acti
     }
 }
 
+/// Resolves the open alert of `key` now (its condition was cleared by staff, e.g. a leverage cap disabled).
+pub async fn resolve_key(st: &AppState, tenant_id: i64, key: &str) {
+    match sqlx::query("UPDATE risk_alerts SET resolved_at = now(), updated_at = now() WHERE tenant_id = $1 AND key = $2 AND resolved_at IS NULL RETURNING *").bind(tenant_id).bind(key).fetch_all(&st.pool).await {
+        Ok(rows) => {
+            for r in rows {
+                push(st, tenant_id, &row_json(&r));
+            }
+        }
+        Err(e) => tracing::warn!(error = %e, %key, "risk alert not resolved"),
+    }
+}
+
 /// Resolves alerts of `kinds` with no new occurrence for `quiet_secs` (order refusals, routing notices).
 pub async fn resolve_quiet(st: &AppState, tenant_id: i64, kinds: &[&str], quiet_secs: i64) {
     let kinds: Vec<String> = kinds.iter().map(|k| k.to_string()).collect();

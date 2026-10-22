@@ -9,7 +9,7 @@ import { ME } from "@kalks/mock";
 import { Avatar, LogoMark, cn } from "@kalks/ui";
 import { useT } from "@kalks/i18n/react";
 import { useMetrics, useTerminal } from "@/lib/store";
-import { accCcy, accMoney } from "@/lib/trading";
+import { accCcy, accMoney, leverageLabel } from "@/lib/trading";
 import { DropMenu } from "@/components/ui/menu";
 import { Badge, LiveMoney } from "@/components/ui/primitives";
 import { Button, IconButton, Tip } from "@/components/ui/kit";
@@ -61,7 +61,7 @@ function AccountRow({ login, active, onPick }: { login: string; active: boolean;
           )}
         </span>
         <span className="block truncate text-[12px] text-fg-3" title={options ? undefined : `${t.dyn(`desk.g.${a.mode}`)} ${t("desk.g.leverage")}`}>
-          {options ? `${a.group} · ${a.server}` : `${a.group} · ${t.dyn(`order.mode.${a.mode}`, a.mode)} · 1:${a.leverage} · ${a.server}`}
+          {options ? `${a.group} · ${a.server}` : `${a.group} · ${t.dyn(`order.mode.${a.mode}`, a.mode)} · ${leverageLabel(a)} · ${a.server}`}
         </span>
       </span>
       <span className="text-end">

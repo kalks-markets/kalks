@@ -328,6 +328,14 @@ pub fn change_leverage(tx: &mut Tx, env: &Env, leverage: u32, staff: bool) -> Re
     if !env.group.leverages.contains(&leverage) {
         return Err(Reject::new("invalid_leverage", format!("Leverage 1:{leverage} is not offered in this group")));
     }
+    // risk leverage cap (src/risk/leverage.rs): a client can't choose more than the account-wide cap; staff can set any
+    // group leverage (the cap still limits the leverage margin is computed at)
+    if !staff
+        && let Some(c) = crate::risk::leverage::account_cap(&env.tenant.risk.leverage_caps, &tx.st.account)
+        && leverage > c.max_leverage
+    {
+        return Err(Reject::new("leverage_capped", format!("Leverage is limited to 1:{} for now by the broker's risk policy", c.max_leverage)));
+    }
     if !tx.st.positions.is_empty() && !staff {
         return Err(Reject::new("positions_open", "Leverage can only be changed when there are no open positions"));
     }

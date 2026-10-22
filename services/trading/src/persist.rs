@@ -91,6 +91,7 @@ pub async fn load_tenant(pool: &PgPool, tenant_id: i64) -> anyhow::Result<Tenant
         cfg.routing_rules = v.0;
     }
     cfg.risk = crate::risk::limits::load(pool, tenant_id).await?;
+    cfg.risk.leverage_caps = crate::risk::leverage::load(pool, tenant_id).await?;
     Ok(cfg)
 }
 
