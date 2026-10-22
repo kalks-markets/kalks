@@ -111,6 +111,7 @@ No session needed. Read it at start-up and refresh it on resume. It still answer
 {
   "apiVersion": 1,
   "minAppVersion": null,
+  "updateUrl": "https://app.kalkstrade.com/download",
   "urls": {
     "app": "https://app.kalkstrade.com",
     "terminal": "https://trade.kalkstrade.com",
@@ -140,6 +141,9 @@ No session needed. Read it at start-up and refresh it on resume. It still answer
   account group and client rules); `false` = hide that screen or card, missing = on. Reload it on start and when an
   API answers `403 section_disabled`.
 - `minAppVersion`: when set (env `MOBILE_MIN_APP_VERSION`), an older app must ask the user to update.
+- `updateUrl`: where the update prompt sends the user: the Client Area's Android download page (`<app>/download`,
+  the current APK, its SHA-256 and install steps; the app is distributed as a direct APK, not through Play). Open it
+  in the browser. Env `MOBILE_UPDATE_URL` pins another URL. Always present.
 - A white-label broker's `terminal` and `engine` / `options` streams use its own trade domain.
 
 ## 6. Kalks Trader — `/api/mobile/trade/*` (native)
@@ -281,6 +285,7 @@ header comment of its route file in `apps/crm/app/api/<family>/…/route.ts`.
   configured.
 - Server env (apps/crm), all optional:
   - `MOBILE_MIN_APP_VERSION`;
+  - `MOBILE_UPDATE_URL` (config `updateUrl`; default `<this host>/download`);
   - `MOBILE_MARKET_DATA_URL`, `MOBILE_ENGINE_STREAM_URL`, `MOBILE_OPTIONS_STREAM_URL` and `MOBILE_SUPPORT_STREAM_URL`
     (pin a URL);
   - `MOBILE_TRADE_SECRET` (the trade-token binding key; default: derived from the internal tokens);

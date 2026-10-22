@@ -6,7 +6,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, LayoutGrid, LogOut, Moon, Settings, Sun } from "lucide-react";
+import { ChevronRight, LayoutGrid, LogOut, Moon, Settings, Smartphone, Sun } from "lucide-react";
 import { Dialog, LanguageMenu, cn, type NavModule } from "@/components/kit";
 import { useT } from "@kalks/i18n/react";
 import { activeSub, isActive } from "./nav-utils";
@@ -86,6 +86,9 @@ function Drawer({ modules, pathname, onSignOut }: { modules: NavModule[]; pathna
         <LanguageMenu />
         <Link href="/profile/preferences" aria-label={t("shell.preferences")} className="k-surface-btn grid size-11 place-items-center rounded-full text-fg-2">
           <Settings className="size-[18px]" />
+        </Link>
+        <Link href="/download" aria-label={t("shell.download.getApp")} title={t("shell.download.getApp")} className="k-surface-btn grid size-11 place-items-center rounded-full text-fg-2">
+          <Smartphone className="size-[18px]" />
         </Link>
         <button type="button" onClick={onSignOut} className="ms-auto flex h-11 items-center gap-2 rounded-full px-3 text-[13px] font-semibold text-down">
           <LogOut className="size-4 rtl:-scale-x-100" /> {t("shell.logOut")}

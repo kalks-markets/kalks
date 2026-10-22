@@ -16,6 +16,25 @@
 # Client Area (CRM). /support/stream = support chat + notifications stream (one-time ticket from the CRM BFF).
 app.kalkstrade.com {
 	import common
+	# The Android app: kalks-<version>.apk + latest.json, uploaded by deploy/publish-app.sh (not in the repo, never by
+	# a deploy). latest.json drives the /download page. Versioned APKs never change: cached for a year; latest.json: no-cache.
+	handle_path /downloads/* {
+		root * /srv/kalks/downloads
+		@apk path *.apk
+		header @apk {
+			Content-Type application/vnd.android.package-archive
+			Content-Disposition attachment
+			Cache-Control "public, max-age=31536000, immutable"
+		}
+		@manifest path /latest.json
+		header @manifest {
+			Content-Type "application/json; charset=utf-8"
+			Cache-Control "no-cache"
+		}
+		file_server {
+			hide .*
+		}
+	}
 	handle /support/stream {
 		rewrite * /v1/stream?{query}
 		reverse_proxy 127.0.0.1:8100

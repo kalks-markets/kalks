@@ -7,7 +7,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowDownToLine, ArrowUpRight, CandlestickChart, Eye, IdCard, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, CandlestickChart, Eye, IdCard, LogOut, Settings, ShieldCheck, Smartphone, UserRound } from "lucide-react";
 import { Avatar, Button, Chip, CommandPalette, LanguageMenu, MarketBoundary, TooltipProvider, cn } from "@/components/kit";
 import { IS_DEMO } from "@kalks/mock";
 import { useT } from "@kalks/i18n/react";
@@ -33,6 +33,7 @@ const ACCOUNT_MENU_DEMO = [
   { label: "shell.security", icon: <ShieldCheck />, href: "/profile/security" },
   { label: "shell.verification", icon: <IdCard />, href: "/profile/verification" },
   { label: "shell.preferences", icon: <Settings />, href: "/profile/preferences" },
+  { label: "shell.download.getApp", icon: <Smartphone />, href: "/download" },
 ] as const;
 
 const ACCOUNT_MENU_LIVE = [
@@ -41,6 +42,7 @@ const ACCOUNT_MENU_LIVE = [
   { label: "shell.nav.viewers", icon: <Eye />, href: "/profile/viewers" },
   { label: "shell.verification", icon: <IdCard />, href: "/profile/verification" },
   { label: "shell.preferences", icon: <Settings />, href: "/profile/preferences" },
+  { label: "shell.download.getApp", icon: <Smartphone />, href: "/download" },
 ] as const;
 
 /** True once the page has scrolled (the sticky top area then gets its frosted backdrop). */

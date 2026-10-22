@@ -476,11 +476,13 @@ test("config: service URLs, streams and the broker's branding", async () => {
   assert.deepEqual(c.flags, { demo_accounts: true });
   assert.deepEqual(c.maintenance, { active: false, message: "", until: null });
   assert.equal(c.minAppVersion, null);
+  assert.equal(c.updateUrl, "https://app.kalkstrade.com/download");
   assert.equal(JSON.stringify(c).includes("TOKEN"), false);
 
   // a white-label broker: its own trade domain and colours (hex only)
   const b = await (await viaProxy(m, "/api/mobile/config", { headers: { host: "app.broker.test", "x-forwarded-proto": "https" } }, m.config.GET, {}, "https://app.broker.test")).res.json();
   assert.equal(b.urls.app, "https://app.broker.test");
+  assert.equal(b.updateUrl, "https://app.broker.test/download");
   assert.equal(b.urls.terminal, "https://trade.broker.test");
   assert.equal(b.urls.streams.engine, "wss://trade.broker.test/engine/stream");
   assert.equal(b.urls.streams.options, "wss://trade.broker.test/options/stream");

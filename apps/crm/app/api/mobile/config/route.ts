@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
     {
       apiVersion: API_VERSION,
       minAppVersion: process.env.MOBILE_MIN_APP_VERSION || null,
+      // where the app sends the user to update (the Android APK page, /download); MOBILE_UPDATE_URL pins another
+      updateUrl: process.env.MOBILE_UPDATE_URL || `${urls.app}/download`,
       urls,
       tenant: {
         slug: brand?.slug ?? cfg?.tenant.slug ?? "kalks",

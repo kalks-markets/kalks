@@ -80,6 +80,7 @@ These go in `apps/crm/.env.local` for local runs, or `apps/crm/.env.production.l
 | `OPTIONS_URL`, `OPTIONS_INTERNAL_TOKEN` | options service (the mobile app's options reads), default `http://127.0.0.1:8104` |
 | `ANTHROPIC_API_KEY` | the mobile app's AI routes (`trade/ai-trader`, `trade/options/explain`); unset = `{configured: false}` |
 | `MOBILE_MIN_APP_VERSION`, `MOBILE_TRADE_SECRET`, `MOBILE_*_URL` | optional mobile settings, see `docs/MOBILE-API.md` §9 |
+| `APP_DOWNLOAD_MANIFEST_URL` | Android app page `/download`: the release manifest (`latest.json`); default `<this host>/downloads/latest.json`, see `deploy/README.md` |
 
 ## Security, sessions and view-only access (live builds)
 

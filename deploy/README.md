@@ -25,6 +25,48 @@ One Ubuntu VPS runs everything. Only Caddy (ports 80/443) and SSH are reachable 
 - Caddy reads `SITE_LOCK_USER` / `SITE_LOCK_HASH` from `/etc/caddy/kalks.env` for the pre-launch lock.
 - Logs: `journalctl -u kalks-<name> -f`.
 
+## Android app downloads (direct APK)
+
+The Android app is distributed as a direct APK from this server (no Play Store for now). APKs are not in git.
+
+**Where the files live.** `/srv/kalks/downloads` on the VPS, owned by `kalks`. Caddy serves it at
+`https://app.kalkstrade.com/downloads/*` (the website's `kalkstrade.com/download/*` points at the same directory). It holds:
+
+- `kalks-<version>.apk`: one file per release. Sent as `application/vnd.android.package-archive` with
+  `Content-Disposition: attachment` and cached for a year (`immutable`): a published version never changes.
+- `latest.json`: the current release, sent with `Cache-Control: no-cache`:
+  `{"version": "1.4.0", "build": 42, "file": "kalks-1.4.0.apk", "size": 48213504, "sha256": "<64 hex>", "minAndroid": "7.0", "releasedAt": "2026-10-20T09:30:00Z"}`.
+  `build` is the Android versionCode, `size` is in bytes, and `file` is a bare file name in the same directory.
+
+One-time setup on the server: `sudo install -d -o kalks -g kalks -m 755 /srv/kalks/downloads`. The next deploy installs the
+Caddyfile with the `/downloads/*` route (or `sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy`).
+
+**Publishing a release.** Run `deploy/publish-app.sh` on your own machine, never on the server. `deploy.sh` doesn't run it.
+
+```sh
+deploy/publish-app.sh build/app/outputs/flutter-apk/app-release.apk 1.4.0 42   # <apk> <version> <build>
+DRY_RUN=1 deploy/publish-app.sh app-release.apk 1.4.0 42                         # only print latest.json
+```
+
+- It connects with `ssh kalks-vps` by default (a `Host kalks-vps` entry in `~/.ssh/config` for the `kalks` user). Set
+  `KALKS_SSH=kalks@<server>` for another target and `DOWNLOADS_DIR` for another directory.
+- `MIN_ANDROID` sets the minimum Android version (default `7.0`). When `aapt` is installed, it checks the APK's own
+  versionName and versionCode against the arguments.
+- It uploads the APK as `kalks-<version>.apk`, checks its SHA-256 on the server, and only then replaces `latest.json`
+  (both renamed into place, so nothing ever reads a half-written file). A version that already exists with different
+  contents is refused, so bump the version instead.
+- Old APKs stay on the server, and links to them keep working. Delete them by hand when they're no longer needed.
+
+**How latest.json drives the page.** `app.kalkstrade.com/download` is public (signed out or in). It reads `latest.json`
+server-side (`apps/crm/lib/app-download.ts`), validates every field, and caches the answer for one minute. A new release
+therefore shows up within a minute, with no deploy. The APK link is resolved next to the manifest. The page shows the
+version, size, release date, minimum Android version, SHA-256, a QR code (desktop) and install steps. When the manifest
+is missing, unreachable or invalid, the page shows "Download coming soon" and no link. The manifest URL defaults to
+`<this host>/downloads/latest.json`. A white-label broker host (which has no `/downloads` route) can set
+`APP_DOWNLOAD_MANIFEST_URL=https://app.kalkstrade.com/downloads/latest.json` in `apps/crm/.env.production.local`.
+The mobile app's update prompt opens the same page (`/api/mobile/config` → `updateUrl`; raise `MOBILE_MIN_APP_VERSION`
+to force an update: docs/MOBILE-API.md).
+
 ## White-label broker domains and tenant isolation
 
 **Domains.** Each broker (tenant) has its own hosts in `tenant_domains` (gateway), one app per host: `website`, `app` (Client Area), `trade` (Trader) and `admin` (Back Office). The Platform Owner manages them in Back Office → Brokers → a broker → Domains (add, change app, disable, remove, check DNS). `tenants.domains` is kept as a mirror of the active rows. Optional: `GATEWAY_PUBLIC_IPS=203.0.113.10,2001:db8::10` in `~/kalks/.env.local` makes "Check DNS" verify that a domain points at this server (otherwise any DNS answer counts).

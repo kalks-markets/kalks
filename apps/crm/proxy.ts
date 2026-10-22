@@ -18,8 +18,9 @@ import { MOBILE_PREFIX, bearerOf, hasCookies, mobileRequestHeaders, mobileRoute 
 // login / register pages offer "Enter demo".
 
 const AUTH_PAGES = ["/login", "/register", "/forgot"];
-/** Public pages (no sign-in): Academy and Prop certificate verification, the end page of a staff session. */
-const PUBLIC_PAGES = ["/certificate", "/verify", "/s", "/staff-session"];
+/** Public pages (no sign-in): Academy and Prop certificate verification, the end page of a staff session, the Android
+ *  app download page (signed-in clients see it too). */
+const PUBLIC_PAGES = ["/certificate", "/verify", "/s", "/staff-session", "/download"];
 
 // Partner links (IB programme, services/ib): /r/CODE[/campaign] or any page with ?ref=CODE[&c=campaign].
 // The click is recorded with the IB service and the referral kept in a first-party cookie (kalks_ref), so

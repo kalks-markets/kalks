@@ -1,7 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
+import { Smartphone } from "lucide-react";
 import { useT } from "@kalks/i18n/react";
 import { ThemedImage, useContentImage, useContentText, type ContentImage } from "@kalks/ui/content";
 import { Delta, LanguageMenu, Logo, PriceText, SymbolAvatar, useBrand, useQuote } from "@/components/kit";
@@ -49,9 +51,13 @@ export function AuthSection({ children }: { children: ReactNode }) {
               {children}
             </motion.div>
           </div>
-          <p className="relative px-6 pb-6 text-[11px] leading-relaxed text-fg-3 lg:px-10">
-            {t("common.riskWarning")}
-          </p>
+          <div className="relative px-6 pb-6 lg:px-10">
+            {/* the Android app (APK) page: public, works signed out */}
+            <Link href="/download" className="mb-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-fg-2 hover:text-fg">
+              <Smartphone className="size-4" /> {t("shell.download.getApp")}
+            </Link>
+            <p className="text-[11px] leading-relaxed text-fg-3">{t("common.riskWarning")}</p>
+          </div>
         </div>
 
         {/* Right — brand photo */}
