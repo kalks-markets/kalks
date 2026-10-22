@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDown, ArrowUp, Award, BookOpen, ChevronDown, ChevronRight, Eye, FileText, GraduationCap, History, Plus, RotateCcw, RotateCw, Save, Trash2, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, Award, BookOpen, ChevronDown, ChevronRight, Eye, FileText, GraduationCap, History, Library, Plus, RotateCcw, RotateCw, Save, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Card, CardHeader, Chip, Dialog, EmptyState, KpiCard, PageHeader, Progress, Reveal, Segmented, Skeleton, Toggle, cn } from "@kalks/ui";
 import { useStaff } from "@/components/staff-session";
 import { contentAllows } from "@/lib/academy";
-import { CmsError, LEVELS, TRACK_ORDER, cms, fmtWhen, trackText, useCms, type AuditRow, type Kind, type NodeData, type NodeFull, type QuizQ, type Stats, type Track, type Tree, type TreePhase } from "./api";
+import { CATEGORIES, CmsError, LEVELS, TRACK_ORDER, cms, fmtWhen, trackText, useCms, type AuditRow, type GlossaryTerm, type Kind, type NodeData, type NodeFull, type QuizQ, type Stats, type Track, type Tree, type TreePhase } from "./api";
 import { Markdown } from "./markdown";
 import { QuizEditor, inputCls } from "./quiz-editor";
 import { useConfirm } from "@/components/confirm";
@@ -133,6 +133,40 @@ function CourseTree({ tree, sel, onSelect, canWrite, onReordered }: { tree: Tree
 }
 
 /* ------------------------------------------------------------------ */
+/* Glossary                                                            */
+/* ------------------------------------------------------------------ */
+
+function GlossaryList({ terms, sel, onSelect }: { terms: GlossaryTerm[]; sel: Sel | null; onSelect: (s: Sel) => void }) {
+  const [q, setQ] = React.useState("");
+  const needle = q.trim().toLowerCase();
+  const list = needle ? terms.filter((x) => `${x.term} ${x.category} ${x.definition}`.toLowerCase().includes(needle)) : terms;
+  return (
+    <div data-testid="glossary-list">
+      <div className="mb-2 flex h-9 items-center gap-2 rounded-full border border-line bg-surface-2 px-3.5">
+        <Search className="size-3.5 text-fg-3" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${terms.length} terms…`} className="w-full bg-transparent text-[13px] outline-none placeholder:text-fg-3" />
+      </div>
+      <ol className="space-y-0.5">
+        {list.map((x) => {
+          const on = sel?.kind === "term" && sel.slug === x.slug;
+          return (
+            <li key={x.slug}>
+              <button type="button" onClick={() => onSelect({ kind: "term", slug: x.slug })} className={cn("flex w-full items-center gap-2 rounded-[10px] px-2 py-1.5 text-left", on ? "bg-ember-soft" : "hover:bg-surface-3/60")} data-testid={`glossary-term-${x.slug}`}>
+                <StatusDot on={x.published} />
+                <span className={cn("min-w-0 flex-1 truncate text-[12.5px]", on ? "text-fg" : "text-fg-2", !x.published && "text-fg-3")}>{x.term}</span>
+                <span className="shrink-0 text-[10.5px] text-fg-3">{x.category}</span>
+                {SOURCE_CHIP[x.source] && <span className={cn("shrink-0 text-[10px] font-medium", x.source === "custom" ? "text-gold" : "text-info")}>{SOURCE_CHIP[x.source]!.label}</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      {list.length === 0 && <p className="px-2 py-6 text-center text-[12.5px] text-fg-3">{terms.length ? "No terms match." : "The glossary is empty."}</p>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Editor                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -185,6 +219,7 @@ function Editor({ sel, lang, canWrite, onSaved, onDeleted }: { sel: Sel; lang: s
     const data: Record<string, unknown> = { ...draft.data };
     delete data.words;
     delete data.minutes;
+    if (Array.isArray(data.related)) data.related = (data.related as string[]).filter((x) => x.trim());
     return put({ data }, "Saved");
   };
   const togglePublish = () => put({ published: !node.published, ...(dirty ? { data: draft.data } : {}) }, node.published ? "Unpublished" : "Published");
@@ -216,7 +251,7 @@ function Editor({ sel, lang, canWrite, onSaved, onDeleted }: { sel: Sel; lang: s
     }
   };
 
-  const title = sel.kind === "exam" ? "Final exam" : d.title || "Untitled";
+  const title = sel.kind === "exam" ? "Final exam" : (sel.kind === "term" ? d.term : d.title) || "Untitled";
   return (
     <Card className="overflow-hidden" data-testid="cms-editor">
       {confirmDialog}
@@ -309,6 +344,37 @@ function Editor({ sel, lang, canWrite, onSaved, onDeleted }: { sel: Sel; lang: s
             <label className="block md:col-span-2">
               <span className="mb-1.5 block text-[12.5px] font-medium text-fg-2">Summary</span>
               <textarea value={d.summary ?? ""} disabled={ro} rows={2} onChange={(e) => set({ summary: e.target.value })} className={inputCls} />
+            </label>
+          </div>
+        )}
+
+        {sel.kind === "term" && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-[12.5px] font-medium text-fg-2">Term</span>
+              <input value={d.term ?? ""} disabled={ro} onChange={(e) => set({ term: e.target.value })} className={inputCls} data-testid="cms-term" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[12.5px] font-medium text-fg-2">Category</span>
+              <select value={d.category ?? CATEGORIES[0]} disabled={ro} onChange={(e) => set({ category: e.target.value })} className={inputCls}>
+                {CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block md:col-span-2">
+              <span className="mb-1.5 block text-[12.5px] font-medium text-fg-2">Definition</span>
+              <textarea value={d.definition ?? ""} disabled={ro} rows={4} onChange={(e) => set({ definition: e.target.value })} className={inputCls} data-testid="cms-definition" />
+            </label>
+            <label className="block md:col-span-2">
+              <span className="mb-1.5 block text-[12.5px] font-medium text-fg-2">Related terms (slugs, comma separated)</span>
+              <input
+                value={(d.related ?? []).join(", ")}
+                disabled={ro}
+                placeholder="e.g. spread, pip"
+                onChange={(e) => set({ related: e.target.value.split(",").map((x) => x.trim()).filter((x, i, a) => x || i === a.length - 1) })}
+                className={cn(inputCls, "font-mono")}
+              />
             </label>
           </div>
         )}
@@ -558,6 +624,9 @@ export function LiveAcademyCms() {
   const audit = useCms<{ audit: AuditRow[] }>(canRead ? "audit" : null);
   const [sel, setSel] = React.useState<Sel | null>(null);
   const [creating, setCreating] = React.useState(false);
+  // left pane: the course tree or the glossary (terms are edited in the same editor)
+  const [pane, setPane] = React.useState<"course" | "glossary">("course");
+  const glossary = useCms<{ terms: GlossaryTerm[] }>(canRead && pane === "glossary" ? `glossary?lang=${lang}` : null);
 
   React.useEffect(() => {
     const first = tree.data?.phases[0]?.sections[0]?.chapters[0];
@@ -576,6 +645,7 @@ export function LiveAcademyCms() {
     tree.reload();
     stats.reload();
     audit.reload();
+    if (pane === "glossary") glossary.reload();
   };
 
   return (
@@ -611,9 +681,35 @@ export function LiveAcademyCms() {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
         <Reveal className="xl:col-span-4">
           <Card className="h-full">
-            <CardHeader title="Course" subtitle={t ? courseSummary(t) : "Loading"} />
+            <CardHeader
+              title={pane === "course" ? "Course" : "Glossary"}
+              subtitle={pane === "glossary" ? (glossary.data ? `${glossary.data.terms.length} terms · ${lang.toUpperCase()}` : "Loading") : t ? courseSummary(t) : "Loading"}
+              action={
+                <Segmented
+                  size="xs"
+                  value={pane}
+                  onChange={setPane}
+                  options={[
+                    { value: "course", label: <><BookOpen className="size-3" /> Course</> },
+                    { value: "glossary", label: <><Library className="size-3" /> Glossary</> },
+                  ]}
+                />
+              }
+            />
             <div className="max-h-[1120px] overflow-y-auto px-3 pb-4 pt-3 sm:px-4">
-              {t ? <CourseTree tree={t} sel={sel} onSelect={setSel} canWrite={canWrite} onReordered={refresh} /> : <Skeleton className="h-[480px] w-full rounded-[16px]" />}
+              {pane === "glossary" ? (
+                glossary.error ? (
+                  <EmptyState illustration="satellite_antenna" title="Couldn't load the glossary" text={glossary.error.message} action={<Button variant="surface" onClick={glossary.reload}><RotateCw /> Try again</Button>} />
+                ) : glossary.data ? (
+                  <GlossaryList terms={glossary.data.terms} sel={sel} onSelect={setSel} />
+                ) : (
+                  <Skeleton className="h-[480px] w-full rounded-[16px]" />
+                )
+              ) : t ? (
+                <CourseTree tree={t} sel={sel} onSelect={setSel} canWrite={canWrite} onReordered={refresh} />
+              ) : (
+                <Skeleton className="h-[480px] w-full rounded-[16px]" />
+              )}
             </div>
             {!canWrite && <p className="px-6 pb-5 text-[12px] text-fg-3">Read-only: your role can view the Academy but not edit it.</p>}
           </Card>

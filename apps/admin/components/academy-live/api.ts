@@ -32,7 +32,13 @@ export type NodeData = {
   minutes?: number;
   pass_mark?: number;
   questions?: QuizQ[];
+  // glossary terms
+  term?: string;
+  category?: string;
+  definition?: string;
+  related?: string[];
 };
+export type GlossaryTerm = Meta & { term: string; category: string; definition: string; related: string[] };
 export type NodeFull = Meta & { kind: Kind; data: NodeData; default: { data: NodeData; published: boolean; order: number } | null };
 
 export type Stats = {
@@ -111,3 +117,5 @@ export const TRACK_ORDER: readonly Track[] = ["fundamental", "technical", "optio
 
 export const fmtWhen = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 export const LEVELS = ["Beginner", "Intermediate", "Advanced", "Professional"] as const;
+/** Glossary categories (services/academy/src/content.rs CATEGORIES). */
+export const CATEGORIES = ["Markets", "Trading mechanics", "Technical analysis", "Fundamental analysis", "Risk management", "Psychology", "Platform"] as const;
