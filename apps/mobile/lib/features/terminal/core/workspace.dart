@@ -85,6 +85,7 @@ class Workspace {
     this.charts = const {},
     this.indicatorFavourites = kDefaultIndicatorFavourites,
     this.advancedQuotes = false,
+    this.tfFavourites = kDefaultTfFavourites,
   });
 
   final List<String> favourites;
@@ -116,6 +117,9 @@ class Workspace {
   /// The quotes' Advanced view: a low · high · last tick time line under every market (Simple: prices only).
   final bool advancedQuotes;
 
+  /// Starred timeframes: next to the chart's timeframe chip, in [kTimeframes] order.
+  final List<String> tfFavourites;
+
   /// The chart of a symbol (the web's default chart until changed).
   ChartSettings chartOf(String symbol) => charts[symbol] ?? ChartSettings(indicators: _defaultIndicators);
 
@@ -134,6 +138,7 @@ class Workspace {
     Map<String, ChartSettings>? charts,
     List<String>? indicatorFavourites,
     bool? advancedQuotes,
+    List<String>? tfFavourites,
   }) => Workspace(
     favourites: favourites ?? this.favourites,
     segment: segment ?? this.segment,
@@ -148,6 +153,7 @@ class Workspace {
     charts: charts ?? this.charts,
     indicatorFavourites: indicatorFavourites ?? this.indicatorFavourites,
     advancedQuotes: advancedQuotes ?? this.advancedQuotes,
+    tfFavourites: tfFavourites ?? this.tfFavourites,
   );
 
   Map<String, dynamic> toJson() => {
@@ -164,6 +170,7 @@ class Workspace {
     'charts': {for (final e in charts.entries) e.key: e.value.toJson()},
     'indicatorFavourites': indicatorFavourites,
     'advancedQuotes': advancedQuotes,
+    'tfFavourites': tfFavourites,
   };
 
   static Workspace fromJson(Map<String, dynamic>? j) {
@@ -174,6 +181,7 @@ class Workspace {
     final dev = j['maxDeviation'];
     final charts = j['charts'];
     final indFav = j['indicatorFavourites'];
+    final tfFav = j['tfFavourites'];
     return Workspace(
       favourites: fav is List ? fav.whereType<String>().toList() : d.favourites,
       segment: j['segment'] is String ? j['segment'] as String : d.segment,
@@ -191,6 +199,7 @@ class Workspace {
       },
       indicatorFavourites: indFav is List ? indFav.whereType<String>().toList() : d.indicatorFavourites,
       advancedQuotes: j['advancedQuotes'] == true,
+      tfFavourites: tfFav is List ? kTimeframes.where(tfFav.contains).toList() : d.tfFavourites,
     );
   }
 }
@@ -232,6 +241,10 @@ class WorkspaceController extends Notifier<Workspace> {
   /// Changes one symbol's chart (type and / or indicators); saved per symbol.
   void updateChart(String symbol, ChartSettings Function(ChartSettings c) f) => update((w) => w.copyWith(charts: {...w.charts, symbol: f(w.chartOf(symbol))}));
 
+  /// Stars / unstars a timeframe (kept in [kTimeframes] order).
+  void toggleTfFavourite(String tf) =>
+      update((w) => w.copyWith(tfFavourites: kTimeframes.where((x) => x == tf ? !w.tfFavourites.contains(x) : w.tfFavourites.contains(x)).toList()));
+
   void toggleIndicatorFavourite(String type) => update(
     (w) => w.copyWith(
       indicatorFavourites: w.indicatorFavourites.contains(type) ? w.indicatorFavourites.where((x) => x != type).toList() : [...w.indicatorFavourites, type],
@@ -243,6 +256,9 @@ final workspaceProvider = NotifierProvider<WorkspaceController, Workspace>(Works
 
 /// Timeframes of the chart (web TIMEFRAMES) and their length in seconds.
 const List<String> kTimeframes = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1', 'MN'];
+
+/// The starred timeframes of a new workspace (TradingView's favourites).
+const List<String> kDefaultTfFavourites = ['M1', 'M5', 'M15', 'H1', 'H4', 'D1'];
 const Map<String, int> kTfSeconds = {'M1': 60, 'M5': 300, 'M15': 900, 'M30': 1800, 'H1': 3600, 'H4': 14400, 'D1': 86400, 'W1': 604800, 'MN': 2592000};
 
 /// Watchlist segments (web SEGMENTS).

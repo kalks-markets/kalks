@@ -1,5 +1,6 @@
 // Chart tab (web MChart, owner design 2026-10): the chart fills the tab (no header, no frame): the symbol pill (tap:
-// another market) and a compact timeframe control float at the top with the chart menu (type, indicators,
+// another market) and the timeframe control (timeframe_picker.dart: the timeframe chip and the starred timeframes)
+// float at the top with the chart menu (type, indicators,
 // templates), the OHLC legend sits under them, and ONE slim pill at the bottom centre trades: [S bid] − volume +
 // [ask B], the same order path as the rest of the terminal (one-click trading on: at once, with a haptic; off: the
 // prefilled order ticket). Trade lines are compact tags: "B 0.50 +12.30", "S 1.11850" (stop), "T 1.12600" (target).
@@ -28,6 +29,7 @@ import 'order_sheet.dart';
 import 'position_sheet.dart';
 import 'room.dart';
 import 'symbol_search.dart';
+import 'timeframe_picker.dart';
 
 /// Room the floating top controls take over the plot (the chart's legend starts below).
 const double kChartTopBar = 48;
@@ -48,9 +50,10 @@ class ChartTab extends ConsumerWidget {
         Positioned.fill(
           child: _Chart(symbol: symbol, tf: ws.tf, topInset: kChartTopBar),
         ),
-        // the symbol pill · timeframes · chart menu, floating over the top of the plot
+        // the symbol pill · timeframes · chart menu, floating over the top of the plot (a 44 px row: the pills are 34 px
+        // tall, the timeframes' touch targets the full 44)
         Positioned(
-          top: 6,
+          top: 1,
           left: 12,
           right: 12,
           child: Row(
@@ -68,7 +71,10 @@ class ChartTab extends ConsumerWidget {
                     children: [
                       SymbolAvatar(symbol, size: 15),
                       const SizedBox(width: 6),
-                      Text(symbol, style: context.text.label.copyWith(fontWeight: FontWeight.w800, fontSize: 13, color: k.fg)),
+                      Text(
+                        symbol,
+                        style: context.text.label.copyWith(fontWeight: FontWeight.w800, fontSize: 13, color: k.fg),
+                      ),
                       const SizedBox(width: 4),
                       Icon(LucideIcons.chevronDown, size: 13, color: k.fg2),
                     ],
@@ -76,45 +82,8 @@ class ChartTab extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Flexible(
-                child: Container(
-                  height: 34,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(color: glass, borderRadius: BorderRadius.circular(17)),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final tf in kTimeframes)
-                          Semantics(
-                            selected: ws.tf == tf,
-                            child: KPressable(
-                              key: ValueKey('chart-tf-$tf'),
-                              minSize: 28,
-                              pressedScale: 1,
-                              semanticLabel: tf,
-                              onTap: () {
-                                KHaptics.selection();
-                                ref.read(workspaceProvider.notifier).update((w) => w.copyWith(tf: tf));
-                              },
-                              child: Container(
-                                height: 28,
-                                constraints: const BoxConstraints(minWidth: 34),
-                                padding: const EdgeInsets.symmetric(horizontal: 6),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(color: ws.tf == tf ? k.ember : Colors.transparent, borderRadius: BorderRadius.circular(14)),
-                                child: Text(
-                                  tf,
-                                  style: context.text.mono(11, weight: FontWeight.w700, color: ws.tf == tf ? k.onEmber : k.fg2),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              // the timeframe on screen (tap: every timeframe) and the starred ones, as many as fit: no sliding
+              Flexible(child: TimeframeBar(glass: glass)),
               const SizedBox(width: 6),
               // chart type, indicators and templates (web chart toolbar)
               Container(
@@ -445,7 +414,10 @@ class _OneClickPillState extends ConsumerState<OneClickPill> {
         Widget side(String s) {
           final buy = s == 'buy';
           final fg = enabled ? Colors.white : k.fg3;
-          final letter = Text(sideLetter(t, s), style: context.text.mono(11, weight: FontWeight.w800, color: fg));
+          final letter = Text(
+            sideLetter(t, s),
+            style: context.text.mono(11, weight: FontWeight.w800, color: fg),
+          );
           final price = PriceText(buy ? (q?.ask ?? 0) : (q?.bid ?? 0), digits: digits, size: 12.5, color: fg, weight: FontWeight.w600);
           return KPressable(
             key: ValueKey('chart-trade-$s'),
@@ -458,10 +430,7 @@ class _OneClickPillState extends ConsumerState<OneClickPill> {
               height: 36,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(color: enabled ? (buy ? k.buyFill : k.sellFill) : k.surface3, borderRadius: BorderRadius.circular(18)),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: buy ? [price, const SizedBox(width: 6), letter] : [letter, const SizedBox(width: 6), price],
-              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: buy ? [price, const SizedBox(width: 6), letter] : [letter, const SizedBox(width: 6), price]),
             ),
           );
         }
@@ -514,7 +483,10 @@ class _OneClickPillState extends ConsumerState<OneClickPill> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (oneClick) Icon(LucideIcons.zap, size: 10, color: k.ember),
-                          Text(fmtVol(_vol), style: context.text.mono(13, weight: FontWeight.w700, color: k.fg)),
+                          Text(
+                            fmtVol(_vol),
+                            style: context.text.mono(13, weight: FontWeight.w700, color: k.fg),
+                          ),
                         ],
                       ),
                     ),

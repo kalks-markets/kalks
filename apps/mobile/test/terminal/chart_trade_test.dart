@@ -88,7 +88,7 @@ void main() {
     expect(chart.top, lessThan(140));
     // the symbol pill and the timeframes float over the top of the plot
     expect(chart.contains(tester.getCenter(find.byKey(const ValueKey('chart-symbol')))), isTrue);
-    expect(chart.contains(tester.getCenter(find.byKey(const ValueKey('chart-tf-M15')))), isTrue);
+    expect(chart.contains(tester.getCenter(find.byKey(const ValueKey('chart-tf')))), isTrue);
     // − / + step the volume by the market's lot step
     await tester.tap(find.byKey(const ValueKey('chart-vol-up')));
     await tester.pump();

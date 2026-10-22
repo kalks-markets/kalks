@@ -57,7 +57,12 @@
     "trader.ticket.more": "More {n} lot",
     "trader.ticket.unitAria": "Stops in price or points",
     "trader.ticket.marginFree": "Margin {margin} · free {free}",
-    "trader.trade.atNow": "at {price} · now {current}"
+    "trader.trade.atNow": "at {price} · now {current}",
+    "trader.tf.minutes": "Minutes",
+    "trader.tf.hours": "Hours",
+    "trader.tf.days": "Days and longer",
+    "trader.tf.current": "Timeframe {tf}, show all timeframes",
+    "trader.tf.hint": "Starred timeframes stay on the chart, one tap away."
   },
   "hi": {
     "unlock.title": "Kalks लॉक है",
@@ -116,7 +121,12 @@
     "trader.ticket.more": "{n} लॉट ज़्यादा",
     "trader.ticket.unitAria": "स्टॉप प्राइस या पॉइंट में",
     "trader.ticket.marginFree": "मार्जिन {margin} · फ़्री {free}",
-    "trader.trade.atNow": "{price} पर · अभी {current}"
+    "trader.trade.atNow": "{price} पर · अभी {current}",
+    "trader.tf.minutes": "मिनट",
+    "trader.tf.hours": "घंटे",
+    "trader.tf.days": "दिन और उससे अधिक",
+    "trader.tf.current": "टाइमफ़्रेम {tf}, सभी टाइमफ़्रेम दिखाएँ",
+    "trader.tf.hint": "स्टार किए गए टाइमफ़्रेम चार्ट पर रहते हैं, बस एक टैप दूर।"
   },
   "ar": {
     "unlock.title": "Kalks مقفل",
@@ -175,7 +185,12 @@
     "trader.ticket.more": "أكثر {n} لوت",
     "trader.ticket.unitAria": "الإيقاف بالسعر أو بالنقاط",
     "trader.ticket.marginFree": "الهامش {margin} · الحر {free}",
-    "trader.trade.atNow": "عند {price} · الآن {current}"
+    "trader.trade.atNow": "عند {price} · الآن {current}",
+    "trader.tf.minutes": "دقائق",
+    "trader.tf.hours": "ساعات",
+    "trader.tf.days": "أيام وأطول",
+    "trader.tf.current": "الإطار الزمني {tf}، عرض كل الأطر الزمنية",
+    "trader.tf.hint": "الأطر الزمنية المميّزة بنجمة تبقى على الرسم البياني بلمسة واحدة."
   },
   "ur": {
     "unlock.title": "Kalks لاک ہے",
@@ -234,7 +249,12 @@
     "trader.ticket.more": "{n} لاٹ زیادہ",
     "trader.ticket.unitAria": "اسٹاپ قیمت یا پوائنٹس میں",
     "trader.ticket.marginFree": "مارجن {margin} · فری {free}",
-    "trader.trade.atNow": "{price} پر · ابھی {current}"
+    "trader.trade.atNow": "{price} پر · ابھی {current}",
+    "trader.tf.minutes": "منٹ",
+    "trader.tf.hours": "گھنٹے",
+    "trader.tf.days": "دن اور اس سے زیادہ",
+    "trader.tf.current": "ٹائم فریم {tf}، تمام ٹائم فریمز دکھائیں",
+    "trader.tf.hint": "ستارہ لگے ٹائم فریمز چارٹ پر رہتے ہیں، بس ایک ٹیپ کی دوری پر۔"
   },
   "fa": {
     "unlock.title": "Kalks قفل است",
@@ -293,7 +313,12 @@
     "trader.ticket.more": "{n} لات بیشتر",
     "trader.ticket.unitAria": "حد ضرر و سود بر اساس قیمت یا پوینت",
     "trader.ticket.marginFree": "مارجین {margin} · آزاد {free}",
-    "trader.trade.atNow": "در {price} · اکنون {current}"
+    "trader.trade.atNow": "در {price} · اکنون {current}",
+    "trader.tf.minutes": "دقیقه",
+    "trader.tf.hours": "ساعت",
+    "trader.tf.days": "روز و بیشتر",
+    "trader.tf.current": "تایم‌فریم {tf}، نمایش همه تایم‌فریم‌ها",
+    "trader.tf.hint": "تایم‌فریم‌های ستاره‌دار روی نمودار می‌مانند، با یک لمس."
   },
   "es": {
     "unlock.title": "Kalks está bloqueado",
@@ -352,7 +377,12 @@
     "trader.ticket.more": "{n} lote más",
     "trader.ticket.unitAria": "Stops en precio o en puntos",
     "trader.ticket.marginFree": "Margen {margin} · libre {free}",
-    "trader.trade.atNow": "a {price} · ahora {current}"
+    "trader.trade.atNow": "a {price} · ahora {current}",
+    "trader.tf.minutes": "Minutos",
+    "trader.tf.hours": "Horas",
+    "trader.tf.days": "Días y más",
+    "trader.tf.current": "Marco temporal {tf}, ver todos",
+    "trader.tf.hint": "Los marcos temporales con estrella quedan en el gráfico, a un toque."
   },
   "pt": {
     "unlock.title": "O Kalks está bloqueado",
@@ -411,7 +441,12 @@
     "trader.ticket.more": "{n} lote a mais",
     "trader.ticket.unitAria": "Stops em preço ou em pontos",
     "trader.ticket.marginFree": "Margem {margin} · livre {free}",
-    "trader.trade.atNow": "a {price} · agora {current}"
+    "trader.trade.atNow": "a {price} · agora {current}",
+    "trader.tf.minutes": "Minutos",
+    "trader.tf.hours": "Horas",
+    "trader.tf.days": "Dias e mais",
+    "trader.tf.current": "Período {tf}, ver todos os períodos",
+    "trader.tf.hint": "Os períodos com estrela ficam no gráfico, a um toque."
   },
   "fr": {
     "unlock.title": "Kalks est verrouillé",
@@ -470,7 +505,12 @@
     "trader.ticket.more": "{n} lot de plus",
     "trader.ticket.unitAria": "Stops en prix ou en points",
     "trader.ticket.marginFree": "Marge {margin} · libre {free}",
-    "trader.trade.atNow": "à {price} · actuel {current}"
+    "trader.trade.atNow": "à {price} · actuel {current}",
+    "trader.tf.minutes": "Minutes",
+    "trader.tf.hours": "Heures",
+    "trader.tf.days": "Jours et plus",
+    "trader.tf.current": "Période {tf}, voir toutes les périodes",
+    "trader.tf.hint": "Les périodes étoilées restent sur le graphique, à portée de doigt."
   },
   "de": {
     "unlock.title": "Kalks ist gesperrt",
@@ -529,7 +569,12 @@
     "trader.ticket.more": "{n} Lot mehr",
     "trader.ticket.unitAria": "Stops als Preis oder Punkte",
     "trader.ticket.marginFree": "Margin {margin} · frei {free}",
-    "trader.trade.atNow": "bei {price} · jetzt {current}"
+    "trader.trade.atNow": "bei {price} · jetzt {current}",
+    "trader.tf.minutes": "Minuten",
+    "trader.tf.hours": "Stunden",
+    "trader.tf.days": "Tage und länger",
+    "trader.tf.current": "Zeitrahmen {tf}, alle Zeitrahmen anzeigen",
+    "trader.tf.hint": "Markierte Zeitrahmen bleiben am Chart, nur einen Tipp entfernt."
   },
   "it": {
     "unlock.title": "Kalks è bloccato",
@@ -588,7 +633,12 @@
     "trader.ticket.more": "{n} lotto in più",
     "trader.ticket.unitAria": "Stop in prezzo o in punti",
     "trader.ticket.marginFree": "Margine {margin} · libero {free}",
-    "trader.trade.atNow": "a {price} · ora {current}"
+    "trader.trade.atNow": "a {price} · ora {current}",
+    "trader.tf.minutes": "Minuti",
+    "trader.tf.hours": "Ore",
+    "trader.tf.days": "Giorni e oltre",
+    "trader.tf.current": "Timeframe {tf}, mostra tutti i timeframe",
+    "trader.tf.hint": "I timeframe con la stella restano sul grafico, a un tocco."
   },
   "ru": {
     "unlock.title": "Kalks заблокирован",
@@ -647,7 +697,12 @@
     "trader.ticket.more": "Больше на {n} лота",
     "trader.ticket.unitAria": "Стопы в цене или пунктах",
     "trader.ticket.marginFree": "Маржа {margin} · свободно {free}",
-    "trader.trade.atNow": "по {price} · сейчас {current}"
+    "trader.trade.atNow": "по {price} · сейчас {current}",
+    "trader.tf.minutes": "Минуты",
+    "trader.tf.hours": "Часы",
+    "trader.tf.days": "Дни и больше",
+    "trader.tf.current": "Таймфрейм {tf}, показать все таймфреймы",
+    "trader.tf.hint": "Отмеченные звёздочкой таймфреймы остаются на графике — в одно касание."
   },
   "tr": {
     "unlock.title": "Kalks kilitli",
@@ -706,7 +761,12 @@
     "trader.ticket.more": "{n} lot fazla",
     "trader.ticket.unitAria": "Stoplar fiyat veya puan olarak",
     "trader.ticket.marginFree": "Teminat {margin} · serbest {free}",
-    "trader.trade.atNow": "{price} seviyesinde · şimdi {current}"
+    "trader.trade.atNow": "{price} seviyesinde · şimdi {current}",
+    "trader.tf.minutes": "Dakikalar",
+    "trader.tf.hours": "Saatler",
+    "trader.tf.days": "Gün ve üzeri",
+    "trader.tf.current": "Zaman dilimi {tf}, tüm zaman dilimlerini göster",
+    "trader.tf.hint": "Yıldızlı zaman dilimleri grafikte kalır, tek dokunuşla."
   },
   "id": {
     "unlock.title": "Kalks terkunci",
@@ -765,7 +825,12 @@
     "trader.ticket.more": "Tambah {n} lot",
     "trader.ticket.unitAria": "Stop dalam harga atau poin",
     "trader.ticket.marginFree": "Margin {margin} · bebas {free}",
-    "trader.trade.atNow": "di {price} · kini {current}"
+    "trader.trade.atNow": "di {price} · kini {current}",
+    "trader.tf.minutes": "Menit",
+    "trader.tf.hours": "Jam",
+    "trader.tf.days": "Hari dan lebih lama",
+    "trader.tf.current": "Timeframe {tf}, tampilkan semua timeframe",
+    "trader.tf.hint": "Timeframe berbintang tetap ada di grafik, cukup sekali ketuk."
   },
   "ms": {
     "unlock.title": "Kalks dikunci",
@@ -824,7 +889,12 @@
     "trader.ticket.more": "Tambah {n} lot",
     "trader.ticket.unitAria": "Stop dalam harga atau mata",
     "trader.ticket.marginFree": "Margin {margin} · bebas {free}",
-    "trader.trade.atNow": "pada {price} · kini {current}"
+    "trader.trade.atNow": "pada {price} · kini {current}",
+    "trader.tf.minutes": "Minit",
+    "trader.tf.hours": "Jam",
+    "trader.tf.days": "Hari dan lebih lama",
+    "trader.tf.current": "Jangka masa {tf}, tunjukkan semua jangka masa",
+    "trader.tf.hint": "Jangka masa berbintang kekal pada carta, hanya sekali ketik."
   },
   "vi": {
     "unlock.title": "Kalks đang bị khóa",
@@ -883,7 +953,12 @@
     "trader.ticket.more": "Thêm {n} lot",
     "trader.ticket.unitAria": "Dừng theo giá hoặc điểm",
     "trader.ticket.marginFree": "Ký quỹ {margin} · còn trống {free}",
-    "trader.trade.atNow": "tại {price} · hiện {current}"
+    "trader.trade.atNow": "tại {price} · hiện {current}",
+    "trader.tf.minutes": "Phút",
+    "trader.tf.hours": "Giờ",
+    "trader.tf.days": "Ngày trở lên",
+    "trader.tf.current": "Khung thời gian {tf}, xem tất cả khung thời gian",
+    "trader.tf.hint": "Khung thời gian gắn sao luôn nằm trên biểu đồ, chỉ cần một chạm."
   },
   "th": {
     "unlock.title": "Kalks ถูกล็อกอยู่",
@@ -942,7 +1017,12 @@
     "trader.ticket.more": "เพิ่ม {n} ล็อต",
     "trader.ticket.unitAria": "จุดหยุดเป็นราคาหรือพอยต์",
     "trader.ticket.marginFree": "มาร์จิ้น {margin} · ว่าง {free}",
-    "trader.trade.atNow": "ที่ {price} · ตอนนี้ {current}"
+    "trader.trade.atNow": "ที่ {price} · ตอนนี้ {current}",
+    "trader.tf.minutes": "นาที",
+    "trader.tf.hours": "ชั่วโมง",
+    "trader.tf.days": "วันขึ้นไป",
+    "trader.tf.current": "ไทม์เฟรม {tf} แสดงไทม์เฟรมทั้งหมด",
+    "trader.tf.hint": "ไทม์เฟรมที่ติดดาวจะอยู่บนกราฟ แตะเพียงครั้งเดียว"
   },
   "zh": {
     "unlock.title": "Kalks 已锁定",
@@ -1001,7 +1081,12 @@
     "trader.ticket.more": "增加 {n} 手",
     "trader.ticket.unitAria": "止损止盈按价格或点数",
     "trader.ticket.marginFree": "保证金 {margin} · 可用 {free}",
-    "trader.trade.atNow": "挂单 {price} · 现价 {current}"
+    "trader.trade.atNow": "挂单 {price} · 现价 {current}",
+    "trader.tf.minutes": "分钟",
+    "trader.tf.hours": "小时",
+    "trader.tf.days": "日及以上",
+    "trader.tf.current": "时间周期 {tf}，显示全部时间周期",
+    "trader.tf.hint": "加星的时间周期会留在图表上，一点即达。"
   },
   "ja": {
     "unlock.title": "Kalks はロックされています",
@@ -1060,7 +1145,12 @@
     "trader.ticket.more": "{n} ロット増やす",
     "trader.ticket.unitAria": "決済逆指値・指値を価格かポイントで",
     "trader.ticket.marginFree": "証拠金 {margin} · 余剰 {free}",
-    "trader.trade.atNow": "{price} で注文 · 現在 {current}"
+    "trader.trade.atNow": "{price} で注文 · 現在 {current}",
+    "trader.tf.minutes": "分足",
+    "trader.tf.hours": "時間足",
+    "trader.tf.days": "日足以上",
+    "trader.tf.current": "時間足 {tf}、すべての時間足を表示",
+    "trader.tf.hint": "スターを付けた時間足はチャート上に並び、ワンタップで切り替えられます。"
   },
   "ko": {
     "unlock.title": "Kalks가 잠겨 있습니다",
@@ -1119,7 +1209,12 @@
     "trader.ticket.more": "{n}랏 늘리기",
     "trader.ticket.unitAria": "가격 또는 포인트로 손절·익절",
     "trader.ticket.marginFree": "증거금 {margin} · 여유 {free}",
-    "trader.trade.atNow": "{price}에 · 현재 {current}"
+    "trader.trade.atNow": "{price}에 · 현재 {current}",
+    "trader.tf.minutes": "분",
+    "trader.tf.hours": "시간",
+    "trader.tf.days": "일 이상",
+    "trader.tf.current": "타임프레임 {tf}, 모든 타임프레임 보기",
+    "trader.tf.hint": "별표한 타임프레임은 차트에 남아 한 번에 전환할 수 있습니다."
   },
   "bn": {
     "unlock.title": "Kalks লক করা আছে",
@@ -1178,7 +1273,12 @@
     "trader.ticket.more": "{n} লট বেশি",
     "trader.ticket.unitAria": "স্টপ দাম বা পয়েন্টে",
     "trader.ticket.marginFree": "মার্জিন {margin} · ফ্রি {free}",
-    "trader.trade.atNow": "{price}-এ · এখন {current}"
+    "trader.trade.atNow": "{price}-এ · এখন {current}",
+    "trader.tf.minutes": "মিনিট",
+    "trader.tf.hours": "ঘণ্টা",
+    "trader.tf.days": "দিন ও তার বেশি",
+    "trader.tf.current": "টাইমফ্রেম {tf}, সব টাইমফ্রেম দেখুন",
+    "trader.tf.hint": "তারকা দেওয়া টাইমফ্রেম চার্টে থাকে, মাত্র এক ট্যাপে।"
   },
   "ta": {
     "unlock.title": "Kalks பூட்டப்பட்டுள்ளது",
@@ -1237,7 +1337,12 @@
     "trader.ticket.more": "{n} லாட் அதிகம்",
     "trader.ticket.unitAria": "ஸ்டாப் விலையில் அல்லது புள்ளிகளில்",
     "trader.ticket.marginFree": "மார்ஜின் {margin} · இலவசம் {free}",
-    "trader.trade.atNow": "{price}-இல் · இப்போது {current}"
+    "trader.trade.atNow": "{price}-இல் · இப்போது {current}",
+    "trader.tf.minutes": "நிமிடங்கள்",
+    "trader.tf.hours": "மணிநேரங்கள்",
+    "trader.tf.days": "நாட்கள் மற்றும் அதற்கு மேல்",
+    "trader.tf.current": "டைம்ஃப்ரேம் {tf}, எல்லா டைம்ஃப்ரேம்களையும் காட்டு",
+    "trader.tf.hint": "நட்சத்திரமிட்ட டைம்ஃப்ரேம்கள் விளக்கப்படத்தில் இருக்கும், ஒரே தட்டலில்."
   },
   "sw": {
     "unlock.title": "Kalks imefungwa",
@@ -1296,6 +1401,11 @@
     "trader.ticket.more": "Ongeza loti {n}",
     "trader.ticket.unitAria": "Stop kwa bei au pointi",
     "trader.ticket.marginFree": "Margin {margin} · huru {free}",
-    "trader.trade.atNow": "kwa {price} · sasa {current}"
+    "trader.trade.atNow": "kwa {price} · sasa {current}",
+    "trader.tf.minutes": "Dakika",
+    "trader.tf.hours": "Saa",
+    "trader.tf.days": "Siku na zaidi",
+    "trader.tf.current": "Kipindi cha muda {tf}, onyesha vipindi vyote",
+    "trader.tf.hint": "Vipindi vyenye nyota hubaki kwenye chati, kwa mguso mmoja."
   }
 }
