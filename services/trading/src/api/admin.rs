@@ -12,8 +12,8 @@ use super::dealing::{Reason, audit_now, check_reason};
 use super::{ApiError, ApiResult, AppState, Body, ROLES_CONFIG, ROLES_DEALING, ROLES_FINANCE, ROLES_FORCE, StaffCtx};
 use crate::engine::AuditDraft;
 use crate::engine::funds::{self, AdjustKind};
-use crate::model::{Book, Mode, Status};
-use crate::money::{D, de_dec, num, r2};
+use crate::model::{AccountKind, Book, Mode, Status};
+use crate::money::{D, ZERO, de_dec, num, r2};
 use crate::persist::{self, AuditRow};
 use crate::rules::Group;
 use crate::shard::{ExecError, Op};
@@ -377,18 +377,24 @@ pub struct ArchiveBody {
     /// Cancel orders and close positions first (as a dealer close). Without it the account must be flat.
     #[serde(default)]
     empty: bool,
+    /// Staff confirmed that the credit and bonus on the account are forfeited (needed when either is above 0).
+    #[serde(default)]
+    ack_forfeit: bool,
     #[serde(flatten)]
     reason: Reason,
 }
 
-/// Staff archive (C1): reason code + note, audited. The balance stays on the account (no wallet transfer);
-/// credit and bonus are forfeited.
+/// Staff archive (C1): reason code + note, audited. Staff never move money (as with Close permanently in
+/// closures.rs): a live account that still holds a balance is refused (`balance_remaining`) and must be emptied
+/// first, by the client (Client Area archive / transfer to wallet) or through Balance & credit. Credit and bonus
+/// are forfeited, only with `ackForfeit`. Checked after the optional `empty` closes, in the same command, so a
+/// refusal leaves the account untouched.
 pub async fn archive(State(st): State<AppState>, s: StaffCtx, Path(login): Path<i64>, Body(b): Body<ArchiveBody>) -> ApiResult<Json<Value>> {
     s.require(ROLES_DEALING)?;
     check_reason(&b.reason)?;
     let by = format!("staff:{}", s.staff.id);
     let dealer = crate::engine::trade::DealerCtx { staff: s.staff.name.clone(), reason_code: b.reason.reason_code.clone(), force: false };
-    let (code, restorable, empty) = (b.reason.reason_code.clone(), b.client_restorable, b.empty);
+    let (code, restorable, empty, ack_forfeit) = (b.reason.reason_code.clone(), b.client_restorable, b.empty, b.ack_forfeit);
     let op: Op = Box::new(move |tx, env| {
         let before = json!({"status": tx.st.account.status.as_str(), "positions": tx.st.positions.len(), "orders": tx.st.orders.len(), "credit": num(tx.st.credit), "bonus": num(tx.st.bonus)});
         let mut closed = 0;
@@ -401,6 +407,18 @@ pub async fn archive(State(st): State<AppState>, s: StaffCtx, Path(login): Path<
             for t in tickets {
                 crate::engine::trade::close_position(tx, env, t, crate::engine::trade::CloseReq { dealer: Some(dealer.clone()), ..Default::default() })?;
                 closed += 1;
+            }
+        }
+        if !tx.st.account.status.is_retired() {
+            let ccy = tx.st.account.ccy();
+            if tx.st.account.kind == AccountKind::Live && r2(tx.st.balance) != ZERO {
+                return Err(crate::engine::Reject::new(
+                    "balance_remaining",
+                    format!("The account still holds {} {ccy}. Staff archive never moves money: have the client move it to their wallet, or withdraw / adjust it through Balance & credit, then archive (or use Close permanently)", r2(tx.st.balance).normalize()),
+                ));
+            }
+            if (tx.st.credit > ZERO || tx.st.bonus > ZERO) && !ack_forfeit {
+                return Err(crate::engine::Reject::new("forfeit_unconfirmed", format!("Credit {} and bonus {} {ccy} are forfeited when the account is archived; confirm to continue", r2(tx.st.credit).normalize(), r2(tx.st.bonus).normalize())));
             }
         }
         let changed = funds::archive(tx, env, &by, &code, restorable)?;

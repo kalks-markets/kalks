@@ -463,3 +463,53 @@ async fn closure_queue_four_eyes_reopen_and_jobs() {
         assert_eq!(serde_json::to_value(&replayed[&l]).unwrap(), snapshot(&hub, l).await, "replay diverged for {l}");
     }
 }
+
+/// Staff archive (Trading › Accounts › Archive) never moves money: a live account that still holds a balance is
+/// refused (staff send the client to the closure flow / Balance & credit instead), and credit / bonus are forfeited
+/// only when the request says so (`ackForfeit`). Demo balances are virtual and don't block.
+#[tokio::test]
+async fn staff_archive_refuses_balance_and_asks_before_forfeit() {
+    use trading::api::admin;
+    let Some((st, _quotes, pool)) = setup("starchive").await else { return };
+    let hub = st.hub.clone();
+    let c = ctx(&st).await;
+    let live_g = c.tenant.groups.values().filter(|g| g.enabled && g.allows("live") && !g.cent && !g.code.starts_with("prop") && !["copy", "copy-netting", "pamm", "mam"].contains(&g.code.as_str())).min_by_key(|g| g.code.clone()).expect("a live group").clone();
+    let a = open_live(&st, &live_g.code).await;
+    let dec = |v: &Value| -> D { v.as_str().map(|s| s.parse().unwrap()).or_else(|| v.as_f64().map(|f| D::try_from(f).unwrap())).unwrap() };
+
+    // 25 balance + 40 credit
+    let op: Op = Box::new(|tx, env| trading::engine::funds::transfer(tx, env, trading::engine::funds::Direction::In, D::from(25), "t-in", None).map(|_| Value::Null));
+    hub.exec(a, "test", None, "", "", None, op).await.unwrap();
+    let op: Op = Box::new(|tx, env| trading::engine::funds::adjust(tx, env, trading::engine::funds::AdjustKind::Credit, D::from(40), "t-credit", "TEST", "credit").map(|_| Value::Null));
+    hub.exec(a, "test", None, "", "", None, op).await.unwrap();
+
+    // a balance on a live account: refused, even with the forfeit confirmed; nothing changes
+    let e = admin::archive(State(st.clone()), staff(&st, ctx(&st).await, "9", "dealer"), Path(a), body(json!({"reasonCode": "ARC-03", "note": "dup", "ackForfeit": true}))).await.unwrap_err();
+    assert_eq!(err_code(e), "balance_remaining");
+    let snap = snapshot(&hub, a).await;
+    assert_eq!((snap["account"]["status"].as_str(), dec(&snap["balance"]), dec(&snap["credit"])), (Some("active"), D::from(25), D::from(40)), "{snap}");
+
+    // balance gone; credit left: refused until the forfeit is confirmed
+    let op: Op = Box::new(|tx, env| trading::engine::funds::transfer(tx, env, trading::engine::funds::Direction::Out, D::from(25), "t-out", None).map(|_| Value::Null));
+    hub.exec(a, "test", None, "", "", None, op).await.unwrap();
+    let e = admin::archive(State(st.clone()), staff(&st, ctx(&st).await, "9", "dealer"), Path(a), body(json!({"reasonCode": "ARC-03", "note": "dup"}))).await.unwrap_err();
+    assert_eq!(err_code(e), "forfeit_unconfirmed");
+    let snap = snapshot(&hub, a).await;
+    assert_eq!((snap["account"]["status"].as_str(), dec(&snap["credit"])), (Some("active"), D::from(40)), "{snap}");
+    let ok = admin::archive(State(st.clone()), staff(&st, ctx(&st).await, "9", "dealer"), Path(a), body(json!({"reasonCode": "ARC-03", "note": "dup", "ackForfeit": true}))).await.unwrap().0;
+    assert_eq!(ok["data"]["changed"], json!(true), "{ok}");
+    let snap = snapshot(&hub, a).await;
+    assert_eq!((snap["account"]["status"].as_str(), dec(&snap["credit"])), (Some("archived"), D::ZERO), "{snap}");
+
+    // a demo with its virtual balance archives without any confirmation
+    let demo_g = c.tenant.groups.values().filter(|g| g.enabled && g.allows("demo") && !g.cent && !g.code.starts_with("prop")).min_by_key(|g| g.code.clone()).unwrap().clone();
+    let d = open_demo(&st, &demo_g.code).await.unwrap();
+    assert!(dec(&snapshot(&hub, d).await["balance"]) > D::ZERO);
+    let ok = admin::archive(State(st.clone()), staff(&st, ctx(&st).await, "9", "dealer"), Path(d), body(json!({"reasonCode": "ARC-05", "note": ""}))).await.unwrap().0;
+    assert_eq!(ok["data"]["changed"], json!(true), "{ok}");
+
+    let replayed = trading::persist::replay_all(&pool).await.unwrap();
+    for l in [a, d] {
+        assert_eq!(serde_json::to_value(&replayed[&l]).unwrap(), snapshot(&hub, l).await, "replay diverged for {l}");
+    }
+}

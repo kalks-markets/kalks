@@ -66,7 +66,8 @@ const ROUTES: Route[] = [
   { method: "GET", re: new RegExp(`^admin/accounts/${T}$`), perm: "accounts.read" },
   { method: "POST", re: new RegExp(`^admin/accounts/${T}/balance$`), perm: "finance.adjust" },
   { method: "POST", re: new RegExp(`^admin/accounts/${T}/(status|group|leverage)$`), perm: "accounts.write" },
-  // lifecycle: archive (optionally emptied first: trades closed, balance to wallet) and restore; reason-coded, audited
+  // lifecycle: archive (optionally trades closed first; never moves money: refused while a live balance remains,
+  // credit / bonus forfeit needs ackForfeit) and restore; reason-coded, audited
   { method: "POST", re: new RegExp(`^admin/accounts/${T}/(archive|restore)$`), perm: "accounts.write" },
   // close permanently (B12, C2, C3, C5, C11, C12): staff requests, the closure queue, reopen (Super Admin, checked by
   // the engine), the exit-reasons report; account policy; bulk archive (C4)

@@ -587,6 +587,7 @@ export function AccountActions({ act, onClose, onDone }: { act: Act; onClose: ()
   const [ctl, setCtl] = React.useState({ tradingDisabled: false, closeOnly: false, maxLot: "", execDelayMs: "0", markupPips: "0" });
   const [empty, setEmpty] = React.useState(false);
   const [clientRestorable, setClientRestorable] = React.useState(true);
+  const [ackForfeit, setAckForfeit] = React.useState(false);
   React.useEffect(() => {
     if (!a) return;
     setFType("bonus");
@@ -596,6 +597,7 @@ export function AccountActions({ act, onClose, onDone }: { act: Act; onClose: ()
     setStatus(LIFECYCLE_STATUSES.includes(a.status) ? "active" : a.status);
     setEmpty(false);
     setClientRestorable(true);
+    setAckForfeit(false);
     setGrp(a.group);
     setLev(String(a.leverage));
     setCtl({ tradingDisabled: a.controls.tradingDisabled, closeOnly: a.controls.closeOnly, maxLot: a.controls.maxLot ? String(a.controls.maxLot) : "", execDelayMs: String(a.controls.execDelayMs), markupPips: String(a.controls.markupPips) });
@@ -618,6 +620,9 @@ export function AccountActions({ act, onClose, onDone }: { act: Act; onClose: ()
   // an account never changes product (the engine refuses a CFD ↔ Options move)
   const groupsFor = dir.groups.filter((g) => g.enabled && (g.accountTypes === "both" || g.accountTypes === a.type) && g.cent === a.cent && productOf(g) === productOf(a));
   const levList = dir.groups.find((g) => g.code === a.group)?.leverages ?? a.leverages;
+  // staff archive never moves money (engine: balance_remaining); credit and bonus are forfeited only when confirmed
+  const archiveBalance = a.type === "live" && Math.round(a.balance * 100) !== 0;
+  const forfeit = Math.max(0, a.credit) + Math.max(0, a.bonus);
   const delayOn = state.tenant.execDelayEnabled;
   const after = fType === "credit" ? a.credit + signedAmt : fType === "bonus" ? a.bonus + signedAmt : a.balance + signedAmt;
 
@@ -682,9 +687,17 @@ export function AccountActions({ act, onClose, onDone }: { act: Act; onClose: ()
         codes={ACC_ARCHIVE_REASONS}
         confirmLabel="Archive account"
         confirmVariant="sell"
-        disabled={!empty && (a.positions > 0 || a.orders > 0) ? `${a.positions} open position(s) · ${a.orders} order(s): turn on “Close open trades” or close them first` : false}
-        onConfirm={async (r) => done(await tradingWrite(`admin/accounts/${a.login}/archive`, { empty, clientRestorable }, r, rest))}
-        success={`${a.login} archived${empty ? " · trades closed, balance moved to the wallet" : ""}`}
+        disabled={
+          archiveBalance
+            ? `${money2(a.balance, ccy)} is still on the account and staff archive never moves money: the client moves it to their wallet, or withdraw it with Balance & credit first (or use Close permanently)`
+            : !empty && (a.positions > 0 || a.orders > 0)
+              ? `${a.positions} open position(s) · ${a.orders} order(s): turn on “Close open trades” or close them first`
+              : forfeit > 0 && !ackForfeit
+                ? `Confirm that ${money2(forfeit, ccy)} of credit and bonus is forfeited`
+                : false
+        }
+        onConfirm={async (r) => done(await tradingWrite(`admin/accounts/${a.login}/archive`, { empty, clientRestorable, ackForfeit: forfeit > 0 && ackForfeit }, r, rest))}
+        success={`${a.login} archived${empty ? " · trades closed" : ""}${forfeit > 0 ? ` · ${money2(forfeit, ccy)} credit and bonus forfeited` : ""}`}
       >
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-2">
@@ -694,13 +707,31 @@ export function AccountActions({ act, onClose, onDone }: { act: Act; onClose: ()
           </div>
           <label className="flex items-start justify-between gap-3 rounded-[12px] border border-line bg-surface-2/60 px-3 py-2.5 text-[12.5px]">
             <span>
-              <span className="block font-medium">Close open trades and move balance to wallet first</span>
+              <span className="block font-medium">Close open trades first</span>
               <span className="block text-[11.5px] text-fg-3">
-                {a.type === "demo" ? "Closes positions and cancels orders at market; the demo balance is virtual and is not moved." : `Closes positions and cancels orders at market, then moves the balance to the client's wallet. Credit and bonus are forfeited${a.credit || a.bonus ? ` (${money2(a.credit + a.bonus, ccy)})` : ""}.`}
+                {a.type === "demo"
+                  ? "Closes positions and cancels orders at market; the demo balance is virtual and stays on the archived account."
+                  : "Closes positions and cancels orders at market (dealer close). Nothing is moved to the wallet: if a balance remains after closing, the engine refuses the archive and the trades stay open."}
               </span>
             </span>
-            <Toggle checked={empty} onChange={setEmpty} label="Close open trades and move balance to wallet first" />
+            <Toggle checked={empty} onChange={setEmpty} label="Close open trades first" />
           </label>
+          {archiveBalance && (
+            <div className="rounded-[12px] border border-warn/40 bg-warn-soft px-3 py-2.5 text-[12px] text-fg-2">
+              This live account still holds {money2(a.balance, ccy)}. Archiving never transfers money to the client&apos;s wallet and never writes it off. Ask the client to move it to their wallet (or archive it themselves in the Client Area, which does the transfer), withdraw it with Balance &amp; credit, or use Close permanently.
+            </div>
+          )}
+          {forfeit > 0 && (
+            <label className="flex items-start justify-between gap-3 rounded-[12px] border border-down/40 bg-down-soft px-3 py-2.5 text-[12.5px]">
+              <span>
+                <span className="block font-medium">Forfeit {money2(forfeit, ccy)} of credit and bonus</span>
+                <span className="block text-[11.5px] text-fg-3">
+                  Credit {money2(a.credit, ccy)} · bonus {money2(a.bonus, ccy)} are removed from the account when it is archived and do not come back on restore.
+                </span>
+              </span>
+              <Toggle checked={ackForfeit} onChange={setAckForfeit} label={`Forfeit ${money2(forfeit, ccy)} of credit and bonus`} />
+            </label>
+          )}
           <label className="flex items-start justify-between gap-3 rounded-[12px] border border-line bg-surface-2/60 px-3 py-2.5 text-[12.5px]">
             <span>
               <span className="block font-medium">Client may restore it themselves</span>
