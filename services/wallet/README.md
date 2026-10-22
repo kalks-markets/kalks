@@ -81,7 +81,7 @@ Newest first. `amount` is the signed change to the client's total (available + l
 
 - **Base URL** `http://127.0.0.1:8095`. JSON in and out, snake_case keys. Every route except `GET /health` needs `X-Kalks-Internal`.
 - **Money.** Amounts are decimal **strings** in responses. Requests accept a string or a JSON number. The service never uses floats. USDT is USD 1:1 (D35).
-- **Staff.** Back Office routes need the staff identity that the admin BFF verified with the gateway: `X-Kalks-Staff-Id`, `X-Kalks-Staff-Name` (percent-encoded), `X-Kalks-Staff-Role`. The service checks the role again (see [Back Office API](#back-office-api)).
+- **Staff.** Back Office routes need the staff identity that the admin BFF verified with the gateway: `X-Kalks-Staff-Id`, `X-Kalks-Staff-Name` (percent-encoded), `X-Kalks-Staff-Role`, `X-Kalks-Staff-Perms` (the gateway permission keys). The service checks the permission again (see [Back Office API](#back-office-api)).
 - **Client context.** Forward the client IP as `X-Forwarded-For` and the user agent as `User-Agent`. Withdrawals record both.
 - **Errors.** `{"error": {"code", "message", "field"?}}`
 
@@ -229,7 +229,7 @@ An unreachable gateway refuses these operations (503 `unavailable`); a replayed 
 
 ## Back Office API
 
-The service checks the role on every staff route. The admin app maps them to `finance.*` permissions (`apps/admin/lib/wallet-perms.ts`).
+The service checks the `finance.*` permission key on every staff route, from `X-Kalks-Staff-Perms` (so a custom role gets exactly what it was granted). Without that header (older callers) it checks the role with the map below; Super Admin and Platform Owner are always allowed. The admin BFF checks the same keys first (`apps/admin/lib/wallet-perms.ts`).
 
 | Permission | Roles | Routes |
 |---|---|---|

@@ -408,3 +408,39 @@ async fn module_switch_refuses_the_client_routes() {
     let r = http.get(format!("{base}/v1/admin/overview")).header("x-kalks-tenant", "qa-prop-off").header("x-kalks-staff-id", "1").header("x-kalks-staff-role", "admin").send().await.unwrap();
     assert_ne!(r.status().as_u16(), 403);
 }
+
+/// Staff routes check the permission keys the admin BFF forwards (`X-Kalks-Staff-Perms`), so a custom role gets
+/// exactly what it was granted whatever built-in role name it is sent with; without the header the role decides.
+/// No database is reached: the check runs first, so "allowed" shows as anything but 403.
+#[tokio::test]
+async fn staff_routes_check_permission_keys() {
+    let pool = sqlx::postgres::PgPoolOptions::new().acquire_timeout(std::time::Duration::from_millis(300)).connect_lazy("postgres://postgres@127.0.0.1:1/kalks_prop_unused").unwrap();
+    let app = Arc::new(Svc::new(config("postgres://postgres@127.0.0.1:1/x", "http://127.0.0.1:1"), pool, None));
+    prop::modules::prime("qa-prop-perms", "prop", true);
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", l.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(l, prop::api::router(app)).await.unwrap() });
+    let http = reqwest::Client::new();
+    let status = |path: &str, role: &str, perms: Option<&str>| {
+        let mut rb = http.post(format!("{base}{path}")).header("x-kalks-tenant", "qa-prop-perms").header("x-kalks-staff-id", "3").header("x-kalks-staff-role", role).json(&json!({"action": "fail", "note": "ok", "reason": "Manual review"}));
+        if let Some(p) = perms {
+            rb = rb.header("x-kalks-staff-perms", p);
+        }
+        async move { rb.send().await.unwrap().status().as_u16() }
+    };
+    let approve = "/v1/admin/payouts/1/approve";
+    let fail = "/v1/admin/challenges/1/override";
+    // custom "Prop payouts" role, sent as viewer (which can't approve by role): may approve, may not write
+    assert_ne!(status(approve, "viewer", Some("prop.read,prop.approve")).await, 403);
+    assert_eq!(status(fail, "viewer", Some("prop.read,prop.approve")).await, 403);
+    // custom "Prop desk" role with prop.write, sent as support
+    assert_ne!(status(fail, "support", Some("prop.read,prop.write")).await, 403);
+    // the role name no longer grants what the keys don't
+    assert_eq!(status(approve, "risk_manager", Some("prop.read,prop.write")).await, 403);
+    assert_eq!(status(approve, "admin", Some("-")).await, 403);
+    // Super Admin / Platform Owner keep full access; without the header (older BFF) the role decides
+    assert_ne!(status(approve, "super_admin", Some("-")).await, 403);
+    assert_ne!(status(approve, "platform_owner", None).await, 403);
+    assert_ne!(status(approve, "finance", None).await, 403);
+    assert_eq!(status(approve, "viewer", None).await, 403);
+}

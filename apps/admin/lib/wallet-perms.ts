@@ -4,8 +4,9 @@
  *
  * The gateway's role → permission matrix (services/gateway/src/admin.rs) has no finance permissions yet, so the
  * admin BFF owns this map, like lib/trading-perms.ts does for trading. It mirrors the role checks the wallet
- * service enforces itself (services/wallet/src/state.rs: ROLES_READ / ROLES_WRITE / ROLES_APPROVE /
- * ROLES_SETTINGS); the BFF checks first and the UI hides what the role can't use.
+ * service falls back to (services/wallet/src/state.rs: ROLES_READ / ROLES_WRITE / ROLES_APPROVE /
+ * ROLES_SETTINGS); the BFF checks first and the UI hides what the role can't use. The service checks the exact
+ * keys forwarded in `x-kalks-staff-perms` (financePerms below).
  *
  * When the gateway starts returning these for a role (any "finance.read" entry in `/v1/admin/auth/me` →
  * permissions), that list wins and this map is no longer consulted. To move them into the gateway, add

@@ -101,6 +101,26 @@ impl T {
         let status = r.status().as_u16();
         (status, r.json().await.unwrap_or(Value::Null))
     }
+    /// As a staff member whose BFF forwarded the gateway permission keys (`X-Kalks-Staff-Perms`).
+    async fn with_perms(&self, role: &str, perms: &str, method: &str, path: &str, body: Option<Value>) -> (u16, Value) {
+        let mut rb = match method {
+            "GET" => self.http.get(format!("{}{path}", self.base)),
+            "PUT" => self.http.put(format!("{}{path}", self.base)),
+            _ => self.http.post(format!("{}{path}", self.base)),
+        };
+        rb = rb
+            .header("x-kalks-internal", "test-internal-token")
+            .header("x-kalks-staff-id", "9")
+            .header("x-kalks-staff-name", "Desk")
+            .header("x-kalks-staff-role", role)
+            .header("x-kalks-staff-perms", perms);
+        if let Some(b) = body {
+            rb = rb.json(&b);
+        }
+        let r = rb.send().await.unwrap();
+        let status = r.status().as_u16();
+        (status, r.json().await.unwrap_or(Value::Null))
+    }
     async fn get(&self, path: &str) -> (u16, Value) {
         self.call("GET", path, None, None).await
     }
@@ -514,6 +534,58 @@ async fn withdrawals_cannot_be_rejected_after_approval() {
         let (s, _) = reject(w).await;
         assert_eq!(s, 409, "a second reject never refunds again");
     }
+    t.invariants().await;
+    t.drop_db().await;
+}
+
+/// Back Office routes check the forwarded permission keys, so a custom role (sent with the covering built-in role
+/// name from the gateway) gets exactly what it was granted; the role decides only when no keys were forwarded.
+#[tokio::test]
+async fn back_office_routes_check_permission_keys() {
+    let Some(t) = T::new("permission keys").await else { return };
+    t.credit(7, "500", "seed-7").await;
+    t.users.set(7, "verified");
+    let req = |key: &str| json!({"user_id": 7, "amount": "20", "chain": "tron", "to_address": CLIENT_TRON, "idempotency_key": key});
+    let (_, v) = t.post("/v1/withdrawals", req("p1")).await;
+    let w1 = v["withdrawal"]["id"].as_i64().unwrap();
+    let (_, v) = t.post("/v1/withdrawals", req("p2")).await;
+    let w2 = v["withdrawal"]["id"].as_i64().unwrap();
+
+    // a custom "Payouts desk" role: read + approve, nothing else (sent as compliance, which can't approve by role)
+    let desk = "finance.read,finance.approve";
+    let (s, v) = t.with_perms("compliance", desk, "GET", "/v1/admin/withdrawals", None).await;
+    assert_eq!(s, 200, "{v}");
+    let (s, v) = t.with_perms("compliance", desk, "POST", &format!("/v1/admin/withdrawals/{w1}/approve"), Some(json!({}))).await;
+    assert_eq!((s, v["withdrawal"]["status"].as_str()), (200, Some("approved")), "{v}");
+    let (s, v) = t.with_perms("compliance", desk, "POST", &format!("/v1/admin/withdrawals/{w2}/reject"), Some(json!({"reason": "Wrong network"}))).await;
+    assert_eq!(s, 200, "{v}");
+    // ... but not mark paid (finance.write) or settings (finance.settings)
+    let (s, _) = t.with_perms("compliance", desk, "POST", &format!("/v1/admin/withdrawals/{w1}/paid"), Some(json!({"tx_hash": hash(80)}))).await;
+    assert_eq!(s, 403);
+    let (s, _) = t.with_perms("compliance", desk, "PUT", "/v1/admin/settings", Some(json!({"limits": {"withdraw_daily_max": "900"}, "reason": "custom"}))).await;
+    assert_eq!(s, 403);
+
+    // the role name no longer grants what the keys don't: "finance" holding only finance.read
+    let (_, v) = t.post("/v1/withdrawals", req("p3")).await;
+    let w3 = v["withdrawal"]["id"].as_i64().unwrap();
+    let (s, _) = t.with_perms("finance", "finance.read", "POST", &format!("/v1/admin/withdrawals/{w3}/approve"), Some(json!({}))).await;
+    assert_eq!(s, 403);
+    let (s, _) = t.with_perms("finance", "finance.read", "POST", "/v1/admin/deposits/1/reject", Some(json!({"reason": "nope"}))).await;
+    assert_eq!(s, 403);
+    let (s, _) = t.with_perms("finance", "-", "GET", "/v1/admin/summary", None).await;
+    assert_eq!(s, 403, "no finance keys at all");
+
+    // a custom settings role: finance.settings works whatever the role name
+    let (s, v) = t.with_perms("compliance", "finance.read,finance.settings", "PUT", "/v1/admin/settings", Some(json!({"limits": {"withdraw_daily_max": "900"}, "reason": "custom"}))).await;
+    assert_eq!(s, 200, "{v}");
+    let (s, v) = t.with_perms("compliance", "finance.read", "GET", "/v1/admin/reconciliation", None).await;
+    assert_eq!(s, 200, "{v}");
+
+    // Super Admin / Platform Owner keep full access
+    let (s, v) = t.with_perms("super_admin", "-", "POST", &format!("/v1/admin/withdrawals/{w3}/approve"), Some(json!({}))).await;
+    assert_eq!(s, 200, "{v}");
+    let (s, _) = t.with_perms("platform_owner", "-", "GET", "/v1/admin/settings", None).await;
+    assert_eq!(s, 200);
     t.invariants().await;
     t.drop_db().await;
 }

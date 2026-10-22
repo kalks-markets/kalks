@@ -186,13 +186,16 @@ pub const ROLES_SETTINGS: &[&str] = &["platform_owner", "super_admin", "admin"];
 /// Forcing a trading-account deduction past the free margin (finance.adjust_force): Super Admin only.
 pub const ROLES_FORCE: &[&str] = &["platform_owner", "super_admin"];
 
-impl StaffCtx {
-    pub fn require(&self, roles: &[&str]) -> Result<(), ApiError> {
-        if roles.contains(&self.staff.role.as_str()) { Ok(()) } else { Err(ApiError::Forbidden(format!("Role {} may not do this", self.staff.role))) }
-    }
+/// System roles (not editable, every permission): allowed whatever list was forwarded.
+const ROLES_SYSTEM: &[&str] = &["platform_owner", "super_admin"];
 
-    /// Whether the staff member holds `perm`: the forwarded gateway list when present, else the role map.
+impl StaffCtx {
+    /// Whether the staff member holds `perm` (a gateway key, services/gateway/src/rbac.rs): the forwarded list when
+    /// present, so custom roles get exactly what they were granted; else the role map (older BFFs).
     pub fn has_perm(&self, perm: &str, fallback_roles: &[&str]) -> bool {
+        if ROLES_SYSTEM.contains(&self.staff.role.as_str()) {
+            return true;
+        }
         match &self.staff.perms {
             Some(p) => p.iter().any(|x| x == perm),
             None => fallback_roles.contains(&self.staff.role.as_str()),

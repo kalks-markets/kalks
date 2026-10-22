@@ -177,7 +177,7 @@ Certificate: `{code, kind (pass | funded | payout), title, traderName, planName,
 
 ### Staff routes (Back Office BFF)
 
-The BFF forwards the verified staff session: `X-Kalks-Staff-Id`, `X-Kalks-Staff-Name` (percent-encoded), `X-Kalks-Staff-Role`. The service checks the role against the permission map below (the admin BFF keeps the same map in `apps/admin/lib/prop-perms.ts`):
+The BFF forwards the verified staff session: `X-Kalks-Staff-Id`, `X-Kalks-Staff-Name` (percent-encoded), `X-Kalks-Staff-Role`, `X-Kalks-Staff-Perms` (the gateway permission keys). The service checks the `prop.*` key from that list, so a custom role gets exactly what it was granted; without the header (older callers) it checks the role against the map below (the admin BFF keeps the same map in `apps/admin/lib/prop-perms.ts`). Super Admin and Platform Owner are always allowed:
 
 | permission | allows | roles |
 |---|---|---|

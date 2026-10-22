@@ -3,9 +3,9 @@
  * certificates, news calendar).
  *
  * The gateway's role → permission matrix has no prop permissions yet, so the admin BFF owns this map. It
- * mirrors the role checks the prop service enforces itself (services/prop README, "Staff routes"); the BFF
+ * mirrors the role checks the prop service falls back to (services/prop README, "Staff routes"); the BFF
  * checks first so a role never reaches the service for something it may not do, and the UI hides what the role
- * can't use.
+ * can't use. The resolved keys are forwarded in `x-kalks-staff-perms` (lib/prop.ts), and the service checks them.
  *
  * When the gateway starts returning prop permissions for a role (any "prop.*" entry in `/v1/admin/auth/me` →
  * permissions), that list wins and this map is no longer consulted.
@@ -40,4 +40,10 @@ export function propAllows(staff: { role: string; permissions?: string[]; rbac?:
   const fromGateway = staff.permissions?.some((p) => p.startsWith("prop."));
   if (fromGateway) return staff.permissions!.includes(perm);
   return PROP_ROLE_MAP[perm].includes(staff.role);
+}
+
+/** Prop permission keys forwarded to the prop service as `x-kalks-staff-perms`, so it checks the exact key and a
+ *  custom role gets what it was granted (the gateway's list when present, else the role map above). */
+export function propPerms(staff: { role: string; permissions?: string[]; rbac?: boolean }): string[] {
+  return PROP_PERMS.filter((p) => propAllows(staff, p));
 }

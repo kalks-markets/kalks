@@ -7,7 +7,7 @@ import { tradingAllows } from "@/lib/trading-perms";
 
 // Finance BFF: browser -> /api/wallet/<path> (same origin, staff cookie) -> wallet service /v1/admin/<path>.
 // The staff session is verified with the gateway on every call and the permission for the route is checked
-// here (lib/wallet-perms.ts); the wallet service checks the role again and writes its audit log.
+// here (lib/wallet-perms.ts); the wallet service checks the forwarded finance.* key again and writes its audit log.
 //   GET names?ids=1,2  -> client names / emails from the gateway (needs clients.read in the gateway)
 // Balance & credit (adjustments/*): a route lists the permissions of which any one is enough here; the wallet
 // service then enforces the exact key (finance.adjust for add / deduct, finance.credit for credit,

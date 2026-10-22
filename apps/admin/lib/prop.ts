@@ -3,6 +3,7 @@
 // the gateway verified (lib/bff.ts requireStaff) — never from anything the browser sends.
 
 import type { GatewayStaff } from "@/lib/gateway";
+import { propPerms } from "@/lib/prop-perms";
 
 const PROP_URL = (process.env.PROP_URL ?? "http://127.0.0.1:8097").replace(/\/$/, "");
 const INTERNAL_TOKEN = process.env.PROP_INTERNAL_TOKEN ?? "";
@@ -20,6 +21,8 @@ function headersFor(init: Init): Record<string, string> {
     headers["x-kalks-staff-id"] = String(init.staff.id);
     headers["x-kalks-staff-name"] = encodeURIComponent(init.staff.name || init.staff.email);
     headers["x-kalks-staff-role"] = init.staff.role;
+    // exact prop.* keys, checked by the service ("-" when none: an empty header would fall back to the role check)
+    headers["x-kalks-staff-perms"] = propPerms(init.staff).join(",") || "-";
   }
   if (init.userId !== undefined) headers["x-kalks-user-id"] = String(init.userId);
   if (init.ip) headers["x-forwarded-for"] = init.ip;

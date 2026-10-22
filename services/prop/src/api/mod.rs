@@ -3,7 +3,8 @@
 //! - Client routes: the BFF forwards the signed-in gateway user in `X-Kalks-User-Id` (+ `X-Kalks-User-Name`,
 //!   `X-Kalks-User-Kyc`).
 //! - Staff routes (`/v1/admin/*`): `X-Kalks-Staff-Id`, `X-Kalks-Staff-Name` (percent-encoded), `X-Kalks-Staff-Role`
-//!   from the verified staff session; the role is checked against [`PERMS`].
+//!   and `X-Kalks-Staff-Perms` (gateway permission keys) from the verified staff session; the `prop.*` key is
+//!   checked, or the role against [`PERMS`] when no keys were forwarded.
 
 pub mod admin;
 pub mod client;
@@ -142,7 +143,9 @@ impl<S: Send + Sync> FromRequestParts<S> for User {
     }
 }
 
-/// Back Office permissions for the prop module (the admin BFF checks the same map first).
+/// Back Office permissions for the prop module (gateway keys, services/gateway/src/rbac.rs). The admin BFF checks
+/// them first and forwards the staff member's keys in `X-Kalks-Staff-Perms`; the roles below are the fallback for
+/// callers that send no list.
 ///
 /// | permission | allows | roles |
 /// |---|---|---|
@@ -158,12 +161,23 @@ pub const PERMS: &[(&str, &[&str])] = &[
 pub struct Staff {
     pub tenant: String,
     pub actor: Actor,
+    /// `X-Kalks-Staff-Perms`: None when the caller sent no list (older BFFs): then only the role is checked.
+    pub perms: Option<Vec<String>>,
 }
 
+/// System roles (not editable, every permission): allowed whatever list was forwarded.
+const ROLES_SYSTEM: &[&str] = &["platform_owner", "super_admin"];
+
 impl Staff {
+    /// The exact key when the BFF forwarded the list, so custom roles get what they were granted; else the role map.
     pub fn require(&self, perm: &str) -> Result<(), ApiError> {
-        let ok = PERMS.iter().find(|(p, _)| *p == perm).is_some_and(|(_, roles)| roles.contains(&self.actor.role.as_str()));
-        if ok { Ok(()) } else { Err(ApiError::Forbidden(format!("Role {} may not do this ({perm})", self.actor.role))) }
+        let role = self.actor.role.as_str();
+        let ok = ROLES_SYSTEM.contains(&role)
+            || match &self.perms {
+                Some(p) => p.iter().any(|x| x == perm),
+                None => PERMS.iter().find(|(p, _)| *p == perm).is_some_and(|(_, roles)| roles.contains(&role)),
+            };
+        if ok { Ok(()) } else { Err(ApiError::Forbidden(format!("Your role doesn't allow this ({perm})"))) }
     }
 }
 
@@ -177,7 +191,8 @@ impl<S: Send + Sync> FromRequestParts<S> for Staff {
             return Err(ApiError::BadRequest("Invalid staff headers".into()));
         }
         let name = header(parts, "x-kalks-staff-name").map(|n| percent_decode(&n)).unwrap_or_else(|| format!("Staff {id}"));
-        Ok(Staff { tenant, actor: Actor { id: format!("staff:{id}"), name: name.chars().take(120).collect(), role } })
+        let perms = header(parts, "x-kalks-staff-perms").map(|v| v.split(',').map(|p| p.trim().to_string()).filter(|p| !p.is_empty() && p.len() <= 64).take(200).collect());
+        Ok(Staff { tenant, actor: Actor { id: format!("staff:{id}"), name: name.chars().take(120).collect(), role }, perms })
     }
 }
 

@@ -1,4 +1,5 @@
-//! Back Office routes (staff identity headers from the admin BFF; roles checked here again).
+//! Back Office routes (staff identity headers from the admin BFF). The `finance.*` key is checked here again from
+//! `X-Kalks-Staff-Perms`; without it the role is checked.
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -37,7 +38,7 @@ fn opt<'a>(v: &'a Option<String>) -> Option<&'a str> {
 /* ---------------- summary ---------------- */
 
 pub async fn summary(State(st): State<AppState>, s_ctx: StaffCtx) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let t = s_ctx.ctx.tenant.id;
     let day = withdrawals::server_day_start(Utc::now());
     let r = sqlx::query(
@@ -74,7 +75,7 @@ pub async fn summary(State(st): State<AppState>, s_ctx: StaffCtx) -> ApiResult<J
 /* ---------------- deposits ---------------- */
 
 pub async fn deposits(State(st): State<AppState>, s_ctx: StaffCtx, Q(q): Q<ListQ>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let (page, limit, offset) = paging(q.page, q.limit, 50, 200);
     let status = opt(&q.status);
     let queue = status == Some("queue");
@@ -103,7 +104,7 @@ pub async fn deposits(State(st): State<AppState>, s_ctx: StaffCtx, Q(q): Q<ListQ
 }
 
 pub async fn deposit(State(st): State<AppState>, s_ctx: StaffCtx, Path(id): Path<i64>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let t = s_ctx.ctx.tenant.id;
     let r = sqlx::query("SELECT * FROM deposits WHERE id = $1 AND tenant_id = $2").bind(id).bind(t).fetch_optional(&st.pool).await?.ok_or_else(|| ApiError::not_found("Deposit"))?;
     let mut v = deposits::deposit_json(&r);
@@ -139,7 +140,7 @@ pub struct AssignBody {
 }
 
 pub async fn assign_deposit(State(st): State<AppState>, s_ctx: StaffCtx, Path(id): Path<i64>, Body(b): Body<AssignBody>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_WRITE)?;
+    s_ctx.require_perm("finance.write", ROLES_WRITE)?;
     Ok(ok(json!({"deposit": deposits::assign(&st, &s_ctx, id, b.user_id, &b.reason).await?})))
 }
 
@@ -150,19 +151,19 @@ pub struct ReasonBody {
 }
 
 pub async fn reject_deposit(State(st): State<AppState>, s_ctx: StaffCtx, Path(id): Path<i64>, Body(b): Body<ReasonBody>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_WRITE)?;
+    s_ctx.require_perm("finance.write", ROLES_WRITE)?;
     Ok(ok(json!({"deposit": deposits::reject(&st, &s_ctx, id, &b.reason).await?})))
 }
 
 pub async fn recheck_deposit(State(st): State<AppState>, s_ctx: StaffCtx, Path(id): Path<i64>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_WRITE)?;
+    s_ctx.require_perm("finance.write", ROLES_WRITE)?;
     Ok(ok(json!({"deposit": deposits::recheck(&st, &s_ctx, id).await?})))
 }
 
 /* ---------------- withdrawals ---------------- */
 
 pub async fn withdrawals(State(st): State<AppState>, s_ctx: StaffCtx, Q(q): Q<ListQ>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let (page, limit, offset) = paging(q.page, q.limit, 50, 200);
     let status = opt(&q.status);
     let chain = opt(&q.chain).map(|c| ChainId::parse(c).map(|c| c.as_str()).ok_or_else(|| ApiError::BadRequest("Unknown chain".into()))).transpose()?;
@@ -191,7 +192,7 @@ pub async fn withdrawals(State(st): State<AppState>, s_ctx: StaffCtx, Q(q): Q<Li
 }
 
 pub async fn withdrawal(State(st): State<AppState>, s_ctx: StaffCtx, Path(id): Path<i64>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let r = sqlx::query("SELECT * FROM withdrawals WHERE id = $1 AND tenant_id = $2").bind(id).bind(s_ctx.ctx.tenant.id).fetch_optional(&st.pool).await?.ok_or_else(|| ApiError::not_found("Withdrawal"))?;
     let risk = withdrawals::risk(&st, &s_ctx.ctx.tenant.slug, &r).await?;
     let history: Vec<Value> = sqlx::query("SELECT * FROM audit_log WHERE tenant_id = $1 AND target_kind = 'withdrawal' AND target_id = $2 ORDER BY id")
@@ -212,12 +213,12 @@ pub struct NoteBody {
 }
 
 pub async fn approve_withdrawal(State(st): State<AppState>, s_ctx: StaffCtx, Path(id): Path<i64>, Body(b): Body<NoteBody>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_APPROVE)?;
+    s_ctx.require_perm("finance.approve", ROLES_APPROVE)?;
     Ok(ok(json!({"withdrawal": withdrawals::approve(&st, &s_ctx, id, b.note.as_deref()).await?})))
 }
 
 pub async fn reject_withdrawal(State(st): State<AppState>, s_ctx: StaffCtx, Path(id): Path<i64>, Body(b): Body<ReasonBody>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_APPROVE)?;
+    s_ctx.require_perm("finance.approve", ROLES_APPROVE)?;
     Ok(ok(json!({"withdrawal": withdrawals::reject(&st, &s_ctx, id, &b.reason).await?})))
 }
 
@@ -228,14 +229,14 @@ pub struct PaidBody {
 }
 
 pub async fn paid_withdrawal(State(st): State<AppState>, s_ctx: StaffCtx, Path(id): Path<i64>, Body(b): Body<PaidBody>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_WRITE)?;
+    s_ctx.require_perm("finance.write", ROLES_WRITE)?;
     Ok(ok(json!({"withdrawal": withdrawals::mark_paid(&st, &s_ctx, id, &b.tx_hash).await?})))
 }
 
 /* ---------------- wallets ---------------- */
 
 pub async fn wallets(State(st): State<AppState>, s_ctx: StaffCtx, Q(q): Q<ListQ>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let (page, limit, offset) = paging(q.page, q.limit, 50, 200);
     let ids: Option<Vec<i64>> = opt(&q.user_ids).map(|v| v.split(',').filter_map(|x| x.trim().parse::<i64>().ok()).take(200).collect());
     let min = opt(&q.min_balance).and_then(crate::money::parse);
@@ -272,7 +273,7 @@ pub async fn wallets(State(st): State<AppState>, s_ctx: StaffCtx, Q(q): Q<ListQ>
 }
 
 pub async fn wallet(State(st): State<AppState>, s_ctx: StaffCtx, Path(user_id): Path<i64>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let t = s_ctx.ctx.tenant.id;
     let b = ledger::balances(&st.pool, t, user_id).await?;
     let ledger_rows = sqlx::query(
@@ -304,7 +305,7 @@ pub async fn wallet(State(st): State<AppState>, s_ctx: StaffCtx, Path(user_id): 
 /* ---------------- settings ---------------- */
 
 pub async fn settings(State(st): State<AppState>, s_ctx: StaffCtx) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let t = s_ctx.ctx.tenant.id;
     let chains = settings::chains(&st.pool, t).await?;
     let limits = settings::limits(&st.pool, t).await?;
@@ -384,7 +385,7 @@ fn nonneg(field: &'static str, v: Option<D>) -> ApiResult<Option<D>> {
 }
 
 pub async fn update_settings(State(st): State<AppState>, s_ctx: StaffCtx, Body(b): Body<SettingsBody>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_SETTINGS)?;
+    s_ctx.require_perm("finance.settings", ROLES_SETTINGS)?;
     let reason = b.reason.trim().to_string();
     if reason.len() < 3 {
         return Err(ApiError::validation("reason", "Enter a reason for the change (kept in the audit log)"));
@@ -512,7 +513,7 @@ pub async fn update_settings(State(st): State<AppState>, s_ctx: StaffCtx, Body(b
 /* ---------------- reconciliation ---------------- */
 
 pub async fn reconciliation(State(st): State<AppState>, s_ctx: StaffCtx) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let t = s_ctx.ctx.tenant.id;
     let pool = &st.pool;
     let sys: BTreeMap<String, D> = sqlx::query_as::<_, (String, D)>("SELECT account_code, sum(amount) FROM ledger_postings WHERE tenant_id = $1 AND user_id IS NULL GROUP BY account_code ORDER BY account_code")
@@ -643,7 +644,7 @@ pub fn audit_json(r: &sqlx::postgres::PgRow) -> Value {
 }
 
 pub async fn audit(State(st): State<AppState>, s_ctx: StaffCtx, Q(q): Q<ListQ>) -> ApiResult<Json<Value>> {
-    s_ctx.require(ROLES_READ)?;
+    s_ctx.require_perm("finance.read", ROLES_READ)?;
     let (page, limit, offset) = paging(q.page, q.limit, 50, 200);
     let rows = sqlx::query("SELECT *, count(*) OVER () AS total FROM audit_log WHERE tenant_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3").bind(s_ctx.ctx.tenant.id).bind(limit).bind(offset).fetch_all(&st.pool).await?;
     let total = rows.first().map(|r| r.get::<i64, _>("total")).unwrap_or(0);
