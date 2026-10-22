@@ -6,9 +6,12 @@
   apps/terminal by tool/build_chart_indicators.mjs: the same maths, overlays, sub-windows and levels as the web).
   The app owns the data and sends it as JSON to window.K.recv(msg) or, coalesced, window.K.batch("[msg, …]"); this page
   draws it and posts gestures back on the `KalksChart` channel (lib/features/terminal/chart/chart_bridge.dart):
-    in:  init {digits, intraday, palette, symbol, tf, step, chartType, indicators, texts} · bars {bars}
+    in:  init {digits, intraday, palette, symbol, tf, step, chartType, indicators, texts, title?} · bars {bars}
          · older {bars, exhausted} · bar {bar} · tail {bars} · inset {top} · quote {bid, ask} · lines {lines: [{id, kind, price, label, side, drag,
-         note, tone, close, handles?, pip?, gap?}]} · palette {palette} · indicators {indicators} · chartType {chartType}
+         note, tone, close, handles?, pip?, gap?, tag?}]} · palette {palette} · indicators {indicators} · chartType {chartType}
+  Trade-line chips are compact tags (owner design 2026-10): a position "B 0.50 +12.30" filled with its side's colour, a
+  stop "S 1.11850" (sell colour) / "T 1.12600" (buy colour): a line with `tag` reads its label and then its price, the
+  dragged price while it moves. `title: false` leaves the market and timeframe out of the legend (the app shows them).
     out: ready · dragstart {id} · drag {id, price} · tap {id} · close {id} · older {before} · long {price} · ind {uid}
   A position line with `handles` ("st" / "s" / "t": no stop loss / no take profit yet) shows small S (red outline) and
   T (blue outline) squares after its P&L, like the web (components/chart/trade-handles.ts): pulling one out makes a
@@ -104,12 +107,12 @@
         position: absolute;
         left: 0;
         top: 0;
-        height: 20px;
+        height: 18px;
         display: flex;
         align-items: center;
-        border-radius: 5px;
+        border-radius: 10px;
         border: 1px solid transparent;
-        font: 500 10.5px "GeistMono", ui-monospace, monospace;
+        font: 700 10px "GeistMono", ui-monospace, monospace;
         line-height: 1;
         white-space: nowrap;
         pointer-events: auto;
@@ -118,7 +121,7 @@
         will-change: transform;
       }
       .chip > span {
-        padding: 0 5px;
+        padding: 0 6px;
         height: 100%;
         display: flex;
         align-items: center;
@@ -130,16 +133,16 @@
         padding: 0 1px 0 4px;
       }
       .chip .note {
-        border-left: 1px solid rgba(127, 127, 127, 0.35);
+        padding-left: 0;
       }
       .chip .x {
-        border-left: 1px solid rgba(127, 127, 127, 0.35);
+        border-left: 1px solid rgba(255, 255, 255, 0.25);
         padding: 0 6px;
         font-size: 12px;
       }
       /* a position's S / T handles: small outlined squares, each in a finger-sized hit area */
       .chip .hs {
-        border-left: 1px solid rgba(127, 127, 127, 0.35);
+        border-left: 1px solid rgba(255, 255, 255, 0.25);
         padding: 0 2px;
       }
       .chip .hb {
@@ -157,7 +160,7 @@
         height: 14px;
         box-sizing: border-box;
         border: 1px solid;
-        border-radius: 3px;
+        border-radius: 7px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -351,7 +354,8 @@
           const b = data[i];
           const col = b.close >= b.open ? pal.up : pal.down;
           const v = (k, x) => `<span class="v">${k} <span style="color:${col}">${fmt(x)}</span></span>`;
-          ohlcEl.innerHTML = `<b>${symbol}, ${tf}</b>${v("O", b.open)}${v("H", b.high)}${v("L", b.low)}${v("C", b.close)}`;
+          const title = initMsg && initMsg.title === false ? "" : `<b>${symbol}, ${tf}</b>`;
+          ohlcEl.innerHTML = `${title}${v("O", b.open)}${v("H", b.high)}${v("L", b.low)}${v("C", b.close)}`;
           const rows = layer ? layer.legend(i) : [];
           // main-pane rows (overlays and hidden instances) fold into "+N more" when they would cover the pane
           const mainRows = rows.filter((r) => r.pane <= 0);
@@ -743,8 +747,9 @@
           if (l.kind === "alert" || l.kind === "barrier") return [pal.warn, onWarm(), pal.warn];
           if (l.kind === "strike") return [pal.ember, "#fff", pal.ember];
           if (l.kind === "breakeven") return [pal.panel, pal.fg2, pal.fg3];
+          // a position's compact tag "B 0.50 +12.30": filled with its side's colour
           const c = l.side === "buy" ? pal.up : pal.down;
-          return [pal.panel, c, c];
+          return [c, "#fff", c];
         }
 
         const setText = (el, s) => {
@@ -787,7 +792,8 @@
           const buy = side === "buy";
           return clampStop(kind, side, (buy ? bid : ask) + (buy === (kind === "tp") ? dist : -dist), gap);
         }
-        const stopLine = (pos, kind, price) => ({ id: kind + ":" + refOf(pos.id), kind, price, label: kind.toUpperCase(), side: pos.side, drag: false, close: false });
+        // a stop made from a handle is a compact tag too: "S 1.11850" / "T 1.12600"
+        const stopLine = (pos, kind, price) => ({ id: kind + ":" + refOf(pos.id), kind, price, label: texts[kind] || kind[0].toUpperCase(), tag: true, side: pos.side, drag: false, close: false });
         /** The app's lines, with a just-made stop kept until they carry it. */
         function withSticky(list) {
           if (!sticky) return list;
@@ -800,7 +806,7 @@
 
         function fillChip(c, l) {
           const [bg, fg, border] = chipColors(l);
-          const filled = l.kind !== "pos" && l.kind !== "breakeven";
+          const filled = l.kind !== "breakeven";
           const noteColor = filled ? fg : l.tone === "up" ? pal.up : l.tone === "down" ? pal.down : pal.fg2;
           const hs = handlesOf(l);
           const ref = l.kind === "pos" ? refOf(l.id) : "";
@@ -812,7 +818,8 @@
             el.style.background = bg;
             el.style.color = fg;
             el.style.borderColor = border;
-            c.grip.style.display = l.drag ? "flex" : "none";
+            // compact tags (positions, stops) drag by the whole tag: no grip
+            c.grip.style.display = l.drag && l.kind !== "pos" && !l.tag ? "flex" : "none";
             c.note.style.display = l.note ? "flex" : "none";
             c.note.textContent = l.note || "";
             c.note.style.color = noteColor;
@@ -824,6 +831,7 @@
               b.classList.toggle("on", pulled(k, ref));
               b.firstChild.style.color = col;
               b.firstChild.style.borderColor = col;
+              b.firstChild.style.background = pal.panel;
               b.firstChild.textContent = texts[k] || k[0].toUpperCase();
               b.title = texts[k + "Title"] || "";
               b.setAttribute("aria-label", b.title || k.toUpperCase());
@@ -831,8 +839,9 @@
             c.x.style.display = l.close ? "flex" : "none";
             c.w = -1;
           }
+          // chart_bridge.dart chipLabel: a tag reads its letter and price; another dragged line its label and the drag price
           const dragging = drag && drag.id === l.id && drag.moved;
-          setLabel(c, dragging && l.kind !== "pos" ? l.label + " " + fmt(drag.price) : l.label);
+          setLabel(c, l.tag ? l.label + " " + fmt(dragging ? drag.price : l.price) : dragging && l.kind !== "pos" ? l.label + " " + fmt(drag.price) : l.label);
         }
 
         /** The chip font is monospaced: the width changes only with the text length. */
@@ -933,7 +942,7 @@
           if (c.tx === x && c.ty === y) return;
           c.tx = x;
           c.ty = y;
-          c.el.style.transform = `translate(${x}px, ${y - 11}px)`; // 22 px tall with its border: centred on the line
+          c.el.style.transform = `translate(${x}px, ${y - 10}px)`; // 20 px tall with its border: centred on the line
         };
 
         /** Chips sit at the price scale like the web's; chips of nearby prices line up side by side to the left. The
@@ -941,10 +950,10 @@
         function placeChips() {
           if (!main || !chart) return;
           const plotW = chart.timeScale().width();
-          // chips stay in the main window (a line at its very bottom keeps its chip); a chip is 22 px tall and
+          // chips stay in the main window (a line at its very bottom keeps its chip); a chip is 20 px tall and
           // centred on its line, so the ones near the pane's bottom edge are held above the next window
           const maxY = pane0H() + 1;
-          const clampY = (y) => Math.min(y, pane0H() - 11);
+          const clampY = (y) => Math.min(y, pane0H() - 10);
           const shown = [];
           let dragged = null;
           for (const c of chips.values()) {

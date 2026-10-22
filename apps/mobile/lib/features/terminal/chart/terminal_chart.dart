@@ -87,6 +87,7 @@ class TerminalChart extends ConsumerStatefulWidget {
     this.indicators = const [],
     this.onIndicatorTapped,
     this.topInset = 0,
+    this.legendTitle = true,
   });
 
   /// The market (also the cache key when no source is given).
@@ -117,6 +118,9 @@ class TerminalChart extends ConsumerStatefulWidget {
 
   /// Room an overlay of the app takes at the top of the plot (the trade panel): the legend starts below it.
   final double topInset;
+
+  /// The legend names the market and timeframe (false: the app shows them over the chart; the legend has the OHLC).
+  final bool legendTitle;
 
   /// Widget tests and the web preview draw the native chart (no WebView there).
   static bool forceNative = false;
@@ -248,6 +252,7 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
         step: kTfSeconds[tf] ?? 60,
         chartType: widget.chartType,
         indicators: _indicatorsJson,
+        title: widget.legendTitle,
         texts: {
           'more': t('chart.legend.more', {'count': '{count}'}),
           'less': t('chart.legend.showLess'),
@@ -326,7 +331,8 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
       case ChartLineDragged(:final id, :final price):
         _c.holdLines = false;
         // an S / T handle dragged out (or tapped) of a position line: the stop line it makes is not given yet
-        final made = widget.lines.any((x) => x.id == id) ? null : lineForHandle(widget.lines, id);
+        final t = context.t;
+        final made = widget.lines.any((x) => x.id == id) ? null : lineForHandle(widget.lines, id, sl: t('chart.line.slHandle'), tp: t('chart.line.tpHandle'));
         final l = widget.lines.where((x) => x.id == id).firstOrNull ?? made;
         if (l == null) {
           _sendLines();

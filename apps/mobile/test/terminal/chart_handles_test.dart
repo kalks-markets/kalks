@@ -184,20 +184,20 @@ void main() {
       expect(line.kind, 'sl');
       expect(line.side, 'buy');
       expect(price, 1.084);
-      // held at the drop price while the server answers: the SL chip is drawn, S is gone, T stays
-      expect(find.text('SL'), findsOneWidget);
+      // held at the drop price while the server answers: the compact "S 1.08400" tag is drawn, S is gone, T stays
+      expect(find.textContaining(RegExp(r'^S 1\.084')), findsOneWidget);
       expect(handle('sl:7'), findsNothing);
       expect(handle('tp:7'), findsOneWidget);
 
       // the position now carries the stop: the given line replaces the held one
       lines.value = [
         const ChartLine(id: 'pos:7', kind: 'pos', price: 1.0840, label: 'BUY 0.10', side: 'buy', draggable: true, handles: 't', pip: 0.0001, gap: 0.0001),
-        const ChartLine(id: 'sl:7', kind: 'sl', price: 1.084, label: 'SL', side: 'buy', draggable: true, note: '0.00', closable: true),
+        const ChartLine(id: 'sl:7', kind: 'sl', price: 1.084, label: 'S', tag: true, side: 'buy', draggable: true, closable: true),
       ];
       answer!.complete(true);
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(seconds: 2));
-      expect(find.text('SL'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'^S 1\.084')), findsOneWidget);
       expect(handle('sl:7'), findsNothing);
       expect(handle('tp:7'), findsOneWidget);
       await done(tester);
@@ -211,11 +211,11 @@ void main() {
       expect(drops.single.$1.id, 'tp:7');
       // twice the stop loss distance: 20 pips over the bid
       expect(drops.single.$2, 1.087);
-      expect(find.text('TP'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'^T 1\.087')), findsOneWidget);
       answer!.complete(false);
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.text('TP'), findsNothing);
+      expect(find.textContaining(RegExp(r'^T \d')), findsNothing);
       expect(handle('tp:7'), findsOneWidget);
       await done(tester);
     });
@@ -227,7 +227,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(drops.single.$1.id, 'tp:7');
       expect(drops.single.$2, greaterThan(1.0851));
-      expect(find.text('TP'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'^T \d')), findsOneWidget);
       answer!.complete(true);
       await tester.pump(const Duration(seconds: 2));
 

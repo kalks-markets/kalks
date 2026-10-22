@@ -22,8 +22,25 @@ class NativeChartSurface extends StatefulWidget {
 }
 
 class _Line {
-  _Line(this.id, this.kind, this.price, this.label, this.side, this.drag, this.note, this.tone, this.close, {this.handles = '', this.pip = 0, this.gap = 0});
+  _Line(
+    this.id,
+    this.kind,
+    this.price,
+    this.label,
+    this.side,
+    this.drag,
+    this.note,
+    this.tone,
+    this.close, {
+    this.handles = '',
+    this.pip = 0,
+    this.gap = 0,
+    this.tag = false,
+  });
   final String id, kind, label;
+
+  /// A compact stop tag: the label, then the price ("S 1.11850").
+  final bool tag;
   final double price;
   final String? side, note, tone;
   final bool drag, close;
@@ -138,6 +155,7 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
                 handles: '${l['handles'] ?? ''}',
                 pip: (l['pip'] as num?)?.toDouble() ?? 0,
                 gap: (l['gap'] as num?)?.toDouble() ?? 0,
+                tag: l['tag'] == true,
               ),
         ];
       case 'palette':
@@ -357,9 +375,9 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
 
   double _chipWidth(_Line l) {
     final dragging = _dragId == l.id && l.kind != 'pos';
-    var chars = l.label.length + (dragging ? _digits + 6 : 0);
+    var chars = l.label.length + (dragging || l.tag ? _digits + 6 : 0);
     var w = chars * 6.4 + 12;
-    if (l.drag) w += 14;
+    if (l.drag && l.kind != 'pos' && !l.tag) w += 14;
     if (l.note != null) {
       chars = l.note!.length;
       w += chars * 6.4 + 11;
@@ -378,7 +396,8 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
             if (l.handles.contains(k[0]) && !_lines.any((x) => x.id == '$k:${l.ref}')) k,
         ];
 
-  _Line _stopLine(_Line pos, String kind, double price) => _Line('$kind:${pos.ref}', kind, price, kind.toUpperCase(), pos.side, false, null, null, false);
+  _Line _stopLine(_Line pos, String kind, double price) =>
+      _Line('$kind:${pos.ref}', kind, price, '${_texts[kind] ?? kind[0].toUpperCase()}', pos.side, false, null, null, false, tag: true);
 
   /// A handle tapped: the stop at the order tickets' starting distance (chart_bridge defaultStop), shown at once.
   void _tapHandle(_Line pos, String kind) {
@@ -429,7 +448,8 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
   Widget _chip(_Line l, double y, double left, KTokens k) {
     final price = _dragId == l.id ? (_dragPrice ?? l.price) : l.price;
     final col = _lineColor(l, k);
-    final filled = l.kind != 'pos' && l.kind != 'breakeven';
+    // compact tags: a position is filled with its side's colour like a stop ("B 0.50 +12.30", "S 1.11850")
+    final filled = l.kind != 'breakeven';
     final warm = l.kind == 'pending' || l.kind == 'alert' || l.kind == 'barrier';
     final fg = warm ? (k.dark ? const Color(0xFF1A1204) : Colors.white) : (filled ? Colors.white : col);
     final noteColor = filled ? fg : (l.tone == 'up' ? _c('up', k.up) : (l.tone == 'down' ? _c('down', k.down) : _c('fg2', k.fg2)));
@@ -510,14 +530,17 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (l.drag)
+              if (l.drag && l.kind != 'pos' && !l.tag)
                 Padding(
                   padding: const EdgeInsets.only(left: 4),
                   child: Text('⋮⋮', style: st(fg.withValues(alpha: 0.7))),
                 ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 5),
-                child: Text('${l.label}${_dragId == l.id && l.kind != 'pos' ? ' ${price.toStringAsFixed(_digits)}' : ''}', style: st(fg)),
+                child: Text(
+                  l.tag || (_dragId == l.id && l.kind != 'pos') ? '${l.label} ${price.toStringAsFixed(_digits)}' : l.label,
+                  style: st(fg),
+                ),
               ),
               if (l.note != null) ...[
                 sep,

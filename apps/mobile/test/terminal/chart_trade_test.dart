@@ -69,16 +69,30 @@ void main() {
   double priceOn(WidgetTester tester, String side) =>
       tester.widget<PriceText>(find.descendant(of: find.byKey(ValueKey('chart-trade-$side')), matching: find.byType(PriceText))).value;
 
-  testWidgets('the panel floats over the chart with the live bid and ask', (tester) async {
+  testWidgets('one slim pill floats at the bottom centre of the full chart with the live bid and ask', (tester) async {
     await open(tester);
     expect(find.byKey(const ValueKey('chart-trade-sell')), findsOneWidget);
     expect(priceOn(tester, 'sell'), 63400);
     expect(priceOn(tester, 'buy'), 63418);
-    // over the plot, not under it
+    // over the plot, not under it: at the bottom, centred, ~36 px tall, SELL left of the volume, BUY right of it
     final chart = tester.getRect(find.byType(TerminalChart));
     final sell = tester.getRect(find.byKey(const ValueKey('chart-trade-sell')));
-    expect(chart.contains(sell.center), isTrue);
-    expect(sell.top - chart.top, lessThan(20));
+    final buy = tester.getRect(find.byKey(const ValueKey('chart-trade-buy')));
+    final vol = tester.getRect(find.byKey(const ValueKey('chart-vol')));
+    expect(chart.contains(sell.center) && chart.contains(buy.center), isTrue);
+    expect(chart.bottom - sell.bottom, lessThan(30));
+    expect(sell.height, 36);
+    expect(sell.right <= vol.left && vol.right <= buy.left, isTrue);
+    expect(((sell.left + buy.right) / 2 - chart.center.dx).abs(), lessThan(2));
+    // the chart fills the tab: no strip above it, it starts right under the terminal header
+    expect(chart.top, lessThan(140));
+    // the symbol pill and the timeframes float over the top of the plot
+    expect(chart.contains(tester.getCenter(find.byKey(const ValueKey('chart-symbol')))), isTrue);
+    expect(chart.contains(tester.getCenter(find.byKey(const ValueKey('chart-tf-M15')))), isTrue);
+    // − / + step the volume by the market's lot step
+    await tester.tap(find.byKey(const ValueKey('chart-vol-up')));
+    await tester.pump();
+    expect(find.descendant(of: find.byKey(const ValueKey('chart-vol')), matching: find.text('0.51')), findsOneWidget);
     await close(tester);
   });
 

@@ -22,6 +22,7 @@ class ChartLine {
     this.handles = '',
     this.pip = 0,
     this.gap = 0,
+    this.tag = false,
   });
 
   /// `pos:TICKET`, `sl:TICKET`, `tp:TICKET`, `pnd:TICKET` or `alr:ID`.
@@ -53,6 +54,10 @@ class ChartLine {
   /// to the price a stop may go), both in price units.
   final double pip, gap;
 
+  /// A compact stop tag (owner design 2026-10): the chip reads the label and then the line's price, "S 1.11850" /
+  /// "T 1.12600", also while it is dragged ([chipLabel]).
+  final bool tag;
+
   /// The ticket / alert id after the prefix.
   String get ref => id.contains(':') ? id.substring(id.indexOf(':') + 1) : id;
 
@@ -69,6 +74,7 @@ class ChartLine {
     handles: handles,
     pip: pip,
     gap: gap,
+    tag: tag,
   );
 
   Map<String, Object?> toJson() => {
@@ -82,6 +88,7 @@ class ChartLine {
     'tone': tone,
     'close': closable,
     if (handles.isNotEmpty) ...{'handles': handles, 'pip': pip, 'gap': gap},
+    if (tag) 'tag': true,
   };
 
   @override
@@ -98,23 +105,34 @@ class ChartLine {
       other.closable == closable &&
       other.handles == handles &&
       other.pip == pip &&
-      other.gap == gap;
+      other.gap == gap &&
+      other.tag == tag;
 
   @override
-  int get hashCode => Object.hash(id, kind, price, label, side, draggable, note, tone, closable, handles, pip, gap);
+  int get hashCode => Object.hash(id, kind, price, label, side, draggable, note, tone, closable, handles, pip, gap, tag);
+}
+
+/// The text of a line's chip (the chart page's setLabel rule, chart.html): a compact stop tag reads its letter and
+/// the price ("S 1.11850", the dragged price while it moves); another line being dragged reads its label and the
+/// drag price ("BUY LIMIT 0.10 1.08450"); a position's tag ("B 0.50") stays as it is (its P&L is the note).
+String chipLabel(ChartLine l, {required int digits, double? dragPrice}) {
+  final p = (dragPrice ?? l.price).toStringAsFixed(digits < 0 ? 0 : digits);
+  if (l.tag) return '${l.label} $p';
+  if (dragPrice != null && l.kind != 'pos') return '${l.label} $p';
+  return l.label;
 }
 
 /// The stop line an S / T handle makes: `sl:T` / `tp:T` for the position line `pos:T` when that line still shows the
 /// handle (it has no such stop); null for any other id. It starts at the position's price, like the chart page's
-/// temporary line.
-ChartLine? lineForHandle(List<ChartLine> lines, String id) {
+/// temporary line, as a compact tag ("S" / "T" and its price; `sl` / `tp` = the letters in the reader's language).
+ChartLine? lineForHandle(List<ChartLine> lines, String id, {String sl = 'S', String tp = 'T'}) {
   final i = id.indexOf(':');
   if (i <= 0) return null;
   final kind = id.substring(0, i);
   if (kind != 'sl' && kind != 'tp') return null;
   final pos = lines.where((l) => l.kind == 'pos' && l.id == 'pos:${id.substring(i + 1)}').firstOrNull;
   if (pos == null || !pos.handles.contains(kind[0])) return null;
-  return ChartLine(id: id, kind: kind, price: pos.price, label: kind.toUpperCase(), side: pos.side, draggable: pos.draggable);
+  return ChartLine(id: id, kind: kind, price: pos.price, label: kind == 'sl' ? sl : tp, tag: true, side: pos.side, draggable: pos.draggable);
 }
 
 double _round(double v, int digits) => double.parse(v.toStringAsFixed(digits < 0 ? 0 : digits));
@@ -201,9 +219,10 @@ List<num> _bar(ChartBar b) => [b.t, b.o, b.h, b.l, b.c, b.v];
 
 /// Messages to the page.
 abstract final class ChartCmd {
-  /// A fresh chart: price precision, whether the time axis shows hours, colours, the legend's market and timeframe, the
-  /// bar length in seconds, the chart type (candles | bars | line | area), the indicator instances (web
-  /// IndicatorInstance JSON, drawn by the web's own indicator code in the page) and the legend's texts.
+  /// A fresh chart: price precision, whether the time axis shows hours, colours, the legend's market and timeframe (and
+  /// whether the legend names them: `title`), the bar length in seconds, the chart type (candles | bars | line |
+  /// area), the indicator instances (web IndicatorInstance JSON, drawn by the web's own indicator code in the page) and
+  /// the legend's texts.
   static String init({
     required int digits,
     required bool intraday,
@@ -214,6 +233,7 @@ abstract final class ChartCmd {
     String chartType = 'candles',
     List<Map<String, Object?>> indicators = const [],
     Map<String, String> texts = const {},
+    bool title = true,
   }) => jsonEncode({
     'type': 'init',
     'digits': digits,
@@ -225,6 +245,8 @@ abstract final class ChartCmd {
     'chartType': chartType,
     'indicators': indicators,
     'texts': texts,
+    // false: the legend shows only the OHLC values (the app shows the market and timeframe itself, over the chart)
+    if (!title) 'title': false,
   });
 
   /// The whole history (oldest first): replaces what is drawn and scrolls to the latest bar.

@@ -6,6 +6,7 @@ import 'package:kalks/features/terminal/chart/chart_bridge.dart';
 import 'package:kalks/features/terminal/chart/chart_surface.dart';
 import 'package:kalks/features/terminal/chart/indicators.dart';
 import 'package:kalks/features/terminal/chart/terminal_chart.dart';
+import 'package:kalks/ui/tokens.dart';
 
 void main() {
   const palette = ChartPalette(
@@ -140,7 +141,10 @@ void main() {
       final tp = lineForHandle(const [pos], 'tp:7');
       expect(tp, isNotNull);
       expect(tp!.kind, 'tp');
-      expect(tp.label, 'TP');
+      // a compact tag: the letter, the page puts the price after it
+      expect(tp.label, 'T');
+      expect(tp.tag, isTrue);
+      expect(lineForHandle(const [pos], 'tp:7')!.toJson()['tag'], isTrue);
       expect(tp.side, 'sell');
       expect(tp.price, 1.085);
       expect(tp.ref, '7');
@@ -314,5 +318,44 @@ void main() {
     expect(toChartTime(winter) - winter, 2 * 3600);
     expect(fromChartTime(toChartTime(summer)), summer);
     expect(fromChartTime(toChartTime(winter)), winter);
+  });
+
+  group('compact trade tags (owner design 2026-10)', () {
+    test('a stop tag reads its letter and its price, the dragged price while it moves', () {
+      const sl = ChartLine(id: 'sl:7', kind: 'sl', price: 1.1185, label: 'S', tag: true, side: 'buy', draggable: true);
+      const tp = ChartLine(id: 'tp:7', kind: 'tp', price: 1.126, label: 'T', tag: true, side: 'buy');
+      expect(chipLabel(sl, digits: 5), 'S 1.11850');
+      expect(chipLabel(tp, digits: 5), 'T 1.12600');
+      expect(chipLabel(sl, digits: 5, dragPrice: 1.119), 'S 1.11900');
+      expect(sl.toJson()['tag'], isTrue);
+      // the flag is part of the line (a changed tag re-sends the lines)
+      expect(sl == const ChartLine(id: 'sl:7', kind: 'sl', price: 1.1185, label: 'S', side: 'buy', draggable: true), isFalse);
+      expect(sl.at(1.12).tag, isTrue);
+    });
+
+    test('a position tag "B 0.50" keeps its text (the P&L is its note); other lines show the drag price only while dragged', () {
+      const pos = ChartLine(id: 'pos:7', kind: 'pos', price: 1.121, label: 'B 0.50', side: 'buy', note: '+12.30', tone: 'up');
+      expect(chipLabel(pos, digits: 5), 'B 0.50');
+      expect(chipLabel(pos, digits: 5, dragPrice: 1.118), 'B 0.50');
+      expect(pos.toJson().containsKey('tag'), isFalse);
+      expect(pos.toJson()['note'], '+12.30');
+      const pnd = ChartLine(id: 'pnd:9', kind: 'pending', price: 1.081, label: 'BUY LIMIT 0.10');
+      expect(chipLabel(pnd, digits: 5), 'BUY LIMIT 0.10');
+      expect(chipLabel(pnd, digits: 5, dragPrice: 1.0845), 'BUY LIMIT 0.10 1.08450');
+    });
+
+    test('the chart tab legend leaves the market and timeframe out (title: false); the default keeps them', () {
+      expect(dec(ChartCmd.init(digits: 5, intraday: true, palette: palette, title: false))['title'], isFalse);
+      expect(dec(ChartCmd.init(digits: 5, intraday: true, palette: palette)).containsKey('title'), isFalse);
+    });
+
+    test('the colour scheme reaches the chart: candles, the ask line and buy tags take the up colour', () {
+      expect(chartPalette(KTokens.traderDark()).up, '#2f7bff');
+      expect(chartPalette(KTokens.traderDark(green: true)).up, '#00c076');
+      // red stays red in both schemes
+      expect(chartPalette(KTokens.traderDark(green: true)).down, chartPalette(KTokens.traderDark()).down);
+      // the near-black ground of the trade room
+      expect(chartPalette(KTokens.traderDark()).bg, '#0b0b0f');
+    });
   });
 }
