@@ -179,7 +179,9 @@ function Editor({ sel, lang, canWrite, onSaved, onDeleted }: { sel: Sel; lang: s
       setBusy(false);
     }
   };
-  const save = () => {
+  // the service keeps one version per item (no drafts): saving a published item changes what learners see at once
+  const save = async () => {
+    if (node.published && !(await ask({ title: "Update the live version?", text: `This ${sel.kind} is published: learners see your changes as soon as you save. To prepare changes without learners seeing them, unpublish it first.`, confirm: "Save and update" }))) return;
     const data: Record<string, unknown> = { ...draft.data };
     delete data.words;
     delete data.minutes;
@@ -259,7 +261,7 @@ function Editor({ sel, lang, canWrite, onSaved, onDeleted }: { sel: Sel; lang: s
               <Toggle checked={node.published} onChange={() => togglePublish()} label="Published" />
             </label>
             <Button size="sm" variant="ember" onClick={save} disabled={busy || !dirty} data-testid="cms-save">
-              <Save /> {busy ? "Saving…" : "Save"}
+              <Save /> {busy ? "Saving…" : node.published ? "Save live" : "Save"}
             </Button>
           </div>
         )}
