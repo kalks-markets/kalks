@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { academy } from "@/lib/academy";
+import { CERT_CODE as CODE, academy, certificateImage } from "@/lib/academy";
 import { sameOrigin, sessionUser } from "@/lib/trading";
 
 // Client Area Academy BFF. Browser -> /api/academy/<route> (same origin) -> services/academy /v1/…
@@ -21,7 +21,6 @@ type Ctx = { params: Promise<{ path: string[] }> };
 
 const NO_STORE = { "cache-control": "no-store" };
 const SLUG = /^[a-z0-9-]{1,96}$/;
-const CODE = /^KA-[A-Z0-9]{5}-[A-Z0-9]{5}$/;
 
 function error(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status, headers: NO_STORE });
@@ -57,19 +56,9 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     if (!CODE.test(code)) return error(404, "not_found", "Certificate not found.");
     if (path.length === 2) return reply(await academy(`/v1/public/certificates/${code}`));
     if (path[2] !== "image") return error(404, "not_found", "Not found.");
-    const r = await academy(`/v1/public/certificates/${code}/svg`, { raw: true });
-    if (r.status !== 200) return error(r.status === 404 ? 404 : 503, r.status === 404 ? "not_found" : "unavailable", r.status === 404 ? "Certificate not found." : "The Academy is unavailable.");
-    const download = req.nextUrl.searchParams.get("download") === "1";
-    return new NextResponse(r.text, {
-      status: 200,
-      headers: {
-        "content-type": "image/svg+xml; charset=utf-8",
-        "cache-control": "private, max-age=300",
-        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
-        "x-content-type-options": "nosniff",
-        ...(download ? { "content-disposition": `attachment; filename="kalks-academy-${code}.svg"` } : {}),
-      },
-    });
+    const img = await certificateImage(code, req.nextUrl.searchParams.get("download") === "1");
+    if (img.status !== 200) return error(img.status, img.status === 404 ? "not_found" : "unavailable", img.status === 404 ? "Certificate not found." : "The Academy is unavailable.");
+    return img;
   }
 
   const user = await auth(req);

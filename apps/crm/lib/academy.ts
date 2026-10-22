@@ -31,3 +31,21 @@ export async function academy(path: string, init: { method?: "GET" | "POST"; bod
     return { status: 503, data: { error: { code: "unavailable", message: "The Academy is unavailable. Please try again shortly." } } };
   }
 }
+
+export const CERT_CODE = /^KA-[A-Z0-9]{5}-[A-Z0-9]{5}$/;
+
+/** A certificate's public image (the service's SVG). Status 404 (unknown code) or 503 (service down) has no body. */
+export async function certificateImage(code: string, download: boolean): Promise<Response> {
+  const r = CERT_CODE.test(code) ? await academy(`/v1/public/certificates/${code}/svg`, { raw: true }) : { status: 404 };
+  if (r.status !== 200 || !("text" in r)) return new Response(null, { status: r.status === 404 ? 404 : 503, headers: { "cache-control": "no-store" } });
+  return new Response(r.text, {
+    status: 200,
+    headers: {
+      "content-type": "image/svg+xml; charset=utf-8",
+      "cache-control": "private, max-age=300",
+      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+      "x-content-type-options": "nosniff",
+      ...(download ? { "content-disposition": `attachment; filename="kalks-academy-${code}.svg"` } : {}),
+    },
+  });
+}

@@ -44,7 +44,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ co
               </div>
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`/api/academy/certificates/${c.code}/image`} alt={`Certificate ${c.code}`} className="mt-6 block w-full rounded-[16px] border border-line" />
+            <img src={`/certificate/${c.code}/image`} alt={`Certificate ${c.code}`} className="mt-6 block w-full rounded-[16px] border border-line" />
           </>
         ) : (
           <div className="k-card p-8 text-center" data-testid="verify-result">
