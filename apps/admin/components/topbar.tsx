@@ -6,7 +6,8 @@ import { Check, ChevronDown, LogOut, ShieldCheck, UserRound, KeyRound } from "lu
 import { Avatar, Chip, CommandPalette, Menu, ThemeToggle, cn } from "@kalks/ui";
 import { NotificationBell } from "@/components/notifications";
 import { IS_DEMO } from "@kalks/mock/mode";
-import { NAV_COMMANDS } from "@/lib/live";
+import { NAV, navCommands } from "@/lib/live";
+import { navFor } from "@/lib/access";
 import { signOut, useStaff } from "@/components/staff-session";
 
 const TENANTS = [
@@ -131,13 +132,15 @@ function QueueChips() {
 
 export function AdminTopRight() {
   const staff = useStaff();
+  // same filter as the rail: no pages the role can't open or whose module is off for the broker
+  const commands = React.useMemo(() => navCommands(IS_DEMO ? NAV : navFor(NAV, staff)), [staff]);
   return (
     <>
       {IS_DEMO && <TenantSwitcher />}
       {IS_DEMO ? <FeedPill /> : <LiveFeedPill />}
       <ServerClock />
       {IS_DEMO && <QueueChips />}
-      <CommandPalette placeholder={IS_DEMO ? "Search user, account #, tx hash, page…" : "Jump to a page…"} items={NAV_COMMANDS.map((c) => ({ group: c.group, label: c.label, href: c.href, icon: <c.Icon /> }))} />
+      <CommandPalette placeholder={IS_DEMO ? "Search user, account #, tx hash, page…" : "Jump to a page…"} items={commands.map((c) => ({ group: c.group, label: c.label, href: c.href, icon: <c.Icon /> }))} />
       <ThemeToggle />
       <NotificationBell />
       <Menu

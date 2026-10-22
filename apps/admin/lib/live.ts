@@ -76,4 +76,5 @@ export const LIVE_NAV: NavModule[] = ADMIN_NAV.flatMap((m) => {
 
 export const NAV = IS_DEMO ? ADMIN_NAV : LIVE_NAV;
 
-export const NAV_COMMANDS = NAV.flatMap((m) => (m.sub ?? [{ href: m.href, label: m.label }]).map((s) => ({ group: m.label, label: s.label, href: s.href, Icon: m.icon })));
+/** Command-palette entries for a navigation tree (pass the role-filtered `navFor(NAV, staff)` so it lists only pages the staff member can open). */
+export const navCommands = (nav: NavModule[]) => nav.flatMap((m) => (m.sub ?? [{ href: m.href, label: m.label }]).map((s) => ({ group: m.label, label: s.label, href: s.href, Icon: m.icon })));

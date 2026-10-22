@@ -8,6 +8,7 @@ import { Button, Card, CardHeader, Chip, DataTable, EmptyState, Input, KpiCard, 
 import { IS_DEMO } from "@kalks/mock/mode";
 import { FilterSelect, ago, sendJson, useApi, useNow, type ApiErr } from "@/components/live/kit";
 import { useCan } from "@/components/staff-session";
+import { NeedsPerm } from "@/components/needs-perm";
 import { DeskDialog } from "@/components/trading-desk/kit";
 import { DeskStatusChip } from "@/components/trading-desk/status";
 import { usdCompact } from "@/components/command/kit";
@@ -271,9 +272,11 @@ function LiveLeverageControl() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
-                <Button variant="surface" size="md" disabled={!!formError || previewing} onClick={runPreview}>
-                  <Eye /> {previewing ? "Previewing…" : "Preview impact"}
-                </Button>
+                <NeedsPerm ok={canWrite} perm="dealing.write" text="Previewing and applying caps need the dealing.write permission">
+                  <Button variant="surface" size="md" disabled={!!formError || previewing || !canWrite} onClick={runPreview}>
+                    <Eye /> {previewing ? "Previewing…" : "Preview impact"}
+                  </Button>
+                </NeedsPerm>
                 {canWrite && (
                   <Button
                     variant={allPositions ? "sell" : "ember"}
@@ -289,7 +292,7 @@ function LiveLeverageControl() {
                 )}
                 <span className="text-[11.5px] text-fg-3">{formError ?? (fresh ? "Previewed: ready to apply" : "Apply unlocks after a preview of these exact settings")}</span>
               </div>
-              {!canWrite && <p className="text-[11.5px] text-fg-3">Applying caps needs the dealing write permission (dealer, risk manager, admins).</p>}
+              {!canWrite && <p className="text-[11.5px] text-fg-3">Previewing and applying caps need the dealing write permission (dealer, risk manager, admins).</p>}
             </div>
           </Card>
         </Reveal>

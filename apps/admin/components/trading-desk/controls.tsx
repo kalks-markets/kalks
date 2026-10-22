@@ -10,6 +10,7 @@ import { MiniClient } from "@/components/trading/shared";
 import { ago, clientName, groupLabel, groupOptions, useDesk, useLiveDirectory, type AccountControl, type ControlMode } from "@/lib/trading-desk";
 import { AccountPicker, DeskDialog, MetaTile } from "./kit";
 import { useCan } from "@/components/staff-session";
+import { NeedsPerm } from "@/components/needs-perm";
 
 /* ------------------------------------------------------------------ */
 /* Account controls (D115)                                             */
@@ -31,6 +32,7 @@ function ComplianceChip() {
 
 export function AccountControls({ addOpen, onAddOpenChange }: { addOpen: boolean; onAddOpenChange: (o: boolean) => void }) {
   const { state, api } = useDesk();
+  const canDeal = useCan("dealing.write");
   const [filter, setFilter] = React.useState<"all" | "delay" | "disabled">("all");
   const [pending, setPending] = React.useState<{ login: string; patch: Patch; label: string } | null>(null);
   const [addLogin, setAddLogin] = React.useState<string | null>(null);
@@ -48,11 +50,15 @@ export function AccountControls({ addOpen, onAddOpenChange }: { addOpen: boolean
       sort: (r) => r.markupPips,
       cell: (r) => (
         <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          {[-0.1, 0.1].map((d) => (
-            <button key={d} onClick={() => setPending({ login: r.login, patch: { markupPips: +(r.markupPips + d).toFixed(1) }, label: `Markup → ${(r.markupPips + d).toFixed(1)} pips` })} aria-label={d < 0 ? "Decrease markup" : "Increase markup"} className="grid size-6 place-items-center rounded-full border border-line text-[12px] text-fg-3 hover:text-fg">
-              {d < 0 ? "−" : "+"}
-            </button>
-          ))}
+          <NeedsPerm ok={canDeal} perm="dealing.write">
+            <span className="inline-flex items-center gap-1">
+              {[-0.1, 0.1].map((d) => (
+                <button key={d} onClick={() => setPending({ login: r.login, patch: { markupPips: +(r.markupPips + d).toFixed(1) }, label: `Markup → ${(r.markupPips + d).toFixed(1)} pips` })} aria-label={d < 0 ? "Decrease markup" : "Increase markup"} className="grid size-6 place-items-center rounded-full border border-line text-[12px] text-fg-3 hover:text-fg">
+                  {d < 0 ? "−" : "+"}
+                </button>
+              ))}
+            </span>
+          </NeedsPerm>
           <span className={cn("k-num w-12 text-right font-mono text-[12.5px]", r.markupPips < 0 ? "text-up" : r.markupPips > 0.6 ? "text-warn" : "text-fg")}>{r.markupPips > 0 ? "+" : ""}{r.markupPips.toFixed(1)}</span>
         </span>
       ),
@@ -64,11 +70,13 @@ export function AccountControls({ addOpen, onAddOpenChange }: { addOpen: boolean
       sort: (r) => r.maxLot,
       cell: (r) => (
         <span onClick={(e) => e.stopPropagation()}>
-          <Menu
-            width={140}
-            items={[1, 2, 5, 10, 20, 50, 100].map((v) => ({ label: <span className="font-mono">{v} lots</span>, onSelect: () => setPending({ login: r.login, patch: { maxLot: v }, label: `Max lot → ${v}` }) }))}
-            trigger={<button className="k-num rounded-full border border-line px-2.5 py-0.5 font-mono text-[12.5px] hover:border-fg-3">{r.maxLot || "—"}</button>}
-          />
+          <NeedsPerm ok={canDeal} perm="dealing.write">
+            <Menu
+              width={140}
+              items={[1, 2, 5, 10, 20, 50, 100].map((v) => ({ label: <span className="font-mono">{v} lots</span>, onSelect: () => setPending({ login: r.login, patch: { maxLot: v }, label: `Max lot → ${v}` }) }))}
+              trigger={<button className="k-num rounded-full border border-line px-2.5 py-0.5 font-mono text-[12.5px] hover:border-fg-3">{r.maxLot || "—"}</button>}
+            />
+          </NeedsPerm>
         </span>
       ),
     },
@@ -80,15 +88,17 @@ export function AccountControls({ addOpen, onAddOpenChange }: { addOpen: boolean
       cell: (r) => (
         <span className="inline-flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
           {r.execDelayMs > 0 && <ComplianceChip />}
-          <Menu
-            width={140}
-            items={[0, 50, 120, 250, 500].map((v) => ({ label: <span className="font-mono">{v} ms</span>, onSelect: () => setPending({ login: r.login, patch: { execDelayMs: v }, label: `Execution delay → ${v} ms` }) }))}
-            trigger={
-              <button className={cn("k-num whitespace-nowrap rounded-full border border-line px-2.5 py-0.5 font-mono text-[12.5px] hover:border-fg-3", r.execDelayMs > 0 ? (delayOn ? "text-warn" : "text-fg-3 line-through") : "text-fg-3")} title={!delayOn && r.execDelayMs > 0 ? "Ignored — tenant policy blocks delays" : undefined}>
-                {r.execDelayMs} ms
-              </button>
-            }
-          />
+          <NeedsPerm ok={canDeal} perm="dealing.write">
+            <Menu
+              width={140}
+              items={[0, 50, 120, 250, 500].map((v) => ({ label: <span className="font-mono">{v} ms</span>, onSelect: () => setPending({ login: r.login, patch: { execDelayMs: v }, label: `Execution delay → ${v} ms` }) }))}
+              trigger={
+                <button className={cn("k-num whitespace-nowrap rounded-full border border-line px-2.5 py-0.5 font-mono text-[12.5px] hover:border-fg-3", r.execDelayMs > 0 ? (delayOn ? "text-warn" : "text-fg-3 line-through") : "text-fg-3")} title={!delayOn && r.execDelayMs > 0 ? "Ignored — tenant policy blocks delays" : undefined}>
+                  {r.execDelayMs} ms
+                </button>
+              }
+            />
+          </NeedsPerm>
         </span>
       ),
     },
@@ -98,7 +108,9 @@ export function AccountControls({ addOpen, onAddOpenChange }: { addOpen: boolean
       align: "center",
       cell: (r) => (
         <span className="inline-flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <Toggle checked={!r.tradingDisabled} label={`Trading enabled for ${r.login}`} onChange={(v) => setPending({ login: r.login, patch: { tradingDisabled: !v }, label: v ? "Enable trading" : "Disable trading" })} />
+          <NeedsPerm ok={canDeal} perm="dealing.write">
+            <Toggle checked={!r.tradingDisabled} label={`Trading enabled for ${r.login}`} onChange={(v) => setPending({ login: r.login, patch: { tradingDisabled: !v }, label: v ? "Enable trading" : "Disable trading" })} />
+          </NeedsPerm>
         </span>
       ),
       csv: (r) => (r.tradingDisabled ? "disabled" : "enabled"),
@@ -109,7 +121,9 @@ export function AccountControls({ addOpen, onAddOpenChange }: { addOpen: boolean
       align: "center",
       cell: (r) => (
         <span onClick={(e) => e.stopPropagation()}>
-          <Toggle checked={r.closeOnly} label={`Close-only for ${r.login}`} onChange={(v) => setPending({ login: r.login, patch: { closeOnly: v }, label: v ? "Set close-only" : "Lift close-only" })} />
+          <NeedsPerm ok={canDeal} perm="dealing.write">
+            <Toggle checked={r.closeOnly} label={`Close-only for ${r.login}`} onChange={(v) => setPending({ login: r.login, patch: { closeOnly: v }, label: v ? "Set close-only" : "Lift close-only" })} />
+          </NeedsPerm>
         </span>
       ),
       csv: (r) => (r.closeOnly ? "yes" : "no"),
@@ -215,6 +229,7 @@ export function TenantDelayCard() {
 
 export function SymbolControls() {
   const { state, api } = useDesk();
+  const canDeal = useCan("dealing.write");
   const dir = useLiveDirectory();
   const [scope, setScope] = React.useState<TradingGroup | "all">("all");
   const [pending, setPending] = React.useState<{ symbol: string; mode: ControlMode | null } | null>(null);
@@ -280,21 +295,25 @@ export function SymbolControls() {
                     Trading
                   </Chip>
                 )}
-                {mode !== "halt" && (
-                  <Button size="xs" variant="surface" onClick={() => setPending({ symbol: s, mode: "halt" })} aria-label={`Halt ${s}`}>
-                    <Ban /> Halt
-                  </Button>
-                )}
-                {mode !== "close-only" && (
-                  <Button size="xs" variant="surface" onClick={() => setPending({ symbol: s, mode: "close-only" })} aria-label={`Close-only ${s}`}>
-                    <CirclePause /> Close-only
-                  </Button>
-                )}
-                {mode && (
-                  <Button size="xs" variant="up-outline" onClick={() => setPending({ symbol: s, mode: null })} aria-label={`Resume ${s}`}>
-                    <CirclePlay /> Resume
-                  </Button>
-                )}
+                <NeedsPerm ok={canDeal} perm="dealing.write">
+                  <span className="flex items-center gap-1.5">
+                    {mode !== "halt" && (
+                      <Button size="xs" variant="surface" onClick={() => setPending({ symbol: s, mode: "halt" })} aria-label={`Halt ${s}`}>
+                        <Ban /> Halt
+                      </Button>
+                    )}
+                    {mode !== "close-only" && (
+                      <Button size="xs" variant="surface" onClick={() => setPending({ symbol: s, mode: "close-only" })} aria-label={`Close-only ${s}`}>
+                        <CirclePause /> Close-only
+                      </Button>
+                    )}
+                    {mode && (
+                      <Button size="xs" variant="up-outline" onClick={() => setPending({ symbol: s, mode: null })} aria-label={`Resume ${s}`}>
+                        <CirclePlay /> Resume
+                      </Button>
+                    )}
+                  </span>
+                </NeedsPerm>
               </div>
             </div>
           );

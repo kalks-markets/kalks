@@ -8,11 +8,14 @@ import { priceFeed } from "@kalks/mock";
 import { MiniClient } from "@/components/trading/shared";
 import { REASON_STOP_OUT, accountMetrics, clientName, getAccount, groupLabel, positionPnl, useDesk, type AccountMetrics, type DeskPosition } from "@/lib/trading-desk";
 import { DeskDialog, MetaTile, money, signedMoney } from "./kit";
+import { useCan } from "@/components/staff-session";
+import { NeedsPerm } from "@/components/needs-perm";
 
 type Row = AccountMetrics & { clientId: string; group: string; leverage: number; loser: DeskPosition | null; loserPnl: number };
 
 export function MarginMonitor() {
   const { state, api } = useDesk();
+  const canDeal = useCan("dealing.write");
   const [view, setView] = React.useState<"risk" | "all">("risk");
   const [target, setTarget] = React.useState<Row | null>(null);
   const symbols = React.useMemo(() => Array.from(new Set(state.positions.map((p) => p.symbol))).sort(), [state.positions]);
@@ -92,9 +95,11 @@ export function MarginMonitor() {
       align: "right",
       cell: (r) => (
         <span className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <Button size="xs" variant="down-outline" disabled={!r.loser} onClick={() => setTarget(r)} aria-label={`Close largest loser on ${r.login}`}>
-            <TrendingDown /> Close loser
-          </Button>
+          <NeedsPerm ok={canDeal} perm="dealing.write">
+            <Button size="xs" variant="down-outline" disabled={!r.loser} onClick={() => setTarget(r)} aria-label={`Close largest loser on ${r.login}`}>
+              <TrendingDown /> Close loser
+            </Button>
+          </NeedsPerm>
           <Link href={`/trading?login=${r.login}`} className="grid size-7 place-items-center rounded-full text-fg-3 hover:bg-surface-3 hover:text-fg" aria-label={`Positions of ${r.login}`}>
             <ExternalLink className="size-3.5" />
           </Link>

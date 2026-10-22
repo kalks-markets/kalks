@@ -8,6 +8,8 @@ import type { NavModule } from "@kalks/ui";
 export const PAGE_PERMS: Record<string, readonly string[]> = {
   "/": ["stats.read"],
   "/command": ["stats.read"],
+  // exposure, alerts and toxic flow come from the dealing desk (LiveRisk checks dealing.read)
+  "/command/risk": ["dealing.read"],
   "/clients": ["clients.read"],
   "/clients/kyc": ["kyc.read"],
   "/trading": ["dealing.read"],
@@ -27,6 +29,8 @@ export const PAGE_PERMS: Record<string, readonly string[]> = {
   "/marketing": ["marketing.read"],
   "/support": ["support.read"],
   "/content": ["content.read"],
+  // the broadcast composer is the whole page and every call needs notifications.write
+  "/content/notifications": ["notifications.write"],
   "/analytics": ["reports.read"],
   "/security": ["audit.read"],
   "/security/users": ["audit.read"],

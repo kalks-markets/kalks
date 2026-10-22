@@ -28,6 +28,7 @@ import { LP_CONNECTIONS, ROUTING_DEFAULT, type RoutingCondition, type RoutingRul
 import { IS_DEMO } from "@kalks/mock/mode";
 import { clientName, currentPriceOf, getAccount, groupOptions, notionalUsd as deskNotional, positionPnl, useDesk, useLiveDirectory, type Book } from "@/lib/trading-desk";
 import { DeskStatusChip } from "@/components/trading-desk/status";
+import { NeedsPerm } from "@/components/needs-perm";
 import { useCan } from "@/components/staff-session";
 import { AccountPicker, BookChip, DeskDialog } from "@/components/trading-desk/kit";
 import { EXPOSURE, notionalUsd } from "@kalks/mock/admin-ops";
@@ -274,8 +275,8 @@ export default function RoutingPage() {
               {rules.map((r, i) => (
                 <motion.div layout key={r.id} transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}>
                 <div
-                  draggable
-                  onDragStart={() => setDragId(r.id)}
+                  draggable={canDeal}
+                  onDragStart={() => canDeal && setDragId(r.id)}
                   onDragOver={(e) => {
                     e.preventDefault();
                     setOverId(r.id);
@@ -287,7 +288,7 @@ export default function RoutingPage() {
                   onDrop={() => dragId && move(dragId, r.id)}
                   className={cn("k-row flex items-start gap-3 px-3 py-3.5 transition-colors", !r.enabled && "opacity-55", overId === r.id && dragId !== r.id && "border-ember/50", dragId === r.id && "opacity-40")}
                 >
-                  <span className="mt-1 cursor-grab text-fg-3 hover:text-fg active:cursor-grabbing" aria-label="Drag to reorder">
+                  <span className={cn("mt-1 text-fg-3", canDeal ? "cursor-grab hover:text-fg active:cursor-grabbing" : "cursor-not-allowed opacity-50")} aria-label={canDeal ? "Drag to reorder" : "Reordering needs the dealing.write permission"} title={canDeal ? undefined : "Needs the dealing.write permission"}>
                     <GripVertical className="size-4" />
                   </span>
                   <span className="k-num mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-surface-3 font-mono text-[11px] text-fg-2">{i + 1}</span>
@@ -314,6 +315,7 @@ export default function RoutingPage() {
                     <div className="k-num font-mono text-[13px]">{formatNumber(r.hits24h, 0)}</div>
                     <div className="text-[10.5px] text-fg-3">{formatNumber(r.lots24h, 1)} lots · 24h</div>
                   </div>
+                  <NeedsPerm ok={canDeal} perm="dealing.write">
                   <div className="flex items-center gap-1">
                     <button onClick={() => setEdit(r)} className="grid size-8 place-items-center rounded-full text-fg-3 hover:bg-surface-3 hover:text-fg" aria-label="Edit rule">
                       <Pencil className="size-3.5" />
@@ -331,6 +333,7 @@ export default function RoutingPage() {
                       onChange={(v) => propose(rules.map((x) => (x.id === r.id ? { ...x, enabled: v } : x)), `${v ? "Enabled" : "Disabled"} ${r.id} · ${r.name}`)}
                     />
                   </div>
+                  </NeedsPerm>
                 </div>
                 </motion.div>
               ))}
@@ -499,12 +502,14 @@ function QuickRoutes() {
             return (
               <div key={g} className="flex items-center gap-2 text-[12.5px]">
                 <span className="w-24 truncate">{label}</span>
-                <Segmented
-                  size="xs"
-                  value={b ?? "rules"}
-                  onChange={(v) => canDeal && setPending({ scope: { group: g }, book: v === "rules" ? null : (v as Book), label: `${label}: ${v === "rules" ? "follow rules" : `route new trades to ${v}-book`}` })}
-                  options={[{ value: "rules", label: "Rules" }, { value: "A", label: "A-book" }, { value: "B", label: "B-book" }]}
-                />
+                <NeedsPerm ok={canDeal} perm="dealing.write">
+                  <Segmented
+                    size="xs"
+                    value={b ?? "rules"}
+                    onChange={(v) => canDeal && setPending({ scope: { group: g }, book: v === "rules" ? null : (v as Book), label: `${label}: ${v === "rules" ? "follow rules" : `route new trades to ${v}-book`}` })}
+                    options={[{ value: "rules", label: "Rules" }, { value: "A", label: "A-book" }, { value: "B", label: "B-book" }]}
+                  />
+                </NeedsPerm>
               </div>
             );
           })}
@@ -512,11 +517,15 @@ function QuickRoutes() {
         <div className="border-t border-line pt-4">
           <AccountPicker value={login} onChange={setLogin} />
           <div className="mt-2 flex gap-2">
-            {(["A", "B"] as const).map((b) => (
-              <Button key={b} size="xs" variant="surface" disabled={!login || !canDeal} onClick={() => login && setPending({ scope: { login }, book: b, label: `${login}: route new trades to ${b}-book` })}>
-                Route to {b}-book
-              </Button>
-            ))}
+            <NeedsPerm ok={canDeal} perm="dealing.write">
+              <span className="flex gap-2">
+                {(["A", "B"] as const).map((b) => (
+                  <Button key={b} size="xs" variant="surface" disabled={!login || !canDeal} onClick={() => login && setPending({ scope: { login }, book: b, label: `${login}: route new trades to ${b}-book` })}>
+                    Route to {b}-book
+                  </Button>
+                ))}
+              </span>
+            </NeedsPerm>
           </div>
           {loginRules.length > 0 && (
             <div className="mt-3 space-y-1.5">
@@ -528,9 +537,11 @@ function QuickRoutes() {
                     <span className="font-mono">{l}</span>
                     <span className="flex-1 truncate text-fg-3">{acc ? clientName(acc.clientId, acc.login) : ""}</span>
                     <BookChip book={r.action.book} />
-                    <button type="button" onClick={() => setPending({ scope: { login: l }, book: null, label: `${l}: remove account route` })} className="grid size-6 place-items-center rounded-full text-fg-3 hover:bg-surface-3 hover:text-down" aria-label={`Remove route for ${l}`}>
-                      <X className="size-3.5" />
-                    </button>
+                    <NeedsPerm ok={canDeal} perm="dealing.write">
+                      <button type="button" onClick={() => setPending({ scope: { login: l }, book: null, label: `${l}: remove account route` })} className="grid size-6 place-items-center rounded-full text-fg-3 hover:bg-surface-3 hover:text-down" aria-label={`Remove route for ${l}`}>
+                        <X className="size-3.5" />
+                      </button>
+                    </NeedsPerm>
                   </div>
                 );
               })}
