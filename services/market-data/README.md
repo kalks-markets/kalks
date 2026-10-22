@@ -117,7 +117,7 @@ change (no close frame, no error) is dropped and reconnected after `MARKET_DATA_
 | `GET /v1/streaming` | plan limits, streamed symbols per market, demand by tier and over the limit |
 | `GET /v1/candles?symbol=EURUSD&tf=H1&limit=500&to=<unix>` | ascending bars `{t,o,h,l,c,v}` (t = unix secs); the latest page includes the forming bar |
 | `GET /v1/history/status` | stored bars per symbol/timeframe |
-| `GET/PUT /v1/admin/spreads` | spread markups per group/symbol (`Authorization: Bearer $MARKET_DATA_ADMIN_TOKEN`); body `{group_code, symbol ("*" = all), markup_points, min_spread_points}` |
+| `GET/PUT /v1/admin/spreads` | spread markups per group/symbol (`Authorization: Bearer $MARKET_DATA_ADMIN_TOKEN`); body `{group_code, symbol ("*" = all), markup_points, min_spread_points}`; any well-formed spread group code except `raw` (a new one, e.g. a white-label broker's `<broker>-standard`, is added to `account_groups`); which groups a broker may edit is checked by the Back Office BFF |
 | `GET /v1/depth?symbol=XAUUSD&group=standard&levels=10` | depth of market `{src, t, bids, asks}` (levels best first, `[price, lots]`) |
 | `WS /v1/stream?group=pro` | send `{"op":"subscribe","symbols":[..],"passive"?:true}` → `{"type":"quote","s","b","a","l","t","d"?:1}`; `{"op":"hold","symbols":[..]}` (trading engine) pins symbols; `{"op":"bars","symbol","tf"}` → `{"type":"bar","s","tf","t","o","h","l","c","v"}`; `{"op":"depth","symbols":[..],"levels"?:10}` → `{"type":"depth","s","src","t","b":[[p,lots]..],"a":[..]}` on every quote change (`unsubscribe` / `unbars` / `undepth` to stop) |
 

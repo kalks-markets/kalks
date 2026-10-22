@@ -274,6 +274,9 @@ async fn put_spread(State(s): State<AppState>, h: HeaderMap, Json(m): Json<Marku
     if m.symbol != "*" && s.market.cat.get(&m.symbol).is_none() {
         return Ok(bad("unknown symbol"));
     }
+    if let Err(e) = m.check() {
+        return Ok(bad(e));
+    }
     s.market.spreads.upsert(&s.market.pool, &m).await?;
     tracing::info!(group = %m.group_code, symbol = %m.symbol, markup = m.markup_points, "spread markup updated");
     Ok(Json(json!({"ok": true})).into_response())

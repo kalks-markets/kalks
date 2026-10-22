@@ -86,7 +86,7 @@ export async function PUT(req: NextRequest) {
   const reason = typeof b.reason === "string" ? b.reason.trim() : "";
   const groups = await tenantSpreadGroups(who.staff);
   if (groups === null) return apiError(503, "unavailable", "The trading engine is unavailable.");
-  if (!groups.includes(group)) return apiError(422, "validation", "Unknown group.");
+  if (!groups.includes(group)) return apiError(422, "validation", `Unknown spread group "${group.slice(0, 64)}": none of this broker's account groups uses it.`);
   if (!SYMBOL_RE.test(symbol)) return apiError(422, "validation", "Unknown symbol.");
   if (!intIn(b.markup_points, 0, 100000)) return NextResponse.json({ error: { code: "validation", field: "markup_points", message: "Markup must be a whole number of points (0–100,000)." } }, { status: 422 });
   if (!intIn(b.min_spread_points, 0, 100000)) return NextResponse.json({ error: { code: "validation", field: "min_spread_points", message: "Minimum spread must be a whole number of points (0–100,000)." } }, { status: 422 });
