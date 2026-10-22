@@ -188,7 +188,7 @@ The IB service decides a client's first deposit (FTD, CPA) from the engine ledge
     - no credited deposit within `deposit_cooldown_hours`;
     - the available balance.
   - **KYC gate (D6).** The service asks the gateway (`GET /v1/internal/users/{id}`). `kyc_status` other than `verified` returns `403 kyc_required`.
-- **Reject or cancel.** The funds are unlocked.
+- **Reject or cancel.** The funds are unlocked. Only a `requested` withdrawal can be rejected (`409 invalid_state` otherwise): payouts are sent by hand, so from `approved` on the money may already have left (a failed payout check also returns to `approved`; fix the hash instead).
 - **Paid.** Staff enter the payout tx hash. The watcher checks the transaction on chain:
   - a USDT `Transfer` from a company address (a receiving or payout address of that chain) to `to_address` of exactly `amount − fee`;
   - it succeeded;

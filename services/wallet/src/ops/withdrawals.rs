@@ -310,9 +310,12 @@ pub async fn reject(st: &AppState, s_ctx: &StaffCtx, id: i64, reason: &str) -> A
     }
     let mut tx = st.pool.begin().await?;
     let w = sqlx::query("SELECT * FROM withdrawals WHERE id = $1 AND tenant_id = $2 FOR UPDATE").bind(id).bind(s_ctx.ctx.tenant.id).fetch_optional(&mut *tx).await?.ok_or_else(|| ApiError::not_found("Withdrawal"))?;
+    // Only before approval: payouts are sent by hand, so from Approved on the money may already have left (a failed
+    // payout check also returns to Approved) and releasing the lock would refund the client twice. The row lock
+    // above serialises this with approve, so a racing approve and reject can't both succeed.
     let status: String = w.get("status");
-    if status != "requested" && status != "approved" {
-        return Err(ApiError::conflict("invalid_state", format!("A {status} withdrawal can't be rejected")));
+    if status != "requested" {
+        return Err(ApiError::conflict("invalid_state", format!("A {status} withdrawal can't be rejected; only one waiting for review can")));
     }
     let t = unlock(&mut tx, &w, &format!("Rejected: {reason}"), &s_ctx.staff.tag()).await?;
     let r = sqlx::query("UPDATE withdrawals SET status = 'rejected', reason = $2, reviewed_by = $3, reviewed_at = now(), final_txn_id = $4, updated_at = now() WHERE id = $1 RETURNING *")

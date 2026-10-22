@@ -467,6 +467,57 @@ async fn withdrawals_lifecycle() {
     t.drop_db().await;
 }
 
+/// Reject returns the locked funds, so it is only allowed before approval: once approved the payout may already
+/// have been sent by hand (even when its on-chain check failed), and a reject would refund the client twice.
+#[tokio::test]
+async fn withdrawals_cannot_be_rejected_after_approval() {
+    let Some(t) = T::new("withdrawal reject states").await else { return };
+    t.credit(7, "500", "seed-7").await;
+    t.users.set(7, "verified");
+    let req = |amount: &str, key: &str| json!({"user_id": 7, "amount": amount, "chain": "tron", "to_address": CLIENT_TRON, "idempotency_key": key});
+    let tr = &t;
+    let reject = |id: i64| async move { tr.staff("POST", &format!("/v1/admin/withdrawals/{id}/reject"), Some(json!({"reason": "Changed our mind"}))).await };
+
+    // approved: payout sent but its check failed (wrong amount) → back to approved; reject is refused
+    let (_, v) = t.post("/v1/withdrawals", req("100", "a")).await;
+    let w = v["withdrawal"]["id"].as_i64().unwrap();
+    t.staff("POST", &format!("/v1/admin/withdrawals/{w}/approve"), Some(json!({}))).await;
+    let (s, v) = reject(w).await;
+    assert_eq!((s, v["error"]["code"].as_str()), (409, Some("invalid_state")), "{v}");
+    t.tron.put(&hash(70), usdt_tx(ChainId::Tron, TRON_ADDR, CLIENT_TRON, "100", 3000));
+    t.tron.set_head(3030);
+    let (_, v) = t.staff("POST", &format!("/v1/admin/withdrawals/{w}/paid"), Some(json!({"tx_hash": hash(70)}))).await;
+    assert_eq!(v["withdrawal"]["status"], "approved", "{v}");
+    let (s, v) = reject(w).await;
+    assert_eq!((s, v["error"]["code"].as_str()), (409, Some("invalid_state")), "{v}");
+    // paid (verifying) and completed: refused too
+    t.tron.put(&hash(71), usdt_tx(ChainId::Tron, TRON_ADDR, CLIENT_TRON, "99", 3040));
+    t.tron.set_head(3041);
+    let (_, v) = t.staff("POST", &format!("/v1/admin/withdrawals/{w}/paid"), Some(json!({"tx_hash": hash(71)}))).await;
+    assert_eq!(v["withdrawal"]["status"], "paid", "{v}");
+    let (s, _) = reject(w).await;
+    assert_eq!(s, 409);
+    t.tron.set_head(3100);
+    watcher::tick(&t.st).await.unwrap();
+    let (s, _) = reject(w).await;
+    assert_eq!(s, 409);
+    assert_eq!(t.balance(7).await, ("400".into(), "0".into()), "no refund on top of the payout");
+
+    // racing approve and reject on one request: exactly one wins, the funds are released at most once
+    for i in 0..5 {
+        let (_, v) = t.post("/v1/withdrawals", req("10", &format!("race-{i}"))).await;
+        let w = v["withdrawal"]["id"].as_i64().unwrap();
+        let approve = format!("/v1/admin/withdrawals/{w}/approve");
+        let ((sa, _), (sr, _)) = tokio::join!(t.staff("POST", &approve, Some(json!({}))), reject(w));
+        assert!((sa == 200) ^ (sr == 200), "approve {sa}, reject {sr}");
+        assert!(sa == 409 || sr == 409);
+        let (s, _) = reject(w).await;
+        assert_eq!(s, 409, "a second reject never refunds again");
+    }
+    t.invariants().await;
+    t.drop_db().await;
+}
+
 #[tokio::test]
 async fn wallet_trading_transfers_are_two_phase_safe() {
     let Some(t) = T::new("trading transfers").await else { return };

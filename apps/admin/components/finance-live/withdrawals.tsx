@@ -89,7 +89,8 @@ function WithdrawalDrawer({ id, onClose, onChanged }: { id: number | null; onClo
       footer={
         w ? (
           <>
-            {(w.status === "requested" || w.status === "approved") && canApprove && (
+            {/* reject only before approval: once approved the payout may already have been sent by hand */}
+            {w.status === "requested" && canApprove && (
               <Button variant="down-outline" disabled={busy} onClick={() => (setMode("reject"), setText(""))}>
                 Reject
               </Button>
@@ -163,7 +164,7 @@ function WithdrawalDrawer({ id, onClose, onChanged }: { id: number | null; onClo
                   </Button>
                 )}
                 {mode === "reject" && (
-                  <Button variant="down-outline" disabled={busy || text.trim().length < 3} onClick={() => act("reject", { reason: text }, "Withdrawal rejected")}>
+                  <Button variant="down-outline" disabled={busy || w.status !== "requested" || text.trim().length < 3} onClick={() => act("reject", { reason: text }, "Withdrawal rejected")}>
                     Reject and unlock funds
                   </Button>
                 )}
