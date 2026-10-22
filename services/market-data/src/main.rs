@@ -18,6 +18,8 @@ mod state;
 mod timeframes;
 
 #[cfg(test)]
+mod tests_candles;
+#[cfg(test)]
 mod tests_catalogue;
 
 use std::time::Duration;

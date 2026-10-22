@@ -42,9 +42,12 @@ pub enum Event {
     Bars { symbol: Arc<str>, bars: Arc<[(Tf, Bar)]> },
 }
 
+/// Bars and ticks waiting for the next 1-second flush. Bars are keyed by their open time too: a bar that closes
+/// between two flushes (its last ticks, then the first tick of the next bar) is stored with its final values, not
+/// replaced by the next bar before it reached the database.
 #[derive(Default)]
 struct Pending {
-    bars: HashMap<(String, Tf), Bar>,
+    bars: HashMap<(String, Tf, DateTime<Utc>), Bar>,
     ticks: Vec<(String, DateTime<Utc>, Option<f64>, Option<f64>, Option<f64>)>,
 }
 
@@ -379,7 +382,7 @@ impl Market {
                         nb
                     }
                 };
-                pending.bars.insert(key, bar);
+                pending.bars.insert((symbol.to_string(), tf, bar.t), bar);
                 changed.push((tf, bar));
             }
             if self.store_ticks {
@@ -417,7 +420,7 @@ impl Market {
                 }
                 b.h = b.h.max(bar.h);
                 b.l = b.l.min(bar.l);
-                pending.bars.insert(key, *b);
+                pending.bars.insert((symbol.to_string(), tf, b.t), *b);
                 changed.push((tf, *b));
             }
         }
@@ -432,7 +435,7 @@ impl Market {
             let mut p = self.pending.lock().unwrap();
             (std::mem::take(&mut p.bars), std::mem::take(&mut p.ticks))
         };
-        let rows: Vec<(String, i32, Bar)> = bars.into_iter().map(|((s, tf), b)| (s, tf.minutes(), b)).collect();
+        let rows: Vec<(String, i32, Bar)> = bars.into_iter().map(|((s, tf, _), b)| (s, tf.minutes(), b)).collect();
         db::upsert_bars(&self.pool, &rows, Source::Live).await?;
         db::insert_ticks(&self.pool, &ticks).await?;
         Ok(())
