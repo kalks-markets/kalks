@@ -12,7 +12,8 @@ import { DeskStatusChip } from "@/components/trading-desk/status";
 
 const tone = (t: DeskOrder["type"]) => (t.startsWith("Buy") ? "up" : "down");
 
-type Act = { k: "cancel" | "modify" | "fill"; o: DeskOrder } | { k: "cancelMany"; tickets: string[] } | null;
+/** Bulk cancel acts only on orders the dealer ticked (like the Positions bulk bar), never on a whole filter. */
+type Act = { k: "cancel" | "modify" | "fill"; o: DeskOrder } | { k: "cancelMany"; orders: DeskOrder[] } | null;
 
 export default function OrdersPage() {
   const { state, api } = useDesk();
@@ -138,6 +139,7 @@ export default function OrdersPage() {
   ];
 
   const o = act && act.k !== "cancelMany" ? act.o : null;
+  const many = act?.k === "cancelMany" ? act.orders : [];
   const near = rows.filter((r) => Math.abs(dist(r).pct) < 0.3).length;
   const close = (v: boolean) => !v && setAct(null);
   return (
@@ -147,8 +149,8 @@ export default function OrdersPage() {
         subtitle={<span className="inline-flex flex-wrap items-center gap-2">Limit, stop and stop-limit orders with live distance to market. <DeskStatusChip /></span>}
         actions={
           <>
-            <Button variant="down-outline" size="lg" disabled={!rows.length} onClick={() => setAct({ k: "cancelMany", tickets: sel.length ? sel.map((s) => s.ticket) : rows.map((r) => r.ticket) })}>
-              <XCircle /> {sel.length ? `Cancel selected (${sel.length})` : `Cancel filtered (${rows.length})`}
+            <Button variant="down-outline" size="lg" disabled={!sel.length} title={sel.length ? undefined : "Tick the orders to cancel first"} onClick={() => setAct({ k: "cancelMany", orders: sel })}>
+              <XCircle /> Cancel selected ({sel.length})
             </Button>
             <Button variant="ember" size="lg" onClick={() => setCreate(true)}>
               <Plus /> New order
@@ -256,13 +258,20 @@ export default function OrdersPage() {
       <DeskDialog
         open={act?.k === "cancelMany"}
         onOpenChange={close}
-        title={`Cancel ${act?.k === "cancelMany" ? act.tickets.length : 0} orders`}
-        description="Each order is cancelled with its own audit entry."
-        confirmLabel={`Cancel ${act?.k === "cancelMany" ? act.tickets.length : 0} orders`}
+        title={`Cancel ${many.length} selected order${many.length === 1 ? "" : "s"}`}
+        description="Only the orders you ticked are cancelled; each one gets its own audit entry. Orders you did not select stay in place."
+        confirmLabel={`Cancel ${many.length} order${many.length === 1 ? "" : "s"}`}
         confirmVariant="sell"
-        onConfirm={(r) => api.cancelOrders(act?.k === "cancelMany" ? act.tickets : [], r)}
-        success={(d) => `${d.done.length} orders cancelled`}
-      />
+        disabled={!many.length && "Nothing selected"}
+        onConfirm={(r) => api.cancelOrders(many.map((x) => x.ticket), r)}
+        success={(d) => `${d.done.length} orders cancelled${d.failed.length ? ` · ${d.failed.length} skipped` : ""}`}
+      >
+        <div className="grid grid-cols-3 gap-2">
+          <MetaTile label="Orders" value={many.length} />
+          <MetaTile label="Clients" value={new Set(many.map((x) => x.clientId)).size} />
+          <MetaTile label="Symbols" value={new Set(many.map((x) => x.symbol)).size} />
+        </div>
+      </DeskDialog>
     </div>
   );
 }
