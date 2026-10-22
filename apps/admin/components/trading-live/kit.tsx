@@ -9,7 +9,7 @@ export const FIN_REASONS = ["FIN-01 · Manual deposit", "FIN-02 · Manual withdr
 export const GRP_REASONS = ["GRP-01 · New offering", "GRP-02 · Pricing change", "GRP-03 · Risk policy", "GRP-04 · Regulatory", "GRP-99 · Other"] as const;
 
 /** Writes to /api/trading/<path> with the reason; returns a DeskResult so DeskDialog can report it. */
-export async function tradingWrite<T>(path: string, body: Record<string, unknown>, reason: Reason, desk?: RestTradingDesk | null, method: "POST" | "PUT" = "POST"): Promise<DeskResult<T>> {
+export async function tradingWrite<T>(path: string, body: Record<string, unknown>, reason: Reason, desk?: RestTradingDesk | null, method: "POST" | "PUT" | "DELETE" = "POST"): Promise<DeskResult<T>> {
   const r = await sendJson<{ data: T; audit?: AuditEntry[] }>(`/api/trading/${path}`, { ...body, reasonCode: reason.code, note: reason.note?.trim() ?? "" }, method);
   if (!r.ok) return { ok: false, error: r.error.message };
   const audit = r.data.audit ?? [];

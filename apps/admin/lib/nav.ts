@@ -67,6 +67,7 @@ export const ADMIN_NAV: NavModule[] = [
       { href: "/trading/routing", label: "Book & routing" },
       { href: "/trading/exposure", label: "Exposure" },
       { href: "/trading/risk-limits", label: "Risk limits" },
+      { href: "/trading/leverage", label: "Leverage control" },
       { href: "/trading/client-scores", label: "Client scores" },
       { href: "/trading/routing-suggestions", label: "Routing suggestions" },
       { href: "/trading/dealer", label: "Dealer desk" },

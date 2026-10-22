@@ -60,8 +60,8 @@ export function useApi<T>(url: string | null, opts: { refreshMs?: number } = {})
   return { data, error, loading, reload };
 }
 
-/** POST/PUT/PATCH JSON to a BFF endpoint. */
-export async function sendJson<T>(url: string, body: unknown, method: "POST" | "PUT" | "PATCH" = "POST"): Promise<{ ok: true; data: T } | { ok: false; error: ApiErr }> {
+/** POST/PUT/PATCH/DELETE JSON to a BFF endpoint. */
+export async function sendJson<T>(url: string, body: unknown, method: "POST" | "PUT" | "PATCH" | "DELETE" = "POST"): Promise<{ ok: true; data: T } | { ok: false; error: ApiErr }> {
   try {
     const r = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" });
     const data = await r.json().catch(() => ({}));

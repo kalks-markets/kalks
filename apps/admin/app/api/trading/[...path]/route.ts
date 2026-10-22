@@ -21,7 +21,7 @@ const ROUTES: Route[] = [
   { method: "GET", re: /^dealing\/routing\/rules$/, perm: "dealing.read" },
   // risk desk (exposure with limit usage, risk limits, alerts, client scores, news windows, routing suggestions)
   { method: "GET", re: /^dealing\/exposure$/, perm: "dealing.read" },
-  { method: "GET", re: /^dealing\/risk\/(limits|alerts|scores|news)$/, perm: "dealing.read" },
+  { method: "GET", re: /^dealing\/risk\/(limits|alerts|scores|news|leverage-caps)$/, perm: "dealing.read" },
   { method: "GET", re: new RegExp(`^dealing/risk/scores/${T}$`), perm: "dealing.read" },
   { method: "GET", re: /^dealing\/routing\/suggestions$/, perm: "dealing.read" },
   { method: "GET", re: /^symbols$/, perm: "dealing.read", to: () => "/v1/symbols" },
@@ -57,6 +57,9 @@ const ROUTES: Route[] = [
   { method: "PUT", re: /^dealing\/risk\/settings$/, perm: "dealing.policy" },
   { method: "POST", re: new RegExp(`^dealing/risk/alerts/${T}/ack$`), perm: "dealing.write" },
   { method: "POST", re: /^dealing\/risk\/scores\/run$/, perm: "dealing.write" },
+  // leverage control (risk leverage caps): preview the impact, apply / replace a cap, disable it (reason code + note)
+  { method: "POST", re: /^dealing\/risk\/leverage-caps(\/preview)?$/, perm: "dealing.write" },
+  { method: "DELETE", re: new RegExp(`^dealing/risk/leverage-caps/${T}$`), perm: "dealing.write" },
   { method: "POST", re: new RegExp(`^dealing/routing/suggestions/${T}/(approve|reject)$`), perm: "dealing.write" },
   // trading accounts, groups, ledger
   { method: "GET", re: /^admin\/accounts$/, perm: "accounts.read" },
