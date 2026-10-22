@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button, Card, CardHeader, Chip, Dialog, EmptyState, Field, Input, PageHeader, cn } from "@kalks/ui";
 import { useCan } from "@/components/staff-session";
 import { ErrorState, TableSkeleton, useApi } from "@/components/live/kit";
+import { useConfirm } from "@/components/confirm";
 import { Select, act, call, type Catalogue, type Role, type RolesResp } from "./kit";
 
 const ACTIONS = [
@@ -174,6 +175,7 @@ export function LiveRoles() {
   const [meta, setMeta] = React.useState({ name: "", description: "" });
   const [creating, setCreating] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [ask, confirmDialog] = useConfirm();
 
   const role = data?.items.find((r) => r.id === sel) ?? null;
   React.useEffect(() => {
@@ -204,6 +206,7 @@ export function LiveRoles() {
 
   return (
     <div className="pb-10">
+      {confirmDialog}
       <PageHeader
         title="Roles & permissions"
         subtitle="Presets for every desk, plus your own roles. Changes apply to everyone in the role on their next click."
@@ -264,7 +267,15 @@ export function LiveRoles() {
                     role.editable ? (
                       <>
                         {role.kind === "preset" && role.customised && (
-                          <Button size="sm" variant="surface" onClick={async () => (await act("POST", `/api/admin/roles/${role.id}/reset`, {}, "Preset restored")) && reload()}>
+                          <Button size="sm" variant="surface" onClick={async () => {
+                              const ok = await ask({
+                                title: `Reset ${role.name} to default?`,
+                                text: `Your edits to this preset are discarded and its ${role.permissions.length} permissions are replaced by the built-in defaults. This applies to all ${role.members} member${role.members === 1 ? "" : "s"} on their next click.`,
+                                confirm: "Reset to default",
+                                tone: "danger",
+                              });
+                              if (ok && (await act("POST", `/api/admin/roles/${role.id}/reset`, {}, "Preset restored"))) reload();
+                            }}>
                             <RotateCcw /> Reset to default
                           </Button>
                         )}
@@ -275,6 +286,13 @@ export function LiveRoles() {
                             disabled={role.members > 0}
                             title={role.members > 0 ? "Move its members to another role first" : undefined}
                             onClick={async () => {
+                              const ok = await ask({
+                                title: `Delete the ${role.name} role?`,
+                                text: `The role and its ${role.permissions.length} permissions are deleted permanently; this can't be undone. Disabled staff still assigned to it also block deletion, so move them to another role first.`,
+                                confirm: "Delete role",
+                                tone: "danger",
+                              });
+                              if (!ok) return;
                               if (await act("DELETE", `/api/admin/roles/${role.id}`, {}, "Role deleted")) {
                                 setSel(null);
                                 reload();

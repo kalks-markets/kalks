@@ -8,6 +8,7 @@ import { ErrorState, TableSkeleton, ago, useApi, useNow, when } from "@/componen
 import { STATUS_TONE, act, call, cap } from "@/components/rbac/kit";
 import type { FeatureCatalogue, Probe } from "./types";
 import { MODULE_LOSES, useModuleSwitch } from "./module-switch";
+import { useConfirm } from "@/components/confirm";
 
 /** Tenant × feature grid (every tenant, the platform's own Kalks tenant included); a click sets an override for that
  *  tenant, the reset icon returns to the default. A module switch asks to confirm with a reason first. */
@@ -94,8 +95,10 @@ export function LiveFlags() {
   const [open, setOpen] = React.useState(false);
   const [f, setF] = React.useState({ key: "", name: "", description: "", default_enabled: false });
   const [err, setErr] = React.useState<{ field?: string; message: string } | null>(null);
+  const [ask, confirmDialog] = useConfirm();
   return (
     <div className="pb-10">
+      {confirmDialog}
       <PageHeader
         title="Feature flags"
         subtitle="Platform catalogue of flags with per-tenant overrides (D146). Tenants can also switch flags in their own Settings."
@@ -129,8 +132,30 @@ export function LiveFlags() {
                     {!x.builtin && (
                       <>
                         <span className="text-[12px] text-fg-3">Default</span>
-                        <Toggle checked={x.default} onChange={async (v) => (await act("PATCH", `/api/owner/features/${x.key}`, { default_enabled: v }, "Default changed")) && reload()} />
-                        <IconButton size="sm" aria-label={`Delete ${x.key}`} onClick={async () => (await act("DELETE", `/api/owner/features/${x.key}`, {}, "Flag deleted")) && reload()}>
+                        <Toggle
+                          checked={x.default}
+                          onChange={async (v) => {
+                            const ok = await ask({
+                              title: `Turn ${x.name} ${v ? "on" : "off"} by default?`,
+                              text: `Every tenant without its own override for ${x.key} gets it ${v ? "on" : "off"}. Tenants with an override keep their setting.`,
+                              confirm: v ? "Default on" : "Default off",
+                            });
+                            if (ok && (await act("PATCH", `/api/owner/features/${x.key}`, { default_enabled: v }, "Default changed"))) reload();
+                          }}
+                        />
+                        <IconButton
+                          size="sm"
+                          aria-label={`Delete ${x.key}`}
+                          onClick={async () => {
+                            const ok = await ask({
+                              title: `Delete the ${x.name} flag?`,
+                              text: `${x.key} is removed from the catalogue for good, together with every tenant override and targeting rule that uses it (it's on for ${x.tenants_on} of ${data.tenants.length} tenants now). Apps reading it see it as missing. This can't be undone.`,
+                              confirm: "Delete flag",
+                              tone: "danger",
+                            });
+                            if (ok && (await act("DELETE", `/api/owner/features/${x.key}`, {}, "Flag deleted"))) reload();
+                          }}
+                        >
                           <Trash2 />
                         </IconButton>
                       </>

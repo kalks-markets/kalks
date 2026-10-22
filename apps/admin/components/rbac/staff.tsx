@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Avatar, Button, Card, CardHeader, Chip, DataTable, Dialog, EmptyState, Field, IconButton, Input, KpiCard, Menu, PageHeader, Reveal, Segmented, type Column } from "@kalks/ui";
 import { useCan, useStaff } from "@/components/staff-session";
 import { ErrorState, TableSkeleton, ago, day, device, useApi, useNow, when } from "@/components/live/kit";
+import { useConfirm } from "@/components/confirm";
 import { InviteLink, STATUS_TONE, Select, act, call, cap, permLabel, useBusy, type RolesResp } from "./kit";
 
 type Member = {
@@ -310,6 +311,7 @@ export function LiveStaff() {
   const [reason, setReason] = React.useState("");
   const [link, setLink] = React.useState<string | undefined>();
   const { busy, run } = useBusy();
+  const [ask, confirmDialog] = useConfirm();
 
   const items = data?.items ?? [];
   const rows = filter === "all" ? items : items.filter((s) => s.status === filter);
@@ -342,12 +344,28 @@ export function LiveStaff() {
         label: "Reset 2FA",
         hint: "Forget devices",
         icon: <RotateCcw />,
-        onSelect: () => void run(`2fa-${s.id}`, async () => (await act("POST", `/api/admin/staff/${s.id}/reset-2fa`, {}, "2FA reset", "Their next sign-in needs a fresh email code.")) && reload()),
+        onSelect: async () => {
+          const ok = await ask({
+            title: `Reset 2FA for ${s.name}?`,
+            text: `This forgets all ${s.trusted_devices} remembered device${s.trusted_devices === 1 ? "" : "s"}, cancels any unused sign-in codes, clears a sign-in lock and signs ${s.name} out everywhere (${s.active_sessions} active session${s.active_sessions === 1 ? "" : "s"}). Their next sign-in needs a fresh email code.`,
+            confirm: "Reset 2FA and sign out",
+            tone: "danger",
+          });
+          if (ok) void run(`2fa-${s.id}`, async () => (await act("POST", `/api/admin/staff/${s.id}/reset-2fa`, {}, "2FA reset", `${s.name} is signed out everywhere; their next sign-in needs a fresh email code.`)) && reload());
+        },
       });
       it.push({
         label: "Force sign-out",
         icon: <LogOut />,
-        onSelect: () => void run(`out-${s.id}`, async () => (await act("POST", `/api/admin/staff/${s.id}/sign-out`, {}, "Signed out everywhere")) && reload()),
+        onSelect: async () => {
+          const ok = await ask({
+            title: `Sign ${s.name} out everywhere?`,
+            text: `Ends all ${s.active_sessions} active Back Office session${s.active_sessions === 1 ? "" : "s"} for ${s.name}. They can sign in again with their password and an emailed code.`,
+            confirm: "Sign out everywhere",
+            tone: "danger",
+          });
+          if (ok) void run(`out-${s.id}`, async () => (await act("POST", `/api/admin/staff/${s.id}/sign-out`, {}, "Signed out everywhere")) && reload());
+        },
       });
     }
     it.push("sep");
@@ -424,6 +442,7 @@ export function LiveStaff() {
 
   return (
     <div className="pb-10">
+      {confirmDialog}
       <PageHeader
         title="Staff"
         subtitle={`Back Office accounts for ${me.tenant.name}`}

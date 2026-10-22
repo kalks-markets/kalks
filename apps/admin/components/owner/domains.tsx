@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button, Chip, Input, Menu } from "@kalks/ui";
 import { ago, useNow } from "@/components/live/kit";
 import { STATUS_TONE, Select, act, call, cap } from "@/components/rbac/kit";
+import { useConfirm } from "@/components/confirm";
 import type { DomainKind, DomainRecord } from "./types";
 
 export const DOMAIN_KINDS: { value: DomainKind; label: string; hint: string }[] = [
@@ -35,10 +36,18 @@ export function TenantDomains({ tenantId, records, onChanged }: { tenantId: numb
   const [kind, setKind] = React.useState<DomainKind>("website");
   const [touched, setTouched] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [ask, confirmDialog] = useConfirm();
   const base = `/api/owner/tenants/${tenantId}/domains`;
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
+    const host = domain.trim().toLowerCase();
+    const ok = await ask({
+      title: `Add ${host}?`,
+      text: `${host} becomes a live address for this broker's ${KIND_LABEL[kind]} straight away: visitors on it are routed to this broker, and a certificate is issued on the first visit once its DNS points at the platform server.`,
+      confirm: "Add domain",
+    });
+    if (!ok) return;
     setBusy(true);
     const r = await call<{ domain: DomainRecord }>("POST", base, { domain, kind });
     setBusy(false);
@@ -60,6 +69,7 @@ export function TenantDomains({ tenantId, records, onChanged }: { tenantId: numb
 
   return (
     <div>
+      {confirmDialog}
       {records.length === 0 ? (
         <p className="rounded-[12px] border border-dashed border-line px-4 py-5 text-[13px] text-fg-3">No domains yet. Add the broker&apos;s website, Client Area, Trader and Back Office hosts.</p>
       ) : (
@@ -87,7 +97,16 @@ export function TenantDomains({ tenantId, records, onChanged }: { tenantId: numb
                       value={d.kind}
                       aria-label={`App served on ${d.domain}`}
                       className="h-8 min-w-[132px] text-[12.5px]"
-                      onChange={async (v) => (await act("PATCH", `${base}/${d.id}`, { kind: v }, `${d.domain}: ${KIND_LABEL[v as DomainKind]}`)) && onChanged()}
+                      onChange={async (v) => {
+                        if (v === d.kind) return;
+                        const ok = await ask({
+                          title: `Serve the ${KIND_LABEL[v as DomainKind]} on ${d.domain}?`,
+                          text: `${d.domain} stops serving the ${KIND_LABEL[d.kind]} immediately and serves the ${KIND_LABEL[v as DomainKind]} instead. Anyone using ${d.domain} for the ${KIND_LABEL[d.kind]} (bookmarks, links, signed-in sessions) lands on the new app.`,
+                          confirm: "Change app",
+                          tone: "danger",
+                        });
+                        if (ok && (await act("PATCH", `${base}/${d.id}`, { kind: v }, `${d.domain}: ${KIND_LABEL[v as DomainKind]}`))) onChanged();
+                      }}
                     >
                       {DOMAIN_KINDS.map((k) => (
                         <option key={k.value} value={k.value}>
@@ -117,10 +136,33 @@ export function TenantDomains({ tenantId, records, onChanged }: { tenantId: numb
                       items={[
                         { label: "Check DNS", onSelect: () => void check(d) },
                         d.status === "active"
-                          ? { label: "Disable", onSelect: async () => (await act("PATCH", `${base}/${d.id}`, { status: "disabled" }, `${d.domain} disabled`)) && onChanged() }
+                          ? {
+                              label: "Disable",
+                              onSelect: async () => {
+                                const ok = await ask({
+                                  title: `Disable ${d.domain}?`,
+                                  text: `${d.domain} stops serving the ${KIND_LABEL[d.kind]} immediately: visitors can no longer reach this broker on it and no new certificate is issued. You can enable it again later.`,
+                                  confirm: "Disable domain",
+                                  tone: "danger",
+                                });
+                                if (ok && (await act("PATCH", `${base}/${d.id}`, { status: "disabled" }, `${d.domain} disabled`))) onChanged();
+                              },
+                            }
                           : { label: "Enable", onSelect: async () => (await act("PATCH", `${base}/${d.id}`, { status: "active" }, `${d.domain} enabled`)) && onChanged() },
                         "sep",
-                        { label: "Remove", danger: true, onSelect: async () => (await act("DELETE", `${base}/${d.id}`, {}, `${d.domain} removed`)) && onChanged() },
+                        {
+                          label: "Remove",
+                          danger: true,
+                          onSelect: async () => {
+                            const ok = await ask({
+                              title: `Remove ${d.domain}?`,
+                              text: `${d.domain} is deleted from this broker and stops serving the ${KIND_LABEL[d.kind]} immediately. Its DNS check history is lost; to use it again you'll have to add it back.`,
+                              confirm: "Remove domain",
+                              tone: "danger",
+                            });
+                            if (ok && (await act("DELETE", `${base}/${d.id}`, {}, `${d.domain} removed`))) onChanged();
+                          },
+                        },
                       ]}
                       trigger={
                         <Button size="xs" variant="surface" aria-label={`Actions for ${d.domain}`}>

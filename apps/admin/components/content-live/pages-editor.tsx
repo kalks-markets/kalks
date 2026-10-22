@@ -665,6 +665,7 @@ export function LiveContentPages() {
   const tree = useCnt<Tree>(me?.read ? "tree" : null);
   const audit = useCnt<{ audit: AuditRow[] }>(me?.read ? "audit" : null);
   const [busy, setBusy] = React.useState(false);
+  const [ask, confirmDialog] = useConfirm();
 
   // deep links from the media library: ?surface&page&slot&locale
   React.useEffect(() => {
@@ -711,7 +712,34 @@ export function LiveContentPages() {
       .catch((e) => toast.error("Couldn't open the preview", { description: (e as Error).message }));
   const publishPage = () =>
     sel &&
+    selPage &&
     (async () => {
+      const drafted = selPage.slots
+        .map((sl) => ({ slot: sl.slot, label: sl.label, langs: Object.entries(sl.locales).filter(([, l]) => l.draft).map(([k]) => k) }))
+        .filter((x) => x.langs.length);
+      const langs = [...new Set(drafted.flatMap((x) => x.langs))].sort();
+      const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+      const ok = await ask({
+        title: `Publish all of ${pageLabel(sel.surface, sel.page)}?`,
+        text: (
+          <div className="space-y-2.5">
+            <p>
+              This publishes <b className="text-fg">every draft on this page</b>: {plural(pageDrafts, "draft")} in {plural(drafted.length, "slot")} across {plural(langs.length, "language")} (
+              {langs.map((l) => l.toUpperCase()).join(", ")}), not just the language or slot you&apos;re editing. Drafts saved by colleagues are included.
+            </p>
+            <ul className="max-h-40 space-y-0.5 overflow-y-auto text-[12.5px] text-fg-3">
+              {drafted.map((x) => (
+                <li key={x.slot}>
+                  {x.label} · {x.langs.map((l) => l.toUpperCase()).join(", ")}
+                </li>
+              ))}
+            </ul>
+            <p>Clients see the new content within about a minute. Unsaved edits in the editor aren&apos;t included.</p>
+          </div>
+        ),
+        confirm: `Publish ${plural(pageDrafts, "draft")}`,
+      });
+      if (!ok) return;
       setBusy(true);
       try {
         const r = await cnt<{ published: unknown[] }>("publish", { body: { surface: sel.surface, page: sel.page } });
@@ -726,6 +754,7 @@ export function LiveContentPages() {
 
   return (
     <div className="pb-16">
+      {confirmDialog}
       <PageHeader
         title="Pages"
         subtitle="Texts, images and links of the website, the Client Area, Kalks Trader and emails, in 22 languages. Save drafts, preview them, then publish."

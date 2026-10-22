@@ -6,6 +6,7 @@ import { Construction, Flag, Layers, Power, RotateCcw } from "lucide-react";
 import { Button, Card, CardHeader, Chip, EmptyState, Field, Input, KpiCard, PageHeader, Toggle } from "@kalks/ui";
 import { useCan } from "@/components/staff-session";
 import { ErrorState, TableSkeleton, ago, useApi, useNow, when } from "@/components/live/kit";
+import { useConfirm } from "@/components/confirm";
 import { Textarea, act } from "./kit";
 
 type Maint = { enabled: boolean; active: boolean; message: string; until: string | null; since: string | null; default_message: string; can_edit: boolean };
@@ -21,6 +22,7 @@ export function LiveMaintenance() {
   const [message, setMessage] = React.useState("");
   const [until, setUntil] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [ask, confirmDialog] = useConfirm();
   React.useEffect(() => {
     if (data) {
       setMessage(data.message === data.default_message ? "" : data.message);
@@ -30,6 +32,24 @@ export function LiveMaintenance() {
   if (!canRead) return <EmptyState title="Not available for your role" illustration="locked" />;
 
   async function save(enabled: boolean) {
+    if (data && enabled !== data.active) {
+      const end = fromLocal(until);
+      const ok = await ask(
+        enabled
+          ? {
+              title: "Start maintenance now?",
+              text: `Every client is held on the maintenance page straight away: Client Area pages show it, client sign-in and sign-up are paused and client API calls answer 503. ${end ? `It ends by itself at ${when(end)}.` : "It stays on until someone ends it here."} Staff and the Back Office keep working.`,
+              confirm: "Start maintenance",
+              tone: "danger",
+            }
+          : {
+              title: "End maintenance now?",
+              text: "The Client Area opens again immediately: clients can sign in and sign up, and client API calls work again.",
+              confirm: "End maintenance",
+            },
+      );
+      if (!ok) return;
+    }
     setBusy(true);
     const ok = await act("PUT", "/api/admin/settings/maintenance", { enabled, message: message || null, until: enabled ? fromLocal(until) : null }, enabled ? "Maintenance mode is on" : "Maintenance mode is off", enabled ? "Clients see the maintenance page; staff keep working." : "The Client Area is open again.");
     setBusy(false);
@@ -38,6 +58,7 @@ export function LiveMaintenance() {
 
   return (
     <div className="pb-10">
+      {confirmDialog}
       <PageHeader title="Maintenance mode" subtitle="Hold clients on a maintenance page during upgrades. Staff and the Back Office keep working." />
       {error ? (
         <ErrorState error={error} onRetry={reload} />

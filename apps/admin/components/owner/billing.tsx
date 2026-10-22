@@ -6,6 +6,7 @@ import { Coins, FilePlus2, Receipt, RefreshCw } from "lucide-react";
 import { Button, Card, CardHeader, Chip, DataTable, Dialog, EmptyState, Field, Input, KpiCard, Menu, PageHeader, Segmented, Toggle, type Column } from "@kalks/ui";
 import { ErrorState, TableSkeleton, day, useApi } from "@/components/live/kit";
 import { STATUS_TONE, Select, act, cap, money, pct } from "@/components/rbac/kit";
+import { useConfirmReason } from "@/components/confirm-reason";
 import type { Billing, Invoice } from "./types";
 
 const NEXT: Record<string, { to: string; label: string }[]> = {
@@ -94,6 +95,33 @@ export function BillingForm({ tenantId, billing, onSaved }: { tenantId: number; 
 }
 
 export function InvoiceTable({ items, onChanged, hideTenant }: { items: Invoice[]; onChanged: () => void; hideTenant?: boolean }) {
+  const [askReason, reasonDialog] = useConfirmReason();
+  async function move(i: Invoice, to: string) {
+    let note: string | undefined;
+    if (to === "paid" || to === "void") {
+      const total = money(i.total_cents, i.currency);
+      const why = await askReason(
+        to === "paid"
+          ? {
+              title: `Mark ${i.number} as paid?`,
+              text: `${i.tenant.name}'s invoice for ${total} is recorded as paid today and drops out of outstanding. Paid invoices can't be changed again, so check the money has actually arrived.`,
+              label: "Payment reference",
+              placeholder: "Bank transfer ref, tx hash or receipt number",
+              confirm: "Mark paid",
+            }
+          : {
+              title: `Void ${i.number}?`,
+              text: `${i.tenant.name}'s invoice for ${total} is cancelled for good: it no longer counts as owed and can't be reissued, paid or edited. Create a new invoice if the amount was wrong.`,
+              placeholder: "Why is this invoice being voided?",
+              confirm: "Void invoice",
+              tone: "danger",
+            },
+      );
+      if (why === null) return;
+      note = why;
+    }
+    if (await act("POST", `/api/owner/invoices/${i.id}/status`, { status: to, ...(note ? { note } : {}) }, `${i.number}: ${to}`)) onChanged();
+  }
   const columns: Column<Invoice>[] = [
     { key: "n", header: "Invoice", cell: (i) => <span className="font-mono text-[12.5px]">{i.number}</span>, sort: (i) => i.number, csv: (i) => i.number },
     ...(hideTenant ? [] : [{ key: "t", header: "Tenant", cell: (i: Invoice) => <Link href={`/brokers/${i.tenant.id}`} className="hover:text-ember">{i.tenant.name}</Link>, sort: (i: Invoice) => i.tenant.name, csv: (i: Invoice) => i.tenant.name }]),
@@ -120,7 +148,7 @@ export function InvoiceTable({ items, onChanged, hideTenant }: { items: Invoice[
         NEXT[i.status] ? (
           <Menu
             align="end"
-            items={NEXT[i.status]!.map((n) => ({ label: n.label, danger: n.to === "void", onSelect: async () => (await act("POST", `/api/owner/invoices/${i.id}/status`, { status: n.to }, `${i.number}: ${n.to}`)) && onChanged() }))}
+            items={NEXT[i.status]!.map((n) => ({ label: n.label, danger: n.to === "void", onSelect: () => void move(i, n.to) }))}
             trigger={
               <Button size="xs" variant="surface">
                 Update
@@ -130,7 +158,12 @@ export function InvoiceTable({ items, onChanged, hideTenant }: { items: Invoice[
         ) : null,
     },
   ];
-  return <DataTable rows={items} columns={columns} rowKey={(i) => String(i.id)} pageSize={20} exportName="invoices" empty={<EmptyState title="No invoices yet" illustration="receipt" />} />;
+  return (
+    <>
+      {reasonDialog}
+      <DataTable rows={items} columns={columns} rowKey={(i) => String(i.id)} pageSize={20} exportName="invoices" empty={<EmptyState title="No invoices yet" illustration="receipt" />} />
+    </>
+  );
 }
 
 type Overview = {

@@ -6,6 +6,7 @@ import { Button, Card, CardHeader, Chip, DataTable, EmptyState, Field, IconButto
 import { useCan, useStaff } from "@/components/staff-session";
 import { ErrorState, TableSkeleton, ago, useApi, useNow, when } from "@/components/live/kit";
 import { validateCidr, cidrSize } from "@/components/security/cidr";
+import { useConfirm } from "@/components/confirm";
 import { act, call } from "./kit";
 
 type Entry = { id: number; cidr: string; label: string; created_at: string; created_by: string | null; last_sign_in_at: string | null };
@@ -20,6 +21,7 @@ export function LiveIpAllowlist() {
   const [label, setLabel] = React.useState("");
   const [err, setErr] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [ask, confirmDialog] = useConfirm();
 
   if (!canRead) return <EmptyState title="Not available for your role" text="Your role doesn't include Back Office security settings." illustration="locked" />;
   const canEdit = !!data?.can_edit;
@@ -50,7 +52,21 @@ export function LiveIpAllowlist() {
       align: "right",
       cell: (e) =>
         canEdit ? (
-          <IconButton size="sm" aria-label={`Remove ${e.cidr}`} onClick={async () => (await act("DELETE", `/api/admin/security/ip/${e.id}`, {}, "Removed", e.cidr)) && reload()}>
+          <IconButton size="sm" aria-label={`Remove ${e.cidr}`} onClick={async () => {
+              const ok = await ask({
+                title: `Remove ${e.cidr}?`,
+                text: (
+                  <>
+                    <span className="font-mono">{e.cidr}</span>
+                    {e.label ? ` (${e.label})` : ""} comes off the allow-list straight away.
+                    {data?.enabled ? " While the allow-list is enforced, staff connecting from this address can no longer sign in, and their signed-in sessions stop working on their next request." : " The allow-list is off, so nobody is blocked until it's switched on."}
+                  </>
+                ),
+                confirm: "Remove address",
+                tone: "danger",
+              });
+              if (ok && (await act("DELETE", `/api/admin/security/ip/${e.id}`, {}, "Removed", e.cidr))) reload();
+            }}>
             <Trash2 />
           </IconButton>
         ) : null,
@@ -59,6 +75,7 @@ export function LiveIpAllowlist() {
 
   return (
     <div className="pb-10">
+      {confirmDialog}
       <PageHeader title="IP allow-list" subtitle="Limit Back Office sign-in and every staff request to your office and VPN addresses" />
       {error ? (
         <ErrorState error={error} onRetry={reload} />
