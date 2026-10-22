@@ -301,14 +301,14 @@ async fn catalog(State(st): State<AppState>, h: HeaderMap, Query(q): Query<LangQ
         .into_iter()
         .map(|r| (r.get::<String, _>(0), (r.get::<i32, _>(1), r.get::<bool, _>(2), r.get::<i64, _>(3))))
         .collect();
-    let certs: HashMap<String, (String, chrono::DateTime<chrono::Utc>)> =
-        sqlx::query("SELECT phase, code, issued_at FROM certificates WHERE tenant = $1 AND user_id = $2 AND NOT revoked")
+    let certs: HashMap<String, (String, chrono::DateTime<chrono::Utc>, i32)> =
+        sqlx::query("SELECT phase, code, issued_at, score_pct FROM certificates WHERE tenant = $1 AND user_id = $2 AND NOT revoked")
             .bind(&t)
             .bind(user)
             .fetch_all(&st.pool)
             .await?
             .into_iter()
-            .map(|r| (r.get::<String, _>(0), (r.get::<String, _>(1), r.get(2))))
+            .map(|r| (r.get::<String, _>(0), (r.get::<String, _>(1), r.get(2), r.get(3))))
             .collect();
 
     let (mut done_all, mut total_all, mut minutes_done, mut minutes_all) = (0usize, 0usize, 0i64, 0i64);
@@ -351,7 +351,8 @@ async fn catalog(State(st): State<AppState>, h: HeaderMap, Query(q): Query<LangQ
                 "chapters": s.chapters.iter().map(|c| chapter_card(c, prog.get(&c.slug))).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "exam": exam,
-            "certificate": certs.get(&p.node.slug).map(|(code, at)| json!({"code": code, "issued_at": at})),
+            // score_pct: the score printed on the certificate (the first pass); a better retake doesn't change it
+            "certificate": certs.get(&p.node.slug).map(|(code, at, score)| json!({"code": code, "issued_at": at, "score_pct": score})),
         }));
     }
     // continue where the learner left off: most recently touched chapter that isn't complete, else the next one

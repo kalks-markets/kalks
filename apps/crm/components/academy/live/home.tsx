@@ -247,7 +247,7 @@ function CertificatesCard({ cat }: { cat: Catalog }) {
   const ready = cat.phases.find((p) => !p.certificate && p.exam?.unlocked);
   const top = certs[0];
   const latest = top
-    ? { code: top.certificate!.code, phase_order: top.order, phase_title: top.title, score_pct: top.exam?.best_pct ?? 0, issued_at: top.certificate!.issued_at, learner_name: me.name }
+    ? { code: top.certificate!.code, phase_order: top.order, phase_title: top.title, score_pct: top.certificate!.score_pct ?? top.exam?.best_pct ?? 0, issued_at: top.certificate!.issued_at, learner_name: me.name }
     : null;
   return (
     <Card className="flex h-full flex-col">

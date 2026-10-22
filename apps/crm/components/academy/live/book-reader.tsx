@@ -465,7 +465,7 @@ function ExamPage({ side, folio }: { side: "left" | "right" | "single"; folio: n
         </div>
         <div className="mt-auto">
           {p.certificate ? (
-            <CertificateCard c={{ code: p.certificate.code, phase_order: p.order, phase_title: p.title, score_pct: e.best_pct ?? 0, issued_at: p.certificate.issued_at, learner_name: c.learner }} className="shadow-[0_14px_30px_-18px_rgba(40,25,5,.7)] ring-1 ring-[rgba(74,52,20,.2)]" />
+            <CertificateCard c={{ code: p.certificate.code, phase_order: p.order, phase_title: p.title, score_pct: p.certificate.score_pct ?? e.best_pct ?? 0, issued_at: p.certificate.issued_at, learner_name: c.learner }} className="shadow-[0_14px_30px_-18px_rgba(40,25,5,.7)] ring-1 ring-[rgba(74,52,20,.2)]" />
           ) : (
             <div className="font-sans">
               <div className="mb-1.5 flex items-center justify-between text-[11px] text-[#7a6950]">

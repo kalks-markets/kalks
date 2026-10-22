@@ -297,6 +297,9 @@ async fn academy_end_to_end() {
     let (_, r, _) = c.call("POST", "/v1/exams/phase-1", &name, Some(json!({"answers": [0,1,2,3,0,1,2,3,0,1]}))).await;
     assert_eq!(r["certificate_issued"], false);
     assert_eq!(r["certificate"]["code"], code.as_str());
+    // the catalogue shows the score printed on the certificate (the first pass), not the best retake
+    let (_, cat, _) = c.call("GET", "/v1/catalog", U, None).await;
+    assert_eq!((cat["phases"][0]["certificate"]["score_pct"].clone(), cat["phases"][0]["exam"]["best_pct"].clone()), (json!(90), json!(100)));
 
     let (_, mine, _) = c.call("GET", "/v1/me/certificates", U, None).await;
     assert_eq!(mine["certificates"][0]["verify_url"], format!("https://my.example.com/certificate/{code}"));

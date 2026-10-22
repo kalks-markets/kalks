@@ -19,7 +19,8 @@ export type ChapterProgress = { read_pct: number; quiz_best: number | null; quiz
 export type ChapterCard = { slug: string; title: string; summary: string; minutes: number; order: number; questions: number; progress: ChapterProgress };
 export type SectionT = { slug: string; track: TrackKey; title: string; summary: string; chapters: ChapterCard[] };
 export type ExamState = { questions: number; pass_mark: number; unlocked: boolean; best_pct: number | null; passed: boolean; attempts: number };
-export type CertRef = { code: string; issued_at: string };
+/** `score_pct`: the score printed on the certificate (its first pass; older Academy builds don't send it). */
+export type CertRef = { code: string; issued_at: string; score_pct?: number };
 export type PhaseT = {
   slug: string;
   order: number;
