@@ -92,6 +92,17 @@ pub struct Settings {
     pub allow_demotion: bool,
     /// Public link base for referral links, e.g. `https://app.kalkstrade.com`.
     pub link_base: String,
+    /// Four-eyes (USD): a payout batch whose total is at or above this needs a second staff member's approval
+    /// before anything is paid. 0 = every batch needs two approvers.
+    #[serde(default = "default_four_eyes_threshold")]
+    pub four_eyes_threshold: D,
+}
+
+/// Default four-eyes threshold (USD) for a new programme or settings saved before the field existed.
+pub const DEFAULT_FOUR_EYES_THRESHOLD: &str = "1000";
+
+fn default_four_eyes_threshold() -> D {
+    dec(DEFAULT_FOUR_EYES_THRESHOLD)
 }
 
 impl Default for Settings {
@@ -125,6 +136,7 @@ impl Default for Settings {
             wash: WashRules { enabled: true, window_secs: 60, volume_tolerance_pct: dec("10"), short_trades_min: 10, short_trades_pct: dec("50") },
             allow_demotion: false,
             link_base: "https://app.kalkstrade.com".into(),
+            four_eyes_threshold: default_four_eyes_threshold(),
         }
     }
 }
@@ -182,6 +194,9 @@ impl Settings {
         }
         if self.wash.window_secs < 1 || self.wash.volume_tolerance_pct < ZERO || self.wash.short_trades_min < 1 {
             return Err(("wash", "Wash-trading thresholds are out of range.".into()));
+        }
+        if self.four_eyes_threshold < ZERO || self.four_eyes_threshold > dec("1000000000") {
+            return Err(("fourEyesThreshold", "Four-eyes threshold must be between 0 and 1,000,000,000 USD (0 = every batch).".into()));
         }
         if self.link_base.len() > 200 || !(self.link_base.starts_with("https://") || self.link_base.starts_with("http://")) {
             return Err(("linkBase", "Link base must be an http(s) URL.".into()));

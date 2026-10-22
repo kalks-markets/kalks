@@ -140,7 +140,8 @@ function CommissionsCard({ ov }: { ov: Overview }) {
 }
 
 function PayoutsCard({ ov }: { ov: Overview }) {
-  const { data } = useApi<BatchesDoc>(`${P("batches")}?status=pending_approval&limit=4`);
+  // `open` = awaiting the first or the second (four-eyes) approval
+  const { data } = useApi<BatchesDoc>(`${P("batches")}?status=open&limit=4`);
   const pending = data?.items ?? [];
   return (
     <Card className="flex h-full flex-col">

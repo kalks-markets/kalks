@@ -5,6 +5,7 @@ The Kalks IB / referral programme (Round 3, D53–D64). Every client is an IB fr
 - [Run locally](#run-locally)
 - [How it works](#how-it-works)
 - [Programme rules](#programme-rules)
+- [Four-eyes approval](#four-eyes-approval)
 - [Data model](#data-model)
 - [API](#api)
 - [How the apps integrate](#how-the-apps-integrate)
@@ -34,7 +35,7 @@ On first start the service creates the `kalks_ib` database, runs `migrations/`, 
  engine  /v1/admin/accounts, /v1/accounts/{login}/ledger ──► account kind/group/cent, first deposit (CPA)
  copy/PAMM service ──POST /v1/ib/events/lots──► deals (source pamm|copy)
  wallet service    ──POST /v1/ib/events/deposit──► first deposit (CPA)
- scheduler ──► payout batch (pending approval) ──admin approve──► POST wallet /v1/wallets/transfers (ib_payout)
+ scheduler ──► payout batch (pending approval) ──admin approve (two staff ≥ fourEyesThreshold)──► POST wallet /v1/wallets/transfers (ib_payout)
 ```
 
 | Loop | Period | What it does |
@@ -68,13 +69,26 @@ On first start the service creates the `kalks_ib` database, runs `migrations/`, 
 | First deposit | The earliest real-money deposit: the oldest `deposit` / `transfer_in` on any of the client's live accounts (engine ledger), or a deposit event pushed by the wallet (USDT credited to the wallet on chain, or a Back Office external deposit). Only one first deposit is kept (time + amount), never a sum, so wallet money later moved to a trading account (`transfer_in`) is not counted twice: the earlier wallet event wins |
 | Levels (D58) | On the 1st of each month: highest level whose `minActiveClients` (tier-1 clients with a qualifying deal that month) **and** `minMonthlyLots` (qualifying lots of the whole network, all tiers) are met. Promotions only unless `allowDemotion`; `levelLocked` members are skipped |
 | PAMM / copy (D64) | Lots allocated to a referred investor are pushed with `POST /v1/ib/events/lots` and earn like the investor's own trades |
-| Payouts (D56) | Pending lines available before the period end are grouped per payee into a batch (payees below `payout.minAmount` or net ≤ 0 carry over). Approve → lines `approved`, payouts `transfer_pending` → wallet credit (`kind: ib_payout`, idempotency key `ib:payout:<tenant>:<batch>:<user>`) → `paid`. Reject → lines back to the pending pool |
+| Payouts (D56) | Pending lines available before the period end are grouped per payee into a batch (payees below `payout.minAmount` or net ≤ 0 carry over). Approve → lines `approved`, payouts `transfer_pending` → wallet credit (`kind: ib_payout`, idempotency key `ib:payout:<tenant>:<batch>:<user>`) → `paid`. Reject → lines back to the pending pool. Batches at or above `fourEyesThreshold` need two approvers ([Four-eyes approval](#four-eyes-approval)) |
 | Reversal | A reopened deal's unbatched pending lines are voided; lines already batched or paid get a negative `clawback` line that nets off the next payout |
 | Self-referral (D59) | Identity (keyed hash of name + date of birth, and of the phone), device hash and IP (loopback ignored) of the client vs its upline. Each signal: `block` (flag + no commission from that client until an admin dismisses), `flag`, or `off` |
 | Wash trading | Opposite, similar-volume (±10 %) trades on the same symbol by the IB or two clients of the same IB, opened and closed within 60 s of each other → flag. ≥ 10 sub-minimum trades making ≥ 50 % of a client's trades in 24 h → `short_trades` flag |
 | Visibility (D61) | `clientVisibility: full` shows IBs client names, emails, first deposit and trades (consent in the sign-up T&C); `masked` shows initials and totals only |
 
 Money is `rust_decimal` everywhere and `NUMERIC` in the database; every line is rounded to cents half away from zero.
+
+## Four-eyes approval
+
+Maker-checker on payout batches, the same design as the wallet's manual adjustments (`services/wallet/README.md#balance--credit-manual-adjustments`) and the prop / marketing payouts. Code: `src/payouts.rs` (`approve`, `reject`), migration `migrations/0006_four_eyes.sql`.
+
+- **Setting.** `fourEyesThreshold` in the programme settings (USD, per tenant, default **1000**; `0` = every batch needs two approvers). Edited in Back Office Partners → Plans & settings → Payouts (`PUT /v1/ib/admin/settings`, reason required); audited as `settings.update` and, when the threshold changes, also as its own `settings.four_eyes_threshold` entry (before / after). Settings saved before the field existed read as 1000.
+- **States.** `pending_approval` → (first approval, `total ≥ threshold`) → `awaiting_second_approval` → (second approval by a different staff member) → `approved` → `paid` / `partially_paid`. Below the threshold one approval goes straight to `approved` as before. The first approval only records `first_approved_by_id` (`staff:<id>`), `first_approved_by_name`, `first_approved_at`, `first_approval_note` and the threshold in force (`four_eyes_threshold`); payouts stay `pending_approval`, lines stay `pending`, nothing is sent to the wallet.
+- **Same staff member.** A second approval from the first approver is refused with `409 four_eyes_same_staff` ("Four-eyes rule: another staff member must give the second approval."); the batch is unchanged.
+- **Reject** works from `pending_approval` and from `awaiting_second_approval`, by either staff member (the first approver too); lines go back to the pending pool as before.
+- **Idempotent release.** Approve / reject lock the batch row (`FOR UPDATE`) and check its status in the same transaction, so the release (`approved`, payouts `transfer_pending`) happens once however often or concurrently it is approved; a repeat approve of a released batch is `409 invalid_state`. Wallet credits keep their per-payout idempotency key.
+- **Audit.** `batch.approve_first` (before `pending_approval`, after `awaiting_second_approval` with total and threshold), `batch.approve` (before = the state it was released from; after has `firstApprovedBy` / `secondApprovedBy` when two approvers were needed), `batch.reject` (before = the state it was rejected from).
+- **API.** Every batch carries `decidedById` and `fourEyes: {required, threshold, firstApprovedById (staff id without the prefix), firstApprovedBy, firstApprovedAt, firstApprovalNote}`; `GET /v1/ib/admin/batches` also returns `fourEyesThreshold` and accepts `status=open` (both awaiting states). Overview: `pendingBatches` counts both awaiting states, `awaitingSecondApproval` the second.
+- **Back Office.** Payout batches shows "Awaiting 2nd approval" (tab, status chip, first approver under it), the drawer shows who gave the first approval, when and their note; others with `partners.approve` get Approve / Reject; for the first approver Approve is disabled with the explanation and Reject stays available. A batch at or above the threshold is approved with "Approve (1 of 2)".
 
 ## Data model
 
@@ -89,7 +103,7 @@ Database `kalks_ib` (`migrations/0001_ib.sql`). Every row has `tenant` (gateway 
 | `accounts` | engine account kind / group / cent cache |
 | `deals` | every processed deal, qualified or not, with the reason; `(source, deal_id, user_id)` primary key = idempotency (`source` = the feed: `engine` \| `pamm` \| `copy`); `origin` = the ledger label (`copy` / `mam` / `pamm` / `engine`, `migrations/0005_deal_origin.sql`); `instrument` (`cfd` / `option`), `lots` (0 for options) and `contracts` |
 | `commissions` | lines: `lot`, `split`, `rebate`, `cpa`, `clawback`, `adjustment`; status `pending → approved → paid` or `rejected` / `void`; unique per (`deal_source`, deal, client, beneficiary, kind) and one CPA per client; `origin` is the deal's label (clawbacks keep it). The ledger APIs return the label as `source` (falling back to the feed for older lines) and the feed as `feed`. Option lines: `symbol_group = 'options'`, `lots` 0, `contracts`, `rate` = the per-contract rate |
-| `payout_batches`, `payouts` | batches and one payout per payee, with transfer attempts, last error, wallet txn |
+| `payout_batches`, `payouts` | batches (status `pending_approval` / `awaiting_second_approval` / `approved` / `paid` / `partially_paid` / `rejected`, first approver for four-eyes) and one payout per payee, with transfer attempts, last error, wallet txn |
 | `fraud_flags` | open / confirmed / dismissed, deduplicated |
 | `reassignments`, `level_history` | append-only history |
 | `audit_log` | append-only (trigger), every admin change and money decision |
@@ -134,9 +148,9 @@ Every route except `GET /health` needs `X-Kalks-Internal: $IB_INTERNAL_TOKEN`. T
 | `POST /v1/ib/admin/partners/{id}/reassign` | `{parentId \| null, reason}` |
 | `GET /v1/ib/admin/commissions?status&kind&ib&client&batch&from&to&page&limit` | ledger + `sum` |
 | `POST /v1/ib/admin/commissions/{id}/reject` | `{reason}` — pending, unbatched lines only |
-| `GET/POST /v1/ib/admin/batches` | batches + transfer counts + unbatched amount; POST `{periodEnd?}` creates a batch now |
+| `GET/POST /v1/ib/admin/batches?status` | batches (with `fourEyes`) + transfer counts + unbatched amount + `fourEyesThreshold`; `status=open` = awaiting the first or second approval; POST `{periodEnd?}` creates a batch now |
 | `GET /v1/ib/admin/batches/{id}` | payees with breakdown, transfer status, open flags |
-| `POST /v1/ib/admin/batches/{id}/approve \| reject \| retry` | `{note?}` / `{reason}` / – |
+| `POST /v1/ib/admin/batches/{id}/approve \| reject \| retry` | `{note?}` / `{reason}` / –. Approve at or above the four-eyes threshold: first call → `awaiting_second_approval`, second call from another staff member releases; same staff → `409 four_eyes_same_staff` |
 | `GET /v1/ib/admin/flags?status`, `POST /v1/ib/admin/flags/{id}/resolve` | `{action: dismiss\|confirm, note}` |
 | `GET /v1/ib/admin/audit?limit&before&target` | audit entries |
 | `POST /v1/ib/admin/run/{sync\|deals\|deposits\|reversals\|payouts\|levels}` | run a loop now (`levels` previews the current month) |
@@ -179,7 +193,7 @@ cargo test -p ib
 ```
 
 - **Unit** (`calc`, `model`): option deals per contract and never lots, the options rate (default 0, validation, kept when absent), option series codes, per-lot amounts, three tiers with shares, rebate + split within the IB's own amount, caps, suspended IBs, rounding conservation, tiny deals, anti-abuse filters (demo, excluded group, reopened, price correction, minimum duration), cent lots, level evaluation (both targets, lock, demotion), wash-pair matching, payout periods, backoff, symbol groups, settings validation.
-- **Database** (`tests/programme.rs`, throw-away `kalks_ib_test_*` database, skipped without PostgreSQL): option deals paid per contract only (rate 0 by default = no lines; the Back Office rate card through `PUT levels`, kept when a PUT omits it; tier %, rebate; short / demo / reopened filters; 0 lots, so level upgrades ignore them; a series pushed as PAMM / copy lots; feed parsing), multi-tier lines with rebate and split, the same deal twice (no double pay), a three-tier chain, short / demo / prop / no-referrer deals, PAMM lots, deals that arrive before the client is mirrored; origin labels from the feed's `source` (copy / MAM fills labelled on the deal, lines, ledger API and clawback; keyed by the `engine` feed, so a re-read without `source` is still a duplicate; a missing or non-social source = `engine`); self-referral block and admin clearing, loopback IPs ignored, wash-pair flag; CPA only after a deposit ≥ minimum and a trade, once; wallet deposit events (recorded, a retry is `duplicate`, a reused key with another amount is refused, a later `transfer_in` of the same money neither replaces nor adds to the first deposit, CPA once, USC ÷ 100, other currencies refused, unknown client 404); batch creation with carry-over, approval, a wallet that fails once (pending transfer, same idempotency key on retry, then paid), clawback after a paid deal is reopened, void of an unpaid one; batch rejection releasing lines; click tracking (unique per visitor, unknown campaign, unknown code).
+- **Database** (`tests/programme.rs`, throw-away `kalks_ib_test_*` database, skipped without PostgreSQL): option deals paid per contract only (rate 0 by default = no lines; the Back Office rate card through `PUT levels`, kept when a PUT omits it; tier %, rebate; short / demo / reopened filters; 0 lots, so level upgrades ignore them; a series pushed as PAMM / copy lots; feed parsing), multi-tier lines with rebate and split, the same deal twice (no double pay), a three-tier chain, short / demo / prop / no-referrer deals, PAMM lots, deals that arrive before the client is mirrored; origin labels from the feed's `source` (copy / MAM fills labelled on the deal, lines, ledger API and clawback; keyed by the `engine` feed, so a re-read without `source` is still a duplicate; a missing or non-social source = `engine`); self-referral block and admin clearing, loopback IPs ignored, wash-pair flag; CPA only after a deposit ≥ minimum and a trade, once; wallet deposit events (recorded, a retry is `duplicate`, a reused key with another amount is refused, a later `transfer_in` of the same money neither replaces nor adds to the first deposit, CPA once, USC ÷ 100, other currencies refused, unknown client 404); batch creation with carry-over, approval, a wallet that fails once (pending transfer, same idempotency key on retry, then paid), clawback after a paid deal is reopened, void of an unpaid one; batch rejection releasing lines; click tracking (unique per visitor, unknown campaign, unknown code); four-eyes (settings without the field read as 1000, below the threshold one approval pays; at the threshold the first approval pays nothing, the same staff member is refused `four_eyes_same_staff`, a second staff member releases it and the wallet is credited exactly once, repeat approvals refused; threshold 0, reject from `awaiting_second_approval` by the first or the second staff member).
 
 ## Known gaps
 

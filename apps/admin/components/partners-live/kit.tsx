@@ -132,6 +132,7 @@ export const COMM_KIND: Record<CommKind, { label: string; tone: ChipTone }> = {
 
 export const BATCH_STATUS: Record<BatchStatus, { label: string; tone: ChipTone }> = {
   pending_approval: S("Awaiting approval", "warn"),
+  awaiting_second_approval: S("Awaiting 2nd approval", "warn"),
   approved: S("Approved · transferring", "info"),
   paid: S("Paid", "up"),
   partially_paid: S("Partly paid", "down"),

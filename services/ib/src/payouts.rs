@@ -1,7 +1,8 @@
 //! Payout batches (D56): pending commissions are grouped per payee into a batch for a closed period
 //! (daily / weekly / monthly). An admin approves or rejects the batch. Approved payouts are credited to the
 //! payee's wallet with `POST /v1/wallets/transfers` (kind `ib_payout`), idempotent per payout. While the
-//! wallet is unreachable a payout stays `transfer_pending` and is retried with backoff.
+//! wallet is unreachable a payout stays `transfer_pending` and is retried with backoff. Batches at or above the
+//! four-eyes threshold need two different approvers (see [`approve`]).
 
 use crate::audit::{self, Actor};
 use crate::calc;
@@ -88,37 +89,107 @@ async fn batch_status(st: &AppState, tenant: &str, id: i64) -> ApiResult<String>
     sqlx::query_scalar("SELECT status FROM payout_batches WHERE id = $1 AND tenant = $2").bind(id).bind(tenant).fetch_optional(&st.pool).await?.ok_or(ApiError::NotFound)
 }
 
-pub async fn approve(st: &AppState, tenant: &str, id: i64, actor: &Actor, note: Option<&str>) -> ApiResult<()> {
-    let mut tx = st.pool.begin().await?;
-    let status: Option<String> = sqlx::query_scalar("SELECT status FROM payout_batches WHERE id = $1 AND tenant = $2 FOR UPDATE").bind(id).bind(tenant).fetch_optional(&mut *tx).await?;
-    match status.as_deref() {
-        None => return Err(ApiError::NotFound),
-        Some("pending_approval") => {}
-        Some(s) => return Err(ApiError::Conflict { code: "invalid_state", message: format!("This batch is {s}.") }),
-    }
-    sqlx::query("UPDATE payout_batches SET status = 'approved', decided_by = $2, decided_at = now(), decision_note = $3 WHERE id = $1").bind(id).bind(actor.label()).bind(note).execute(&mut *tx).await?;
-    sqlx::query("UPDATE payouts SET status = 'transfer_pending', next_attempt_at = now() WHERE batch_id = $1 AND status = 'pending_approval'").bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE commissions SET status = 'approved', updated_at = now() WHERE batch_id = $1 AND status = 'pending'").bind(id).execute(&mut *tx).await?;
-    audit::record(&mut *tx, tenant, actor, "batch.approve", Some(format!("batch:{id}")), Some(json!({"status": "pending_approval"})), Some(json!({"status": "approved"})), note).await?;
-    tx.commit().await?;
-    st.wake_payouts.notify_one();
-    Ok(())
+/// What an approval did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Approval {
+    /// The batch is approved and its payouts are queued for the wallet.
+    Released,
+    /// Four-eyes: first approval recorded; a different staff member must approve before anything is paid.
+    AwaitingSecond,
 }
 
-/// Rejects a batch: its commissions go back to the pending pool (a later batch picks them up), unless an
-/// admin rejects individual lines.
+/// Approves a batch. Four-eyes: a batch whose total is at or above the programme's `fourEyesThreshold` (USD,
+/// 0 = every batch) needs two different staff members. The first approval moves it to
+/// `awaiting_second_approval` and pays nothing; the second (another staff member) releases it. The same staff
+/// member is refused with `409 four_eyes_same_staff`. The batch row is locked and its status checked inside one
+/// transaction, so the release happens once however often (or concurrently) it is approved.
+pub async fn approve(st: &AppState, tenant: &str, id: i64, actor: &Actor, note: Option<&str>) -> ApiResult<Approval> {
+    let threshold = db::settings(&st.pool, tenant).await?.four_eyes_threshold;
+    let mut tx = st.pool.begin().await?;
+    let row = sqlx::query("SELECT status, total, first_approved_by_id, first_approved_by_name FROM payout_batches WHERE id = $1 AND tenant = $2 FOR UPDATE")
+        .bind(id)
+        .bind(tenant)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let status: String = row.get("status");
+    let total: D = row.get("total");
+    let first: Option<(String, Option<String>)> = row.get::<Option<String>, _>("first_approved_by_id").map(|i| (i, row.get("first_approved_by_name")));
+    match status.as_str() {
+        "pending_approval" if total >= threshold => {
+            sqlx::query(
+                "UPDATE payout_batches SET status = 'awaiting_second_approval', first_approved_by_id = $2, first_approved_by_name = $3,
+                    first_approved_at = now(), first_approval_note = $4, four_eyes_threshold = $5 WHERE id = $1",
+            )
+            .bind(id)
+            .bind(&actor.id)
+            .bind(actor.label())
+            .bind(note)
+            .bind(threshold)
+            .execute(&mut *tx)
+            .await?;
+            audit::record(
+                &mut *tx,
+                tenant,
+                actor,
+                "batch.approve_first",
+                Some(format!("batch:{id}")),
+                Some(json!({"status": "pending_approval"})),
+                Some(json!({"status": "awaiting_second_approval", "total": total.to_string(), "threshold": threshold.to_string()})),
+                note,
+            )
+            .await?;
+            tx.commit().await?;
+            return Ok(Approval::AwaitingSecond);
+        }
+        "pending_approval" => {}
+        "awaiting_second_approval" => {
+            if first.as_ref().is_some_and(|(by, _)| *by == actor.id) {
+                return Err(ApiError::Conflict { code: "four_eyes_same_staff", message: "Four-eyes rule: another staff member must give the second approval.".into() });
+            }
+        }
+        s => return Err(ApiError::Conflict { code: "invalid_state", message: format!("This batch is {s}.") }),
+    }
+    sqlx::query("UPDATE payout_batches SET status = 'approved', decided_by = $2, decided_by_id = $3, decided_at = now(), decision_note = $4 WHERE id = $1")
+        .bind(id)
+        .bind(actor.label())
+        .bind(&actor.id)
+        .bind(note)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE payouts SET status = 'transfer_pending', next_attempt_at = now() WHERE batch_id = $1 AND status = 'pending_approval'").bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE commissions SET status = 'approved', updated_at = now() WHERE batch_id = $1 AND status = 'pending'").bind(id).execute(&mut *tx).await?;
+    let mut after = json!({"status": "approved", "total": total.to_string()});
+    if let Some((_, name)) = &first {
+        after["firstApprovedBy"] = json!(name);
+        after["secondApprovedBy"] = json!(actor.label());
+    }
+    audit::record(&mut *tx, tenant, actor, "batch.approve", Some(format!("batch:{id}")), Some(json!({"status": status})), Some(after), note).await?;
+    tx.commit().await?;
+    st.wake_payouts.notify_one();
+    Ok(Approval::Released)
+}
+
+/// Rejects a batch (awaiting the first or the second approval; either approver may reject): its commissions go
+/// back to the pending pool (a later batch picks them up), unless an admin rejects individual lines.
 pub async fn reject(st: &AppState, tenant: &str, id: i64, actor: &Actor, note: &str) -> ApiResult<()> {
     let mut tx = st.pool.begin().await?;
     let status: Option<String> = sqlx::query_scalar("SELECT status FROM payout_batches WHERE id = $1 AND tenant = $2 FOR UPDATE").bind(id).bind(tenant).fetch_optional(&mut *tx).await?;
-    match status.as_deref() {
+    let status = match status.as_deref() {
         None => return Err(ApiError::NotFound),
-        Some("pending_approval") => {}
+        Some(s @ ("pending_approval" | "awaiting_second_approval")) => s.to_string(),
         Some(s) => return Err(ApiError::Conflict { code: "invalid_state", message: format!("This batch is {s}.") }),
-    }
-    sqlx::query("UPDATE payout_batches SET status = 'rejected', decided_by = $2, decided_at = now(), decision_note = $3 WHERE id = $1").bind(id).bind(actor.label()).bind(note).execute(&mut *tx).await?;
+    };
+    sqlx::query("UPDATE payout_batches SET status = 'rejected', decided_by = $2, decided_by_id = $3, decided_at = now(), decision_note = $4 WHERE id = $1")
+        .bind(id)
+        .bind(actor.label())
+        .bind(&actor.id)
+        .bind(note)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("UPDATE payouts SET status = 'rejected' WHERE batch_id = $1").bind(id).execute(&mut *tx).await?;
     let released = sqlx::query("UPDATE commissions SET batch_id = NULL, payout_id = NULL, updated_at = now() WHERE batch_id = $1 AND status = 'pending'").bind(id).execute(&mut *tx).await?.rows_affected();
-    audit::record(&mut *tx, tenant, actor, "batch.reject", Some(format!("batch:{id}")), Some(json!({"status": "pending_approval"})), Some(json!({"status": "rejected", "released": released})), Some(note)).await?;
+    audit::record(&mut *tx, tenant, actor, "batch.reject", Some(format!("batch:{id}")), Some(json!({"status": status})), Some(json!({"status": "rejected", "released": released})), Some(note)).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -233,7 +304,17 @@ pub async fn auto_batch_tick(st: &AppState, tenant: &str) -> anyhow::Result<Opti
     Ok(id)
 }
 
-pub fn batch_json(r: &sqlx::postgres::PgRow) -> Value {
+/// A batch for the Back Office. `threshold` = the programme's current four-eyes threshold (used while the batch
+/// still waits for its first approval; afterwards the snapshot taken at the first approval is shown).
+pub fn batch_json(r: &sqlx::postgres::PgRow, threshold: D) -> Value {
+    let status: String = r.get("status");
+    let total: D = r.get("total");
+    let snapshot: Option<D> = r.get("four_eyes_threshold");
+    let first_id: Option<String> = r.get("first_approved_by_id");
+    let required = match status.as_str() {
+        "pending_approval" => total >= threshold,
+        _ => first_id.is_some(),
+    };
     json!({
         "id": r.get::<i64, _>("id"),
         "schedule": r.get::<String, _>("schedule"),
@@ -249,6 +330,16 @@ pub fn batch_json(r: &sqlx::postgres::PgRow) -> Value {
         "decidedAt": r.get::<Option<DateTime<Utc>>, _>("decided_at"),
         "decisionNote": r.get::<Option<String>, _>("decision_note"),
         "completedAt": r.get::<Option<DateTime<Utc>>, _>("completed_at"),
+        "decidedById": r.get::<Option<String>, _>("decided_by_id"),
+        "fourEyes": {
+            "required": required,
+            "threshold": num(snapshot.unwrap_or(threshold)),
+            // the staff id (without the `staff:` prefix); the Back Office compares it with the signed-in staff member
+            "firstApprovedById": first_id.as_deref().map(|s| s.strip_prefix("staff:").unwrap_or(s)),
+            "firstApprovedBy": r.get::<Option<String>, _>("first_approved_by_name"),
+            "firstApprovedAt": r.get::<Option<DateTime<Utc>>, _>("first_approved_at"),
+            "firstApprovalNote": r.get::<Option<String>, _>("first_approval_note"),
+        },
     })
 }
 

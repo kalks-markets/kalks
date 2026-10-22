@@ -38,6 +38,8 @@ export type Settings = {
   wash: { enabled: boolean; windowSecs: number; volumeTolerancePct: number; shortTradesMin: number; shortTradesPct: number };
   allowDemotion: boolean;
   linkBase: string;
+  /** Four-eyes (USD): batches at or above this need a second approver. 0 = every batch. */
+  fourEyesThreshold: number;
 };
 
 export type SettingsDoc = { settings: Settings; version: number; updatedAt: string; updatedBy: string | null; nextPayoutClose: string };
@@ -69,6 +71,7 @@ export function toSettings(raw: Record<string, unknown>): Settings {
     },
     allowDemotion: !!r.allowDemotion,
     linkBase: r.linkBase ?? "",
+    fourEyesThreshold: r.fourEyesThreshold === undefined || r.fourEyesThreshold === null ? 1000 : n(r.fourEyesThreshold),
   };
 }
 
@@ -229,7 +232,18 @@ export type CommissionsDoc = Paged<Commission> & { sum: number };
 /* Batches & payouts                                                    */
 /* ------------------------------------------------------------------ */
 
-export type BatchStatus = "pending_approval" | "approved" | "paid" | "partially_paid" | "rejected";
+export type BatchStatus = "pending_approval" | "awaiting_second_approval" | "approved" | "paid" | "partially_paid" | "rejected";
+
+/** Four-eyes state of a batch: whether it needs two approvers and who gave the first approval. */
+export type FourEyes = {
+  required: boolean;
+  threshold: number;
+  /** Staff id (as the gateway sends it) of the first approver. */
+  firstApprovedById: string | null;
+  firstApprovedBy: string | null;
+  firstApprovedAt: string | null;
+  firstApprovalNote: string | null;
+};
 export type PayoutStatus = "pending_approval" | "transfer_pending" | "paid" | "rejected" | "failed";
 
 export type Batch = {
@@ -247,10 +261,12 @@ export type Batch = {
   decidedAt: string | null;
   decisionNote: string | null;
   completedAt: string | null;
+  decidedById?: string | null;
+  fourEyes?: FourEyes;
   transfers?: { paid: number; pending: number; failed: number };
 };
 
-export type BatchesDoc = Paged<Batch> & { unbatched: { amount: number; payees: number }; schedule: Schedule; minAmount: number; nextClose: string };
+export type BatchesDoc = Paged<Batch> & { unbatched: { amount: number; payees: number }; schedule: Schedule; minAmount: number; nextClose: string; fourEyesThreshold?: number };
 
 export type Payout = {
   id: number;
@@ -333,6 +349,7 @@ export const FIELD_LABEL: Record<string, string> = {
   selfReferral: "Self-referral",
   wash: "Wash trading",
   linkBase: "Link base",
+  fourEyesThreshold: "Four-eyes threshold",
   levels: "Levels",
   key: "Level key",
   rank: "Rank",

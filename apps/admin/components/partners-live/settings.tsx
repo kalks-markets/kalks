@@ -311,6 +311,7 @@ export function LiveProgrammeSettings() {
       (s.minTradeSeconds !== base.minTradeSeconds || s.centLotFactor !== base.centLotFactor || !same(s.excludedGroups, base.excludedGroups)) && "qualifying trades",
       !same(s.cpa, base.cpa) && "CPA rules",
       !same(s.payout, base.payout) && "payout schedule",
+      s.fourEyesThreshold !== base.fourEyesThreshold && `four-eyes threshold (${usd(base.fourEyesThreshold)} → ${usd(s.fourEyesThreshold)})`,
       (s.maxRebatePct !== base.maxRebatePct || s.maxSplitPct !== base.maxSplitPct) && "rebate / split limits",
       (s.clientVisibility !== base.clientVisibility || s.linkBase !== base.linkBase || s.allowDemotion !== base.allowDemotion) && "visibility and links",
       (!same(s.selfReferral, base.selfReferral) || !same(s.wash, base.wash)) && "abuse rules",
@@ -490,6 +491,9 @@ export function LiveProgrammeSettings() {
                 </SettingRow>
                 <SettingRow label="Create batch automatically" hint="When a period closes, a batch is created for approval">
                   <Toggle checked={s.payout.autoCreate} onChange={(v) => edit && setIn("payout", { autoCreate: v })} label="Auto-create batches" />
+                </SettingRow>
+                <SettingRow label="Four-eyes threshold (USD)" hint="Payouts at or above this amount need a second staff member to approve. 0 = every payout.">
+                  {edit ? <NumInput size="sm" className="w-32" prefix="$" value={s.fourEyesThreshold} onChange={(v) => set({ fourEyesThreshold: v })} min={0} step={100} /> : <Val>{s.fourEyesThreshold === 0 ? "Every batch" : usd(s.fourEyesThreshold)}</Val>}
                 </SettingRow>
               </RowsCard>
             </Reveal>

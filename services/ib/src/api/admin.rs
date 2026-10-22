@@ -62,6 +62,20 @@ pub async fn put_settings(State(st): State<AppState>, s: StaffCtx, Json(r): Json
         .execute(&mut *tx)
         .await?;
     audit::record(&mut *tx, &s.tenant, &s.actor(), "settings.update", Some("settings".into()), Some(serde_json::to_value(&before)?), Some(serde_json::to_value(&r.settings)?), Some(&reason)).await?;
+    if before.four_eyes_threshold != r.settings.four_eyes_threshold {
+        // its own entry, so the money-control change stands out in the audit log
+        audit::record(
+            &mut *tx,
+            &s.tenant,
+            &s.actor(),
+            "settings.four_eyes_threshold",
+            Some("settings".into()),
+            Some(json!({"fourEyesThreshold": num(before.four_eyes_threshold)})),
+            Some(json!({"fourEyesThreshold": num(r.settings.four_eyes_threshold)})),
+            Some(&reason),
+        )
+        .await?;
+    }
     tx.commit().await?;
     get_settings(State(st), s).await
 }
@@ -139,7 +153,8 @@ pub async fn overview(State(st): State<AppState>, s: StaffCtx) -> ApiResult<Json
            (SELECT coalesce(sum(amount), 0) FROM commissions WHERE tenant = $1 AND status = 'paid') AS paid,
            (SELECT coalesce(sum(lots), 0) FROM deals WHERE tenant = $1 AND qualified AND NOT reversed AND close_time >= $2) AS lots,
            (SELECT count(*) FROM fraud_flags WHERE tenant = $1 AND status = 'open') AS flags,
-           (SELECT count(*) FROM payout_batches WHERE tenant = $1 AND status = 'pending_approval') AS batches,
+           (SELECT count(*) FROM payout_batches WHERE tenant = $1 AND status IN ('pending_approval', 'awaiting_second_approval')) AS batches,
+           (SELECT count(*) FROM payout_batches WHERE tenant = $1 AND status = 'awaiting_second_approval') AS second_batches,
            (SELECT count(*) FROM payouts WHERE tenant = $1 AND status IN ('transfer_pending','failed')) AS transfers",
     )
     .bind(t)
@@ -194,7 +209,7 @@ pub async fn overview(State(st): State<AppState>, s: StaffCtx) -> ApiResult<Json
             "members": k.get::<i64, _>("members"), "referredClients": k.get::<i64, _>("referred"), "ibsWithClients": k.get::<i64, _>("ibs"),
             "earningIbs": k.get::<i64, _>("earning_ibs"), "commissionMonth": num(k.get("month")), "commissionPrevMonth": num(k.get("prev")),
             "pending": num(k.get("pending")), "approved": num(k.get("approved")), "paid": num(k.get("paid")), "lotsMonth": num(k.get("lots")),
-            "openFlags": k.get::<i64, _>("flags"), "pendingBatches": k.get::<i64, _>("batches"), "transfersInFlight": k.get::<i64, _>("transfers"),
+            "openFlags": k.get::<i64, _>("flags"), "pendingBatches": k.get::<i64, _>("batches"), "awaitingSecondApproval": k.get::<i64, _>("second_batches"), "transfersInFlight": k.get::<i64, _>("transfers"),
         },
         "months": months.iter().map(|r| {
             let m: String = r.get("m");
@@ -621,7 +636,9 @@ pub async fn batches(State(st): State<AppState>, s: StaffCtx, Query(q): Query<Ba
             (SELECT count(*) FROM payouts p WHERE p.batch_id = b.id AND p.status = 'paid') AS paid_n,
             (SELECT count(*) FROM payouts p WHERE p.batch_id = b.id AND p.status = 'transfer_pending') AS pending_n,
             (SELECT count(*) FROM payouts p WHERE p.batch_id = b.id AND p.status = 'failed') AS failed_n
-         FROM payout_batches b WHERE b.tenant = $1 AND ($2::text IS NULL OR b.status = $2) ORDER BY b.created_at DESC LIMIT $3 OFFSET $4",
+         FROM payout_batches b WHERE b.tenant = $1
+           AND ($2::text IS NULL OR b.status = $2 OR ($2 = 'open' AND b.status IN ('pending_approval', 'awaiting_second_approval')))
+         ORDER BY b.created_at DESC LIMIT $3 OFFSET $4",
     )
     .bind(&s.tenant)
     .bind(q.status.as_deref().filter(|x| *x != "all"))
@@ -637,7 +654,7 @@ pub async fn batches(State(st): State<AppState>, s: StaffCtx, Query(q): Query<Ba
     let settings = db::settings(&st.pool, &s.tenant).await?;
     Ok(Json(json!({
         "items": rows.iter().map(|r| {
-            let mut v = payouts::batch_json(r);
+            let mut v = payouts::batch_json(r, settings.four_eyes_threshold);
             v["transfers"] = json!({"paid": r.get::<i64, _>("paid_n"), "pending": r.get::<i64, _>("pending_n"), "failed": r.get::<i64, _>("failed_n")});
             v
         }).collect::<Vec<_>>(),
@@ -645,6 +662,7 @@ pub async fn batches(State(st): State<AppState>, s: StaffCtx, Query(q): Query<Ba
         "unbatched": {"amount": num(unbatched.get("amount")), "payees": unbatched.get::<i64, _>("payees")},
         "schedule": settings.payout.schedule, "minAmount": num(settings.payout.min_amount),
         "nextClose": payouts::next_close(&settings.payout.schedule, settings.payout.weekday, settings.payout.month_day),
+        "fourEyesThreshold": num(settings.four_eyes_threshold),
     })))
 }
 
@@ -662,8 +680,9 @@ pub async fn batch(State(st): State<AppState>, s: StaffCtx, Path(id): Path<i64>)
     .bind(id)
     .fetch_all(&st.pool)
     .await?;
+    let threshold = db::settings(&st.pool, &s.tenant).await?.four_eyes_threshold;
     Ok(Json(json!({
-        "batch": payouts::batch_json(&b),
+        "batch": payouts::batch_json(&b, threshold),
         "payouts": lines.iter().map(|r| json!({
             "id": r.get::<i64, _>("id"), "userId": r.get::<i64, _>("user_id"),
             "name": format!("{} {}", r.get::<Option<String>, _>("first_name").unwrap_or_default(), r.get::<Option<String>, _>("last_name").unwrap_or_default()).trim().to_string(),
@@ -693,9 +712,11 @@ pub async fn create_batch(State(st): State<AppState>, s: StaffCtx, Json(r): Json
 
 pub async fn approve_batch(State(st): State<AppState>, s: StaffCtx, Path(id): Path<i64>, Json(r): Json<NoteReq>) -> ApiResult<Json<Value>> {
     s.require(ROLES_APPROVE)?;
-    payouts::approve(&st, &s.tenant, id, &s.actor(), r.note.as_deref().map(str::trim).filter(|n| !n.is_empty())).await?;
-    // first transfer attempt right away so the response already shows paid / pending transfer
-    let _ = payouts::transfer_tick(&st).await;
+    let outcome = payouts::approve(&st, &s.tenant, id, &s.actor(), r.note.as_deref().map(str::trim).filter(|n| !n.is_empty())).await?;
+    if outcome == payouts::Approval::Released {
+        // first transfer attempt right away so the response already shows paid / pending transfer
+        let _ = payouts::transfer_tick(&st).await;
+    }
     batch(State(st), s, Path(id)).await
 }
 

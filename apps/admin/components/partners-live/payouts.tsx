@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Check, HandCoins, RefreshCw, RotateCw, Wallet, X } from "lucide-react";
+import { Check, HandCoins, RefreshCw, RotateCw, ShieldCheck, Wallet, X } from "lucide-react";
 import { Button, Card, Chip, DataTable, Dialog, Money, PageHeader, Reveal, Segmented, Skeleton, cn, type Column } from "@kalks/ui";
 import { MiniStat, Section } from "@/components/config/kit";
 import { Pager, TableSkeleton, ago, day, useApi, useNow, when } from "@/components/live/kit";
+import { useStaff } from "@/components/staff-session";
 import { P, ibSend, type Batch, type BatchDetail, type BatchStatus, type BatchesDoc, type Payout } from "./api";
 import { BATCH_STATUS, EmptyNote, MemberLink, PAYOUT_STATUS, PartnersError, ReadOnlyNote, StatusPill, WEEKDAYS, int, usd, usePerms, useReasonAction, useUrlParam } from "./kit";
 
@@ -14,6 +15,21 @@ const PER = 25;
 
 function period(b: Batch) {
   return `${b.periodStart ? day(b.periodStart) : "Start"} → ${day(b.periodEnd)}`;
+}
+
+const SELF_APPROVE_NOTE = "You gave the first approval. Another staff member must give the second approval (four-eyes).";
+
+/** Four-eyes view of a batch for the signed-in staff member. */
+function fourEyesOf(b: Batch, meId: string) {
+  const awaitingSecond = b.status === "awaiting_second_approval";
+  return {
+    awaitingSecond,
+    /** waiting for its first approval, and at / above the threshold: the first approval pays nothing */
+    needsTwo: b.status === "pending_approval" && !!b.fourEyes?.required,
+    /** the signed-in staff member gave the first approval: they can't give the second */
+    own: awaitingSecond && b.fourEyes?.firstApprovedById === meId,
+    open: b.status === "pending_approval" || awaitingSecond,
+  };
 }
 
 /** Transfer state of one payee line, stated plainly. */
@@ -51,10 +67,12 @@ function TransferState({ p, now }: { p: Payout; now: number }) {
 
 function BatchDrawer({ id, perms, onClose, onChanged }: { id: number | null; perms: { write: boolean; approve: boolean }; onClose: () => void; onChanged: () => void }) {
   const now = useNow();
+  const me = useStaff();
   const act = useReasonAction();
   const { data, error, reload } = useApi<BatchDetail>(id !== null ? P(`batches/${id}`) : null, { refreshMs: 30_000 });
   const d = data && data.batch.id === id ? data : null;
   const b = d?.batch;
+  const fe = b ? fourEyesOf(b, String(me.id)) : null;
   const flagged = d?.payouts.filter((p) => p.openFlags > 0) ?? [];
   const failed = d?.payouts.filter((p) => p.status === "failed").length ?? 0;
   const retrying = d?.payouts.filter((p) => p.status === "transfer_pending").length ?? 0;
@@ -66,9 +84,14 @@ function BatchDrawer({ id, perms, onClose, onChanged }: { id: number | null; per
 
   const approve = () =>
     b &&
+    fe &&
     act.ask({
-      title: `Approve batch #${b.id}`,
-      description: `Pays ${usd(b.total)} to ${int(b.payees)} payee${b.payees === 1 ? "" : "s"}. Each amount is credited to the member's client wallet right away; if the wallet service is down, the transfer waits and retries automatically.`,
+      title: fe.needsTwo ? `Approve batch #${b.id} (1 of 2)` : fe.awaitingSecond ? `Second approval for batch #${b.id}` : `Approve batch #${b.id}`,
+      description: fe.needsTwo
+        ? `This batch is at or above the four-eyes threshold (${usd(b.fourEyes?.threshold ?? 0)}). Your approval is recorded, but nothing is paid until another staff member with approval rights gives the second approval.`
+        : fe.awaitingSecond
+          ? `${b.fourEyes?.firstApprovedBy ?? "Another staff member"} gave the first approval. Your approval releases ${usd(b.total)} to ${int(b.payees)} payee${b.payees === 1 ? "" : "s"}: each amount is credited to the member's client wallet right away; if the wallet service is down, the transfer waits and retries automatically.`
+          : `Pays ${usd(b.total)} to ${int(b.payees)} payee${b.payees === 1 ? "" : "s"}. Each amount is credited to the member's client wallet right away; if the wallet service is down, the transfer waits and retries automatically.`,
       body: (
         <div className="space-y-2">
           <div className="grid grid-cols-3 gap-2">
@@ -85,11 +108,12 @@ function BatchDrawer({ id, perms, onClose, onChanged }: { id: number | null; per
       ),
       reason: "optional",
       placeholder: "Anything worth noting for the audit log",
-      confirmLabel: `Approve and pay ${usd(b.total)}`,
+      confirmLabel: fe.needsTwo ? "Approve (1 of 2)" : `Approve and pay ${usd(b.total)}`,
       confirmVariant: "buy",
       run: (note) => ibSend<BatchDetail>(`batches/${b.id}/approve`, note ? { note } : {}),
-      success: `Batch #${b.id} approved`,
+      success: (r) => (r.batch.status === "awaiting_second_approval" ? "First approval recorded · waiting for a second approver" : `Batch #${b.id} approved`),
       successDetail: (r) => {
+        if (r.batch.status === "awaiting_second_approval") return `Nothing is paid until another staff member approves batch #${b.id}.`;
         const paid = r.payouts.filter((p) => p.status === "paid").length;
         const pend = r.payouts.filter((p) => p.status === "transfer_pending").length;
         return pend ? `${paid} credited · ${pend} waiting for the wallet, retrying` : `${paid} credited to client wallets`;
@@ -101,7 +125,7 @@ function BatchDrawer({ id, perms, onClose, onChanged }: { id: number | null; per
     b &&
     act.ask({
       title: `Reject batch #${b.id}`,
-      description: "Nothing is paid. The batch's commission lines go back to pending and will be picked up by the next batch (reject individual lines in Commissions first if they should never be paid).",
+      description: `Nothing is paid${fe?.awaitingSecond ? ` (the first approval by ${b.fourEyes?.firstApprovedBy ?? "another staff member"} is discarded)` : ""}. The batch's commission lines go back to pending and will be picked up by the next batch (reject individual lines in Commissions first if they should never be paid).`,
       confirmLabel: "Reject batch",
       confirmVariant: "sell",
       run: (reason) => ibSend<BatchDetail>(`batches/${b.id}/reject`, { reason }),
@@ -158,15 +182,16 @@ function BatchDrawer({ id, perms, onClose, onChanged }: { id: number | null; per
         title={b ? `Batch #${b.id}` : id !== null ? `Batch #${id}` : ""}
         description={b ? `${b.schedule} · ${period(b)} · created by ${b.createdBy} ${when(b.createdAt)}` : undefined}
         footer={
-          b && perms.approve && (b.status === "pending_approval" || failed + retrying > 0) ? (
+          b && fe && perms.approve && (fe.open || failed + retrying > 0) ? (
             <div className="flex w-full flex-wrap items-center justify-end gap-2">
-              {b.status === "pending_approval" ? (
+              {fe.open ? (
                 <>
+                  {fe.own && <span className="mr-auto max-w-md text-[12px] text-fg-3">{SELF_APPROVE_NOTE}</span>}
                   <Button variant="down-outline" size="sm" onClick={reject}>
                     <X /> Reject
                   </Button>
-                  <Button variant="buy" size="sm" onClick={approve}>
-                    <Check /> Approve and pay
+                  <Button variant="buy" size="sm" onClick={approve} disabled={fe.own} title={fe.own ? SELF_APPROVE_NOTE : undefined} data-testid="batch-approve">
+                    <Check /> {fe.needsTwo ? "Approve (1 of 2)" : fe.awaitingSecond ? "Second approval and pay" : "Approve and pay"}
                   </Button>
                 </>
               ) : (
@@ -204,13 +229,30 @@ function BatchDrawer({ id, perms, onClose, onChanged }: { id: number | null; per
                   Approved payouts are credited to each member&apos;s client wallet. If the wallet service is unavailable the line stays <b className="font-medium text-fg-2">pending transfer</b> and is retried automatically with backoff; nothing is paid twice.
                 </span>
               </div>
+              {(fe?.needsTwo || b.fourEyes?.firstApprovedBy) && (
+                <div className={cn("mt-3 flex items-start gap-2.5 rounded-[14px] border px-3.5 py-2.5 text-[12.5px]", fe?.awaitingSecond ? "border-warn/30 bg-warn-soft text-fg" : "border-line bg-surface-2/60 text-fg-2")} data-testid="batch-four-eyes">
+                  <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
+                  <span>
+                    {fe?.needsTwo ? (
+                      <>Four-eyes: this batch is at or above {usd(b.fourEyes?.threshold ?? 0)}, so two different staff members must approve it before anything is paid.</>
+                    ) : (
+                      <>
+                        First approval by <span className="font-medium">{b.fourEyes?.firstApprovedBy}</span> {when(b.fourEyes?.firstApprovedAt ?? null)}
+                        {fe?.awaitingSecond && <> · waiting for a second approver (four-eyes, {usd(b.fourEyes?.threshold ?? 0)} and above)</>}
+                        {b.fourEyes?.firstApprovalNote && <span className="mt-1 block text-fg-3">“{b.fourEyes.firstApprovalNote}”</span>}
+                        {fe?.own && <span className="mt-1 block text-fg-3">{SELF_APPROVE_NOTE}</span>}
+                      </>
+                    )}
+                  </span>
+                </div>
+              )}
               {(b.decidedBy || b.decisionNote) && (
                 <div className="mt-3 text-[12.5px] text-fg-2">
                   {b.status === "rejected" ? "Rejected" : "Approved"} by <span className="font-medium">{b.decidedBy ?? "—"}</span> {when(b.decidedAt)}
                   {b.decisionNote && <div className="mt-1 text-fg-3">“{b.decisionNote}”</div>}
                 </div>
               )}
-              {b.status === "pending_approval" && !perms.approve && <div className="mt-3"><ReadOnlyNote what="approve payouts" /></div>}
+              {fe?.open && !perms.approve && <div className="mt-3"><ReadOnlyNote what="approve payouts" /></div>}
             </Section>
             <Section title="Payees" action={<Link href={`/partners/commissions?batch=${b.id}`} className="text-[12px] text-fg-3 hover:text-fg">View lines</Link>}>
               <DataTable columns={cols} rows={d.payouts} pageSize={25} dense rowKey={(p) => String(p.id)} exportName={`ib-batch-${b.id}`} empty={<EmptyNote title="No payees" />} />
@@ -225,6 +267,7 @@ function BatchDrawer({ id, perms, onClose, onChanged }: { id: number | null; per
 
 export function LivePayoutBatches() {
   const now = useNow();
+  const meId = String(useStaff().id);
   const perms = usePerms();
   const act = useReasonAction();
   const [tab, setTab] = React.useState<Tab>("all");
@@ -268,7 +311,7 @@ export function LivePayoutBatches() {
       header: "Transfers",
       hideOn: "lg",
       cell: (b) =>
-        b.transfers && (b.status !== "pending_approval" && b.status !== "rejected") ? (
+        b.transfers && b.status !== "pending_approval" && b.status !== "awaiting_second_approval" && b.status !== "rejected" ? (
           <span className="k-num text-[12px] text-fg-2">
             <span className="text-up">{b.transfers.paid} credited</span>
             {b.transfers.pending > 0 && <span className="text-info"> · {b.transfers.pending} retrying</span>}
@@ -278,7 +321,28 @@ export function LivePayoutBatches() {
           <span className="text-[12px] text-fg-3">—</span>
         ),
     },
-    { key: "s", header: "Status", cell: (b) => <span className="flex flex-col items-start gap-0.5"><StatusPill map={BATCH_STATUS} status={b.status} />{b.decidedBy && <span className="max-w-36 truncate text-[10.5px] text-fg-3">{b.decidedBy}</span>}</span>, csv: (b) => b.status },
+    {
+      key: "s",
+      header: "Status",
+      cell: (b) => {
+        const fe = fourEyesOf(b, meId);
+        return (
+          <span className="flex flex-col items-start gap-0.5">
+            <StatusPill map={BATCH_STATUS} status={b.status} />
+            {fe.awaitingSecond ? (
+              <span className="max-w-40 truncate text-[10.5px] text-fg-3" title={fe.own ? SELF_APPROVE_NOTE : undefined}>
+                1st: {fe.own ? "you" : b.fourEyes?.firstApprovedBy}
+              </span>
+            ) : fe.needsTwo ? (
+              <span className="text-[10.5px] text-fg-3">Needs 2 approvers</span>
+            ) : (
+              b.decidedBy && <span className="max-w-36 truncate text-[10.5px] text-fg-3">{b.decidedBy}</span>
+            )}
+          </span>
+        );
+      },
+      csv: (b) => b.status,
+    },
     { key: "c", header: "Created", align: "right", hideOn: "md", cell: (b) => <span className="whitespace-nowrap text-[11.5px] text-fg-3" title={when(b.createdAt)}>{ago(b.createdAt, now)}<span className="block max-w-32 truncate">{b.createdBy}</span></span>, csv: (b) => b.createdAt },
   ];
 
@@ -288,7 +352,9 @@ export function LivePayoutBatches() {
     <div className="pb-16">
       <PageHeader
         title="Payout batches"
-        subtitle="Commission is paid in batches. Approved payouts are credited to each IB's client wallet."
+        subtitle={`Commission is paid in batches. Approved payouts are credited to each IB's client wallet.${
+          data?.fourEyesThreshold !== undefined ? (data.fourEyesThreshold === 0 ? " Every batch needs two approvers (four-eyes)." : ` Batches of ${usd(data.fourEyesThreshold)} or more need two approvers (four-eyes).`) : ""
+        }`}
         actions={
           <>
             {perms.loaded && !perms.approve && <ReadOnlyNote what="approve payouts" />}
@@ -321,6 +387,7 @@ export function LivePayoutBatches() {
               options={[
                 { value: "all", label: "All" },
                 { value: "pending_approval", label: "Awaiting approval" },
+                { value: "awaiting_second_approval", label: "Awaiting 2nd approval" },
                 { value: "approved", label: "Transferring" },
                 { value: "paid", label: "Paid" },
                 { value: "partially_paid", label: "Partly paid" },

@@ -574,3 +574,122 @@ async fn wallet_deposit_events_are_idempotent_and_never_counted_twice() {
     assert!(matches!(push(json!({"userId": 999, "amount": 1, "currency": "USDT", "idempotencyKey": "k-x"})).await, Err(ApiError::NotFound)));
     e.drop().await;
 }
+
+// ---------------------------------------------------------------- four-eyes on payout batches
+
+fn staff(id: u32) -> Actor {
+    Actor { id: format!("staff:{id}"), name: Some(format!("Staff {id}")) }
+}
+
+impl Env {
+    async fn set_four_eyes(&self, usd: &str) {
+        let mut s = db::settings(&self.st.pool, "kalks").await.unwrap();
+        s.four_eyes_threshold = dec(usd);
+        sqlx::query("UPDATE settings SET data = $1 WHERE tenant = 'kalks'").bind(sqlx::types::Json(&s)).execute(&self.st.pool).await.unwrap();
+    }
+
+    /// One payee (IB `ib`) earning 30 USD from its client `ib + 1`, batched.
+    async fn batch_of_30(&self, ib: i64, deal_id: i64) -> i64 {
+        self.member(ib, None, "silver").await;
+        self.member(ib + 1, Some(ib), "bronze").await;
+        deals::ingest(&self.st, &deal(deal_id, ib + 1, "XAUUSD", "3", 600)).await.unwrap();
+        payouts::create_batch(&self.st, "kalks", &Actor::system(), None, Utc::now() + Duration::seconds(1)).await.unwrap().expect("batch")
+    }
+
+    async fn batch_status(&self, id: i64) -> String {
+        sqlx::query_scalar("SELECT status FROM payout_batches WHERE id = $1").bind(id).fetch_one(&self.st.pool).await.unwrap()
+    }
+}
+
+#[tokio::test]
+async fn four_eyes_default_threshold_and_below_threshold_single_approval_pays() {
+    let (url, calls) = mock_wallet(0).await;
+    let Some(e) = env(Some(url)).await else { return };
+    // settings saved before the field existed fall back to the default (1000 USD)
+    let _ = db::settings(&e.st.pool, "kalks").await.unwrap();
+    sqlx::query("UPDATE settings SET data = data - 'fourEyesThreshold' WHERE tenant = 'kalks'").execute(&e.st.pool).await.unwrap();
+    assert_eq!(db::settings(&e.st.pool, "kalks").await.unwrap().four_eyes_threshold, dec("1000"));
+    let b = e.batch_of_30(70, 9701).await;
+    assert_eq!(payouts::approve(&e.st, "kalks", b, &staff(1), None).await.unwrap(), payouts::Approval::Released);
+    assert_eq!(e.batch_status(b).await, "approved");
+    assert_eq!(payouts::transfer_tick(&e.st).await.unwrap(), (1, 0, 0));
+    assert_eq!(calls.lock().unwrap().len(), 1);
+    assert_eq!(e.batch_status(b).await, "paid");
+    assert_eq!(e.count("SELECT count(*) FROM audit_log WHERE action = 'batch.approve_first'").await, 0);
+    e.drop().await;
+}
+
+#[tokio::test]
+async fn four_eyes_at_threshold_needs_a_second_staff_member_and_pays_once() {
+    let (url, calls) = mock_wallet(0).await;
+    let Some(e) = env(Some(url)).await else { return };
+    e.set_four_eyes("30").await; // the batch total is exactly 30: "at or above" needs two approvers
+    let b = e.batch_of_30(72, 9721).await;
+
+    // first approval: recorded, nothing paid
+    assert_eq!(payouts::approve(&e.st, "kalks", b, &staff(1), Some("looks right")).await.unwrap(), payouts::Approval::AwaitingSecond);
+    assert_eq!(e.batch_status(b).await, "awaiting_second_approval");
+    assert_eq!(payouts::transfer_tick(&e.st).await.unwrap(), (0, 0, 0));
+    assert_eq!(calls.lock().unwrap().len(), 0, "no wallet credit before the second approval");
+    assert_eq!(e.count(&format!("SELECT count(*) FROM payouts WHERE batch_id = {b} AND status = 'pending_approval'")).await, 1);
+    assert_eq!(e.count("SELECT count(*) FROM commissions WHERE beneficiary_id = 72 AND status = 'pending'").await, 1);
+    assert_eq!(
+        e.count(&format!("SELECT count(*) FROM payout_batches WHERE id = {b} AND first_approved_by_id = 'staff:1' AND four_eyes_threshold = 30 AND first_approval_note = 'looks right'")).await,
+        1
+    );
+
+    // the same staff member can't give the second approval
+    let same = payouts::approve(&e.st, "kalks", b, &staff(1), None).await;
+    assert!(matches!(same, Err(ib::error::ApiError::Conflict { code: "four_eyes_same_staff", .. })), "{same:?}");
+    assert_eq!(e.batch_status(b).await, "awaiting_second_approval");
+
+    // the batch JSON tells the Back Office who gave the first approval
+    let row = sqlx::query("SELECT * FROM payout_batches WHERE id = $1").bind(b).fetch_one(&e.st.pool).await.unwrap();
+    let v = payouts::batch_json(&row, dec("30"));
+    assert_eq!(v["fourEyes"]["required"], true);
+    assert_eq!(v["fourEyes"]["firstApprovedById"], "1");
+    assert_eq!(v["fourEyes"]["firstApprovedBy"], "Staff 1 (staff:1)");
+
+    // another staff member releases it; the money moves exactly once
+    assert_eq!(payouts::approve(&e.st, "kalks", b, &staff(2), None).await.unwrap(), payouts::Approval::Released);
+    assert_eq!(e.batch_status(b).await, "approved");
+    assert!(payouts::approve(&e.st, "kalks", b, &staff(2), None).await.is_err(), "a released batch can't be approved again");
+    assert!(payouts::approve(&e.st, "kalks", b, &staff(3), None).await.is_err());
+    assert_eq!(payouts::transfer_tick(&e.st).await.unwrap(), (1, 0, 0));
+    assert_eq!(payouts::transfer_tick(&e.st).await.unwrap(), (0, 0, 0));
+    {
+        let c = calls.lock().unwrap();
+        assert_eq!(c.len(), 1, "paid exactly once");
+        assert_eq!(c[0]["amount"], "30");
+        assert_eq!(c[0]["user_id"], 72);
+    }
+    assert_eq!(e.batch_status(b).await, "paid");
+    assert_eq!(e.count("SELECT count(*) FROM audit_log WHERE action = 'batch.approve_first' AND actor = 'staff:1'").await, 1);
+    assert_eq!(e.count("SELECT count(*) FROM audit_log WHERE action = 'batch.approve' AND actor = 'staff:2' AND after->>'firstApprovedBy' = 'Staff 1 (staff:1)'").await, 1);
+    e.drop().await;
+}
+
+#[tokio::test]
+async fn four_eyes_zero_threshold_and_reject_from_awaiting_second_approval() {
+    let (url, calls) = mock_wallet(0).await;
+    let Some(e) = env(Some(url)).await else { return };
+    e.set_four_eyes("0").await; // every batch needs two approvers
+    let b = e.batch_of_30(74, 9741).await;
+    assert_eq!(payouts::approve(&e.st, "kalks", b, &staff(1), None).await.unwrap(), payouts::Approval::AwaitingSecond);
+    // the first approver may still reject
+    payouts::reject(&e.st, "kalks", b, &staff(1), "wrong period").await.unwrap();
+    assert_eq!(e.batch_status(b).await, "rejected");
+    assert_eq!(e.count("SELECT count(*) FROM commissions WHERE beneficiary_id = 74 AND status = 'pending' AND batch_id IS NULL").await, 1, "lines go back to the pool");
+    assert!(payouts::approve(&e.st, "kalks", b, &staff(2), None).await.is_err(), "a rejected batch can't be approved");
+    assert_eq!(payouts::transfer_tick(&e.st).await.unwrap(), (0, 0, 0));
+    assert_eq!(calls.lock().unwrap().len(), 0);
+    assert_eq!(e.count("SELECT count(*) FROM audit_log WHERE action = 'batch.reject' AND before->>'status' = 'awaiting_second_approval'").await, 1);
+
+    // a second staff member can reject too
+    let b2 = payouts::create_batch(&e.st, "kalks", &Actor::system(), None, Utc::now() + Duration::seconds(1)).await.unwrap().expect("re-batched");
+    payouts::approve(&e.st, "kalks", b2, &staff(1), None).await.unwrap();
+    payouts::reject(&e.st, "kalks", b2, &staff(2), "duplicate").await.unwrap();
+    assert_eq!(e.batch_status(b2).await, "rejected");
+    assert_eq!(calls.lock().unwrap().len(), 0);
+    e.drop().await;
+}
