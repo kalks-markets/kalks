@@ -33,6 +33,7 @@ import 'cfd/alerts.dart';
 import 'cfd/chart_tab.dart';
 import 'cfd/history_tab.dart';
 import 'cfd/order_sheet.dart';
+import 'cfd/symbol_screen.dart';
 import 'cfd/trade_tab.dart';
 import 'cfd/watchlist_tab.dart';
 import 'core/market.dart';
@@ -87,7 +88,8 @@ Future<void> showOpenProductSheet(BuildContext context, String product) async {
   if (go == true) router.go('/accounts/new?product=$product');
 }
 
-/// The CFD bottom-bar tab: watch | chart | trade | history | account.
+/// The CFD bottom-bar tab: watch | chart | trade | history | account, and `symbol` (the symbol screen opened from the
+/// quotes: the Watchlist tab stays lit, back returns to it).
 class CfdTabController extends Notifier<String> {
   @override
   String build() => 'chart';
@@ -95,6 +97,26 @@ class CfdTabController extends Notifier<String> {
 }
 
 final cfdTabProvider = NotifierProvider<CfdTabController, String>(CfdTabController.new);
+
+/// The market of the symbol screen (order book).
+class SymbolScreenController extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? s) => state = s;
+}
+
+final symbolScreenProvider = NotifierProvider<SymbolScreenController, String?>(SymbolScreenController.new);
+
+/// Opens the symbol screen of `symbol` (a quote row's tap).
+void openSymbolScreen(WidgetRef ref, String symbol) {
+  ref.read(symbolScreenProvider.notifier).set(symbol);
+  ref.read(cfdTabProvider.notifier).set('symbol');
+}
+
+/// Tabs drawn without the terminal header: the symbol screen (a sub-screen of the quotes with its own back button).
+/// The chart keeps the header (back, CFD | Options, the account, the bell: it is the first screen) and fills everything
+/// under it edge to edge, its controls floating over the plot.
+bool fullScreenTab(String tab) => tab == 'symbol';
 
 class TerminalScreen extends ConsumerStatefulWidget {
   const TerminalScreen({super.key, this.login, this.symbol, this.side, this.mode});
@@ -263,6 +285,8 @@ class _Terminal extends ConsumerWidget {
     ref.watch(marketFeedProvider);
     ref.watch(symbolsProvider);
     ref.watch(terminalProvider.select((s) => s.login));
+    // the symbol screen fills the screen with its own back button; the other tabs keep the header
+    final full = mode != 'options' && fullScreenTab(ref.watch(cfdTabProvider));
     return Scaffold(
       backgroundColor: k.bg,
       resizeToAvoidBottomInset: false,
@@ -270,7 +294,7 @@ class _Terminal extends ConsumerWidget {
         textDirection: TextDirection.ltr,
         child: Column(
           children: [
-            const _Header(),
+            if (full) SizedBox(height: MediaQuery.paddingOf(context).top) else const _Header(),
             Expanded(child: mode == 'options' ? const _OptionsBody() : const _CfdBody()),
           ],
         ),
@@ -537,45 +561,56 @@ class _CfdBodyState extends ConsumerState<_CfdBody> {
     final k = context.k;
     final tab = ref.watch(cfdTabProvider);
     final positions = ref.watch(terminalProvider.select((s) => s.positions.length));
+    final symbol = ref.watch(symbolScreenProvider);
     if (tab == 'chart') _chartBuilt = true;
+    // the symbol screen belongs to the quotes: their tab stays lit
+    final lit = tab == 'symbol' ? 'watch' : tab;
     final tabs = [
-      ('watch', LucideIcons.list, t('trader.mobile.tab.watch')),
+      ('watch', LucideIcons.arrowDownUp, t('trader.mobile.tab.watch')),
       ('chart', LucideIcons.candlestickChart, t('trader.mobile.tab.chart')),
-      ('trade', LucideIcons.chartNoAxesColumn, t('trader.mobile.tab.trade')),
+      ('trade', LucideIcons.trendingUp, t('trader.mobile.tab.trade')),
       ('history', LucideIcons.history, t('trader.mobile.tab.history')),
-      ('account', LucideIcons.userRound, t('trader.mobile.tab.account')),
+      ('account', LucideIcons.slidersHorizontal, t('trader.mobile.tab.account')),
     ];
     final mq = MediaQuery.of(context);
-    return Column(
-      children: [
-        Expanded(
-          child: _Gate(
-            child: Stack(
-              children: [
-                // the chart stays alive between tabs (its WebView and history); the other tabs mount when shown, so
-                // only rows on screen ask the market feed for live prices
-                if (_chartBuilt)
-                  Offstage(
-                    offstage: tab != 'chart',
-                    child: TickerMode(enabled: tab == 'chart', child: const ChartTab()),
-                  ),
-                if (tab == 'watch') const WatchlistTab(),
-                if (tab == 'trade') const TradeTab(),
-                if (tab == 'history') const HistoryTab(),
-                if (tab == 'account') const AccountTab(),
-                const AlertsWatcher(),
-                const MarketWants(),
-              ],
+    return PopScope(
+      // back on the symbol screen returns to the quotes
+      canPop: tab != 'symbol',
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && tab == 'symbol') ref.read(cfdTabProvider.notifier).set('watch');
+      },
+      child: Column(
+        children: [
+          Expanded(
+            child: _Gate(
+              child: Stack(
+                children: [
+                  // the chart stays alive between tabs (its WebView and history); the other tabs mount when shown, so
+                  // only rows on screen ask the market feed for live prices
+                  if (_chartBuilt)
+                    Offstage(
+                      offstage: tab != 'chart',
+                      child: TickerMode(enabled: tab == 'chart', child: const ChartTab()),
+                    ),
+                  if (tab == 'watch') const WatchlistTab(),
+                  if (tab == 'symbol' && symbol != null) SymbolScreen(symbol: symbol),
+                  if (tab == 'trade') const TradeTab(),
+                  if (tab == 'history') const HistoryTab(),
+                  if (tab == 'account') const AccountTab(),
+                  const AlertsWatcher(),
+                  const MarketWants(),
+                ],
+              ),
             ),
           ),
-        ),
-        KFrosted(
-          color: k.bar,
-          border: Border(top: BorderSide(color: k.line, width: 0.6)),
-          child: Padding(
+          Container(
+            decoration: BoxDecoration(
+              color: k.bg,
+              border: Border(top: BorderSide(color: k.surface2)),
+            ),
             padding: EdgeInsets.only(bottom: mq.padding.bottom),
             child: SizedBox(
-              height: 54,
+              height: 60,
               child: Row(
                 children: [
                   for (final x in tabs)
@@ -588,38 +623,29 @@ class _CfdBodyState extends ConsumerState<_CfdBody> {
                           ref.read(cfdTabProvider.notifier).set(x.$1);
                         },
                         child: Semantics(
-                          selected: x.$1 == tab,
+                          selected: x.$1 == lit,
                           button: true,
                           label: x.$3,
+                          excludeSemantics: true,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              if (x.$1 == tab)
-                                Positioned(
-                                  top: 0,
-                                  left: 18,
-                                  right: 18,
-                                  child: Container(
-                                    height: 2,
-                                    decoration: BoxDecoration(color: k.ember, borderRadius: BorderRadius.circular(1)),
-                                  ),
-                                ),
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(x.$2, size: 19, color: x.$1 == tab ? k.ember : k.fg3),
-                                  const SizedBox(height: 3),
+                                  Icon(x.$2, size: 22, color: x.$1 == lit ? k.ember : k.fg3),
+                                  const SizedBox(height: 4),
                                   Text(
                                     x.$3,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: context.text.micro.copyWith(color: x.$1 == tab ? k.ember : k.fg3, fontWeight: FontWeight.w500),
+                                    style: context.text.micro.copyWith(color: x.$1 == lit ? k.ember : k.fg3, fontSize: 11, fontWeight: FontWeight.w700),
                                   ),
                                 ],
                               ),
                               if (x.$1 == 'trade' && positions > 0)
                                 Positioned(
-                                  top: 5,
+                                  top: 6,
                                   right: 14,
                                   child: Container(
                                     constraints: const BoxConstraints(minWidth: 15),
@@ -642,8 +668,8 @@ class _CfdBodyState extends ConsumerState<_CfdBody> {
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
