@@ -7,7 +7,11 @@ Wants=network-online.target
 User=kalks
 WorkingDirectory=/home/kalks/kalks-demo/apps/admin
 Environment=NODE_ENV=production
-ExecStart=/home/kalks/kalks-demo/apps/admin/node_modules/.bin/next start -p 4001 -H 127.0.0.1
+# -H localhost, not 127.0.0.1: Next names the middleware request URL "localhost" for any loopback host, and a
+# rewrite whose host differs from the one the server started with is proxied out over HTTPS (Caddy sends
+# X-Forwarded-Proto) and fails; IPv4 first so "localhost" binds 127.0.0.1, where Caddy connects.
+Environment=NODE_OPTIONS=--dns-result-order=ipv4first
+ExecStart=/home/kalks/kalks-demo/apps/admin/node_modules/.bin/next start -p 4001 -H localhost
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
