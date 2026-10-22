@@ -6,7 +6,7 @@ Rust service that owns Kalks price data: live Infoway feed → broker-standard c
 
 - **Raw price only.** Candles are built from the raw provider price. Group spreads are applied to outgoing quotes only, never to stored bars. This matches every broker's charts.
 - **M1–H1** open on exact UTC boundaries.
-- **H4, D1, W1, MN** are cut at New York close: server time is GMT+3 while US DST is active, GMT+2 otherwise, and weeks start Sunday 00:00 server time. This is the MT4/MT5 broker standard. They are aggregated from our H1 bars (W1/MN from D1).
+- **H4, D1, W1, MN** are cut at New York close: server time is GMT+3 while US DST is active, GMT+2 otherwise, and weeks start Sunday 00:00 server time. This is the MT4/MT5 broker standard. They are aggregated from our H1 bars (W1/MN from D1). On a DST switch day the server day (and week, month, 4-hour bar) holding the switch is one bar, an hour shorter or longer: a bar opens at the UTC instant its server-time boundary had (crypto trades through both switches).
 - **Reconciler.** Each closed M1/M5/M15/M30/H1 bar is replaced by the provider's final OHLC, 4s and again 40s after it closes (source = 3, final). Late or missed ticks can therefore never leave a candle different from the market. Closed H4/D1/W1/MN buckets are then rebuilt from the corrected bars.
 - **Backfill.** Any provider bar that has already closed is stored as final, so restarts and gaps heal themselves.
 - **Stocks** only count ticks during the regular session (09:30–16:00 New York), like the exchange candles. Extended-hours prints are ignored.

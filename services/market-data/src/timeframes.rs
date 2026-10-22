@@ -2,7 +2,9 @@
 //!
 //! M1–H1 bars start on exact UTC minute/hour boundaries (identical on every platform).
 //! H4, D1, W1 and MN are cut at New York close, like MT4/MT5 brokers: server time is GMT+3 while
-//! US daylight saving is active and GMT+2 otherwise; weeks start Sunday 00:00 server time.
+//! US daylight saving is active and GMT+2 otherwise; weeks start Sunday 00:00 server time. A bar opens at the UTC
+//! instant its server-time boundary had then (so on the switch day the server day / week / month is one bar, an hour
+//! shorter or longer, never two bars or a bar opening before the one it follows).
 
 use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Utc, Weekday};
 
@@ -81,26 +83,31 @@ impl Tf {
                 Utc.timestamp_opt(secs.div_euclid(d) * d, 0).unwrap()
             }
             Tf::H4 | Tf::D1 => {
-                let off = server_offset_secs(ts);
                 let d = self.minutes() as i64 * 60;
-                let local = secs + off;
-                Utc.timestamp_opt(local.div_euclid(d) * d - off, 0).unwrap()
+                let local = secs + server_offset_secs(ts);
+                server_to_utc(local.div_euclid(d) * d)
             }
             Tf::W1 => {
-                let off = server_offset_secs(ts);
-                let local = Utc.timestamp_opt(secs + off, 0).unwrap().date_naive();
+                let local = Utc.timestamp_opt(secs + server_offset_secs(ts), 0).unwrap().date_naive();
                 let back = local.weekday().num_days_from_sunday() as i64;
                 let sunday = local - Duration::days(back);
-                midnight(sunday) - Duration::seconds(off)
+                server_to_utc(midnight(sunday).timestamp())
             }
             Tf::MN => {
-                let off = server_offset_secs(ts);
-                let local = Utc.timestamp_opt(secs + off, 0).unwrap().date_naive();
+                let local = Utc.timestamp_opt(secs + server_offset_secs(ts), 0).unwrap().date_naive();
                 let first = NaiveDate::from_ymd_opt(local.year(), local.month(), 1).unwrap();
-                midnight(first) - Duration::seconds(off)
+                server_to_utc(midnight(first).timestamp())
             }
         }
     }
+}
+
+/// A server-time wall clock reading (seconds) → the UTC instant it names, with the offset in force at that instant.
+/// In the hour the clocks go back it names two instants: the first (still GMT+3).
+fn server_to_utc(local: i64) -> DateTime<Utc> {
+    let summer = local - 3 * 3600;
+    let utc = if server_offset_secs(Utc.timestamp_opt(summer, 0).unwrap()) == 3 * 3600 { summer } else { local - 2 * 3600 };
+    Utc.timestamp_opt(utc, 0).unwrap()
 }
 
 fn midnight(d: NaiveDate) -> DateTime<Utc> {
@@ -156,6 +163,38 @@ mod tests {
         // 2026-09-25 is a Friday; week starts Sunday 2026-09-20 00:00 server = 09-19 21:00 UTC
         assert_eq!(Tf::W1.bucket(t("2026-09-25T09:30:00Z")), t("2026-09-19T21:00:00Z"));
         assert_eq!(Tf::MN.bucket(t("2026-09-25T09:30:00Z")), t("2026-08-31T21:00:00Z"));
+    }
+
+    /// Crypto trades through both US DST switches (Sunday 2026-03-08 07:00 UTC and Sunday 2026-11-01 06:00 UTC, the
+    /// first of a month). Every tick of the switch day must land in one bar per server day / week / month / 4 hours,
+    /// with bar open times that never go back as time goes on (no second November bar, no H4 bar opening before the
+    /// one it follows).
+    #[test]
+    fn buckets_stay_whole_and_in_order_across_the_dst_switches() {
+        for (from, to) in [("2026-03-07T12:00:00Z", "2026-03-09T12:00:00Z"), ("2026-10-31T12:00:00Z", "2026-11-02T12:00:00Z")] {
+            for tf in Tf::ALL {
+                let mut ts = t(from);
+                let mut prev = tf.bucket(ts);
+                while ts < t(to) {
+                    let b = tf.bucket(ts);
+                    assert!(b <= ts, "{tf:?} {ts}: bar opens after the tick ({b})");
+                    assert!(b >= prev, "{tf:?} {ts}: bar {b} opens before the previous one {prev}");
+                    assert_eq!(tf.bucket(b), b, "{tf:?} {ts}: the bar's open time is in another bar");
+                    prev = b;
+                    ts += Duration::minutes(1);
+                }
+            }
+        }
+        // the server day, week and month of the autumn switch are one bar each, 25 hours longer by one hour
+        assert_eq!(Tf::MN.bucket(t("2026-11-01T05:59:00Z")), t("2026-10-31T21:00:00Z"));
+        assert_eq!(Tf::MN.bucket(t("2026-11-01T06:00:00Z")), t("2026-10-31T21:00:00Z"));
+        assert_eq!(Tf::W1.bucket(t("2026-11-01T12:00:00Z")), t("2026-10-31T21:00:00Z"));
+        assert_eq!(Tf::D1.bucket(t("2026-11-01T21:59:00Z")), t("2026-10-31T21:00:00Z"));
+        assert_eq!(Tf::D1.bucket(t("2026-11-01T22:00:00Z")), t("2026-11-01T22:00:00Z"));
+        // H4 after the spring switch: 06:00 UTC (08:00 server, GMT+2) runs to 09:00 UTC (12:00 server, GMT+3)
+        assert_eq!(Tf::H4.bucket(t("2026-03-08T07:30:00Z")), t("2026-03-08T06:00:00Z"));
+        assert_eq!(Tf::H4.bucket(t("2026-03-08T09:00:00Z")), t("2026-03-08T09:00:00Z"));
+        assert_eq!(Tf::D1.bucket(t("2026-03-08T12:00:00Z")), t("2026-03-07T22:00:00Z"));
     }
 
     #[test]
