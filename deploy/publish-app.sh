@@ -61,17 +61,17 @@ fi
 
 if [ -z "$remote_sha" ]; then
   echo "uploading $FILE ($SIZE bytes)…"
-  rsync --partial --chmod=F644 -t "$APK" "$SSH_TARGET:$DIR/.$FILE.part"
+  rsync --partial -t "$APK" "$SSH_TARGET:$DIR/.$FILE.part"
   got=$(ssh "$SSH_TARGET" "sha256sum '$DIR/.$FILE.part' | cut -d' ' -f1")
   [ "$got" = "$SHA" ] || { echo "upload check failed (server SHA-256 $got)" >&2; exit 1; }
-  ssh "$SSH_TARGET" "mv -f '$DIR/.$FILE.part' '$DIR/$FILE'"
+  ssh "$SSH_TARGET" "chmod 644 '$DIR/.$FILE.part' && mv -f '$DIR/.$FILE.part' '$DIR/$FILE'"
 else
   echo "$FILE already on the server (same SHA-256): not uploaded again"
 fi
 
 # then switch latest.json (atomic rename, so the page never reads half a file)
-rsync --chmod=F644 "$MANIFEST" "$SSH_TARGET:$DIR/.latest.json.part"
-ssh "$SSH_TARGET" "mv -f '$DIR/.latest.json.part' '$DIR/latest.json'"
+rsync "$MANIFEST" "$SSH_TARGET:$DIR/.latest.json.part"
+ssh "$SSH_TARGET" "chmod 644 '$DIR/.latest.json.part' && mv -f '$DIR/.latest.json.part' '$DIR/latest.json'"
 
 echo "published: https://app.kalkstrade.com/downloads/$FILE"
 echo "page:      https://app.kalkstrade.com/download (updates within a minute)"
