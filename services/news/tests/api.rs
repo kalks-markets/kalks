@@ -194,6 +194,17 @@ async fn news_and_calendar_end_to_end() {
     assert!(titles(&t.get("/v1/news").await, "items").iter().all(|x| !x.contains("Gold")));
     t.call("PUT", "/v1/admin/sources/fxstreet", &staff, Some(json!({"enabled": true}))).await;
 
+    // the brief and the feeds / calendar are shared by every broker: only the platform tenant regenerates or fetches
+    for path in ["/v1/admin/brief", "/v1/admin/sources/fed/refresh", "/v1/admin/calendar/refresh"] {
+        let (s, e) = t.call("POST", path, &other, Some(json!({}))).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{path}: {e}");
+        assert_eq!(e["error"]["code"], "forbidden", "{path}");
+    }
+    let (s, e) = t.call("POST", "/v1/admin/brief", &staff, Some(json!({}))).await;
+    assert_eq!(s, StatusCode::SERVICE_UNAVAILABLE, "the platform passes the tenant check (no AI key in tests): {e}");
+    let (_, au) = t.call("GET", "/v1/admin/audit", &other, None).await;
+    assert!(au["entries"].as_array().unwrap().iter().all(|x| x["action"] != "source.refresh" && x["action"] != "calendar.refresh"), "{au}");
+
     // --- world map ---
     let m = t.get("/v1/news/map").await;
     let us = m["countries"].as_array().unwrap().iter().find(|c| c["country"] == "us").unwrap().clone();

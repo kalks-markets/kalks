@@ -21,9 +21,11 @@
 //! Back Office (admin BFF checks `content.read` / `content.write` and adds `X-Kalks-Staff`):
 //! `GET /v1/admin/news?status&source&q&limit&offset` · `PUT /v1/admin/news/{id} {pinned?, hidden?, symbols?,
 //! countries?, importance?}` · `DELETE /v1/admin/news/{id}` (reset to automatic tags) · `GET /v1/admin/sources` ·
-//! `PUT /v1/admin/sources/{id} {enabled}` (platform tenant only) · `POST /v1/admin/sources/{id}/refresh` ·
+//! `PUT /v1/admin/sources/{id} {enabled}` · `POST /v1/admin/sources/{id}/refresh` ·
 //! `GET /v1/admin/calendar?from&to` · `PUT /v1/admin/calendar/{id} {actual?, impact?}` ·
-//! `POST /v1/admin/calendar/refresh` · `POST /v1/admin/brief {day?}` · `GET /v1/admin/stats` · `GET /v1/admin/audit`
+//! `POST /v1/admin/calendar/refresh` · `POST /v1/admin/brief {day?}` · `GET /v1/admin/stats` · `GET /v1/admin/audit`.
+//! Feeds, the calendar and the daily brief are shared by every broker, so changing a source or a calendar event,
+//! fetching / refreshing them and regenerating the brief are platform tenant only (403 `forbidden` otherwise).
 
 use axum::extract::{Path, Query, Request, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -106,6 +108,16 @@ fn staff(h: &HeaderMap) -> R<String> {
         .map(|s| s.trim().chars().take(120).collect::<String>())
         .filter(|s| !s.is_empty())
         .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "unauthorized", "Missing staff member."))
+}
+
+/// Feeds, the calendar and the daily brief are shared by every broker: only the platform tenant changes, fetches or
+/// regenerates them. Returns the tenant (always the platform) for the audit entry.
+fn platform_only(h: &HeaderMap, msg: &str) -> R<String> {
+    let t = tenant(h);
+    if t != PLATFORM_TENANT {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "forbidden", msg));
+    }
+    Ok(t)
 }
 
 async fn require_internal(State(st): State<AppState>, req: Request, next: Next) -> Response {
@@ -719,10 +731,7 @@ async fn admin_sources(State(st): State<AppState>, h: HeaderMap) -> R {
 
 async fn admin_source_put(State(st): State<AppState>, h: HeaderMap, Path(id): Path<String>, Json(b): Json<Value>) -> R {
     let who = staff(&h)?;
-    let t = tenant(&h);
-    if t != PLATFORM_TENANT {
-        return Err(ApiError::new(StatusCode::FORBIDDEN, "forbidden", "Feed sources are managed by the platform."));
-    }
+    let t = platform_only(&h, "Feed sources are managed by the platform.")?;
     let enabled = b.get("enabled").and_then(Value::as_bool).ok_or_else(|| ApiError::bad("enabled must be true or false."))?;
     let r = sqlx::query("UPDATE sources SET enabled = $2, updated_by = $3, updated_at = now(), last_fetch_at = CASE WHEN $2 THEN NULL ELSE last_fetch_at END WHERE id = $1").bind(&id).bind(enabled).bind(&who).execute(&st.pool).await?;
     if r.rows_affected() == 0 {
@@ -734,6 +743,7 @@ async fn admin_source_put(State(st): State<AppState>, h: HeaderMap, Path(id): Pa
 
 async fn admin_source_refresh(State(st): State<AppState>, h: HeaderMap, Path(id): Path<String>) -> R {
     let who = staff(&h)?;
+    let t = platform_only(&h, "Feed sources are fetched by the platform.")?;
     let _g = st.refresh.try_lock().map_err(|_| ApiError::new(StatusCode::TOO_MANY_REQUESTS, "busy", "A refresh is already running."))?;
     let last: Option<Option<DateTime<Utc>>> = sqlx::query_scalar("SELECT last_fetch_at FROM sources WHERE id = $1 AND kind <> 'provider'").bind(&id).fetch_optional(&st.pool).await?;
     let last = last.ok_or_else(|| ApiError::not_found("Source"))?;
@@ -741,7 +751,7 @@ async fn admin_source_refresh(State(st): State<AppState>, h: HeaderMap, Path(id)
         return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "too_soon", "This feed was fetched less than a minute ago."));
     }
     let res = workers::fetch_source(&st, &id).await;
-    store::audit(&st.pool, &tenant(&h), &who, "source.refresh", &format!("source:{id}"), json!({"ok": res.is_ok()})).await?;
+    store::audit(&st.pool, &t, &who, "source.refresh", &format!("source:{id}"), json!({"ok": res.is_ok()})).await?;
     match res {
         Ok(msg) => Ok(Json(json!({"ok": true, "result": msg}))),
         Err(e) => Err(ApiError::new(StatusCode::BAD_GATEWAY, "fetch_failed", format!("The feed could not be fetched: {e}"))),
@@ -773,10 +783,7 @@ async fn admin_calendar(State(st): State<AppState>, h: HeaderMap, Query(q): Quer
 
 async fn admin_calendar_put(State(st): State<AppState>, h: HeaderMap, Path(id): Path<i64>, Json(b): Json<Value>) -> R {
     let who = staff(&h)?;
-    let t = tenant(&h);
-    if t != PLATFORM_TENANT {
-        return Err(ApiError::new(StatusCode::FORBIDDEN, "forbidden", "The calendar is managed by the platform."));
-    }
+    let t = platform_only(&h, "The calendar is managed by the platform.")?;
     let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM calendar_events WHERE id = $1").bind(id).fetch_optional(&st.pool).await?;
     exists.ok_or_else(|| ApiError::not_found("Event"))?;
     if let Some(a) = b.get("actual") {
@@ -800,13 +807,14 @@ async fn admin_calendar_put(State(st): State<AppState>, h: HeaderMap, Path(id): 
 
 async fn admin_calendar_refresh(State(st): State<AppState>, h: HeaderMap) -> R {
     let who = staff(&h)?;
+    let t = platform_only(&h, "The calendar is managed by the platform.")?;
     let _g = st.refresh.try_lock().map_err(|_| ApiError::new(StatusCode::TOO_MANY_REQUESTS, "busy", "A refresh is already running."))?;
     let wait = workers::calendar_cooldown(&st).await?;
     if wait > 0 {
         return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "too_soon", format!("The calendar export allows two requests per five minutes. Try again in {} s.", wait)));
     }
     let res = workers::refresh_calendar(&st).await;
-    store::audit(&st.pool, &tenant(&h), &who, "calendar.refresh", "calendar", json!({"ok": res.is_ok()})).await?;
+    store::audit(&st.pool, &t, &who, "calendar.refresh", "calendar", json!({"ok": res.is_ok()})).await?;
     match res {
         Ok(msg) => Ok(Json(json!({"ok": true, "result": msg}))),
         Err(e) => Err(ApiError::new(StatusCode::BAD_GATEWAY, "fetch_failed", format!("The calendar could not be fetched: {e}"))),
@@ -815,6 +823,8 @@ async fn admin_calendar_refresh(State(st): State<AppState>, h: HeaderMap) -> R {
 
 async fn admin_brief(State(st): State<AppState>, h: HeaderMap, body: Option<Json<Value>>) -> R {
     let who = staff(&h)?;
+    // one brief per day for every broker's clients (no per-broker brief): a white-label editor must not replace it
+    let t = platform_only(&h, "The daily brief is shared by every broker and is managed by the platform.")?;
     if st.cfg.anthropic_key.is_empty() {
         return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "unavailable", "The AI brief is not configured (ANTHROPIC_API_KEY)."));
     }
@@ -824,7 +834,7 @@ async fn admin_brief(State(st): State<AppState>, h: HeaderMap, body: Option<Json
     }
     let _g = st.refresh.try_lock().map_err(|_| ApiError::new(StatusCode::TOO_MANY_REQUESTS, "busy", "A refresh is already running."))?;
     let b = brief::generate(&st, day, &who).await.map_err(|e| ApiError::new(StatusCode::BAD_GATEWAY, "ai_error", e.to_string()))?;
-    store::audit(&st.pool, &tenant(&h), &who, "brief.generate", &format!("brief:{day}"), json!({})).await?;
+    store::audit(&st.pool, &t, &who, "brief.generate", &format!("brief:{day}"), json!({})).await?;
     Ok(Json(json!({"brief": b, "day": day})))
 }
 

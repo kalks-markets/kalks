@@ -4,8 +4,8 @@ import { contentAllows, type ContentPerm } from "@/lib/academy";
 import { newsAdmin } from "@/lib/news-server";
 
 // Back Office news + calendar BFF: browser -> /api/news/<path> (same origin, staff cookie) -> services/news /v1/admin/…
-// content.read for reads, content.write for every change. Feed sources and calendar edits are platform-wide
-// and only the platform tenant may change them (the service enforces it).
+// content.read for reads, content.write for every change. Feed sources, the calendar and the daily brief are
+// platform-wide: only the platform tenant may change, fetch / refresh or regenerate them (the service enforces it).
 //
 //   GET    news?status&source&q&limit&offset   stories with this tenant's pin / hide / retag state
 //   PUT    news/{id}                           {pinned?, hidden?, symbols?, countries?, importance?}

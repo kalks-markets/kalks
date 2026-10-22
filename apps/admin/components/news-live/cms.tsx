@@ -280,6 +280,8 @@ export function LiveNewsCms() {
   const total = list.data?.total ?? 0;
   const liveSources = (sources.data?.sources ?? []).filter((x) => x.enabled && x.kind !== "provider");
   const maxToday = Math.max(1, ...liveSources.map((x) => x.last24h));
+  // feeds, calendar and brief are platform-wide: the news service says whether this tenant may change them
+  const isPlatform = !!sources.data?.canToggle;
 
   return (
     <div className="pb-16">
@@ -477,11 +479,13 @@ export function LiveNewsCms() {
                 ) : (
                   <div className="text-[12.5px] text-fg-3">No brief yet today.</div>
                 )}
-                {canWrite && brief.data?.configured && (
+                {/* one brief a day for every broker's clients: only the platform tenant regenerates it (the service enforces it) */}
+                {canWrite && brief.data?.configured && isPlatform && (
                   <Button size="sm" variant="surface" className="mt-3" onClick={regenerate} disabled={briefBusy}>
                     <RefreshCw /> {briefBusy ? "Writing… (up to a minute)" : "Regenerate today's brief"}
                   </Button>
                 )}
+                {brief.data?.configured && sources.data && !isPlatform && <div className="mt-3 text-[11.5px] text-fg-3">Shared by every brand on the platform and managed by the platform.</div>}
               </div>
             </Card>
           </Reveal>
