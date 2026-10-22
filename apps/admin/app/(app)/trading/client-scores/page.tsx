@@ -8,7 +8,7 @@ import { TableSkeleton, ago, useApi, useNow } from "@/components/live/kit";
 import { useCan } from "@/components/staff-session";
 import { DeskStatusChip } from "@/components/trading-desk/status";
 import { signedMoney } from "@/components/trading-desk/kit";
-import { CategoryChip, ConnectEngineState, LoginCell, RiskError, ScoreBar, ScoreDrawer, recomputeScores } from "@/components/trading-live/risk-kit";
+import { CategoryChip, ConnectEngineState, LoginCell, RiskError, SCORE_LOSING_MAX, SCORE_PROFITABLE_MIN, ScoreBar, ScoreDrawer, recomputeScores } from "@/components/trading-live/risk-kit";
 import { CATEGORY_LABEL, ensureClientNames, flagLabel, groupLabel, holdText, liveClientName, useLiveDirectory, type ClientScore, type ScoreCategory, type ScoreList } from "@/lib/trading-desk";
 
 type Filter = "all" | ScoreCategory;
@@ -126,7 +126,7 @@ export default function ClientScoresPage() {
             />
           )}
           <p className="mt-4 flex items-start gap-2 text-[11.5px] text-fg-3">
-            <GaugeIcon className="mt-0.5 size-3.5 shrink-0" /> Categories: toxic (latency arbitrage, gap trading, copied trades, bonus abuse), likely profitable (70+), neutral, likely losing. Routing rules can match “Risk score” and “Risk category”.
+            <GaugeIcon className="mt-0.5 size-3.5 shrink-0" /> Categories: toxic (latency arbitrage, gap trading, copied trades, bonus abuse), likely profitable ({SCORE_PROFITABLE_MIN}+), neutral, likely losing ({SCORE_LOSING_MAX} or less). Routing rules can match “Risk score” and “Risk category”.
           </p>
         </Card>
       </Reveal>

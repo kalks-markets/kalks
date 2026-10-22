@@ -43,14 +43,18 @@ export function CategoryChip({ category, size = "sm" }: { category: string | nul
 const SCORE_FILL: Record<string, string> = { down: "bg-down", warn: "bg-warn", neutral: "bg-fg-3", up: "bg-up" };
 const SCORE_TEXT: Record<string, string> = { down: "text-down", warn: "text-warn", neutral: "text-fg-2", up: "text-up" };
 
+/** Category bands of the engine's client score (services/trading risk/score.rs): ≥ 65 likely profitable, ≤ 35 likely losing. */
+export const SCORE_PROFITABLE_MIN = 65;
+export const SCORE_LOSING_MAX = 35;
+
 /** 0-100 client score as a small bar (high = likely profitable for the client = risk for the B-book). */
 export function ScoreBar({ score, category, className, wide }: { score: number; category?: string | null; className?: string; wide?: boolean }) {
-  const tone = categoryTone(category ?? (score >= 70 ? "likely_profitable" : score < 35 ? "likely_losing" : "neutral"));
+  const tone = categoryTone(category ?? (score >= SCORE_PROFITABLE_MIN ? "likely_profitable" : score <= SCORE_LOSING_MAX ? "likely_losing" : "neutral"));
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <span className={cn("relative h-1.5 overflow-hidden rounded-full bg-surface-3", wide ? "w-full min-w-24" : "w-16")}>
         <span className={cn("absolute inset-y-0 left-0 rounded-full", SCORE_FILL[tone])} style={{ width: `${Math.max(3, Math.min(100, score))}%` }} />
-        <span className="absolute inset-y-0 left-[70%] w-px bg-fg-3/60" aria-hidden />
+        <span className="absolute inset-y-0 w-px bg-fg-3/60" style={{ left: `${SCORE_PROFITABLE_MIN}%` }} aria-hidden />
       </span>
       <span className={cn("k-num w-7 text-right font-mono text-[12px] font-medium", SCORE_TEXT[tone])}>{Math.round(score)}</span>
     </span>

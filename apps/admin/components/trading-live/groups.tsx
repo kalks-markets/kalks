@@ -9,7 +9,8 @@ import { AuditNotice, BookChip, ErrorBanner, ReasonFields, reportResult, useReas
 import { loadGroups, productOf, type LiveGroup, type Product } from "@/lib/trading-desk";
 import { GRP_REASONS, tradingWrite } from "./kit";
 
-const LEVERAGES = [10, 20, 30, 50, 100, 200, 300, 400, 500, 1000, 2000];
+/** Leverage chips offered; the engine accepts 1–3000 (services/trading api/admin.rs validate_group). */
+const LEVERAGES = [10, 20, 30, 50, 100, 200, 300, 400, 500, 1000, 2000, 3000];
 const SPREAD_GROUPS = ["standard", "pro", "ecn", "cent"];
 
 /** The spread groups this broker prices from: those its groups use (a broker other than the platform broker has
@@ -345,7 +346,7 @@ function GroupEditor({ edit, spreadGroups, onClose, onSaved }: { edit: { g: Live
             Leverage list <span className="font-normal text-fg-3">clients choose from these</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {LEVERAGES.map((l) => {
+            {[...new Set([...LEVERAGES, ...g.leverages])].sort((a, b) => a - b).map((l) => {
               const on = g.leverages.includes(l);
               const def = g.defaultLeverage === l;
               return (

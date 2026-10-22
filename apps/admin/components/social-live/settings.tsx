@@ -7,6 +7,9 @@ import { MiniField, NumInput, SettingRow, Slider } from "@/components/config/kit
 import { useApi } from "@/components/live/kit";
 import { ReadOnlyNote, SocialError, socialWrite, useNoteAction, useSocialCan, usd, type SocialSettings } from "./kit";
 
+/** Engine limit for the maximum performance fee (services/trading api/social_admin.rs save_settings). */
+const FEE_MAX_PCT = 90;
+
 const KEYS: (keyof SocialSettings)[] = ["feeMinPct", "feeMaxPct", "platformCutPct", "minTrackDays", "minOwnCapitalPct", "minMasterEquity", "minAllocation", "tradeDelayMinutes"];
 
 const LABEL: Record<keyof SocialSettings, string> = {
@@ -22,7 +25,7 @@ const LABEL: Record<keyof SocialSettings, string> = {
 
 function validate(s: SocialSettings): string | null {
   for (const k of KEYS) if (!Number.isFinite(s[k]) || s[k] < 0) return `${LABEL[k]} must be zero or more.`;
-  if (s.feeMaxPct > 100) return "The maximum performance fee can't exceed 100%.";
+  if (s.feeMaxPct > FEE_MAX_PCT) return `The maximum performance fee can't exceed ${FEE_MAX_PCT}%.`;
   if (s.feeMinPct > s.feeMaxPct) return "The minimum performance fee is above the maximum.";
   if (s.platformCutPct > 100) return "The platform cut can't exceed 100%.";
   if (s.minOwnCapitalPct > 100) return "The master's own capital can't exceed 100%.";
@@ -139,10 +142,10 @@ export function LiveSocialSettingsPage() {
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <MiniField label="Minimum">
-                      <NumInput value={s.feeMinPct} onChange={(v) => up({ feeMinPct: v })} min={0} max={100} step={1} suffix="%" />
+                      <NumInput value={s.feeMinPct} onChange={(v) => up({ feeMinPct: v })} min={0} max={FEE_MAX_PCT} step={1} suffix="%" />
                     </MiniField>
                     <MiniField label="Maximum">
-                      <NumInput value={s.feeMaxPct} onChange={(v) => up({ feeMaxPct: v })} min={0} max={100} step={1} suffix="%" />
+                      <NumInput value={s.feeMaxPct} onChange={(v) => up({ feeMaxPct: v })} min={0} max={FEE_MAX_PCT} step={1} suffix="%" />
                     </MiniField>
                   </div>
                 </div>
