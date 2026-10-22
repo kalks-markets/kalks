@@ -4,6 +4,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../../ui/ui.dart';
@@ -13,19 +14,21 @@ import 'chart_webview_stub.dart' if (dart.library.io) 'chart_webview.dart';
 
 /// Sends commands to a surface and receives its events. Commands sent before the surface is ready are queued.
 ///
-/// Live updates (quotes, the forming bar, trade lines) are coalesced and delivered together at most once per [frame]:
-/// the last quote, the last version of each bar and the last set of lines win, so the page gets one call per frame
-/// instead of one per tick. Other commands (init, history, indicators, chart type, colours) go out at once. While a
-/// trade line is dragged ([holdLines]) line updates wait, so the dragged line stays under the finger.
+/// Live updates (quotes, the forming bar, trade lines) are delivered on the next animation frame: every tick that
+/// arrives before that frame is coalesced (the last quote, the last version of each bar and the last set of lines
+/// win), so the page gets at most one call per frame and a price never waits longer than one frame. Other commands
+/// (init, history, indicators, chart type, colours) go out at once. While a trade line is dragged ([holdLines]) line
+/// updates wait and the rest goes out every [dragInterval], so the dragged line stays under the finger.
 class ChartSurfaceController {
-  ChartSurfaceController({this.frame = const Duration(milliseconds: 60)});
+  ChartSurfaceController({this.dragInterval = const Duration(milliseconds: 180)});
 
-  /// The longest a live update waits before it is delivered.
-  final Duration frame;
+  /// How often live updates go out while a trade line is dragged (the finger's moves come first).
+  final Duration dragInterval;
 
   final List<_Cmd> _queue = [];
   void Function(List<String> batch)? _sink;
   Timer? _timer;
+  int? _frameId;
   bool _soon = false;
   bool _holdLines = false;
   bool _disposed = false;
@@ -39,7 +42,7 @@ class ChartSurfaceController {
   static final _typeRe = RegExp(r'^\{"type":"(\w+)"');
   static final _barRe = RegExp(r'^\{"type":"bar","bar":\[(-?\d+)');
   static const _live = {'quote', 'bar', 'lines'};
-  static const _latestOnly = {'quote', 'lines', 'indicators', 'chartType', 'palette'};
+  static const _latestOnly = {'quote', 'lines', 'indicators', 'chartType', 'palette', 'inset'};
 
   void send(String json) {
     if (_disposed) return;
@@ -70,22 +73,40 @@ class ChartSurfaceController {
   @visibleForTesting
   List<String> get pending => [for (final m in _queue) m.json];
 
+  /// Bridge calls made so far (tests, measurements).
+  @visibleForTesting
+  int deliveries = 0;
+
   void _schedule({required bool now}) {
     if (_sink == null) return;
     if (now) {
       if (_soon) return;
       _soon = true;
       scheduleMicrotask(_flush);
-    } else {
+    } else if (_holdLines) {
       // while a chip is dragged the page gets fewer calls (the finger's moves come first)
-      _timer ??= Timer(_holdLines ? frame * 3 : frame, _flush);
+      _timer ??= Timer(dragInterval, _flush);
+    } else {
+      // the next frame (scheduleFrameCallback also asks for one when the app is idle)
+      _frameId ??= SchedulerBinding.instance.scheduleFrameCallback((_) {
+        _frameId = null;
+        _flush();
+      });
     }
+  }
+
+  void _cancelFrame() {
+    final id = _frameId;
+    if (id == null) return;
+    _frameId = null;
+    SchedulerBinding.instance.cancelFrameCallbackWithId(id);
   }
 
   void _flush() {
     _soon = false;
     _timer?.cancel();
     _timer = null;
+    _cancelFrame();
     final s = _sink;
     if (s == null || _queue.isEmpty) return;
     final out = <String>[];
@@ -100,7 +121,10 @@ class ChartSurfaceController {
     _queue
       ..clear()
       ..addAll(keep);
-    if (out.isNotEmpty) s(out);
+    if (out.isNotEmpty) {
+      deliveries++;
+      s(out);
+    }
   }
 
   /// Called by the surface when it can draw: the last init (if it is not queued) and everything queued, at once.
@@ -108,15 +132,20 @@ class ChartSurfaceController {
     _sink = sink;
     _timer?.cancel();
     _timer = null;
+    _cancelFrame();
     final out = [if (lastInit != null && (_queue.isEmpty || _queue.first.json != lastInit)) lastInit!, for (final m in _queue) m.json];
     _queue.clear();
-    if (out.isNotEmpty) sink(out);
+    if (out.isNotEmpty) {
+      deliveries++;
+      sink(out);
+    }
   }
 
   void detach() {
     _sink = null;
     _timer?.cancel();
     _timer = null;
+    _cancelFrame();
   }
 
   /// The chart widget is gone: no more deliveries.

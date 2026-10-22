@@ -7,7 +7,7 @@
   The app owns the data and sends it as JSON to window.K.recv(msg) or, coalesced, window.K.batch("[msg, …]"); this page
   draws it and posts gestures back on the `KalksChart` channel (lib/features/terminal/chart/chart_bridge.dart):
     in:  init {digits, intraday, palette, symbol, tf, step, chartType, indicators, texts} · bars {bars}
-         · older {bars, exhausted} · bar {bar} · quote {bid, ask} · lines {lines: [{id, kind, price, label, side, drag,
+         · older {bars, exhausted} · bar {bar} · tail {bars} · inset {top} · quote {bid, ask} · lines {lines: [{id, kind, price, label, side, drag,
          note, tone, close, handles?, pip?, gap?}]} · palette {palette} · indicators {indicators} · chartType {chartType}
     out: ready · dragstart {id} · drag {id, price} · tap {id} · close {id} · older {before} · long {price} · ind {uid}
   A position line with `handles` ("st" / "s" / "t": no stop loss / no take profit yet) shows small S (red outline) and
@@ -674,6 +674,27 @@
           schedulePlace();
         }
 
+        /* A background refresh of cached history (the app showed its cache at once): the last drawn bar and the newer
+           ones, updated in place with series.update() so the view stays where it is. Past prices, not a live tick: the
+           newest bar is drawn at its real close at once (no glide). */
+        function setTail(list) {
+          if (!data.length || !list || !list.length) return;
+          for (const raw of list) {
+            const b = toBar(raw);
+            const last = data[data.length - 1];
+            if (b.time < last.time) continue;
+            if (b.time > last.time) data.push(b);
+            else data[data.length - 1] = b;
+            main.update(mainPoint(b));
+            vol.update(volPoint(b));
+          }
+          gl.bar = data[data.length - 1];
+          gl.close = gl.bar.close;
+          if (layer) layer.reset();
+          if (hover < 0) scheduleLegend();
+          schedulePlace();
+        }
+
         function setQuote(b, a) {
           if (!bidLine) return;
           bid = b;
@@ -1141,6 +1162,13 @@
               return prepend(m.bars, m.exhausted);
             case "bar":
               return upsertBar(m.bar);
+            case "tail":
+              return setTail(m.bars);
+            case "inset":
+              // the app's trade panel over the top of the plot: the legend starts below it
+              document.getElementById("legend").style.top = 6 + (Number(m.top) || 0) + "px";
+              legendSig = "";
+              return scheduleLegend();
             case "quote":
               return setQuote(m.bid, m.ask);
             case "lines":

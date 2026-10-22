@@ -113,12 +113,10 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
         final add = [for (final b in (m['bars'] as List? ?? const [])) _row(b)];
         if (_bars.isNotEmpty) _bars = [...add.where((b) => b[0] < _bars.first[0]), ..._bars];
       case 'bar':
-        final b = _row(m['bar']);
-        if (b.length < 6 || _bars.isEmpty) break;
-        if (b[0] > _bars.last[0]) {
-          _bars.add(b);
-        } else if (b[0] == _bars.last[0]) {
-          _bars[_bars.length - 1] = b;
+        _upsert(_row(m['bar']));
+      case 'tail':
+        for (final b in (m['bars'] as List? ?? const [])) {
+          _upsert(_row(b));
         }
       case 'quote':
         _bid = (m['bid'] as num?)?.toDouble() ?? _bid;
@@ -148,6 +146,15 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
         _inds = _instances(m['indicators']);
       case 'chartType':
         _type = '${m['chartType'] ?? 'candles'}';
+    }
+  }
+
+  void _upsert(List<double> b) {
+    if (b.length < 6 || _bars.isEmpty) return;
+    if (b[0] > _bars.last[0]) {
+      _bars.add(b);
+    } else if (b[0] == _bars.last[0]) {
+      _bars[_bars.length - 1] = b;
     }
   }
 
@@ -451,7 +458,10 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
                 border: Border.all(color: c),
                 borderRadius: BorderRadius.circular(3),
               ),
-              child: Text('${_texts[kind] ?? kind[0].toUpperCase()}', style: st(c).copyWith(fontSize: 9, fontWeight: FontWeight.w700, fontFamily: KFonts.sans)),
+              child: Text(
+                '${_texts[kind] ?? kind[0].toUpperCase()}',
+                style: st(c).copyWith(fontSize: 9, fontWeight: FontWeight.w700, fontFamily: KFonts.sans),
+              ),
             ),
           ),
         ),

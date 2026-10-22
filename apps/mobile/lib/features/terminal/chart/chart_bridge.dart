@@ -236,6 +236,13 @@ abstract final class ChartCmd {
   /// The forming bar (new or updated).
   static String bar(ChartBar b) => jsonEncode({'type': 'bar', 'bar': _bar(b)});
 
+  /// A background refresh of cached history that lines up with what is drawn: its last bar and the newer ones,
+  /// updated in place (the view stays, nothing glides: these are past prices, not a live tick).
+  static String tail(List<ChartBar> bars) => jsonEncode({'type': 'tail', 'bars': bars.map(_bar).toList()});
+
+  /// Room the app's own overlay takes at the top of the plot (the trade panel on the chart): the legend starts below.
+  static String inset(double top) => jsonEncode({'type': 'inset', 'top': top});
+
   /// The account's executable bid / ask lines.
   static String quote(double bid, double ask) => jsonEncode({'type': 'quote', 'bid': bid, 'ask': ask});
 

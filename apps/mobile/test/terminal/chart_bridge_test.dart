@@ -243,6 +243,49 @@ void main() {
     c.dispose();
   });
 
+  testWidgets('a tick reaches the page on the very next frame, and every frame with ticks gets its own call', (tester) async {
+    final c = ChartSurfaceController();
+    final calls = <List<String>>[];
+    c.attach(calls.add);
+    // 3 frames, 4 ticks inside each (250 Hz quotes against 60 Hz frames)
+    var tick = 0;
+    for (var f = 0; f < 3; f++) {
+      for (var i = 0; i < 4; i++) {
+        c.send(ChartCmd.quote(1.0 + tick, 2.0 + tick));
+        tick++;
+        await tester.binding.delayed(const Duration(milliseconds: 4));
+      }
+      // nothing goes out between frames …
+      expect(calls, hasLength(f));
+      await tester.pump();
+      // … and the frame delivers the newest quote, not a stale one
+      expect(calls, hasLength(f + 1));
+      expect(dec(calls.last.single)['bid'], 1.0 + tick - 1);
+    }
+    expect(c.deliveries, 3);
+    // a quiet market: no frame, no call
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(calls, hasLength(3));
+    // a single bar update is one bar, not the series
+    c.send(ChartCmd.bar((t: 600, o: 1, h: 2, l: 0.5, c: 1.5, v: 3)));
+    await tester.pump();
+    final m = dec(calls.last.single);
+    expect(m['type'], 'bar');
+    expect(m['bar'], [600, 1, 2, 0.5, 1.5, 3]);
+    c.dispose();
+  });
+
+  test('a background refresh that lines up goes out as a tail; the inset is the latest only', () {
+    final m = dec(ChartCmd.tail([(t: 600, o: 1, h: 2, l: 0.5, c: 1.5, v: 3), (t: 660, o: 1.5, h: 1.6, l: 1.4, c: 1.45, v: 1)]));
+    expect(m['type'], 'tail');
+    expect((m['bars'] as List).map((b) => (b as List).first), [600, 660]);
+    final c = ChartSurfaceController();
+    c.send(ChartCmd.inset(58));
+    c.send(ChartCmd.inset(0));
+    expect(c.pending.map(dec).map((x) => x['top']), [0]);
+    c.dispose();
+  });
+
   testWidgets('while a chip is dragged, trade-line updates wait and the latest goes out when it is dropped', (tester) async {
     final c = ChartSurfaceController();
     final calls = <List<String>>[];

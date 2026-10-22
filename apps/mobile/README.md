@@ -174,7 +174,13 @@ on the trade API (`trade/*`, docs/MOBILE-API.md §6) and the streams in `lib/cor
   engine notifications to the bell); actions: `core/trade_actions.dart` (banners, haptics, the web's reject texts).
 - The chart: `assets/chart/chart.html` with **lightweight-charts 5.2.1 bundled offline** (from node_modules, Apache 2.0,
   licence next to it) in a WebView on Android; `chart/chart_bridge.dart` is the JSON codec; the web preview and widget
-  tests draw a native stand-in (`chart/chart_native.dart`, `TerminalChart.forceNative`). Indicators are the web's own
+  tests draw a native stand-in (`chart/chart_native.dart`, `TerminalChart.forceNative`). Tick by tick: every quote and
+  forming bar from the stream goes to the page on the **next animation frame** (`ChartSurfaceController`: ticks inside
+  one frame coalesce to the newest, at most one bridge call per frame; a tick is one `bar` / `quote` message, the page
+  calls `series.update()`). History is kept for the session per market + timeframe (`chart/history_cache.dart`): a
+  timeframe seen before draws and ticks at once, its refresh lands in place (`tail`, the view stays), and the strip's
+  neighbouring timeframes are fetched ahead. The Chart tab's SELL (bid) · volume · BUY (ask) panel floats over the top
+  of the plot like MT5's one-click panel and uses the same order path (one-click off: the order sheet). Indicators are the web's own
   code: `node apps/mobile/tool/build_chart_indicators.mjs` (from the repo root, after the web files change) bundles
   `apps/terminal/lib/indicators.ts` + `components/chart/indicators/{layer,band-fill}.ts` into
   `assets/chart/indicators.bundle.js` and writes the registry `assets/chart/indicators.json` for the menus

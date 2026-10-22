@@ -1,5 +1,6 @@
-// One chart window (web: components/chart/engine.ts + chart-view.tsx): candle history from market data (cached per
-// symbol / timeframe so switching draws at once, then the tail is refreshed), the forming bar from the stream, the
+// One chart window (web: components/chart/engine.ts + chart-view.tsx): candle history from market data (cached for
+// the session per symbol / timeframe so switching draws at once and ticks at once, then refreshed in the background
+// in place; the neighbouring timeframes are fetched ahead: history_cache.dart), the forming bar from the stream, the
 // account's bid / ask lines, and the trade lines (positions, SL / TP, pending orders, alerts) with drag / tap
 // callbacks. Charts are drawn in broker server time like MT5 (GMT+3 in US summer time, GMT+2 otherwise).
 import 'dart:async';
@@ -16,6 +17,7 @@ import '../core/trade_math.dart';
 import '../core/workspace.dart';
 import 'chart_bridge.dart';
 import 'chart_surface.dart';
+import 'history_cache.dart';
 import 'indicators.dart';
 
 /// UTC unix seconds -> chart time (server time).
@@ -41,6 +43,9 @@ abstract class ChartSource {
 
   /// Bid / ask lines; returns the unsubscribe (null: none).
   void Function()? quotes(void Function(double bid, double ask) onQuote) => null;
+
+  /// Whether the neighbouring timeframes may be fetched ahead (cheap: one market-data request each).
+  bool get prefetch => false;
 }
 
 /// A market of the market-data service.
@@ -62,6 +67,9 @@ class MarketChartSource extends ChartSource {
 
   @override
   void Function()? quotes(void Function(double bid, double ask) onQuote) => feed.subscribe([symbol], (q) => onQuote(q.bid, q.ask));
+
+  @override
+  bool get prefetch => true;
 }
 
 class TerminalChart extends ConsumerStatefulWidget {
@@ -78,6 +86,7 @@ class TerminalChart extends ConsumerStatefulWidget {
     this.chartType = 'candles',
     this.indicators = const [],
     this.onIndicatorTapped,
+    this.topInset = 0,
   });
 
   /// The market (also the cache key when no source is given).
@@ -106,6 +115,9 @@ class TerminalChart extends ConsumerStatefulWidget {
   /// An indicator's legend row was tapped.
   final void Function(String uid)? onIndicatorTapped;
 
+  /// Room an overlay of the app takes at the top of the plot (the trade panel): the legend starts below it.
+  final double topInset;
+
   /// Widget tests and the web preview draw the native chart (no WebView there).
   static bool forceNative = false;
 
@@ -114,7 +126,7 @@ class TerminalChart extends ConsumerStatefulWidget {
 }
 
 class _TerminalChartState extends ConsumerState<TerminalChart> {
-  static final Map<String, List<Candle>> _cache = {};
+  ChartHistoryCache get _cache => ChartHistoryCache.instance;
   final ChartSurfaceController _c = ChartSurfaceController();
   final List<void Function()> _unsubs = [];
   List<Candle> _data = [];
@@ -170,6 +182,7 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
     if (!listEquals(old.lines, widget.lines)) _sendLines();
     if (old.chartType != widget.chartType) _c.send(ChartCmd.chartType(widget.chartType));
     if (!listEquals(old.indicators, widget.indicators)) _c.send(ChartCmd.indicators(_indicatorsJson));
+    if (old.topInset != widget.topInset) _c.send(ChartCmd.inset(widget.topInset));
   }
 
   List<Map<String, Object?>> get _indicatorsJson => [for (final i in widget.indicators) i.toJson()];
@@ -187,12 +200,7 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
     }
     final f = _fresh;
     final add = f != null && h != null && h.$1 == f.id && !widget.lines.any((l) => l.id == f.id);
-    final lines = h == null
-        ? widget.lines
-        : [
-            for (final l in widget.lines) l.id == h.$1 ? l.at(h.$2) : l,
-            if (add) f.at(h.$2),
-          ];
+    final lines = h == null ? widget.lines : [for (final l in widget.lines) l.id == h.$1 ? l.at(h.$2) : l, if (add) f.at(h.$2)];
     _c.send(ChartCmd.lines(lines));
   }
 
@@ -228,7 +236,7 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
     _unsubs.clear();
     final src = _source;
     final tf = widget.tf;
-    final key = '${src.key}|$tf';
+    final key = ChartHistoryCache.keyOf(src.key, tf);
     final t = context.t;
     _c.send(
       ChartCmd.init(
@@ -251,26 +259,50 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
         },
       ),
     );
+    if (widget.topInset > 0) _c.send(ChartCmd.inset(widget.topInset));
     _sendLines();
-    final cached = _cache[key];
-    if (cached != null && cached.isNotEmpty) {
-      _data = [...cached];
-      _c.send(ChartCmd.bars(_data.map(_bar).toList()));
-    }
+    // the session's copy first (switching back to a timeframe or a market draws at once) …
+    final cached = _cache.get(key);
+    _data = cached == null ? [] : [...cached];
+    if (_data.isNotEmpty) _c.send(ChartCmd.bars(_data.map(_bar).toList()));
     final q = src.quotes((bid, ask) {
       if (gen == _gen) _c.send(ChartCmd.quote(bid, ask));
     });
     if (q != null) _unsubs.add(q);
-    final fresh = await src.history(tf);
+    // … ticking at once (every bar from the stream reaches the chart on the next frame) …
+    var live = false;
+    if (_data.isNotEmpty) {
+      _liveBars(src, tf, key, gen);
+      live = true;
+    }
+    // … then refreshed in the background (the same request as a fetch-ahead of this timeframe, if one is running)
+    final fresh = await _cache.fetch(key, () => src.history(tf));
     if (!mounted || gen != _gen) return;
     if (fresh.isNotEmpty) {
-      // keep a forming bar that arrived while the request was in flight
-      final last = _data.isNotEmpty ? _data.last : null;
-      _data = [...fresh];
-      if (last != null && last.t > _data.last.t) _data.add(last);
-      _cache[key] = [..._data];
-      _c.send(ChartCmd.bars(_data.map(_bar).toList()));
+      // a forming bar that arrived meanwhile and the older pages scrolled back to are kept
+      final m = mergeHistory(_data, fresh);
+      final tail = m.tail;
+      _data = m.bars;
+      _cache.put(key, _data);
+      if (tail == null) {
+        _c.send(ChartCmd.bars(_data.map(_bar).toList()));
+      } else if (tail.isNotEmpty) {
+        // the cache lined up: only its last bar and the newer ones, in place (the view stays)
+        _c.send(ChartCmd.tail(tail.map(_bar).toList()));
+      }
     }
+    if (!live) _liveBars(src, tf, key, gen);
+    // the strip's neighbours of this timeframe, so the likely next tap draws at once
+    if (src.prefetch) {
+      for (final n in neighbourTimeframes(tf, kTimeframes)) {
+        unawaited(_cache.prefetch(ChartHistoryCache.keyOf(src.key, n), () => src.history(n)));
+      }
+    }
+  }
+
+  /// The forming bar from the stream: every update goes to the chart (coalesced to one call per frame by the
+  /// surface) and into the session cache.
+  void _liveBars(ChartSource src, String tf, String key, int gen) {
     final b = src.bars(tf, (bar) {
       if (gen != _gen || _data.isEmpty) return;
       if (bar.t < _data.last.t) return;
@@ -279,6 +311,7 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
       } else {
         _data[_data.length - 1] = bar;
       }
+      _cache.upsert(key, bar);
       _c.send(ChartCmd.bar(_bar(bar)));
     });
     if (b != null) _unsubs.add(b);
@@ -346,7 +379,7 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
     final add = older.where((c) => c.t < first).toList();
     if (add.isNotEmpty) {
       _data = [...add, ..._data];
-      _cache['${src.key}|${widget.tf}'] = [..._data];
+      _cache.put(ChartHistoryCache.keyOf(src.key, widget.tf), _data);
     }
     _c.send(ChartCmd.older(add.map(_bar).toList(), exhausted: add.isEmpty));
   }

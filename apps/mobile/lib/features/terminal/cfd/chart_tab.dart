@@ -1,5 +1,6 @@
-// Chart tab (web MChart): the symbol and timeframes strip, the chart with its trade lines, and the bottom bar
-// SELL (bid) · volume · BUY (ask). One-click trading on: Sell / Buy trade at once (haptic); off: the order sheet.
+// Chart tab (web MChart): the symbol and timeframes strip, the chart with its trade lines, and the trade panel
+// SELL (bid) · volume · BUY (ask) floating over the top of the chart like MT5's one-click panel (the web's bottom
+// bar). One-click trading on: Sell / Buy trade at once (haptic); off: the order sheet.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -107,12 +108,19 @@ class ChartTab extends ConsumerWidget {
                   border: Border.all(color: k.line),
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: _Chart(symbol: symbol, tf: ws.tf),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _Chart(symbol: symbol, tf: ws.tf, topInset: readOnly ? 0 : _TradePanel.height + 6),
+                    ),
+                    // one-tap trading on the chart (MT5's one-click panel): SELL (bid) · volume · BUY (ask)
+                    if (!readOnly) PositionedDirectional(top: 6, start: 6, child: _TradePanel(symbol: symbol)),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-        if (!readOnly) _TradeBar(symbol: symbol),
       ],
     );
   }
@@ -120,8 +128,9 @@ class ChartTab extends ConsumerWidget {
 
 /// The chart with the account's trade lines (web useTradeLines + commitLineDrag).
 class _Chart extends ConsumerWidget {
-  const _Chart({required this.symbol, required this.tf});
+  const _Chart({required this.symbol, required this.tf, this.topInset = 0});
   final String symbol, tf;
+  final double topInset;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -186,6 +195,7 @@ class _Chart extends ConsumerWidget {
       indicators: chart.indicators,
       onIndicatorTapped: (uid) => unawaited(showIndicatorActions(context, ref, symbol, uid)),
       onLongPress: ro ? null : (price) => _longPress(context, ref, price),
+      topInset: topInset,
     );
   }
 
@@ -345,16 +355,22 @@ class _Chart extends ConsumerWidget {
   }
 }
 
-/// SELL (bid) · volume stepper · BUY (ask) (web MChart bottom bar).
-class _TradeBar extends ConsumerStatefulWidget {
-  const _TradeBar({required this.symbol});
+/// One-tap trading on the chart, like MT5's one-click panel: SELL (live bid) · volume stepper · BUY (live ask),
+/// floating over the top of the plot (web MChart's bottom bar, the same rules). The same order path as the rest of
+/// the terminal: one-click trading on (Account tab) sends a market order at once (haptic); off, the tap opens the
+/// prefilled order sheet to confirm. Closed market, a delayed quote or an order on its way: disabled.
+class _TradePanel extends ConsumerStatefulWidget {
+  const _TradePanel({required this.symbol});
   final String symbol;
 
+  /// The panel's height (the chart's legend starts below it).
+  static const double height = 52;
+
   @override
-  ConsumerState<_TradeBar> createState() => _TradeBarState();
+  ConsumerState<_TradePanel> createState() => _TradePanelState();
 }
 
-class _TradeBarState extends ConsumerState<_TradeBar> {
+class _TradePanelState extends ConsumerState<_TradePanel> {
   late String _vol = ref.read(workspaceProvider).lot.toStringAsFixed(2);
   Timer? _clock;
   bool _busy = false;
@@ -399,11 +415,15 @@ class _TradeBarState extends ConsumerState<_TradeBar> {
     final open = isMarketOpen(spec);
     final digits = spec?.digits ?? 5;
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+      height: _TradePanel.height,
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: k.surface,
-        border: Border(top: BorderSide(color: k.line, width: 0.6)),
+        // a solid fill (no blur over the chart's WebView), slightly see-through like MT5's panel
+        color: k.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: k.line),
       ),
+      // every tick of the market's quote rebuilds the prices (the stream's real bid / ask, nothing smoothed)
       child: QuoteBuilder(
         symbol: widget.symbol,
         builder: (context, q) {
@@ -413,29 +433,30 @@ class _TradeBarState extends ConsumerState<_TradeBar> {
             final buy = s == 'buy';
             final bg = enabled ? (buy ? k.buyFill : k.sellFill) : k.surface3;
             final fg = enabled ? Colors.white : k.fg3;
-            return Expanded(
-              child: KPressable(
-                pressedScale: 0.97,
-                haptic: false,
-                semanticLabel: t(buy ? 'common.buy' : 'common.sell'),
-                onTap: enabled ? () => unawaited(_trade(s, open, delayed)) : null,
-                child: Container(
-                  height: 48,
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-                  child: Column(
-                    crossAxisAlignment: buy ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        t(buy ? 'common.buy' : 'common.sell').toUpperCase(),
-                        style: context.text.micro.copyWith(color: fg.withValues(alpha: 0.85), fontSize: 9.5, letterSpacing: 1),
-                      ),
-                      const SizedBox(height: 1),
-                      PriceText(buy ? (q?.ask ?? 0) : (q?.bid ?? 0), digits: digits, size: 14, color: fg),
-                    ],
-                  ),
+            return KPressable(
+              key: ValueKey('chart-trade-$s'),
+              pressedScale: 0.97,
+              haptic: false,
+              semanticLabel: t(buy ? 'common.buy' : 'common.sell'),
+              onTap: enabled ? () => unawaited(_trade(s, open, delayed)) : null,
+              child: Container(
+                width: 94,
+                height: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(7)),
+                child: Column(
+                  crossAxisAlignment: buy ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      t(buy ? 'common.buy' : 'common.sell').toUpperCase(),
+                      style: context.text.micro.copyWith(color: fg.withValues(alpha: 0.85), fontSize: 9, letterSpacing: 1),
+                    ),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: PriceText(buy ? (q?.ask ?? 0) : (q?.bid ?? 0), digits: digits, size: 14, color: fg),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -445,13 +466,14 @@ class _TradeBarState extends ConsumerState<_TradeBar> {
               ? t('trader.mobile.marketClosed')
               : (delayed ? t('desk.side.delayedTip') : (oneClick ? t('trader.mobile.oneClick') : t('trader.mobile.confirm')));
           return Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               side('sell'),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               SizedBox(
-                width: 112,
+                width: 100,
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     TStepper(
                       value: _vol,
@@ -459,28 +481,29 @@ class _TradeBarState extends ConsumerState<_TradeBar> {
                       min: spec?.lotMin ?? 0.01,
                       max: spec?.lotMax ?? 100,
                       step: spec?.lotStep ?? 0.01,
+                      height: 28,
                       semanticLabel: t('trader.mobile.volume'),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         if (delayed)
                           Padding(
-                            padding: const EdgeInsets.only(right: 3),
-                            child: Icon(Icons.schedule_rounded, size: 10, color: k.warn),
+                            padding: const EdgeInsets.only(right: 2),
+                            child: Icon(Icons.schedule_rounded, size: 9, color: k.warn),
                           ),
                         if (oneClick && open && !delayed)
                           Padding(
-                            padding: const EdgeInsets.only(right: 2),
-                            child: Icon(Icons.bolt_rounded, size: 11, color: k.ember),
+                            padding: const EdgeInsets.only(right: 1),
+                            child: Icon(Icons.bolt_rounded, size: 10, color: k.ember),
                           ),
                         Flexible(
                           child: Text(
                             caption,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: context.text.mono(9.5, color: !open || delayed ? k.warn : k.fg3),
+                            style: context.text.mono(8.5, color: !open || delayed ? k.warn : k.fg3),
                           ),
                         ),
                       ],
@@ -488,7 +511,7 @@ class _TradeBarState extends ConsumerState<_TradeBar> {
                   ],
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               side('buy'),
             ],
           );
