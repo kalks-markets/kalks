@@ -15,6 +15,11 @@ const Color kGold = Color(0xFFFFA040);
 /// The lighter orange (web --k-neon-red / the hover face).
 const Color kEmberLight = Color(0xFFFF7A2E);
 
+/// Kalks Trader's "Green / red" scheme (Account tab › Colours): the up / buy / profit / TP colour, and the fill under
+/// white text (a shade darker for contrast).
+const Color kTraderGreen = Color(0xFF00C076);
+const Color kTraderGreenFill = Color(0xFF00A86B);
+
 /// The Vantablack canvas of the Client Area, the icon and the splash (founder 2026-10-10).
 const Color kCanvas = Color(0xFF000000);
 
@@ -258,16 +263,19 @@ class KTokens extends ThemeExtension<KTokens> {
 
   /* ---------------- Kalks Trader (apps/terminal/app/globals.css) ---------------- */
 
-  factory KTokens.traderDark({Color ember = kEmber, Color gold = kGold}) {
-    const panel = Color(0xFF0E0E12);
-    const panel2 = Color(0xFF15151A);
+  /// The trade room (owner design 2026-10): a near-black ground (#0b0b0f) under #121217 cards. `green`: the Green / red
+  /// colour scheme instead of the default blue / red.
+  factory KTokens.traderDark({Color ember = kEmber, Color gold = kGold, bool green = false}) {
+    const ground = Color(0xFF0B0B0F);
+    const panel = Color(0xFF121217);
+    const panel2 = Color(0xFF17171D);
     return KTokens(
       brightness: Brightness.dark,
       trader: true,
-      bg: const Color(0xFF050507),
+      bg: ground,
       surface: panel,
       surface2: panel2,
-      surface3: const Color(0xFF1E1E24),
+      surface3: const Color(0xFF1D1D24),
       line: _rgba(255, 255, 255, 0.07),
       lineTop: _rgba(255, 255, 255, 0.14),
       fg: const Color(0xFFF5F5F7),
@@ -279,9 +287,9 @@ class KTokens extends ThemeExtension<KTokens> {
       onEmber: const Color(0xFFFFFFFF),
       gold: gold,
       goldSoft: _alpha(gold, 0.12),
-      // Kalks Trader: blue = up / buy / profit / TP, red = down / sell / loss / SL (web apps/terminal globals.css)
-      up: const Color(0xFF2F7BFF),
-      upSoft: _rgba(47, 123, 255, 0.12),
+      // Kalks Trader: blue (or green) = up / buy / profit / TP, red = down / sell / loss / SL (web apps/terminal globals.css)
+      up: green ? kTraderGreen : const Color(0xFF2F7BFF),
+      upSoft: green ? _rgba(0, 192, 118, 0.14) : _rgba(47, 123, 255, 0.12),
       down: const Color(0xFFF04438),
       downSoft: _rgba(240, 68, 56, 0.12),
       warn: const Color(0xFFF59E0B),
@@ -295,10 +303,10 @@ class KTokens extends ThemeExtension<KTokens> {
       wash1: _rgba(255, 90, 31, 0.07),
       wash2: _rgba(120, 120, 160, 0.06),
       wash3: _rgba(0, 0, 0, 0),
-      bar: _alpha(panel, 0.9),
+      bar: _alpha(ground, 0.94),
       sheet: _alpha(panel2, 0.92),
       scrim: _rgba(0, 0, 0, 0.6),
-      buyFill: const Color(0xFF1F5FE0),
+      buyFill: green ? kTraderGreenFill : const Color(0xFF1F5FE0),
       sellFill: const Color(0xFFDC2626),
       shadowCard: [BoxShadow(color: _rgba(0, 0, 0, 0.7), offset: const Offset(0, 12), blurRadius: 32, spreadRadius: -18)],
       shadowPop: [
@@ -320,7 +328,7 @@ class KTokens extends ThemeExtension<KTokens> {
     );
   }
 
-  factory KTokens.traderLight({Color ember = kEmber}) {
+  factory KTokens.traderLight({Color ember = kEmber, bool green = false}) {
     const panel = Color(0xFFFFFFFF);
     const panel2 = Color(0xFFF5F3F0);
     return KTokens(
@@ -341,8 +349,8 @@ class KTokens extends ThemeExtension<KTokens> {
       onEmber: const Color(0xFFFFFFFF),
       gold: const Color(0xFFA16207),
       goldSoft: _rgba(201, 151, 31, 0.12),
-      up: const Color(0xFF1F5FE0),
-      upSoft: _rgba(31, 95, 224, 0.12),
+      up: green ? kTraderGreenFill : const Color(0xFF1F5FE0),
+      upSoft: green ? _rgba(0, 168, 107, 0.12) : _rgba(31, 95, 224, 0.12),
       down: const Color(0xFFDC2626),
       downSoft: _rgba(240, 68, 56, 0.12),
       warn: const Color(0xFFB45309),
@@ -359,7 +367,7 @@ class KTokens extends ThemeExtension<KTokens> {
       bar: _alpha(panel, 0.86),
       sheet: _alpha(panel, 0.92),
       scrim: _rgba(15, 15, 20, 0.3),
-      buyFill: const Color(0xFF1F5FE0),
+      buyFill: green ? kTraderGreenFill : const Color(0xFF1F5FE0),
       sellFill: const Color(0xFFDC2626),
       shadowCard: [BoxShadow(color: _rgba(20, 20, 30, 0.25), offset: const Offset(0, 10), blurRadius: 28, spreadRadius: -18)],
       shadowPop: [

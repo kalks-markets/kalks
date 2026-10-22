@@ -1,5 +1,7 @@
-// Account tab (web MAccount): the accounts (one tap switches; add an account login), one-click trading, sound on
-// fills, dark theme, language, demo refill, back to the Client Area, log out of this account.
+// Account tab (web MAccount, owner design 2026-10): the colour scheme (Blue / red, the default, or Green / red, with
+// a SELL / BUY preview each; it repaints the whole trade room and the chart), the accounts (one tap switches; add an
+// account login), one-click trading, advanced quotes, sound on fills, dark theme, language, demo refill, back to the
+// Client Area, log out of this account.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -20,6 +22,7 @@ import '../core/trade_actions.dart';
 import '../core/workspace.dart';
 import '../widgets/kit.dart';
 import 'account_sheets.dart';
+import 'room.dart';
 
 class AccountTab extends ConsumerWidget {
   const AccountTab({super.key});
@@ -36,8 +39,8 @@ class AccountTab extends ConsumerWidget {
       pressedScale: 1,
       onTap: onTap,
       child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        height: 50,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: k.line, width: 0.6)),
         ),
@@ -53,10 +56,36 @@ class AccountTab extends ConsumerWidget {
         ),
       ),
     );
+    final scheme = ref.watch(traderSchemeProvider);
+    Widget label(String text) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
+      child: Text(
+        text.toUpperCase(),
+        style: context.text.micro.copyWith(color: k.fg3, fontSize: 11, letterSpacing: 0.6),
+      ),
+    );
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(kRoomGutter, 0, kRoomGutter, 20),
       children: [
-        TSectionLabel(t('common.accounts'), padding: const EdgeInsets.fromLTRB(2, 0, 2, 6)),
+        label(t('app.trader.colors.title')),
+        Row(
+          children: [
+            for (final s in TraderScheme.values) ...[
+              if (s != TraderScheme.values.first) const SizedBox(width: 10),
+              Expanded(
+                child: SchemeCard(
+                  scheme: s,
+                  selected: s == scheme,
+                  onTap: () {
+                    KHaptics.selection();
+                    unawaited(ref.read(traderSchemeProvider.notifier).set(s));
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+        label(t('common.accounts')),
         TPanel(
           child: Column(
             children: [
@@ -70,7 +99,7 @@ class AccountTab extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        label(t('desk.set.trading')),
         TPanel(
           child: Column(
             children: [
@@ -81,6 +110,15 @@ class AccountTab extends ConsumerWidget {
                   value: ws.oneClick,
                   semanticLabel: t('trader.oneClick.name'),
                   onChanged: (v) => ref.read(workspaceProvider.notifier).update((w) => w.copyWith(oneClick: v)),
+                ),
+              ),
+              row(
+                t('app.trader.settings.advancedQuotes'),
+                LucideIcons.listTree,
+                KSwitch(
+                  value: ws.advancedQuotes,
+                  semanticLabel: t('app.trader.settings.advancedQuotes'),
+                  onChanged: (v) => ref.read(workspaceProvider.notifier).update((w) => w.copyWith(advancedQuotes: v)),
                 ),
               ),
               row(
@@ -164,6 +202,68 @@ class AccountTab extends ConsumerWidget {
                 },
         ),
       ],
+    );
+  }
+}
+
+/// A colour scheme's preview card (owner design 2026-10): its name and a SELL / BUY pair in its colours; the chosen
+/// one has an ember border.
+class SchemeCard extends StatelessWidget {
+  const SchemeCard({super.key, required this.scheme, required this.selected, required this.onTap});
+  final TraderScheme scheme;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final k = context.k;
+    final green = scheme == TraderScheme.green;
+    // the scheme's own fills, whatever the current theme
+    final tokens = k.dark ? KTokens.traderDark(green: green) : KTokens.traderLight(green: green);
+    Widget pill(String text, Color c) => Expanded(
+      child: Container(
+        height: 30,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(15)),
+        child: Text(
+          text.toUpperCase(),
+          style: context.text.micro.copyWith(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+        ),
+      ),
+    );
+    return Semantics(
+      selected: selected,
+      child: KPressable(
+        key: ValueKey('scheme-${scheme.name}'),
+        semanticLabel: t(green ? 'app.trader.colors.green' : 'app.trader.colors.blue'),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: k.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: selected ? k.ember : k.surface3, width: 2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t(green ? 'app.trader.colors.green' : 'app.trader.colors.blue'),
+                style: context.text.label.copyWith(fontSize: 13, fontWeight: FontWeight.w700, color: k.fg),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  pill(t('common.sell'), tokens.sellFill),
+                  const SizedBox(width: 6),
+                  pill(t('common.buy'), tokens.buyFill),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

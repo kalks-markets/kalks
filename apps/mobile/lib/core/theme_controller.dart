@@ -23,3 +23,20 @@ class TraderThemeController extends Notifier<ThemeMode> {
 }
 
 final traderThemeModeProvider = NotifierProvider<TraderThemeController, ThemeMode>(TraderThemeController.new);
+
+/// Kalks Trader's colour scheme (Account tab › Colours): blue / red (the default, the web terminal's colours) or
+/// green / red. Up / buy / profit / TP take the scheme's colour everywhere in the trade room (quotes, buttons, P&L, the
+/// chart's candles and lines); down / sell / loss / SL stay red.
+enum TraderScheme { blue, green }
+
+class TraderSchemeController extends Notifier<TraderScheme> {
+  @override
+  TraderScheme build() => ref.read(prefsProvider).traderScheme == 'green' ? TraderScheme.green : TraderScheme.blue;
+
+  Future<void> set(TraderScheme s) async {
+    state = s;
+    await ref.read(prefsProvider).setTraderScheme(s.name);
+  }
+}
+
+final traderSchemeProvider = NotifierProvider<TraderSchemeController, TraderScheme>(TraderSchemeController.new);

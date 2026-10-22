@@ -38,8 +38,10 @@ abstract final class KTheme {
     );
   }
 
-  static ThemeData trader(Brightness b, {KBrand brand = const KBrand()}) =>
-      _build(b == Brightness.light ? KTokens.traderLight(ember: brand.primary) : KTokens.traderDark(ember: brand.primary, gold: brand.accent));
+  /// Kalks Trader; `green`: the Green / red colour scheme (up / buy / profit / TP green instead of blue).
+  static ThemeData trader(Brightness b, {KBrand brand = const KBrand(), bool green = false}) => _build(
+    b == Brightness.light ? KTokens.traderLight(ember: brand.primary, green: green) : KTokens.traderDark(ember: brand.primary, gold: brand.accent, green: green),
+  );
 
   static ThemeData _build(KTokens k) {
     final family = k.trader ? KFonts.sans : KFonts.display;

@@ -15,6 +15,7 @@ class Prefs {
   static const _kLocale = 'kalks.locale';
   static const _kTheme = 'kalks.theme';
   static const _kTraderTheme = 'kalks.trader.theme';
+  static const _kTraderScheme = 'kalks.trader.scheme';
   static const _kBiometric = 'kalks.biometric';
   static const _kBiometricAsked = 'kalks.biometric.asked';
   static const _kConfig = 'kalks.config';
@@ -31,6 +32,10 @@ class Prefs {
   /// Kalks Trader theme: dark by default, like the web terminal.
   ThemeMode get traderThemeMode => _mode(_p.getString(_kTraderTheme), ThemeMode.dark);
   Future<void> setTraderThemeMode(ThemeMode m) => _p.setString(_kTraderTheme, m.name);
+
+  /// Kalks Trader's up / buy colour: `blue` (default, blue / red) or `green` (green / red).
+  String get traderScheme => _p.getString(_kTraderScheme) == 'green' ? 'green' : 'blue';
+  Future<void> setTraderScheme(String v) => _p.setString(_kTraderScheme, v == 'green' ? 'green' : 'blue');
 
   static ThemeMode _mode(String? v, ThemeMode fallback) => ThemeMode.values.firstWhere((m) => m.name == v, orElse: () => fallback);
 

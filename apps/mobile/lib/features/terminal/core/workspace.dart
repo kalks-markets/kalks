@@ -84,6 +84,7 @@ class Workspace {
     this.lastLogin,
     this.charts = const {},
     this.indicatorFavourites = kDefaultIndicatorFavourites,
+    this.advancedQuotes = false,
   });
 
   final List<String> favourites;
@@ -112,6 +113,9 @@ class Workspace {
   /// Starred indicator types of the indicators list.
   final List<String> indicatorFavourites;
 
+  /// The quotes' Advanced view: a low · high · last tick time line under every market (Simple: prices only).
+  final bool advancedQuotes;
+
   /// The chart of a symbol (the web's default chart until changed).
   ChartSettings chartOf(String symbol) => charts[symbol] ?? ChartSettings(indicators: _defaultIndicators);
 
@@ -129,6 +133,7 @@ class Workspace {
     String? lastLogin,
     Map<String, ChartSettings>? charts,
     List<String>? indicatorFavourites,
+    bool? advancedQuotes,
   }) => Workspace(
     favourites: favourites ?? this.favourites,
     segment: segment ?? this.segment,
@@ -142,6 +147,7 @@ class Workspace {
     lastLogin: lastLogin ?? this.lastLogin,
     charts: charts ?? this.charts,
     indicatorFavourites: indicatorFavourites ?? this.indicatorFavourites,
+    advancedQuotes: advancedQuotes ?? this.advancedQuotes,
   );
 
   Map<String, dynamic> toJson() => {
@@ -157,6 +163,7 @@ class Workspace {
     'lastLogin': lastLogin,
     'charts': {for (final e in charts.entries) e.key: e.value.toJson()},
     'indicatorFavourites': indicatorFavourites,
+    'advancedQuotes': advancedQuotes,
   };
 
   static Workspace fromJson(Map<String, dynamic>? j) {
@@ -183,6 +190,7 @@ class Workspace {
           for (final e in charts.entries) '${e.key}': ?ChartSettings.fromJson(e.value),
       },
       indicatorFavourites: indFav is List ? indFav.whereType<String>().toList() : d.indicatorFavourites,
+      advancedQuotes: j['advancedQuotes'] == true,
     );
   }
 }

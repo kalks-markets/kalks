@@ -236,10 +236,11 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> with WidgetsBin
   @override
   Widget build(BuildContext context) {
     final mode = ref.watch(traderThemeModeProvider);
+    final scheme = ref.watch(traderSchemeProvider);
     final brand = ref.watch(configProvider.select((c) => c.brand));
     final platform = MediaQuery.platformBrightnessOf(context);
     final b = mode == ThemeMode.system ? platform : (mode == ThemeMode.dark ? Brightness.dark : Brightness.light);
-    final theme = KTheme.trader(b, brand: brand);
+    final theme = KTheme.trader(b, brand: brand, green: scheme == TraderScheme.green);
     // engine banners take the terminal's look while it is open
     final banners = ref.read(bannerProvider);
     banners.theme = theme;

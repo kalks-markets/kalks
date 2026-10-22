@@ -177,7 +177,7 @@ String _rgba(Color c) => 'rgba(${(c.r * 255).round()},${(c.g * 255).round()},${(
 /// The chart colours of the terminal theme (web --t-chart-bg, --t-grid, --k-*).
 ChartPalette chartPalette(KTokens k) => ChartPalette(
   dark: k.dark,
-  bg: k.dark ? '#0a0a0d' : '#ffffff',
+  bg: k.dark ? _hex(k.bg) : '#ffffff',
   grid: k.dark ? 'rgba(255,255,255,0.035)' : 'rgba(15,15,20,0.055)',
   line: k.dark ? 'rgba(255,255,255,0.07)' : 'rgba(15,15,20,0.1)',
   up: _hex(k.up),
