@@ -340,6 +340,42 @@ impl Social {
         Ok(charged)
     }
 
+    /// Staff review of a pending copy / PAMM / MAM fee (D76), in one transaction. Approve queues the master's
+    /// payout (`fee − platform cut`, wallet kind `copy_fee` / `mam_fee`). Reject refunds the whole fee to the
+    /// payer's wallet (the follower, investor or MAM client: `refund`, key `fee-refund:<id>`); nothing goes to
+    /// the master and the platform keeps no cut. `None` when the fee is not pending.
+    pub async fn review_fee(&self, tenant: i64, id: i64, approve: bool, reviewer: &str, note: &str) -> anyhow::Result<Option<sqlx::postgres::PgRow>> {
+        let mut t = self.pool.begin().await?;
+        let Some(r) = sqlx::query("UPDATE social_fees SET status = $3, reviewed_by = $4, note = $5, updated_at = now() WHERE id = $1 AND tenant_id = $2 AND status = 'pending' RETURNING *")
+            .bind(id)
+            .bind(tenant)
+            .bind(if approve { "approved" } else { "rejected" })
+            .bind(reviewer)
+            .bind(note)
+            .fetch_optional(&mut *t)
+            .await?
+        else {
+            return Ok(None);
+        };
+        if approve {
+            let master_id: i64 = r.get("master_id");
+            let master_user = self.reg.read().unwrap().masters.get(&master_id).map(|m| m.user_id).unwrap_or(0);
+            let amt: D = r.get("master_amount");
+            if amt > ZERO {
+                let (kind, memo) = if r.get::<String, _>("source") == "mam" { ("mam_fee", "MAM fee payout") } else { ("copy_fee", "Performance fee payout") };
+                super::wallet::enqueue(&mut *t, tenant, &format!("fee:{id}"), master_user, amt, super::wallet::CREDIT, kind, &format!("fee:{id}"), memo).await?;
+            } else {
+                sqlx::query("UPDATE social_fees SET status = 'paid', paid_at = now() WHERE id = $1").bind(id).execute(&mut *t).await?;
+            }
+        } else {
+            let amt: D = r.get("amount");
+            let memo = if r.get::<String, _>("source") == "mam" { "MAM fee refunded (rejected by staff)" } else { "Performance fee refunded (rejected by staff)" };
+            super::wallet::enqueue(&mut *t, tenant, &format!("fee-refund:{id}"), r.get("payer_user_id"), amt, super::wallet::CREDIT, "refund", &format!("fee-refund:{id}"), memo).await?;
+        }
+        t.commit().await?;
+        Ok(Some(r))
+    }
+
     /* ---------------- guard (D70, D74) ---------------- */
 
     async fn run_guard(self: Arc<Self>) {

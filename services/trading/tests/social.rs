@@ -3,7 +3,8 @@
 //! - a master's open / partial close / close are mirrored into the follower's copy account with the right size;
 //! - stopping with "keep positions" leaves the copied position open and unmanaged (no guard, no more mirroring);
 //! - the copy allocation arrives through the wallet (`to-trading`) and moves the HWM; a performance fee is
-//!   charged above the HWM at settlement and recorded pending;
+//!   charged above the HWM at settlement and recorded pending; rejecting it refunds the whole fee to the
+//!   follower's wallet (`refund` credit) and pays the master nothing;
 //! - a PAMM fund: seed → invest request → rollover (units at NAV) → profit → rollover with fee + redemption;
 //!   units = Σ unit ledger, NAV unchanged by fee and redemption; IB lots split by the units held at the deal's
 //!   open time (a later investor gets none, a later redemption keeps its share, shares add up to the volume);
@@ -17,7 +18,7 @@ use axum::extract::{Path, State};
 use axum::routing::post;
 use chrono::Utc;
 use serde_json::{Value, json};
-use sqlx::ConnectOptions;
+use sqlx::{ConnectOptions, Row};
 use sqlx::postgres::PgConnectOptions;
 use std::str::FromStr;
 use std::sync::atomic::AtomicI64;
@@ -224,6 +225,23 @@ async fn copy_and_pamm_end_to_end_with_replay() {
     assert_eq!(pending, 1);
     // no second fee without new profit
     assert!(social.settle_copy(sub.id, Utc::now(), false).await.unwrap().is_none());
+
+    // staff reject the fee (D76): the whole fee goes back to the follower's wallet as a `refund` credit, the master
+    // gets nothing and the fee can't be reviewed twice
+    let fee_id: i64 = sqlx::query_scalar("SELECT id FROM social_fees WHERE sub_id = $1 AND status = 'pending'").bind(sub.id).fetch_one(&pool).await.unwrap();
+    let row = social.review_fee(1, fee_id, false, "IT", "charged by mistake").await.unwrap().expect("pending fee reviewed");
+    assert_eq!(row.get::<String, _>("status"), "rejected");
+    let refunds: Vec<(i64, D, String, String, String)> = sqlx::query_as("SELECT user_id, amount, direction, kind, reference FROM wallet_outbox WHERE idempotency_key = $1")
+        .bind(format!("fee-refund:{fee_id}"))
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(refunds, vec![(777, fee, "credit".into(), "refund".into(), format!("fee-refund:{fee_id}"))], "full fee refunded to the payer");
+    let payouts: i64 = sqlx::query_scalar("SELECT count(*) FROM wallet_outbox WHERE idempotency_key = $1").bind(format!("fee:{fee_id}")).fetch_one(&pool).await.unwrap();
+    assert_eq!(payouts, 0, "nothing paid to the master");
+    assert!(social.review_fee(1, fee_id, true, "IT", "again").await.unwrap().is_none(), "a rejected fee is no longer pending");
+    trading::social::wallet::flush(&pool, &social.wallet, |_| "kalks".into()).await;
+    assert!(calls.lock().unwrap().iter().any(|x| x["kind"] == "refund" && x["direction"] == "credit" && x["user_id"] == 777 && x["amount"] == json!(fee.normalize().to_string())), "refund delivered to the wallet");
 
     // stop copying: nothing open, balance goes back to the wallet
     let out = social.stop_sub(sub.id, "client", true, true).await.unwrap();

@@ -451,7 +451,7 @@ master account shard ── commit (events) ──► event tap (only logins wit
 - **Performance fee, copy (D66).**
   - It is settled at the master's fee period end (`daily`, `weekly` or `monthly`, at the server-day rollover) by `settle_copy`: `hwm' = hwm + net deposits since the last settlement`, and `fee = pct × max(0, equity − hwm')`.
   - The fee is debited from the copy account (`perf_fee` ledger txn: `acct:L:balance −fee` · `house:perf_fees:USD +fee`) and `hwm = equity − fee`.
-  - The fee is recorded in `social_fees` as `pending`. After admin approval (D76), the wallet pays the master `fee − platform cut` (`kind: copy_fee`, direction `credit`). The platform cut stays in `house:perf_fees`.
+  - The fee is recorded in `social_fees` as `pending`. After admin approval (D76), the wallet pays the master `fee − platform cut` (`kind: copy_fee`, direction `credit`). The platform cut stays in `house:perf_fees`. A rejected fee is refunded in full (platform cut included) to the payer's wallet (`kind: refund`, key `fee-refund:<id>`); the master gets nothing.
   - The fee % is locked on the subscription when it starts. A later change by the master applies to new subscriptions only.
 
 ### PAMM (D65–D67, D74)
@@ -466,7 +466,7 @@ master account shard ── commit (events) ──► event tap (only logins wit
   - A pending request can be cancelled; a cancelled invest is refunded to the wallet (`pamm_redeem`, `credit`).
 - **Rollover.** At the end of the fund's period (daily / weekly / monthly, at 00:00 server time; weekly = the rollover into Monday; monthly = into the 1st), or on demand from the Back Office:
   1. `nav = equity ÷ units`.
-  2. **Fees.** For each investor (the master pays none) with `nav > hwm`: `fee = pct × (nav − hwm) × units`. The fee is taken as units at NAV (`units −= fee ÷ nav`, so NAV is unchanged) and `hwm = nav`. The total fee is debited from the fund account (`perf_fee` txn) and recorded as a pending `social_fees` row per investor.
+  2. **Fees.** For each investor (the master pays none) with `nav > hwm`: `fee = pct × (nav − hwm) × units`. The fee is taken as units at NAV (`units −= fee ÷ nav`, so NAV is unchanged) and `hwm = nav`. The total fee is debited from the fund account (`perf_fee` txn) and recorded as a pending `social_fees` row per investor. Approve and reject work as for copy fees: a rejected fee goes back to the investor's wallet (not as units).
   3. **Redemptions** at `nav`: `amount = units × nav`, debited from the fund (`transfer_out`, ref `pamm:redeem:<id>`), then credited to the wallet (`pamm_redeem`). A redemption the fund's free margin cannot cover stays pending (`insufficient_free_margin`). The master cannot redeem below `minOwnPct` of units (D68).
   4. **Investments** at `nav`: `units = amount ÷ nav`. The fund is credited (`transfer_in`, ref `pamm:invest:<id>`). The investor's HWM becomes the unit-weighted blend of the old HWM and `nav`. An investment that would push the master's share below `minOwnPct` is rejected and refunded.
   5. A `pamm_rollovers` row records NAV, equity, units, fees, inflows and outflows.
@@ -578,7 +578,7 @@ Same conventions as the rest of the engine: the internal token, `X-Kalks-Tenant`
 | `POST /v1/social/admin/snapshots` | `{note}` | `{written}` |
 | `GET /v1/social/admin/settings` / `PUT` | `{feeMinPct, feeMaxPct, platformCutPct, minTrackDays, minOwnCapitalPct, minMasterEquity, minAllocation, tradeDelayMinutes, note}` | `{settings}` |
 | `GET /v1/social/admin/fees?status=` | – | `{items: FeeView[], totals:{pending, approved, paid}}` |
-| `POST /v1/social/admin/fees/{id}/review` | `{decision:"approve"\|"reject", note}` | `{fee}`: approve pays the master through the wallet (`copy_fee`) |
+| `POST /v1/social/admin/fees/{id}/review` | `{decision:"approve"\|"reject", note}` | `{fee}`: approve pays the master through the wallet (`copy_fee`, `mam_fee` for MAM) minus the platform cut; reject refunds the whole fee to the payer's wallet (`refund`, key `fee-refund:<id>`, audit `social.fee.reject` with `refundedTo`) |
 | `GET /v1/social/admin/audit?limit=&before=` | – | `AuditEntry[]` (`social.*` actions) |
 
 **House accounts** (driven by the ALGO service, services/algo README "House accounts"). A house master is a platform-owned live account running an automated strategy; `social_masters.is_house` marks it and every master view (and a subscription's `master`) carries `"house": true` so the apps show the "House strategy · Operated by Kalks" label. A hidden house master takes no new followers (`master_status`). Staff headers, `ROLES_SOCIAL_WRITE`, a note on every write, audited as `social.house.*`:

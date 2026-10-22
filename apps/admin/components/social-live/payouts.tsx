@@ -19,24 +19,33 @@ export function LivePayoutsPage() {
   const totals = data?.totals ?? {};
   const t = (k: string) => amountOf(totals[k]);
 
+  // Where the fee was charged. A rejected fee is refunded in full (platform cut included) to the payer's wallet.
+  const chargedOn = (f: FeeView) => (f.source === "pamm" ? `PAMM fund ${f.login}, as units` : f.source === "mam" ? `MAM-linked account ${f.login}` : `copy account ${f.login}`);
   const review = (f: FeeView, decision: "approve" | "reject") =>
     act.ask({
-      title: decision === "approve" ? `Approve and pay fee #${f.id}` : `Reject fee #${f.id}`,
+      title: decision === "approve" ? `Approve and pay fee #${f.id}` : `Reject and refund fee #${f.id}`,
       description:
         decision === "approve"
           ? `Pays ${usd(f.masterAmount)} to ${f.master}'s wallet now (fee ${usd(f.amount)} less the platform cut of ${usd(f.platformCut)}). This moves real money and can't be undone from here.`
-          : `The fee stays with the platform (house performance-fee account) and nothing is paid to ${f.master}.`,
-      confirmLabel: decision === "approve" ? `Pay ${usd(f.masterAmount)}` : "Reject fee",
+          : `Refunds the full fee of ${usd(f.amount)} to the payer's wallet (client #${f.payerUserId}; charged on ${chargedOn(f)}). Nothing is paid to ${f.master} and the platform keeps no cut. This moves real money and can't be undone from here.`,
+      confirmLabel: decision === "approve" ? `Pay ${usd(f.masterAmount)}` : `Refund ${usd(f.amount)}`,
       confirmVariant: decision === "approve" ? "buy" : "sell",
-      body: (
-        <div className="grid grid-cols-3 gap-2">
-          <MiniStat label="Fee charged" value={usd(f.amount)} />
-          <MiniStat label="Platform cut" value={usd(f.platformCut)} />
-          <MiniStat label="To master" value={usd(f.masterAmount)} tone="gold" />
-        </div>
-      ),
+      body:
+        decision === "approve" ? (
+          <div className="grid grid-cols-3 gap-2">
+            <MiniStat label="Fee charged" value={usd(f.amount)} />
+            <MiniStat label="Platform cut" value={usd(f.platformCut)} />
+            <MiniStat label="To master" value={usd(f.masterAmount)} tone="gold" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            <MiniStat label="Fee charged" value={usd(f.amount)} />
+            <MiniStat label="To master" value={usd(0)} />
+            <MiniStat label={`Refund to client #${f.payerUserId}`} value={usd(f.amount)} tone="gold" />
+          </div>
+        ),
       run: (note) => socialWrite(`admin/fees/${f.id}/review`, { decision, note }),
-      success: decision === "approve" ? `Fee #${f.id} approved` : `Fee #${f.id} rejected`,
+      success: decision === "approve" ? `Fee #${f.id} approved` : `Fee #${f.id} rejected · ${usd(f.amount)} refunded to client #${f.payerUserId}'s wallet`,
       onDone: reload,
     });
 
@@ -81,7 +90,7 @@ export function LivePayoutsPage() {
     <div className="pb-16">
       <PageHeader
         title="Fee payouts"
-        subtitle="Performance fees charged to followers, PAMM investors and MAM accounts. Approving pays the master's wallet; the platform cut stays with the house."
+        subtitle="Performance fees charged to followers, PAMM investors and MAM accounts. Approving pays the master's wallet; the platform cut stays with the house. Rejecting refunds the whole fee to the payer's wallet."
         actions={
           <>
             {!canApprove && <ReadOnlyNote what="approve payouts" />}

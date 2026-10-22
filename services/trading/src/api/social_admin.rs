@@ -353,7 +353,7 @@ pub async fn fees(State(st): State<AppState>, s: StaffCtx, Query(q): Query<Statu
     Ok(Json(json!({"items": items, "totals": totals})))
 }
 
-/// D76: approve (pay the master's wallet: fee − platform cut) or reject (refund the payer's wallet).
+/// D76: approve (pay the master's wallet: fee − platform cut) or reject (refund the whole fee to the payer's wallet).
 pub async fn review_fee(State(st): State<AppState>, s: StaffCtx, Path(id): Path<i64>, Body(b): Body<Map<String, Value>>) -> ApiResult<Json<Value>> {
     s.require(ROLES_SOCIAL_APPROVE)?;
     let n = note(&b)?;
@@ -363,34 +363,15 @@ pub async fn review_fee(State(st): State<AppState>, s: StaffCtx, Path(id): Path<
         Some("reject") => false,
         _ => return Err(ApiError::Validation { field: "decision", message: "decision must be approve or reject".into() }),
     };
-    let mut t = st.pool.begin().await?;
-    let r = sqlx::query("UPDATE social_fees SET status = $3, reviewed_by = $4, note = $5, updated_at = now() WHERE id = $1 AND tenant_id = $2 AND status = 'pending' RETURNING *")
-        .bind(id)
-        .bind(tenant)
-        .bind(if approve { "approved" } else { "rejected" })
-        .bind(&s.staff.name)
-        .bind(&n)
-        .fetch_optional(&mut *t)
-        .await?
-        .ok_or_else(|| ApiError::Conflict { code: "fee_status", message: "This fee is not pending".into() })?;
-    let master_id: i64 = r.get("master_id");
-    let master_user = st.social.reg.read().unwrap().masters.get(&master_id).map(|m| m.user_id).unwrap_or(0);
-    if approve {
-        let amt: D = r.get("master_amount");
-        if amt > ZERO {
-            let (kind, memo) = if r.get::<String, _>("source") == "mam" { ("mam_fee", "MAM fee payout") } else { ("copy_fee", "Performance fee payout") };
-            crate::social::wallet::enqueue(&mut *t, tenant, &format!("fee:{id}"), master_user, amt, crate::social::wallet::CREDIT, kind, &format!("fee:{id}"), memo).await?;
-        } else {
-            sqlx::query("UPDATE social_fees SET status = 'paid', paid_at = now() WHERE id = $1").bind(id).execute(&mut *t).await?;
-        }
-    } else {
-        let amt: D = r.get("amount");
-        crate::social::wallet::enqueue(&mut *t, tenant, &format!("fee-refund:{id}"), r.get("payer_user_id"), amt, crate::social::wallet::CREDIT, "refund", &format!("fee-refund:{id}"), "Performance fee refunded").await?;
-    }
-    t.commit().await?;
+    let r = st.social.review_fee(tenant, id, approve, &s.staff.name, &n).await?.ok_or_else(|| ApiError::Conflict { code: "fee_status", message: "This fee is not pending".into() })?;
     let row = sqlx::query("SELECT f.*, m.nickname FROM social_fees f JOIN social_masters m ON m.id = f.master_id WHERE f.id = $1").bind(id).fetch_one(&st.pool).await?;
     let fee = fee_json(&row);
-    let a = st.social.audit(tenant, &s.staff, if approve { "social.fee.approve" } else { "social.fee.reject" }, Some(row.get("login")), &format!("fee:{id}"), Some(json!({"feeId": id, "status": "pending"})), Some(json!({"feeId": id, "status": fee["status"], "amount": fee["amount"], "masterAmount": fee["masterAmount"]})), &n).await;
+    let mut after = json!({"feeId": id, "status": fee["status"], "amount": fee["amount"], "masterAmount": fee["masterAmount"]});
+    if !approve {
+        // where the money went: the whole fee back to the payer's wallet
+        after["refundedTo"] = json!({"userId": r.get::<i64, _>("payer_user_id"), "login": r.get::<i64, _>("login"), "amount": fee["amount"], "wallet": true});
+    }
+    let a = st.social.audit(tenant, &s.staff, if approve { "social.fee.approve" } else { "social.fee.reject" }, Some(row.get("login")), &format!("fee:{id}"), Some(json!({"feeId": id, "status": "pending"})), Some(after), &n).await;
     // deliver the payout right away when the wallet is up (the outbox retries otherwise)
     let slugs = st.hub.shared.registry.clone();
     crate::social::wallet::flush(&st.pool, &st.social.wallet, |t| slugs.get(t).map(|x| x.slug.clone()).unwrap_or_else(|| "kalks".into())).await;
