@@ -24,6 +24,7 @@
     "./content": "./src/content/react.tsx",
     "./content/server": "./src/content/server.ts",
     "./content/types": "./src/content/types.ts",
+    "./public-url": "./src/lib/public-url.ts",
     "./*": "./src/*"
   },
   "scripts": {

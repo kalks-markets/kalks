@@ -55,20 +55,9 @@ export function cleanRef(ref: string | null | undefined): string {
   return /^[A-Za-z0-9]{3,24}$/.test(v) ? v : "";
 }
 
-/**
- * Public origin of this app as the browser sees it. Behind Caddy that comes from X-Forwarded-Proto/Host
- * (app.kalkstrade.com); in development it is the request's own origin (http://localhost:3000).
- * Google only redirects to URIs registered on the OAuth client, so a forged host cannot receive a code.
- */
-export function publicOrigin(headers: Headers, requestUrl: string): string {
-  const url = new URL(requestUrl);
-  const first = (v: string | null) => v?.split(",")[0]?.trim() || "";
-  const host = first(headers.get("x-forwarded-host")) || first(headers.get("host")) || url.host;
-  let proto = first(headers.get("x-forwarded-proto")) || url.protocol.replace(/:$/, "");
-  if (proto !== "https" && proto !== "http") proto = "https";
-  if (!/^[a-z0-9.-]+(:\d{1,5})?$/i.test(host)) return url.origin;
-  return `${proto}://${host}`;
-}
+// Public origin as the browser sees it (Google only redirects to URIs registered on the OAuth client, so a forged
+// host cannot receive a code).
+export { publicOrigin } from "@kalks/ui/public-url";
 
 // ---------- state cookie ----------
 

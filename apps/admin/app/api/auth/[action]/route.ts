@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { publicUrl } from "@kalks/ui/public-url";
 import { STAFF_COOKIE, STAFF_DEVICE_COOKIE, clientIp, forgetStaff, gateway, safeNext } from "@/lib/gateway";
 
 // Back Office staff auth BFF. Browser -> /api/auth/<action> (same origin) -> gateway /v1/admin/auth/<action>.
@@ -94,9 +95,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ acti
       // only clear a cookie that really is dead, so a cross-site link can't sign someone out
       const r = await gateway("/v1/admin/auth/me", { token, ip: clientIp(req.headers), userAgent: req.headers.get("user-agent") });
       // 403 = blocked session (IP allow-list, suspended broker): it's dead for this browser too
-      if (r.status !== 401 && r.status !== 403) return NextResponse.redirect(new URL(next || "/", req.url));
+      if (r.status !== 401 && r.status !== 403) return NextResponse.redirect(publicUrl(req, next || "/"));
     }
-    const url = new URL("/login", req.url);
+    const url = publicUrl(req, "/login");
     if (next) url.searchParams.set("next", next);
     const res = NextResponse.redirect(url);
     res.cookies.delete(STAFF_COOKIE);

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { publicUrl } from "@kalks/ui/public-url";
 import { CONTENT_PREVIEW_COOKIE, isPreviewToken, safePreviewPath } from "@kalks/ui/content/server";
 
 // Back Office preview links (Content → Pages → Preview): /api/content-preview?token=<signed token>&path=/login stores
@@ -7,7 +8,7 @@ import { CONTENT_PREVIEW_COOKIE, isPreviewToken, safePreviewPath } from "@kalks/
 
 export function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
-  const res = NextResponse.redirect(new URL(safePreviewPath(q.get("path")), req.url));
+  const res = NextResponse.redirect(publicUrl(req, safePreviewPath(q.get("path"))));
   res.headers.set("cache-control", "no-store");
   if (q.get("exit")) {
     res.cookies.delete(CONTENT_PREVIEW_COOKIE);
