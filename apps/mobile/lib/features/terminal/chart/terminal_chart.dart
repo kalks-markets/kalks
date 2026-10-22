@@ -20,11 +20,27 @@ import 'chart_surface.dart';
 import 'history_cache.dart';
 import 'indicators.dart';
 
-/// UTC unix seconds -> chart time (server time).
-int toChartTime(int utc) => utc + serverOffsetSeconds(DateTime.fromMillisecondsSinceEpoch(utc * 1000, isUtc: true));
+/// The US autumn switch of `year` (first Sunday of November, 06:00 UTC): server time goes back from GMT+3 to GMT+2.
+int _autumnSwitch(int year) {
+  final first = DateTime.utc(year, 11);
+  final sunday = 1 + (7 - first.weekday % 7) % 7;
+  return DateTime.utc(year, 11, sunday, 6).millisecondsSinceEpoch ~/ 1000;
+}
 
-/// Chart time -> UTC unix seconds (DST-aware inverse).
+/// UTC unix seconds -> chart time (server time). Strictly increasing, which lightweight-charts needs: when server time
+/// goes back an hour (autumn switch) the two UTC hours around the switch share the one server hour 08:00-09:00, at
+/// half speed (crypto's M1-H4 bars there are 30 s of chart time apart), instead of the second hour repeating the
+/// first one's times (an out-of-order series the chart refuses to draw).
+int toChartTime(int utc) {
+  final sw = _autumnSwitch(DateTime.fromMillisecondsSinceEpoch(utc * 1000, isUtc: true).year);
+  if (utc >= sw - 3600 && utc < sw + 3600) return sw + 2 * 3600 + (utc - (sw - 3600)) ~/ 2;
+  return utc + serverOffsetSeconds(DateTime.fromMillisecondsSinceEpoch(utc * 1000, isUtc: true));
+}
+
+/// Chart time -> UTC unix seconds (DST-aware inverse of [toChartTime]).
 int fromChartTime(int chart) {
+  final sw = _autumnSwitch(DateTime.fromMillisecondsSinceEpoch(chart * 1000, isUtc: true).year);
+  if (chart >= sw + 2 * 3600 && chart < sw + 3 * 3600) return sw - 3600 + (chart - (sw + 2 * 3600)) * 2;
   final summer = chart - 3 * 3600;
   return toChartTime(summer) == chart ? summer : chart - 2 * 3600;
 }
