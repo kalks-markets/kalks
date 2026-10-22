@@ -39,6 +39,10 @@ function metaSummary(meta: Record<string, unknown>) {
   return parts.join(" · ");
 }
 
+/** The CSV export reads at most EXPORT_PAGES × EXPORT_PER_PAGE rows (the gateway allows 1000 a page for exports). */
+const EXPORT_PAGES = 20;
+const EXPORT_PER_PAGE = 1000;
+
 export function LiveAudit() {
   const router = useRouter();
   const params = useSearchParams();
@@ -68,18 +72,26 @@ export function LiveAudit() {
 
   async function exportCsv() {
     const rows: AuditEvent[] = [];
-    for (let p = 1; p <= 20; p++) {
-      const r = await fetch(`/api/admin/audit${qs({ ...filters, page: p, per_page: 1000, export: true })}`, { cache: "no-store" });
+    let total = 0;
+    for (let p = 1; p <= EXPORT_PAGES; p++) {
+      const r = await fetch(`/api/admin/audit${qs({ ...filters, page: p, per_page: EXPORT_PER_PAGE, export: true })}`, { cache: "no-store" });
       if (!r.ok) return toast.error("Export failed", { description: "Couldn't load the audit log. Try again." });
       const d = (await r.json()) as AuditPage;
+      total = d.total;
       rows.push(...d.items);
       if (rows.length >= d.total || d.items.length === 0) break;
     }
+    const truncated = rows.length < total;
     downloadCsv(
       `audit-log-${new Date().toISOString().slice(0, 10)}`,
       ["ID", "Time (UTC)", "Actor type", "Actor ID", "Actor", "Actor email", "Action", "Target type", "Target ID", "Target", "IP", "User agent", "Details"],
       rows.map((e) => [e.id, e.created_at, e.actor.kind, e.actor.id, actorName(e), e.actor.email, e.action, e.target.kind, e.target.id, targetText(e), e.ip, e.user_agent, JSON.stringify(e.meta)]),
     );
+    if (truncated)
+      toast.warning(`Export cut off at ${rows.length.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} entries`, {
+        description: `The file has the newest entries only, back to ${when(rows[rows.length - 1]?.created_at ?? null, true)}. Narrow the date range or filters and export the rest separately.`,
+        duration: 15_000,
+      });
   }
 
   const columns: Column<AuditEvent>[] = [
@@ -127,7 +139,12 @@ export function LiveAudit() {
               <RefreshCw /> Refresh
             </Button>
             {canExport && (
-              <Button variant="ember" onClick={exportCsv} disabled={!data || data.total === 0}>
+              <Button
+                variant="ember"
+                onClick={exportCsv}
+                disabled={!data || data.total === 0}
+                title={data && data.total > EXPORT_PAGES * EXPORT_PER_PAGE ? `Exports the newest ${(EXPORT_PAGES * EXPORT_PER_PAGE).toLocaleString("en-US")} of ${data.total.toLocaleString("en-US")} matching entries; narrow the filters to get the rest` : undefined}
+              >
                 <Download /> Export CSV
               </Button>
             )}

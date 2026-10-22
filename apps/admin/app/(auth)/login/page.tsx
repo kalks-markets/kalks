@@ -86,7 +86,7 @@ function AuditNotice() {
       </span>
       <div className="min-w-0 text-[13px]">
         <div className="font-medium text-fg">Every sign-in is audited</div>
-        <div className="text-[12px] text-fg-3">Email code required on new devices · 12h sessions</div>
+        <div className="text-[12px] text-fg-3">Emailed code at every sign-in · 12h sessions</div>
       </div>
     </div>
   );
@@ -224,7 +224,7 @@ function StaffLogin() {
           </span>
           <h1 className="mt-5 text-[28px] font-medium tracking-[-0.02em]">Check your email</h1>
           <p className="mt-2 text-[14.5px] text-fg-2">
-            New device. We sent a 6-digit code to <span className="text-fg">{otp?.email_masked}</span>. It expires in {Math.round((otp?.expires_in ?? 300) / 60)} minutes.
+            To finish signing in, enter the 6-digit code we sent to <span className="text-fg">{otp?.email_masked}</span>. It expires in {Math.round((otp?.expires_in ?? 300) / 60)} minutes.
           </p>
           <div className="mt-8 space-y-4">
             <FormError>{err?.message}</FormError>

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Avatar, Button, Card, CardHeader, Chip, Donut, Flag, KpiCard, ListRow, Menu, Money, PageHeader, Reveal, Skeleton, cn } from "@kalks/ui";
 import { ColumnChart, MiniStat } from "@/components/config/kit";
 import { ago, day, useApi, useNow } from "@/components/live/kit";
+import { useConfirm } from "@/components/confirm";
 import { P, ibSend, type BatchesDoc, type FlagsDoc, type Level, type Overview } from "./api";
 import { BATCH_STATUS, EmptyNote, FLAG_KIND, LevelChip, PartnersError, SEV_TONE, StatusPill, int, levelStyle, lots, monthLabel, usd, usdK, usePerms, useLevels } from "./kit";
 
@@ -20,7 +21,7 @@ const JOBS: { job: string; label: string; hint: string }[] = [
   { job: "deposits", label: "Scan first deposits", hint: "CPA" },
   { job: "reversals", label: "Sweep reversals", hint: "clawbacks" },
   { job: "payouts", label: "Retry wallet transfers", hint: "approved" },
-  { job: "levels", label: "Evaluate levels", hint: "month so far" },
+  { job: "levels", label: "Apply level changes", hint: "month so far · applies now" },
 ];
 
 function jobSummary(job: string, d: Record<string, unknown>) {
@@ -35,7 +36,7 @@ function jobSummary(job: string, d: Record<string, unknown>) {
     case "payouts":
       return `${int(v("paid"))} credited · ${int(v("pending"))} still pending · ${int(v("failed"))} failed`;
     case "levels":
-      return `${int(v("changed"))} level changes`;
+      return `${int(v("changed"))} level changes applied`;
     default:
       return "Done";
   }
@@ -43,7 +44,18 @@ function jobSummary(job: string, d: Record<string, unknown>) {
 
 function RunMenu({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [ask, confirmDialog] = useConfirm();
   const run = async (job: string, label: string) => {
+    if (
+      job === "levels" &&
+      !(await ask({
+        title: "Apply level changes now?",
+        text: "Every partner's level is re-evaluated on this month's results so far and the changes are applied immediately: partners who qualify are promoted and, if demotion is allowed, others are demoted (locked levels stay as they are). New levels change commission rates from now on and are recorded in level history as this month's evaluation. This is not a preview and can't be undone from here.",
+        confirm: "Apply level changes",
+        tone: "danger",
+      }))
+    )
+      return;
     setBusy(job);
     const r = await ibSend<Record<string, unknown>>(`run/${job}`, {});
     setBusy(null);
@@ -55,16 +67,19 @@ function RunMenu({ onDone }: { onDone: () => void }) {
     onDone();
   };
   return (
-    <Menu
-      width={260}
-      header={<div className="text-[11.5px] text-fg-3">Runs a background job now instead of waiting for its schedule. Logged in the audit trail.</div>}
-      trigger={
-        <Button variant="ghost" disabled={!!busy}>
-          <Play /> {busy ? "Running…" : "Run now"} <ChevronDown />
-        </Button>
-      }
-      items={JOBS.map((j) => ({ label: j.label, hint: j.hint, onSelect: () => run(j.job, j.label) }))}
-    />
+    <>
+      {confirmDialog}
+      <Menu
+        width={260}
+        header={<div className="text-[11.5px] text-fg-3">Runs a background job now instead of waiting for its schedule. Logged in the audit trail.</div>}
+        trigger={
+          <Button variant="ghost" disabled={!!busy}>
+            <Play /> {busy ? "Running…" : "Run now"} <ChevronDown />
+          </Button>
+        }
+        items={JOBS.map((j) => ({ label: j.label, hint: j.hint, onSelect: () => void run(j.job, j.label) }))}
+      />
+    </>
   );
 }
 
