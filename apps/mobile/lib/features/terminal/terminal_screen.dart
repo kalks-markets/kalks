@@ -1,12 +1,14 @@
 // Kalks Trader, full screen (its own route above the Client Area; back returns to it). The web's PHONE layout
 // (apps/terminal/components/mobile/mobile-terminal.tsx) in the app's iOS look:
-//   header      back · CFD | Options (the account switch by product) · account pill (login, Live / Demo / read-only,
-//               equity, floating P&L) · bell
+//   header      back · account pill (login, Live / Demo / Options / read-only, equity, floating P&L; tap: the
+//               account switcher) · bell
 //   CFD         Watchlist · Chart · Trade · History · Account (bottom bar; the chart opens first)
 //   Options     its own body and bottom bar (options/options_terminal.dart)
-// An account is a CFD account or an Options account (its group's product): the workspace follows the account on
-// screen, and CFD | Options switches to the client's last / default account of that product (or offers to open one).
-// The Options side is hidden while the broker has the Options module off.
+// An account is a CFD account or an Options account (its group's product) and the room follows the account on
+// screen: there is no CFD | Options switch (owner request 2026-10). The account switcher (the header's pill, the
+// Account tab) lists the CFD and the Options accounts, Live and Demo, and offers "Open an Options account" when the
+// client has none; `?mode=options|cfd` still opens the client's account of that product. The Options side is hidden
+// while the broker has the Options module off.
 // Like the web's mobile terminal (dir="ltr") the terminal keeps its left-to-right layout in Arabic, Urdu and Persian:
 // bid / ask, Sell / Buy and the chart keep their places, only the words are translated.
 import 'dart:async';
@@ -56,37 +58,12 @@ final activeProductProvider = Provider.autoDispose<String>((ref) {
 });
 
 /// The terminal's workspace (web useTradeMode): cfd | options. Not a choice of its own: an Options account opens the
-/// options workspace, a CFD account the CFD one (always CFD while the broker has the Options module off).
+/// options workspace, a CFD account the CFD one (always CFD while the broker has the Options module off). The client
+/// changes it by switching accounts.
 final tradeModeProvider = Provider.autoDispose<String>((ref) {
   final optionsOn = ref.watch(configProvider.select((c) => c.moduleOn('options')));
   return optionsOn && ref.watch(activeProductProvider) == 'options' ? 'options' : 'cfd';
 });
-
-/// The header's CFD | Options: shows the client's last / default account of that product; none -> offers to open
-/// one (the open-account wizard with the product chosen).
-Future<void> switchToProduct(BuildContext context, WidgetRef ref, String product) async {
-  final sessions = ref.read(tradeSessionsProvider.notifier);
-  final login = await sessions.loginForProduct(product);
-  if (!context.mounted) return;
-  if (login == null) return showOpenProductSheet(context, product);
-  if (login == ref.read(tradeSessionsProvider).active) return;
-  KHaptics.selection();
-  await switchTradeAccount(context, login);
-}
-
-/// "Open a CFD account" / "Open an Options account" when the client holds none of that product.
-Future<void> showOpenProductSheet(BuildContext context, String product) async {
-  final t = context.t;
-  final router = GoRouter.of(context);
-  final options = product == 'options';
-  final go = await showKActionSheet<bool>(
-    context,
-    title: options ? t('options.account.noneTitle') : null,
-    message: options ? t('options.account.noneText') : null,
-    actions: [KAction(label: t(options ? 'trader.acct.openOptions' : 'trader.acct.openCfd'), value: true, icon: LucideIcons.plus, primary: true)],
-  );
-  if (go == true) router.go('/accounts/new?product=$product');
-}
 
 /// The CFD bottom-bar tab: watch | chart | trade | history | account, and `symbol` (the symbol screen opened from the
 /// quotes: the Watchlist tab stays lit, back returns to it).
@@ -114,7 +91,7 @@ void openSymbolScreen(WidgetRef ref, String symbol) {
 }
 
 /// Tabs drawn without the terminal header: the symbol screen (a sub-screen of the quotes with its own back button).
-/// The chart keeps the header (back, CFD | Options, the account, the bell: it is the first screen) and fills everything
+/// The chart keeps the header (back, the account, the bell: it is the first screen) and fills everything
 /// under it edge to edge, its controls floating over the plot.
 bool fullScreenTab(String tab) => tab == 'symbol';
 
@@ -313,8 +290,6 @@ class _Header extends ConsumerWidget {
     final t = context.t;
     final k = context.k;
     final unread = ref.watch(notificationsProvider.select((s) => s.unread));
-    final mode = ref.watch(tradeModeProvider);
-    final optionsOn = ref.watch(configProvider.select((c) => c.moduleOn('options')));
     final rtl = Directionality.of(context) == TextDirection.rtl;
     return KFrosted(
       color: k.bar,
@@ -333,21 +308,6 @@ class _Header extends ConsumerWidget {
                   semanticLabel: t('common.back'),
                   onPressed: () => context.canPop() ? context.pop() : context.go('/'),
                 ),
-                // the account switch by product: CFD | Options shows the client's account of that product
-                if (optionsOn) ...[
-                  SizedBox(
-                    width: 118,
-                    child: KSegmented<String>(
-                      key: const ValueKey('trader-product'),
-                      height: 30,
-                      values: const ['cfd', 'options'],
-                      labels: [t('trader.opt.mode.cfd'), t('trader.opt.mode.options')],
-                      selected: mode,
-                      onChanged: (v) => unawaited(switchToProduct(context, ref, v)),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                ],
                 const Expanded(child: _AccountPill()),
                 KIconButton(
                   icon: LucideIcons.bell,
@@ -412,6 +372,8 @@ class _AccountPill extends ConsumerWidget {
                       if (a != null) ...[
                         const SizedBox(width: 4),
                         TBadge(t.dyn('trader.accountType.${a.type}', fallback: a.type), tone: a.live ? TBadgeTone.ember : TBadgeTone.gold),
+                        // the room follows the account: an Options account says so on the pill
+                        if (a.isOptions) ...[const SizedBox(width: 3), TBadge(t('accounts.product.chipOptions'), tone: TBadgeTone.info)],
                       ],
                       if (st.readOnly) ...[const SizedBox(width: 3), TBadge(t('trader.badge.readOnly'), tone: TBadgeTone.warn)],
                       if (streamDown) ...[

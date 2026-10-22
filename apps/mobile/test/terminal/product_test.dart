@@ -1,6 +1,6 @@
 // CFD / Options account split in Kalks Trader: the workspace follows the account on screen (a CFD account opens the
-// CFD workspace, an Options account the options one); `?mode=` picks an account of that product; the header's
-// CFD | Options switches to the client's account of that product; a CFD market's link on an Options account moves to
+// CFD workspace, an Options account the options one); `?mode=` picks an account of that product; there is no
+// CFD | Options switch: the account switcher changes the account (and offers an Options account to a client without); a CFD market's link on an Options account moves to
 // the CFD account; the account switcher lists CFD accounts and Options accounts; the Options module off keeps CFD only.
 // The sample client (lib/preview) holds CFD accounts 10042817 (default), 10051123 and 20017734, and the demo Options
 // account 20019001.
@@ -211,18 +211,44 @@ void main() {
       await close(tester);
     });
 
-    testWidgets('CFD | Options in the header switches to the account of that product', (tester) async {
+    testWidgets('no CFD | Options in the header: the room follows the account picked in the account switcher', (tester) async {
       await open(tester, '/trader?login=10042817');
-      final seg = find.byKey(const ValueKey('trader-product'));
-      expect(seg, findsOneWidget);
-      await tester.tap(find.descendant(of: seg, matching: find.text('Options')));
+      expect(find.byKey(const ValueKey('trader-product')), findsNothing);
+      expect(find.text('Options'), findsNothing);
+      // the account pill opens the switcher; the Options account opens the Options room
+      await tester.tap(find.text('10042817').first);
+      await _frames(tester);
+      await tester.tap(find.byKey(const ValueKey('trader-account-20019001')));
       await _frames(tester);
       expect(active(), '20019001');
       expect(h.container.read(tradeModeProvider), 'options');
-      await tester.tap(find.descendant(of: seg, matching: find.text('CFD')));
+      final pill = find.byWidgetPredicate((w) => w.runtimeType.toString() == '_AccountPill');
+      expect(
+        find.descendant(of: pill, matching: find.text('OPTIONS')),
+        findsOneWidget,
+        reason: 'the pill says so',
+      );
+      // and back to the CFD account
+      await tester.tap(find.text('20019001').first);
+      await _frames(tester);
+      await tester.tap(find.byKey(const ValueKey('trader-account-10042817')));
       await _frames(tester);
       expect(active(), '10042817');
       expect(h.container.read(tradeModeProvider), 'cfd');
+      await close(tester);
+    });
+
+    testWidgets('a client without an Options account is offered one in the account switcher', (tester) async {
+      // the sample client without its Options account
+      final cfdOnly = ownAccountsProvider.overrideWith((ref) async => [_acc(10042817, def: true), _acc(10051123), _acc(20017734, type: 'demo')]);
+      await open(tester, '/trader?login=10042817', extra: [cfdOnly]);
+      await tester.tap(find.text('10042817').first);
+      await _frames(tester);
+      expect(find.text('OPTIONS ACCOUNTS'), findsOneWidget);
+      expect(find.byKey(const ValueKey('trader-open-options')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('trader-open-options')));
+      await _frames(tester);
+      expect(find.text('wizard product=options'), findsOneWidget, reason: 'the open-account wizard with the product chosen');
       await close(tester);
     });
 
