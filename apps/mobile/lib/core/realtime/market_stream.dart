@@ -6,7 +6,8 @@
 //   wants (favourites, positions and orders, the chart) — `want(owner, symbols)`;
 // - demand changes are debounced (700 ms quiet, at most every 3 s) and sent as diffs: `subscribe` for new symbols,
 //   `subscribe` + `passive: true` for dropped ones;
-// - charts and depth ask through `bars` / `unbars` and `depth` / `undepth`.
+// - charts and depth ask through `bars` / `unbars` and `depth` / `undepth`; after a reconnect a chart fetches the bars
+//   it missed (`onReconnect`).
 // Frames: quote {s, b, a, l?, t, d?}, bar {s, tf, t, o, h, l, c, v}, depth {s, src, t, b, a}.
 import 'dart:async';
 
@@ -80,6 +81,8 @@ class MarketStream {
   final Map<String, Set<String>> _wants = {};
   final Map<String, Set<BarListener>> _bars = {};
   final Map<String, Set<DepthListener>> _depth = {};
+  final Set<void Function()> _reconnects = {};
+  bool _opened = false;
   Set<String> _activeSent = {};
   Timer? _demandTimer;
   DateTime? _demandSince;
@@ -151,6 +154,13 @@ class MarketStream {
     };
   }
 
+  /// Called after every reconnect (not the first connect): bar updates sent while the socket was down are lost, so
+  /// a chart fetches the bars it missed. Returns the unsubscribe.
+  void Function() onReconnect(void Function() fn) {
+    _reconnects.add(fn);
+    return () => _reconnects.remove(fn);
+  }
+
   /// The depth-of-market ladder of `symbol` (every quote change pushes a fresh book).
   void Function() subscribeDepth(String symbol, DepthListener fn) {
     final set = _depth[symbol] ??= {};
@@ -183,6 +193,12 @@ class MarketStream {
       _socket.send({'op': 'bars', 'symbol': p[0], 'tf': p[1]});
     }
     if (_depth.isNotEmpty) _socket.send({'op': 'depth', 'symbols': _depth.keys.toList()});
+    if (_opened) {
+      for (final fn in [..._reconnects]) {
+        fn();
+      }
+    }
+    _opened = true;
   }
 
   void _scheduleDemand() {

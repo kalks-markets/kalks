@@ -262,6 +262,10 @@ abstract final class ChartCmd {
   /// updated in place (the view stays, nothing glides: these are past prices, not a live tick).
   static String tail(List<ChartBar> bars) => jsonEncode({'type': 'tail', 'bars': bars.map(_bar).toList()});
 
+  /// Corrected history (bars that closed, bars missed while the stream was down): replaces what is drawn, the view
+  /// stays where the reader put it.
+  static String redraw(List<ChartBar> bars) => jsonEncode({'type': 'redraw', 'bars': bars.map(_bar).toList()});
+
   /// Room the app's own overlay takes at the top of the plot (the trade panel on the chart): the legend starts below.
   static String inset(double top) => jsonEncode({'type': 'inset', 'top': top});
 

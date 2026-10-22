@@ -117,3 +117,30 @@ List<String> neighbourTimeframes(String tf, List<String> order) {
   final tail = bars.sublist(i);
   return (bars: bars, tail: tail.length <= maxTail ? tail : null);
 }
+
+bool _same(Candle a, Candle b) => a.t == b.t && a.o == b.o && a.h == b.h && a.l == b.l && a.c == b.c && a.v == b.v;
+
+/// The newest bars from the server merged into the candles a chart shows: the latest page after the live stream
+/// reconnected (`page`; one that starts after the shown bars, a gap longer than the page, replaces them), or the last
+/// few bars after a bar closed (their stored, final values). For the latter the shown forming bar keeps its close
+/// (live updates went on while the answer was on its way) and takes in the answer's range. Null when nothing
+/// changed; `tail` = the changed bars when they are all at or after the shown last bar (an update in place), else
+/// null (the chart redraws them all, the view stays).
+({List<Candle> bars, List<Candle>? tail})? refreshBars(List<Candle> shown, List<Candle> fresh, {bool page = false}) {
+  if (fresh.isEmpty) return null;
+  if (shown.isEmpty || (page && fresh.first.t > shown.last.t)) return (bars: [...fresh], tail: null);
+  final bars = mergeHistory(shown, fresh).bars;
+  final live = shown.last;
+  if (!page && fresh.last.t == live.t) {
+    final i = bars.lastIndexWhere((c) => c.t == live.t);
+    final f = bars[i];
+    bars[i] = Candle(live.t, f.o, f.h > live.h ? f.h : live.h, f.l < live.l ? f.l : live.l, live.c, f.v > live.v ? f.v : live.v);
+  }
+  var i = 0;
+  while (i < shown.length && i < bars.length && _same(shown[i], bars[i])) {
+    i++;
+  }
+  if (i == shown.length && i == bars.length) return null;
+  final tail = i < bars.length && i >= shown.length - 1 && bars[i].t >= live.t ? bars.sublist(i) : null;
+  return (bars: bars, tail: tail);
+}

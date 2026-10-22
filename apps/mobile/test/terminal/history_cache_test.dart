@@ -31,6 +31,21 @@ class FakeSource extends ChartSource {
   final Map<String, List<Completer<List<Candle>>>> asked = {};
   final Map<String, void Function(Candle)> live = {};
   final List<String> events = [];
+  final List<void Function()> resync = [];
+
+  @override
+  Future<List<Candle>> recent(String tf, int count) {
+    events.add('recent $tf $count');
+    final c = Completer<List<Candle>>();
+    (asked[tf] ??= []).add(c);
+    return c.future;
+  }
+
+  @override
+  void Function()? resyncs(void Function() onResync) {
+    resync.add(onResync);
+    return () => resync.remove(onResync);
+  }
 
   @override
   Future<List<Candle>> history(String tf, {int? to}) {
@@ -95,6 +110,37 @@ void main() {
       final m = mergeHistory(shown, const []);
       expect(m.bars, same(shown));
       expect(m.tail, isEmpty);
+    });
+  });
+
+  group('refreshBars', () {
+    Candle k(int t, double o, double h, double l, double cl) => Candle(t, o, h, l, cl, 1);
+    test('a bar that closed takes its stored values; the forming bar keeps its live close', () {
+      final shown = [k(0, 1, 2, 0.5, 1.5), k(60, 1.5, 1.8, 1.4, 1.6), k(120, 1.62, 1.62, 1.62, 1.65)];
+      // the server's final values of the bar at 60 (a late tick), and the forming bar as it was a moment ago
+      final fresh = [k(60, 1.5, 1.9, 1.4, 1.62), k(120, 1.62, 1.7, 1.6, 1.63)];
+      final r = refreshBars(shown, fresh)!;
+      expect(times(r.bars), [0, 60, 120]);
+      expect([r.bars[1].h, r.bars[1].c], [1.9, 1.62]);
+      expect([r.bars[2].h, r.bars[2].l, r.bars[2].c], [1.7, 1.6, 1.65]);
+      expect(r.tail, isNull, reason: 'a bar before the last changed: redraw');
+      expect(refreshBars(r.bars, fresh), isNull, reason: 'nothing changed');
+    });
+
+    test('only the forming bar changed: an update in place', () {
+      final shown = [c(0), c(60)];
+      final r = refreshBars(shown, [const Candle(60, 1, 3, 0.5, 1, 1)])!;
+      expect(times(r.tail!), [60]);
+    });
+
+    test('after a reconnect the latest page fills the bars missed; a page past a longer gap replaces them', () {
+      final shown = run(0, 600);
+      final r = refreshBars(shown, run(300, 1200), page: true)!;
+      expect(times(r.bars), times(run(0, 1200)));
+      expect(r.tail, isNotNull);
+      final far = refreshBars(shown, run(6000, 6600), page: true)!;
+      expect(times(far.bars), times(run(6000, 6600)));
+      expect(far.tail, isNull);
     });
   });
 
@@ -187,6 +233,47 @@ void main() {
       src.answer('M15', run(0, 660));
       await tester.pump();
       expect(ChartHistoryCache.instance.get('FAKE|M15')!.last.t, 660);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.runAsync(() async => h.container.dispose());
+      TerminalChart.forceNative = false;
+    });
+
+    testWidgets('a closed bar takes its stored values; a reconnect brings the bars missed meanwhile', (tester) async {
+      TerminalChart.forceNative = true;
+      late Harness h;
+      await tester.runAsync(() async {
+        h = await Harness.create(extra: [marketFeedProvider.overrideWith((ref) => FixedFeed(const {}))]);
+      });
+      final src = FakeSource('LIVE');
+      await pump(tester, h.container, TerminalChart(symbol: 'LIVE', tf: 'M1', source: src));
+      src.answer('M1', run(0, 600));
+      await tester.pump();
+      final key = ChartHistoryCache.keyOf('LIVE', 'M1');
+
+      // the minute at 600 closes at 1.4 as far as the stream showed, the next one starts
+      src.live['M1']!(c(600, 1.4));
+      src.live['M1']!(c(660, 1.41));
+      src.events.clear();
+      await tester.pump(TerminalChart.settleDelay);
+      expect(src.events, ['recent M1 3']);
+      // stored: the minute at 600 closed at 1.45 (a last tick the stream did not deliver)
+      src.answer('M1', [c(540), c(600, 1.45), c(660, 1.40)]);
+      await tester.pump();
+      var cached = ChartHistoryCache.instance.get(key)!;
+      expect(cached.firstWhere((x) => x.t == 600).c, 1.45);
+      expect(cached.last.c, 1.41, reason: 'the forming bar keeps its live close');
+
+      // the stream was down for three minutes: the bars it missed come with the latest page
+      src.events.clear();
+      for (final r in [...src.resync]) {
+        r();
+      }
+      expect(src.events, ['history M1']);
+      src.answer('M1', run(0, 900));
+      await tester.pump();
+      cached = ChartHistoryCache.instance.get(key)!;
+      expect(times(cached), times(run(0, 900)));
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.runAsync(() async => h.container.dispose());

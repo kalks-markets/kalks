@@ -124,6 +124,12 @@ class _NativeChartSurfaceState extends State<NativeChartSurface> {
         _scroll = 0;
         _exhausted = false;
         _loadingOlder = false;
+      case 'redraw':
+        final rows = [for (final b in (m['bars'] as List? ?? const [])) _row(b)];
+        if (rows.isEmpty) break;
+        if (_bars.isEmpty || rows.first[0] != _bars.first[0]) _exhausted = false;
+        _bars = rows;
+        _scroll = _scroll.clamp(0, math.max(0, _bars.length - 10).toDouble());
       case 'older':
         _loadingOlder = false;
         _exhausted = m['exhausted'] == true;

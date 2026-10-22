@@ -7,7 +7,7 @@
   The app owns the data and sends it as JSON to window.K.recv(msg) or, coalesced, window.K.batch("[msg, …]"); this page
   draws it and posts gestures back on the `KalksChart` channel (lib/features/terminal/chart/chart_bridge.dart):
     in:  init {digits, intraday, palette, symbol, tf, step, chartType, indicators, texts, title?} · bars {bars}
-         · older {bars, exhausted} · bar {bar} · tail {bars} · inset {top} · quote {bid, ask} · lines {lines: [{id, kind, price, label, side, drag,
+         · older {bars, exhausted} · bar {bar} · tail {bars} · redraw {bars} · inset {top} · quote {bid, ask} · lines {lines: [{id, kind, price, label, side, drag,
          note, tone, close, handles?, pip?, gap?, tag?}]} · palette {palette} · indicators {indicators} · chartType {chartType}
   Trade-line chips are compact tags (owner design 2026-10): a position "B 0.50 +12.30" filled with its side's colour, a
   stop "S 1.11850" (sell colour) / "T 1.12600" (buy colour): a line with `tag` reads its label and then its price, the
@@ -703,6 +703,17 @@
           schedulePlace();
         }
 
+        /* Corrected history (bars that closed and were stored with their final values, bars missed while the app's
+           stream was down): replaces what is drawn; the view stays where the reader put it. */
+        function redraw(list) {
+          if (!data.length || !list || !list.length) return;
+          if (list[0][0] !== data[0].time) exhausted = false;
+          data = list.map(toBar);
+          drawAll();
+          if (hover < 0) scheduleLegend();
+          schedulePlace();
+        }
+
         function setQuote(b, a) {
           if (!bidLine) return;
           bid = b;
@@ -1177,6 +1188,8 @@
               return upsertBar(m.bar);
             case "tail":
               return setTail(m.bars);
+            case "redraw":
+              return redraw(m.bars);
             case "inset":
               // the app's trade panel over the top of the plot: the legend starts below it
               document.getElementById("legend").style.top = 6 + (Number(m.top) || 0) + "px";

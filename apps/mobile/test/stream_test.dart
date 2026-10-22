@@ -330,5 +330,29 @@ void main() {
         m.stop();
       });
     });
+
+    test('a chart hears of every reconnect (not the first connect) and re-asks for its bars', () {
+      fakeAsync((async) {
+        final channels = <FakeChannel>[];
+        final m = MarketStream(wsUrl: 'wss://api/v1/stream', allSymbols: ['EURUSD'], connector: (u) => (channels..add(FakeChannel(u))).last)..start();
+        async.flushMicrotasks();
+        var resyncs = 0;
+        final off = m.onReconnect(() => resyncs++);
+        m.subscribeBars('EURUSD', 'M1', (_) {});
+        expect(resyncs, 0);
+        channels.last.drop();
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 1));
+        expect(channels, hasLength(2));
+        expect(channels.last.frames.any((f) => f['op'] == 'bars' && f['symbol'] == 'EURUSD' && f['tf'] == 'M1'), isTrue);
+        expect(resyncs, 1);
+        off();
+        channels.last.drop();
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 1));
+        expect(resyncs, 1);
+        m.stop();
+      });
+    });
   });
 }

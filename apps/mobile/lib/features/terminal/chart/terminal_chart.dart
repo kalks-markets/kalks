@@ -54,8 +54,15 @@ abstract class ChartSource {
   /// History oldest first, UTC seconds; `to` = inclusive end (older pages).
   Future<List<Candle>> history(String tf, {int? to});
 
+  /// The newest `count` bars (oldest first, the forming one last): a look at the bars that just closed.
+  Future<List<Candle>> recent(String tf, int count) => history(tf);
+
   /// The forming bar; returns the unsubscribe (null: no live bars).
   void Function()? bars(String tf, void Function(Candle bar) onBar) => null;
+
+  /// Called after the live bars reconnected (bar updates sent while they were down were lost); returns the
+  /// unsubscribe (null: never).
+  void Function()? resyncs(void Function() onResync) => null;
 
   /// Bid / ask lines; returns the unsubscribe (null: none).
   void Function()? quotes(void Function(double bid, double ask) onQuote) => null;
@@ -79,7 +86,13 @@ class MarketChartSource extends ChartSource {
   Future<List<Candle>> history(String tf, {int? to}) => feed.candles(symbol, tf, limit: to == null ? 1000 : 1500, to: to);
 
   @override
+  Future<List<Candle>> recent(String tf, int count) => feed.candles(symbol, tf, limit: count);
+
+  @override
   void Function()? bars(String tf, void Function(Candle bar) onBar) => feed.subscribeBars(symbol, tf, (Bar b) => onBar(Candle(b.t, b.o, b.h, b.l, b.c, b.v)));
+
+  @override
+  void Function()? resyncs(void Function() onResync) => feed.onReconnect(onResync);
 
   @override
   void Function()? quotes(void Function(double bid, double ask) onQuote) => feed.subscribe([symbol], (q) => onQuote(q.bid, q.ask));
@@ -141,6 +154,10 @@ class TerminalChart extends ConsumerStatefulWidget {
   /// Widget tests and the web preview draw the native chart (no WebView there).
   static bool forceNative = false;
 
+  /// How long after a bar closed the chart takes its stored values (the server replaces a closed bar with the
+  /// provider's final OHLC 4 s after it closes): what is drawn then matches the history a reload shows.
+  static Duration settleDelay = const Duration(seconds: 8);
+
   @override
   ConsumerState<TerminalChart> createState() => _TerminalChartState();
 }
@@ -157,6 +174,9 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
   /// A dropped line kept at its drop price until the app's action finished: (id, price).
   (String, double)? _held;
   Timer? _holdTimer;
+
+  /// The look at the bar that just closed ([TerminalChart.settleDelay]).
+  Timer? _settle;
 
   /// A stop made from a position line's S / T handle (lineForHandle): not among the given lines until the position
   /// carries it, so it is added to what the chart shows while it is held.
@@ -240,6 +260,7 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
     }
     _unsubs.clear();
     _holdTimer?.cancel();
+    _settle?.cancel();
     _c.dispose();
     super.dispose();
   }
@@ -250,6 +271,7 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
     final gen = ++_gen;
     // a fresh chart (another market, a reloaded page) has no drag in progress
     _c.holdLines = false;
+    _settle?.cancel();
     for (final u in _unsubs) {
       u();
     }
@@ -322,13 +344,16 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
   }
 
   /// The forming bar from the stream: every update goes to the chart (coalesced to one call per frame by the
-  /// surface) and into the session cache.
+  /// surface) and into the session cache. When a bar closes, its stored values are taken a few seconds later; after
+  /// the stream reconnected, the bars it missed.
   void _liveBars(ChartSource src, String tf, String key, int gen) {
     final b = src.bars(tf, (bar) {
       if (gen != _gen || _data.isEmpty) return;
       if (bar.t < _data.last.t) return;
       if (bar.t > _data.last.t) {
         _data.add(bar);
+        _settle?.cancel();
+        _settle = Timer(TerminalChart.settleDelay, () => unawaited(_refresh(src, tf, key, gen, count: 3)));
       } else {
         _data[_data.length - 1] = bar;
       }
@@ -336,6 +361,28 @@ class _TerminalChartState extends ConsumerState<TerminalChart> {
       _c.send(ChartCmd.bar(_bar(bar)));
     });
     if (b != null) _unsubs.add(b);
+    final r = src.resyncs(() {
+      if (gen == _gen) unawaited(_refresh(src, tf, key, gen));
+    });
+    if (r != null) _unsubs.add(r);
+  }
+
+  /// Brings what is drawn up to date with the server: the latest page after a reconnect (the bars missed while the
+  /// stream was down, a stale last bar), the newest `count` bars after a bar closed (its final values).
+  Future<void> _refresh(ChartSource src, String tf, String key, int gen, {int? count}) async {
+    final List<Candle> fresh;
+    try {
+      fresh = count == null ? await src.history(tf) : await src.recent(tf, count);
+    } catch (_) {
+      return;
+    }
+    if (!mounted || gen != _gen) return;
+    final next = refreshBars(_data, fresh, page: count == null);
+    if (next == null) return;
+    _data = next.bars;
+    _cache.put(key, _data);
+    final tail = next.tail;
+    _c.send(tail != null ? ChartCmd.tail(tail.map(_bar).toList()) : ChartCmd.redraw(_data.map(_bar).toList()));
   }
 
   void _onEvent(ChartEvent e) {

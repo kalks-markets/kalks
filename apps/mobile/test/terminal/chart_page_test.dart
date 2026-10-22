@@ -58,7 +58,9 @@ Map<int, List<double>> draw(String node, List<Object> steps) {
     final r = Process.runSync(node, ['test/terminal/chart_page_harness.mjs', f.path]);
     if (r.exitCode != 0) fail('chart page: ${r.stderr}');
     final m = (jsonDecode('${r.stdout}') as Map).cast<String, dynamic>();
-    return {for (final e in m.entries) int.parse(e.key): [for (final x in e.value as List) (x as num).toDouble()]};
+    return {
+      for (final e in m.entries) int.parse(e.key): [for (final x in e.value as List) (x as num).toDouble()],
+    };
   } finally {
     dir.deleteSync(recursive: true);
   }
@@ -67,7 +69,7 @@ Map<int, List<double>> draw(String node, List<Object> steps) {
 void main() {
   final node = _node();
   final skip = node == null ? 'Node is not installed' : null;
-  final init = ChartCmd.init(digits: 2, intraday: true, palette: _palette, tf: 'M1', step: 60);
+  final init = ChartCmd.init(digits: 2, intraday: true, palette: _palette, tf: 'M1');
   final history = [for (var t = 0; t < 600; t += 60) b(t, 10, 10.5, 9.5, 10.2)];
 
   group('the chart page', () {
@@ -98,6 +100,21 @@ void main() {
       ]);
       expect(drawn[540], [10, 10.6, 9.4, 9.45]);
       expect(drawn[600], [9.5, 9.5, 9.5, 9.5]);
+    }, skip: skip);
+
+    test('corrected history (a closed bar\'s stored values, bars missed while offline) replaces what is drawn', () {
+      final drawn = draw(node!, [
+        init,
+        ChartCmd.bars(history),
+        ChartCmd.quote(10.2, 10.3),
+        ChartCmd.bar(b(600, 10.2, 10.2, 10.2, 10.2)),
+        3,
+        ChartCmd.redraw([...history.take(9), b(540, 10, 10.7, 9.5, 10.25), b(600, 10.2, 10.3, 10.1, 10.3), b(660, 10.3, 10.3, 10.3, 10.3)]),
+        30,
+      ]);
+      expect(drawn.keys, [for (var t = 0; t <= 660; t += 60) t]);
+      expect(drawn[540], [10, 10.7, 9.5, 10.25]);
+      expect(drawn[660], [10.3, 10.3, 10.3, 10.3]);
     }, skip: skip);
   });
 }

@@ -300,6 +300,9 @@ class MarketFeed {
   void want(String owner, Iterable<String> symbols) => _stream.want(owner, symbols);
 
   void Function() subscribeBars(String symbol, String tf, BarListener fn) => _stream.subscribeBars(symbol, tf, fn);
+
+  /// After every reconnect of the stream (bars sent meanwhile were missed). Returns the unsubscribe.
+  void Function() onReconnect(void Function() fn) => _stream.onReconnect(fn);
   void Function() subscribeDepth(String symbol, DepthListener fn) => _stream.subscribeDepth(symbol, fn);
 
   /// Candle history (oldest first), `to` = unix seconds inclusive. Empty when unavailable.
