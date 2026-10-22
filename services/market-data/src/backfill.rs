@@ -397,20 +397,24 @@ fn aggregate(src: &[Bar], dst: Tf, src_oldest: DateTime<Utc>) -> Vec<Bar> {
     map.into_values().collect()
 }
 
-/// H4 & D1 from H1, then W1 & MN from D1 — for bars at or after `from` (None = everything).
+/// H4 & D1 from H1, then W1 & MN from D1 — for bars at or after `from` (None = everything). Only buckets that start
+/// inside the loaded window are rebuilt: one that started before it would be built from part of its bars.
 async fn aggregate_higher(mk: &Market, inst: &Instrument, from: Option<DateTime<Utc>>) -> anyhow::Result<()> {
     let Some(h1_oldest) = db::oldest_bar(&mk.pool, &inst.symbol, Tf::H1.minutes()).await? else { return Ok(()) };
     let start = from.map(|f| Tf::W1.bucket(f)).unwrap_or(h1_oldest).max(h1_oldest);
-    let h1 = db::load_bars(&mk.pool, &inst.symbol, Tf::H1.minutes(), None, Some(start - Duration::days(35)), 1_000_000).await?;
+    let h1_from = start - Duration::days(35);
+    let h1 = db::load_bars(&mk.pool, &inst.symbol, Tf::H1.minutes(), None, Some(h1_from), 1_000_000).await?;
     for dst in [Tf::H4, Tf::D1] {
-        let bars = aggregate(&h1, dst, h1_oldest);
+        let bars = aggregate(&h1, dst, h1_oldest.max(h1_from));
         store(mk, inst, dst, &bars, Source::Aggregated).await?;
         seed_current(mk, inst, dst, &bars);
     }
     let Some(d1_oldest) = db::oldest_bar(&mk.pool, &inst.symbol, Tf::D1.minutes()).await? else { return Ok(()) };
-    let d1 = db::load_bars(&mk.pool, &inst.symbol, Tf::D1.minutes(), None, Some(Tf::MN.bucket(start) - Duration::days(1)), 1_000_000).await?;
+    // from the week that holds the first day of the month: every W1 and MN bucket in the window is whole
+    let d1_from = Tf::W1.bucket(Tf::MN.bucket(start));
+    let d1 = db::load_bars(&mk.pool, &inst.symbol, Tf::D1.minutes(), None, Some(d1_from), 1_000_000).await?;
     for dst in [Tf::W1, Tf::MN] {
-        let bars = aggregate(&d1, dst, d1_oldest);
+        let bars = aggregate(&d1, dst, d1_oldest.max(d1_from));
         store(mk, inst, dst, &bars, Source::Aggregated).await?;
         seed_current(mk, inst, dst, &bars);
     }
@@ -520,6 +524,62 @@ async fn reconcile_higher(mk: &Market, inst: &Instrument, end: DateTime<Utc>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// W1 and MN are rebuilt from the D1 bars after an H1 page (deep history, a gap healed): the D1 window loaded for
+    /// that starts inside an earlier week and month, and those buckets must not be rebuilt from the few days of them
+    /// in the window (that overwrote last month's bar with its last day). Against PostgreSQL :5433.
+    #[tokio::test]
+    async fn rebuilding_higher_timeframes_leaves_buckets_before_the_window_alone() {
+        use std::str::FromStr;
+        let base = std::env::var("MARKET_DATA_TEST_DATABASE_URL").unwrap_or_else(|_| "postgres://postgres@127.0.0.1:5433/postgres".into());
+        let name = format!("kalks_md_agg_{}", std::process::id());
+        let server = sqlx::postgres::PgConnectOptions::from_str(&base).unwrap();
+        let url = sqlx::ConnectOptions::to_url_lossy(&server.clone().database(&name)).to_string();
+        let pool = db::connect(&url).await.expect("PostgreSQL :5433 must be running for this test");
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../config");
+        let cat = crate::instruments::Catalogue::load(&format!("{root}/instruments.json"), &format!("{root}/holidays")).unwrap();
+        let mk = Market::new(cat, pool.clone(), crate::spreads::Spreads::default(), false, crate::demand::Demand::new(Vec::<String>::new(), Default::default()));
+        let inst = mk.cat.get("BTCUSD").unwrap().clone();
+        let day = |m: u32, d: u32| Tf::D1.bucket(Utc.with_ymd_and_hms(2026, m, d, 12, 0, 0).unwrap());
+        // provider daily bars, 1 Aug - 20 Oct (server days), every one different
+        let mut d1 = Vec::new();
+        let mut d = day(8, 1);
+        let mut i = 0.0;
+        while d <= day(10, 20) {
+            d1.push(Bar { t: d, o: 100.0 + i, h: 110.0 + i, l: 90.0 - i, c: 101.0 + i, v: 1.0 });
+            d = Tf::D1.bucket(d + Duration::hours(36));
+            i += 1.0;
+        }
+        store(&mk, &inst, Tf::D1, &d1, Source::Provider).await.unwrap();
+        let oldest = d1[0].t;
+        for dst in [Tf::W1, Tf::MN] {
+            store(&mk, &inst, dst, &aggregate(&d1, dst, oldest), Source::Aggregated).await.unwrap();
+        }
+        let before_mn = db::load_bars(&pool, "BTCUSD", Tf::MN.minutes(), None, None, 10).await.unwrap();
+        let before_w1 = db::load_bars(&pool, "BTCUSD", Tf::W1.minutes(), None, None, 50).await.unwrap();
+        // our H1 coverage: 12-14 Oct, consistent with those days
+        let mut h1 = Vec::new();
+        for b in d1.iter().filter(|b| b.t >= day(10, 12) && b.t <= day(10, 14)) {
+            for h in 0..24 {
+                let (o, c) = if h == 0 { (b.o, b.c) } else { (b.c, b.c) };
+                let (hi, lo) = if h == 5 { (b.h, b.c) } else if h == 9 { (b.c, b.l) } else { (o.max(c), o.min(c)) };
+                h1.push(Bar { t: b.t + Duration::hours(h), o, h: hi, l: lo, c, v: 1.0 / 24.0 });
+            }
+        }
+        store(&mk, &inst, Tf::H1, &h1, Source::Reconciled).await.unwrap();
+        // an H1 page that starts on 13 Oct (deep history, or a gap healed)
+        aggregate_higher(&mk, &inst, Some(day(10, 13))).await.unwrap();
+
+        let after_mn = db::load_bars(&pool, "BTCUSD", Tf::MN.minutes(), None, None, 10).await.unwrap();
+        let after_w1 = db::load_bars(&pool, "BTCUSD", Tf::W1.minutes(), None, None, 50).await.unwrap();
+        let key = |v: &[Bar]| v.iter().map(|b| (b.t, b.o, b.h, b.l, b.c)).collect::<Vec<_>>();
+        assert_eq!(key(&after_mn), key(&before_mn), "August, September and October keep their whole months");
+        assert_eq!(key(&after_w1), key(&before_w1), "every week keeps its whole range");
+
+        pool.close().await;
+        let mut admin = sqlx::ConnectOptions::connect(&server.database("postgres")).await.unwrap();
+        let _ = sqlx::query(sqlx::AssertSqlSafe(format!("DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE)"))).execute(&mut admin).await;
+    }
 
     #[test]
     fn the_waited_for_timeframe_comes_first() {
