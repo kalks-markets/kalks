@@ -219,22 +219,21 @@ impl Node {
     }
 }
 
+/// Effective order of node `n` for tenant `$1`: the tenant's own order (content_order) wins over the row's.
+const ORD: &str = "COALESCE((SELECT o.ord FROM content_order o WHERE o.tenant = $1 AND o.kind = n.kind AND o.slug = n.slug), n.ord) AS ord";
+
 /// Tenant-resolved nodes: tenant override in `lang` > default in `lang` > tenant override in English > default
 /// in English. `with_body` = false strips chapter bodies (catalogue / tree queries).
 pub async fn nodes(pool: &PgPool, tenant: &str, lang: &str, kinds: &[&str], with_body: bool) -> anyhow::Result<Vec<Node>> {
     let kinds: Vec<String> = kinds.iter().map(|s| s.to_string()).collect();
-    let sql = if with_body {
-        "SELECT DISTINCT ON (kind, slug) tenant, lang, kind, slug, parent, ord, published, data, updated_at, updated_by,
+    let data = if with_body { "data" } else { "data - 'body' AS data" };
+    let sql = format!(
+        "SELECT DISTINCT ON (kind, slug) tenant, lang, kind, slug, parent, {ORD}, published, {data}, updated_at, updated_by,
                 EXISTS (SELECT 1 FROM content_nodes d WHERE d.tenant = '*' AND d.kind = n.kind AND d.slug = n.slug) AS has_default
          FROM content_nodes n WHERE tenant IN ($1, '*') AND lang IN ($2, 'en') AND kind = ANY($3)
          ORDER BY kind, slug, (lang <> $2), (tenant = '*')"
-    } else {
-        "SELECT DISTINCT ON (kind, slug) tenant, lang, kind, slug, parent, ord, published, data - 'body' AS data, updated_at, updated_by,
-                EXISTS (SELECT 1 FROM content_nodes d WHERE d.tenant = '*' AND d.kind = n.kind AND d.slug = n.slug) AS has_default
-         FROM content_nodes n WHERE tenant IN ($1, '*') AND lang IN ($2, 'en') AND kind = ANY($3)
-         ORDER BY kind, slug, (lang <> $2), (tenant = '*')"
-    };
-    let rows = sqlx::query(sql).bind(tenant).bind(lang).bind(&kinds).fetch_all(pool).await?;
+    );
+    let rows = sqlx::query(sqlx::AssertSqlSafe(sql)).bind(tenant).bind(lang).bind(&kinds).fetch_all(pool).await?;
     Ok(rows.into_iter().map(row_node).collect())
 }
 
@@ -255,12 +254,12 @@ fn row_node(r: sqlx::postgres::PgRow) -> Node {
 }
 
 pub async fn node(pool: &PgPool, tenant: &str, lang: &str, kind: &str, slug: &str) -> anyhow::Result<Option<Node>> {
-    let r = sqlx::query(
-        "SELECT tenant, lang, kind, slug, parent, ord, published, data, updated_at, updated_by,
+    let r = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "SELECT tenant, lang, kind, slug, parent, {ORD}, published, data, updated_at, updated_by,
                 EXISTS (SELECT 1 FROM content_nodes d WHERE d.tenant = '*' AND d.kind = n.kind AND d.slug = n.slug) AS has_default
          FROM content_nodes n WHERE tenant IN ($1, '*') AND lang IN ($2, 'en') AND kind = $3 AND slug = $4
          ORDER BY (lang <> $2), (tenant = '*') LIMIT 1",
-    )
+    )))
     .bind(tenant)
     .bind(lang)
     .bind(kind)
@@ -356,6 +355,25 @@ pub async fn put_override(pool: &PgPool, tenant: &str, lang: &str, kind: &str, s
     .bind(staff)
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+const SET_ORDER: &str = "INSERT INTO content_order (tenant, kind, slug, ord, updated_by) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (tenant, kind, slug) DO UPDATE SET ord = EXCLUDED.ord, updated_by = EXCLUDED.updated_by, updated_at = now()";
+
+/// Sets a tenant's order of nodes (`slugs[i]` gets order i + 1) without touching their content.
+pub async fn put_order(pool: &PgPool, tenant: &str, kind: &str, slugs: &[String], staff: &str) -> anyhow::Result<()> {
+    let mut tx = pool.begin().await?;
+    for (i, slug) in slugs.iter().enumerate() {
+        sqlx::query(SET_ORDER).bind(tenant).bind(kind).bind(slug).bind(i as i32 + 1).bind(staff).execute(&mut *tx).await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Sets one node's order for a tenant.
+pub async fn set_order(pool: &PgPool, tenant: &str, kind: &str, slug: &str, ord: i32, staff: &str) -> anyhow::Result<()> {
+    sqlx::query(SET_ORDER).bind(tenant).bind(kind).bind(slug).bind(ord).bind(staff).execute(pool).await?;
     Ok(())
 }
 

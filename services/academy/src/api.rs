@@ -28,7 +28,8 @@
 //! Options" with a single `options` section) can be studied, examined and certified at any time.
 //!
 //! Back Office (admin BFF checks `content.read` / `content.write` and adds `X-Kalks-Staff`). Writes are
-//! copy-on-write overrides for the staff member's tenant; `DELETE` resets a node to the platform default:
+//! copy-on-write overrides for the staff member's tenant; `DELETE` resets a node to the platform default. The order
+//! (`reorder`) is kept per tenant apart from the content, so moving a node doesn't override it:
 //!
 //! `GET /v1/admin/tree` · `GET|PUT|DELETE /v1/admin/nodes/{kind}/{slug}` · `POST /v1/admin/chapters` ·
 //! `POST /v1/admin/reorder` · `GET /v1/admin/stats` · `GET /v1/admin/audit` · `GET /v1/admin/glossary`
@@ -942,8 +943,10 @@ async fn admin_put(State(st): State<AppState>, h: HeaderMap, Path((kind, slug)):
     if !errors.is_empty() {
         return Err(ApiError(StatusCode::UNPROCESSABLE_ENTITY, "validation", errors[0].clone(), Some(json!(errors))));
     }
-    let ord = b.order.unwrap_or(cur.ord);
-    store::put_override(&st.pool, &t, &lang, &kind, &slug, &parent, ord, published, &data, &who).await?;
+    store::put_override(&st.pool, &t, &lang, &kind, &slug, &parent, cur.ord, published, &data, &who).await?;
+    if let Some(ord) = b.order.filter(|o| *o != cur.ord) {
+        store::set_order(&st.pool, &t, &kind, &slug, ord, &who).await?;
+    }
     let action = if cur.published != published { if published { "publish" } else { "unpublish" } } else { "edit" };
     store::audit(&st.pool, &t, &who, action, &kind, &slug, &lang, json!({"title": data.get("title").or_else(|| data.get("term"))})).await;
     let n = store::node(&st.pool, &t, &lang, &kind, &slug).await?.ok_or_else(|| ApiError::not_found("Item"))?;
@@ -1045,13 +1048,8 @@ async fn admin_reorder(State(st): State<AppState>, h: HeaderMap, Json(b): Json<R
     if b.slugs.iter().any(|s| !siblings.contains_key(s.as_str())) {
         return Err(ApiError::bad("Every item must belong to the same parent."));
     }
-    for (i, s) in b.slugs.iter().enumerate() {
-        let n = siblings[s.as_str()];
-        let ord = i as i32 + 1;
-        if n.ord != ord {
-            store::put_override(&st.pool, &t, &lang, &n.kind, &n.slug, &n.parent, ord, n.published, &n.data, &who).await?;
-        }
-    }
+    // the order lives apart from the content: moving a chapter doesn't make it an "Edited" override
+    store::put_order(&st.pool, &t, &b.kind, &b.slugs, &who).await?;
     store::audit(&st.pool, &t, &who, "reorder", &b.kind, &b.parent, &lang, json!({"slugs": b.slugs})).await;
     Ok(Json(json!({"ok": true})))
 }

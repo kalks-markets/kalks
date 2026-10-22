@@ -69,10 +69,11 @@ fn fixture(root: &Path) {
     std::fs::write(root.join("en/glossary.yaml"), format!("terms:\n{}", terms.join(""))).unwrap();
 }
 
-async fn test_db() -> Option<String> {
+/// A throw-away database per test (`tag`) and process, so the tests can run in parallel.
+async fn test_db(tag: &str) -> Option<String> {
     let server = std::env::var("ACADEMY_TEST_DATABASE_URL").unwrap_or_else(|_| "postgres://postgres@127.0.0.1:5433/postgres".into());
     let opts = PgConnectOptions::from_str(&server).ok()?;
-    let db = format!("kalks_academy_test_{}", std::process::id());
+    let db = format!("kalks_academy_test_{tag}_{}", std::process::id());
     let mut conn = match opts.clone().database("postgres").connect().await {
         Ok(c) => c,
         Err(e) => {
@@ -186,7 +187,7 @@ async fn real_content_passes_lint() {
 
 #[tokio::test]
 async fn academy_end_to_end() {
-    let Some(url) = test_db().await else { return };
+    let Some(url) = test_db("e2e").await else { return };
     let dir = tempfile::tempdir().unwrap();
     fixture(dir.path());
     let pool = store::connect(&url).await.unwrap();
@@ -396,6 +397,58 @@ async fn academy_end_to_end() {
     let (_, ch, _) = c.call("GET", "/v1/chapters/p1-f-c2", &[("x-kalks-tenant", "other"), ("x-kalks-user-id", "42")], None).await;
     assert_eq!(ch["chapter"]["title"], "Chapter two v2");
 
+    pool.close().await;
+    drop_db(&url).await;
+}
+
+/// Seeds the fixture into a fresh database and returns the pool, the content dir (kept alive) and a client.
+async fn setup(tag: &str) -> Option<(String, sqlx::PgPool, tempfile::TempDir, Client)> {
+    let url = test_db(tag).await?;
+    let dir = tempfile::tempdir().unwrap();
+    fixture(dir.path());
+    let pool = store::connect(&url).await.unwrap();
+    store::seed_all(&pool, dir.path()).await.unwrap();
+    let cfg = Config {
+        bind: String::new(),
+        database_url: url.clone(),
+        internal_token: "test-token".into(),
+        content_dir: dir.path().display().to_string(),
+        verify_base_url: "https://my.example.com".into(),
+        dev_mode: true,
+        json_logs: false,
+        gateway_database_url: String::new(),
+    };
+    let c = Client { app: router(AppState { pool: pool.clone(), cfg: Arc::new(cfg), gateway: None }) };
+    Some((url, pool, dir, c))
+}
+
+fn tree_chapters(tree: &Value, phase: usize, section: usize) -> Vec<Value> {
+    tree["phases"][phase]["sections"][section]["chapters"].as_array().unwrap().clone()
+}
+
+/// Reordering is a structure change, not a content edit: the chapters keep tracking the platform version (no
+/// "Edited" override rows that would freeze their content), and the new order holds for learners.
+#[tokio::test]
+async fn reorder_does_not_override_content() {
+    let Some((url, pool, dir, c)) = setup("reorder").await else { return };
+    let order: Vec<String> = (1..=6).rev().map(|i| format!("p1-t-c{i}")).collect();
+    let (s, r, _) = c.call("POST", "/v1/admin/reorder", S, Some(json!({"lang": "en", "kind": "chapter", "parent": "p1-technical", "slugs": order}))).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let (_, tree, _) = c.call("GET", "/v1/admin/tree", S, None).await;
+    let chs = tree_chapters(&tree, 0, 1);
+    assert_eq!(chs.iter().map(|c| c["slug"].as_str().unwrap().to_string()).collect::<Vec<_>>(), order);
+    assert!(chs.iter().all(|c| c["source"] == "default"), "reordered chapters must not become overrides: {chs:?}");
+    let (_, ch, _) = c.call("GET", "/v1/chapters/p1-t-c6", U, None).await;
+    assert_eq!((ch["section"]["index"].clone(), ch["prev"]["slug"].clone()), (json!(1), json!("p1-f-c6")));
+    // a platform content update still reaches the tenant after the reorder
+    std::fs::write(dir.path().join("en/phase-1/technical/01-c.md"), chapter("p1-t-c1", 1, 1).replace("Chapter p1-t-c1", "Chapter one v2")).unwrap();
+    store::seed_all(&pool, dir.path()).await.unwrap();
+    let (_, ch, _) = c.call("GET", "/v1/chapters/p1-t-c1", U, None).await;
+    assert_eq!((ch["chapter"]["title"].clone(), ch["section"]["index"].clone()), (json!("Chapter one v2"), json!(6)));
+    // another tenant keeps the platform order
+    let other: &[(&str, &str)] = &[("x-kalks-tenant", "other"), ("x-kalks-user-id", "42")];
+    let (_, ch, _) = c.call("GET", "/v1/chapters/p1-t-c1", other, None).await;
+    assert_eq!(ch["section"]["index"], 1);
     pool.close().await;
     drop_db(&url).await;
 }
