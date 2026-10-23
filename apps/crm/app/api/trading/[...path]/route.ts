@@ -15,7 +15,9 @@ import { dealCommission, dealPremiumsUsd, isOptionTrade, matchesInstrument, opti
 //
 //   GET  groups                              open-account groups and their specs
 //   GET  accounts                            the client's accounts (live metrics)
-//   POST accounts                            {type, group, leverage?, name?, password?, initialBalance?}
+//   POST accounts                            {type, group, leverage?, name?, password?, initialBalance?} -> {account,
+//                                            credentials: {login}}: no password is needed to open (Kalks signs the client
+//                                            in); the engine generates any not supplied and they never leave the server
 //   GET  accounts/{login}                    {account, positions[], orders[]}
 //   GET  accounts/{login}/history?from&to&page&limit[&instrument=option|cfd]
 //                                            instrument: only Kalks FX Options deals (or only CFD deals); the BFF pages
@@ -213,10 +215,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     }
     const r = await engine<{ account?: unknown; credentials?: Obj }>("/v1/accounts", { user, req, body: open });
     if (r.status !== 200) return reply(r.status, r.data);
-    // Generated passwords are returned exactly once, here; they are not stored anywhere by the Client Area.
-    const creds = { ...(r.data.credentials ?? {}) };
-    if (open.password && !creds.password) creds.password = open.password;
-    return reply(200, { account: clientAccount(r.data.account), credentials: creds });
+    // The engine's generated passwords stay here: the client trades through Kalks (SSO) and sets a trading or investor
+    // password of their own later, under the account's settings (accounts/{login}/passwords, with the emailed code).
+    return reply(200, { account: clientAccount(r.data.account), credentials: { login: r.data.credentials?.login } });
   }
 
   if (path.length === 1 && path[0] === "prefs") {
