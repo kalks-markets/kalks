@@ -20,6 +20,44 @@ void resetPreviewWallet() {
   previewWalletCalls.clear();
   previewWalletReads.clear();
   _s = _WalletState();
+  previewNowPayments = false;
+}
+
+/// Crypto deposits through NOWPayments offered (off by default, like a broker that never switched them on).
+bool previewNowPayments = false;
+
+/// The sample NOWPayments coins (`wallet/nowpayments/config`).
+const List<Map<String, Object?>> _npCoins = [
+  {
+    'code': 'usdttrc20',
+    'ticker': 'USDT',
+    'name': 'USDT',
+    'network': 'TRON (TRC20)',
+    'icon': 'usdt',
+    'chain_icon': 'trx',
+    'needs_extra_id': false,
+    'min_usd': '10',
+  },
+  {'code': 'btc', 'ticker': 'BTC', 'name': 'Bitcoin', 'network': 'Bitcoin', 'icon': 'btc', 'chain_icon': null, 'needs_extra_id': false, 'min_usd': '25.01'},
+  {'code': 'xrp', 'ticker': 'XRP', 'name': 'XRP', 'network': 'XRP Ledger', 'icon': 'xrp', 'chain_icon': null, 'needs_extra_id': true, 'min_usd': '10'},
+];
+
+/// A crypto payment: waiting for 2 polls, confirming for 2, then credited.
+Map<String, Object?> _npPoll(Map<String, Object?> p) {
+  final polls = (p['_polls'] as int? ?? 0) + 1;
+  p['_polls'] = polls;
+  final status = polls <= 2 ? 'waiting' : (polls <= 4 ? 'confirming' : 'credited');
+  if (status != 'waiting') p['actually_paid'] = p['pay_amount'];
+  if (status == 'credited' && p['status'] != 'credited') {
+    p['credit_amount'] = p['price_amount'];
+    p['credited_at'] = _iso(DateTime.now());
+    _s.available += _d(p['price_amount']);
+  }
+  p['status'] = status;
+  return {
+    for (final e in p.entries)
+      if (!e.key.startsWith('_')) e.key: e.value,
+  };
 }
 
 _WalletState _s = _WalletState();
@@ -140,6 +178,9 @@ class _Intent {
 }
 
 class _WalletState {
+  /// NOWPayments crypto payments by id (polled: waiting -> confirming -> credited).
+  final Map<int, Map<String, Object?>> npPayments = {};
+
   _WalletState() {
     final now = DateTime.now();
     // a deposit being confirmed (the overview's "In progress"), resumable at /wallet/deposit?intent=…
@@ -454,6 +495,15 @@ Map<String, dynamic> _page(List<Map<String, dynamic>> all, Map<String, String> q
         return (200, _page(list, query));
       case 'ledger':
         return (200, {'items': <Object>[], 'page': 1, 'limit': 50, 'total': 0});
+      case 'nowpayments/config':
+        if (!previewNowPayments) return (200, {'enabled': false, 'coins': <Object>[]});
+        return (200, {'enabled': true, 'sandbox': false, 'min_deposit_usd': '10', 'max_deposit_usd': '50000', 'fee_paid_by_user': true, 'coins': _npCoins});
+    }
+    final np = RegExp(r'^nowpayments/payments/(\d{1,18})$').firstMatch(route);
+    if (np != null) {
+      final p = _s.npPayments[int.parse(np.group(1)!)];
+      if (p == null) return (404, _err('not_found', 'Payment not found'));
+      return (200, {'payment': _npPoll(p)});
     }
     final intent = RegExp(r'^deposits/intents/(dep_[0-9a-f]{24})$').firstMatch(route);
     if (intent != null) {
@@ -466,6 +516,48 @@ Map<String, dynamic> _page(List<Map<String, dynamic>> all, Map<String, String> q
 
   // writes
   switch (route) {
+    case 'nowpayments/payments':
+      if (!previewNowPayments) return (422, _err('nowpayments_disabled', 'Crypto deposits are not available at the moment'));
+      final amount = '${body['amount'] ?? ''}'.trim();
+      if (!RegExp(r'^\d{1,12}(\.\d{1,2})?$').hasMatch(amount) || _d(amount) <= 0) {
+        return (422, _err('validation', 'Enter an amount in USD with up to 2 decimals.', 'amount'));
+      }
+      final coin = _npCoins.where((c) => c['code'] == body['pay_currency']).firstOrNull;
+      if (coin == null) return (422, _err('validation', 'Choose one of the listed coins', 'pay_currency'));
+      if (_d(amount) < _d(coin['min_usd'])) return (422, _err('below_minimum', 'The minimum for this coin is ${coin['min_usd']} USD'));
+      final id = _s.nextId++;
+      final p = <String, Object?>{
+        'id': id,
+        'order_id': 'np_${_hex(id, 24)}',
+        'status': 'waiting',
+        'np_status': 'waiting',
+        'price_amount': amount,
+        'price_currency': 'USD',
+        'pay_currency': coin['code'],
+        'coin': coin,
+        'pay_amount': (_d(amount) * (coin['code'] == 'btc' ? 0.0000152 : 1.005)).toStringAsFixed(coin['code'] == 'btc' ? 8 : 6),
+        'pay_address': coin['code'] == 'xrp'
+            ? 'rLNaPoKeeBjZe2qs6x52yVPZpZ8td4dc6w'
+            : (coin['code'] == 'btc' ? 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh' : _tronAddress),
+        'payin_extra_id': coin['needs_extra_id'] == true ? '771234' : null,
+        'expires_at': _iso(DateTime.now().add(const Duration(minutes: 20))),
+        'actually_paid': null,
+        'credit_amount': null,
+        'credited_at': null,
+        'sandbox': false,
+        'created_at': _iso(DateTime.now()),
+        '_polls': 0,
+      };
+      _s.npPayments[id] = p;
+      return (
+        200,
+        {
+          'payment': {
+            for (final e in p.entries)
+              if (!e.key.startsWith('_')) e.key: e.value,
+          },
+        },
+      );
     case 'notifications/read':
       for (final n in _s.notices) {
         n['read'] = true;

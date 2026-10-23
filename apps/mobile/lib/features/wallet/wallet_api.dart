@@ -232,6 +232,147 @@ class IntentView {
       IntentView(intent: DepositIntent.fromJson(_map(j['intent'])), deposit: j['deposit'] is Map ? Deposit.fromJson(_map(j['deposit'])) : null);
 }
 
+/* ------------------------------------------------------------------ crypto deposits (NOWPayments) */
+
+/// A coin clients can pay with (`GET wallet/nowpayments/config` coins, a payment's `coin`).
+class NpCoin {
+  const NpCoin({
+    required this.code,
+    required this.ticker,
+    required this.name,
+    required this.network,
+    required this.icon,
+    required this.chainIcon,
+    required this.needsExtraId,
+    required this.minUsd,
+  });
+
+  /// NOWPayments' ticker (usdttrc20, btc, …)
+  final String code;
+  final String ticker, name, network, icon;
+  final String? chainIcon;
+  final bool needsExtraId;
+  final String minUsd;
+
+  /// "USDT · TRON (TRC20)", or the ticker alone.
+  String get label => network.isEmpty ? ticker : '$ticker · $network';
+
+  static NpCoin fromJson(Map<String, dynamic> j) => NpCoin(
+    code: '${j['code'] ?? ''}',
+    ticker: '${j['ticker'] ?? (j['code'] ?? '').toString().toUpperCase()}',
+    name: '${j['name'] ?? ''}',
+    network: '${j['network'] ?? ''}',
+    icon: '${j['icon'] ?? ''}',
+    chainIcon: _s(j['chain_icon']),
+    needsExtraId: j['needs_extra_id'] == true,
+    minUsd: '${j['min_usd'] ?? '0'}',
+  );
+}
+
+/// `GET wallet/nowpayments/config`: off, or the coins and the USD limits.
+class NpConfig {
+  const NpConfig({required this.enabled, required this.sandbox, required this.minUsd, required this.maxUsd, required this.feePaidByUser, required this.coins});
+  final bool enabled, sandbox, feePaidByUser;
+  final String minUsd, maxUsd;
+  final List<NpCoin> coins;
+
+  /// Whether the deposit page offers the crypto method.
+  bool get offered => enabled && coins.isNotEmpty;
+
+  NpCoin? coin(String code) => coins.where((c) => c.code == code).firstOrNull;
+
+  static NpConfig fromJson(Map<String, dynamic> j) => NpConfig(
+    enabled: j['enabled'] == true,
+    sandbox: j['sandbox'] == true,
+    minUsd: '${j['min_deposit_usd'] ?? '0'}',
+    maxUsd: '${j['max_deposit_usd'] ?? '0'}',
+    feePaidByUser: j['fee_paid_by_user'] == true,
+    coins: [for (final c in _list(j['coins'])) NpCoin.fromJson(c)],
+  );
+}
+
+/// A crypto payment (`POST wallet/nowpayments/payments` / `GET wallet/nowpayments/payments/{id}` -> {payment}).
+class NpPayment {
+  const NpPayment({
+    required this.id,
+    required this.status,
+    required this.priceAmount,
+    required this.coin,
+    required this.payAmount,
+    required this.payAddress,
+    required this.payinExtraId,
+    required this.actuallyPaid,
+    required this.expiresAt,
+    required this.creditAmount,
+    required this.sandbox,
+  });
+
+  final int id;
+
+  /// creating | waiting | confirming | credited | review | expired | failed | refunded | rejected
+  final String status;
+  final String priceAmount;
+  final NpCoin coin;
+  final String? payAmount, payAddress, payinExtraId, actuallyPaid, creditAmount;
+  final DateTime? expiresAt;
+  final bool sandbox;
+
+  /// Still waiting for money or for confirmations (the page keeps polling and shows no "new deposit").
+  bool get open => status == 'waiting' || status == 'creating' || status == 'confirming';
+
+  static NpPayment fromJson(Map<String, dynamic> j) => NpPayment(
+    id: _int(j['id']),
+    status: '${j['status'] ?? 'waiting'}',
+    priceAmount: '${j['price_amount'] ?? '0'}',
+    coin: NpCoin.fromJson(_map(j['coin'])),
+    payAmount: _s(j['pay_amount']),
+    payAddress: _s(j['pay_address']),
+    payinExtraId: _s(j['payin_extra_id']),
+    actuallyPaid: _s(j['actually_paid']),
+    expiresAt: _dateOrNull(j['expires_at']),
+    creditAmount: _s(j['credit_amount']),
+    sandbox: j['sandbox'] == true,
+  );
+}
+
+/// A NOWPayments coin code as people read it ("usdttrc20" -> "USDT TRC20", "bnbbsc" -> "BNB"; web npCoinName).
+String npCoinName(String? code) {
+  final c = (code ?? '').toLowerCase();
+  const nets = {'trc20': 'TRC20', 'bsc': 'BEP20', 'erc20': 'ERC20', 'sol': 'SOL', 'matic': 'Polygon', 'ton': 'TON'};
+  for (final base in const ['usdt', 'usdc']) {
+    if (c.startsWith(base) && c.length > base.length) {
+      final net = c.substring(base.length);
+      return '${base.toUpperCase()} ${nets[net] ?? net.toUpperCase()}';
+    }
+  }
+  if (c == 'bnbbsc' || c == 'bnbmainnet') return 'BNB';
+  return c.toUpperCase();
+}
+
+/// A USD deposit amount (2 decimals) within the coin's minimum and the broker's maximum.
+bool npAmountOk(String amount, String? minUsd, String? maxUsd) {
+  final a = amount.trim();
+  final n = double.tryParse(a) ?? 0;
+  final max = _num(maxUsd);
+  return _amount2.hasMatch(a) && n > 0 && n >= _num(minUsd) && (max <= 0 || n <= max);
+}
+
+/// The payment status chips (web NP_STATUS).
+const Map<String, WalletStatus> kNpStatus = {
+  'creating': (tone: KChipTone.warn, label: 'wallet.nowpayments.status.waiting'),
+  'waiting': (tone: KChipTone.warn, label: 'wallet.nowpayments.status.waiting'),
+  'confirming': (tone: KChipTone.info, label: 'wallet.nowpayments.status.confirming'),
+  'credited': (tone: KChipTone.up, label: 'wallet.nowpayments.status.credited'),
+  'review': (tone: KChipTone.warn, label: 'wallet.nowpayments.status.review'),
+  'expired': (tone: KChipTone.neutral, label: 'wallet.nowpayments.status.expired'),
+  'failed': (tone: KChipTone.down, label: 'wallet.nowpayments.status.failed'),
+  'refunded': (tone: KChipTone.neutral, label: 'wallet.nowpayments.status.refunded'),
+  'rejected': (tone: KChipTone.down, label: 'wallet.nowpayments.status.rejected'),
+};
+
+/// The logos in assets/coins (other coins get a letter disc).
+const Set<String> kCoinIcons = {'ada', 'avax', 'bnb', 'btc', 'doge', 'dot', 'eth', 'link', 'ltc', 'matic', 'sol', 'trx', 'usdt', 'xrp'};
+
 /* ------------------------------------------------------------------ withdrawals, transfers */
 
 /// A withdrawal: requested → approved / rejected → paid → completed (cancelled while requested).
@@ -509,6 +650,17 @@ final depositIntentProvider = FutureProvider.autoDispose.family<IntentView, Stri
   return IntentView.fromJson(await ref.watch(apiProvider).get<Map<String, dynamic>>('wallet/deposits/intents/$id'));
 });
 
+/// `useWallet("nowpayments/config")`: crypto deposits through NOWPayments (off unless the broker switched them on).
+final npConfigProvider = FutureProvider.autoDispose<NpConfig>((ref) async {
+  return NpConfig.fromJson(await ref.watch(apiProvider).get<Map<String, dynamic>>('wallet/nowpayments/config'));
+});
+
+/// `useWallet("nowpayments/payments/<id>", 5000)`: the crypto payment, polled every 5 s while it is shown.
+final npPaymentProvider = FutureProvider.autoDispose.family<NpPayment, int>((ref, id) async {
+  ref.pollEvery(const Duration(seconds: 5));
+  return NpPayment.fromJson(_map((await ref.watch(apiProvider).get<Map<String, dynamic>>('wallet/nowpayments/payments/$id'))['payment']));
+});
+
 /// `useWallet("withdrawals?limit=20", 15000)`.
 final withdrawalsProvider = FutureProvider.autoDispose<WalletPage<Withdrawal>>((ref) async {
   ref.pollEvery(const Duration(seconds: 15));
@@ -702,6 +854,7 @@ WalletStatus? activityStatus(ActivityItem a) => switch (a.type) {
 String activityTitle(ActivityItem a, T t) {
   switch (a.type) {
     case 'deposit':
+      if (a.kind == 'nowpayments') return t('wallet.nowpayments.activityLine', {'coin': npCoinName(a.note)});
       return t('wallet.depositLine', {'network': a.chain == null ? '' : chainLabel(a.chain).short}).trim();
     case 'withdrawal':
       return t('wallet.withdrawalLine', {'network': a.chain == null ? '' : chainLabel(a.chain).short}).trim();
@@ -719,6 +872,8 @@ String activitySub(ActivityItem a, T t) {
     return t('wallet.activity.confirmations', {'done': min(a.confirmations ?? 0, req), 'required': req});
   }
   if (a.type == 'withdrawal' && a.address != null && a.address!.isNotEmpty) return t('wallet.activity.to', {'address': shortHash(a.address!)});
+  // a NOWPayments deposit's note is its coin, already in the title
+  if (a.kind == 'nowpayments') return '';
   return a.note ?? '';
 }
 

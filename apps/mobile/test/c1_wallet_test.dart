@@ -40,6 +40,7 @@ Map<String, Object?> _en() => {
   'wallet.error.generic': 'Something went wrong.',
   'wallet.error.insufficientFunds': 'Not enough available balance.',
   'common.networkError': 'Network error. Check your connection and try again.',
+  'wallet.nowpayments.activityLine': 'Crypto deposit · {coin}',
 };
 
 final T _t = T('en', null, _en());
@@ -254,6 +255,37 @@ void main() {
       expect(_a({'type': 'deposit', 'status': 'rejected'}).dim, isTrue);
     });
 
+    test('crypto deposits (NOWPayments): coin names, activity rows, amounts, models', () {
+      expect(npCoinName('usdttrc20'), 'USDT TRC20');
+      expect(npCoinName('usdtbsc'), 'USDT BEP20');
+      expect(npCoinName('USDTERC20'), 'USDT ERC20');
+      expect(npCoinName('bnbbsc'), 'BNB');
+      expect(npCoinName('btc'), 'BTC');
+      expect(npCoinName(null), '');
+      final row = _a({'type': 'deposit', 'kind': 'nowpayments', 'status': 'credited', 'note': 'usdtbsc', 'chain': null});
+      expect(activityTitle(row, _t), 'Crypto deposit · USDT BEP20');
+      expect(activitySub(row, _t), '');
+      expect(activityStatus(row)!.label, 'wallet.status.deposit.credited');
+      expect(npAmountOk('100', '10', '50000'), isTrue);
+      expect(npAmountOk('9.99', '10', '50000'), isFalse);
+      expect(npAmountOk('50001', '10', '50000'), isFalse);
+      expect(npAmountOk('10.123', '10', '50000'), isFalse);
+      expect(kNpStatus['confirming'], (tone: KChipTone.info, label: 'wallet.nowpayments.status.confirming'));
+      final p = NpPayment.fromJson({
+        'id': 7,
+        'status': 'waiting',
+        'price_amount': '100',
+        'coin': {'code': 'xrp', 'ticker': 'XRP', 'name': 'XRP', 'network': 'XRP Ledger', 'icon': 'xrp', 'chain_icon': null, 'needs_extra_id': true},
+        'pay_amount': '100.5',
+        'pay_address': 'rLNaPoKeeBjZe2qs6x52yVPZpZ8td4dc6w',
+        'payin_extra_id': '771234',
+        'expires_at': '2026-10-23T10:20:00Z',
+      });
+      expect((p.id, p.open, p.coin.label, p.payinExtraId, p.coin.needsExtraId), (7, true, 'XRP · XRP Ledger', '771234', true));
+      final off = NpConfig.fromJson({'enabled': false, 'coins': <Object>[]});
+      expect(off.offered, isFalse);
+    });
+
     test('KYC notice per status', () {
       expect(kycNoticeTitle(KycStatus.verified), isNull);
       expect(kycNoticeTitle(KycStatus.pending), 'wallet.kyc.inReview');
@@ -458,6 +490,61 @@ void main() {
       expect(find.text('20 / 20 confirmations', findRichText: true), findsOneWidget);
       // polls only read: nothing was sent again
       expect(previewWalletCalls.length, writes);
+      await unmount(tester);
+    });
+
+    testWidgets('deposit: no crypto method until the broker offers NOWPayments', (tester) async {
+      await _open(tester, '/wallet/deposit');
+      expect(find.text('New deposit'), findsOneWidget);
+      expect(find.text('Crypto (NOWPayments)'), findsNothing);
+      await unmount(tester);
+    });
+
+    testWidgets('crypto deposit (NOWPayments): amount + coin -> exact amount, address, memo -> confirming -> credited', (tester) async {
+      previewNowPayments = true;
+      await _open(tester, '/wallet/deposit');
+      expect(find.text('USDT direct'), findsOneWidget);
+      await _tap(tester, find.text('Crypto (NOWPayments)'));
+      expect(find.text('Deposit with crypto'), findsWidgets);
+      await tester.enterText(find.byType(TextField).first, '5');
+      await tester.pump();
+      // under the 10 USD minimum
+      expect(tester.widget<KButton>(_button(LucideIcons.wallet)).onPressed, isNull);
+      await tester.enterText(find.byType(TextField).first, '100');
+      await tester.pump();
+      await _tap(tester, find.text('XRP'));
+      await _tap(tester, _button(LucideIcons.wallet));
+      expect(_writes('wallet/nowpayments/payments').single.body, {'amount': '100', 'pay_currency': 'xrp'});
+      await settle(tester);
+      expect(find.text('Send 100.500000 XRP'), findsOneWidget);
+      expect(find.text('rLNaPoKeeBjZe2qs6x52yVPZpZ8td4dc6w'), findsOneWidget);
+      // the memo / tag the coin needs, with its warning
+      expect(find.text('771234'), findsOneWidget);
+      expect(find.textContaining('You must include this memo'), findsOneWidget);
+      expect(find.byType(KQrCode), findsOneWidget);
+      int reads() => previewWalletReads.where((r) => r.startsWith('wallet/nowpayments/payments/')).length;
+      Future<void> nextPoll() async {
+        final n = reads();
+        var waited = 0;
+        while (reads() == n && waited < 100) {
+          await tester.pump(const Duration(milliseconds: 100));
+          await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 2)));
+          waited++;
+        }
+        for (var i = 0; i < 6; i++) {
+          await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+          await tester.pump();
+        }
+      }
+
+      await nextPoll();
+      await nextPoll();
+      expect(find.text('Payment found, confirming'), findsOneWidget);
+      expect(find.text('Received 100.500000 XRP'), findsOneWidget);
+      await nextPoll();
+      await nextPoll();
+      expect(find.text('Deposit credited'), findsOneWidget);
+      expect(find.text('100.00 USDT was added to your wallet.'), findsOneWidget);
       await unmount(tester);
     });
 
