@@ -27,8 +27,9 @@ const PUBLIC_PAGES = ["/certificate", "/verify", "/s", "/staff-session", "/downl
 // sign-up (email or Google) attributes the partner and campaign. Signed-out visitors land on /register.
 const REF_SEEN = "kalks_ref_seen";
 
-/** Pages and APIs that stay reachable in maintenance mode and without a session. */
-const ALWAYS_OPEN = ["/status", "/maintenance", "/unavailable", "/api/status", "/unsubscribe", "/api/unsubscribe"];
+/** Pages and APIs that stay reachable in maintenance mode and without a session. The NOWPayments IPN is called by
+ *  NOWPayments itself (signature checked by the wallet service, lib/nowpayments-ipn.ts). */
+const ALWAYS_OPEN = ["/status", "/maintenance", "/unavailable", "/api/status", "/unsubscribe", "/api/unsubscribe", "/api/payments/nowpayments/ipn"];
 
 // Broker runtime config (gateway tenant config): maintenance mode holds clients on /maintenance (their API
 // calls answer 503); a module the Platform Owner switched off (D112) is hidden from the nav and its pages and

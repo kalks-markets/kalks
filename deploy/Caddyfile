@@ -49,6 +49,12 @@ app.kalkstrade.com {
 	request_body @kycUpload {
 		max_size 12MB
 	}
+	# NOWPayments IPN (public, no session): a small JSON body. The Client Area route forwards it byte for byte to the
+	# wallet, which checks the HMAC-SHA512 signature (x-nowpayments-sig); the route also rate-limits per IP.
+	@nowpaymentsIpn path /api/payments/nowpayments/ipn
+	request_body @nowpaymentsIpn {
+		max_size 64KB
+	}
 	reverse_proxy 127.0.0.1:3000
 }
 

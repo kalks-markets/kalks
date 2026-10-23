@@ -94,7 +94,10 @@ done
 # wallet secrets (never printed): internal token generated once, database kalks_wallet next to the gateway's.
 # Receiving addresses are seeded from WALLET_BSC_ADDRESS / WALLET_TRON_ADDRESS on the first start only; after
 # that they are an audited Back Office setting. TRONGRID_API_KEY comes from .env.tron when present.
+# WALLET_SECRETS_KEY (AES-256-GCM) encrypts the NOWPayments API key / IPN secret the owner pastes in the Back Office;
+# generated once, back it up with the database (the stored keys can't be read without it: paste them again then).
 grep -q '^WALLET_INTERNAL_TOKEN=' .env.local || printf 'WALLET_INTERNAL_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env.local
+grep -q '^WALLET_SECRETS_KEY=' .env.local || printf 'WALLET_SECRETS_KEY=%s\n' "$(openssl rand -hex 32)" >> .env.local
 if ! grep -q '^WALLET_DATABASE_URL=' .env.local && grep -q '^GATEWAY_DATABASE_URL=' .env.local; then
   printf 'WALLET_DATABASE_URL=%s\n' "$(grep '^GATEWAY_DATABASE_URL=' .env.local | cut -d= -f2- | sed -E 's#/[^/?]+([?].*)?$#/kalks_wallet\1#')" >> .env.local
 fi
