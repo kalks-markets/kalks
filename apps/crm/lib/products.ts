@@ -31,7 +31,13 @@ export function offeredGroups<G extends WizardGroup>(groups: readonly G[], kind:
   return groups.filter((g) => g.enabled && !systemGroup(g.code) && (g.accountTypes === "both" || g.accountTypes === kind) && productOf(g) === product);
 }
 
-type CountedAccount = HasProduct & { type: string; group: string; status: string };
+/** The account type the wizard preselects among the offered ones: the broker's Standard type ("standard",
+ *  "options-standard") when offered, else the first. */
+export function defaultGroup<G extends { code: string }>(offered: readonly G[]): G | undefined {
+  return offered.find((g) => /(^|-)standard$/i.test(g.code)) ?? offered[0];
+}
+
+type CountedAccount =HasProduct & { type: string; group: string; status: string };
 
 /** The client's accounts of `kind` that count against the account limit of a `product` group: the engine counts per
  *  (live / demo, product), never archived or closed accounts nor platform-managed ones. */

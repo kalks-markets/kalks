@@ -562,5 +562,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "Hakuna aina za akaunti zilizo wazi kwa bidhaa hii kwa sasa.",
   "wizard.introFirst": "Hatua moja fupi kabla ya akaunti yako ya kwanza ya Options: utangulizi wa dakika 1.",
   "wizard.agreeLiveOptions": "Ninaelewa kwamba options zina hatari kubwa: option iliyonunuliwa inaweza kuisha bila thamani, na option iliyouzwa inaweza kupoteza zaidi ya malipo yaliyopokelewa.",
+  "wizard.subtitleQuick": "Inachukua chini ya dakika moja. Hakuna nenosiri linalohitajika: unafanya biashara moja kwa moja kutoka Kalks.",
+  "wizard.typeLabel": "Aina ya akaunti",
+  "wizard.moreOptions": "Chaguo zaidi",
+  "wizard.moreOptionsHint": "Si lazima. Mipangilio chaguomsingi inawafaa wafanyabiashara wengi.",
+  "wizard.review.noPassword": "Hakuna nenosiri linalohitajika: unaweza kufanya biashara kutoka Kalks mara moja. Weka nenosiri la biashara au la mwekezaji wakati wowote kwenye mipangilio ya akaunti.",
+  "summary.afterOpening": "Baada ya kufunguliwa, ni leverage pekee inayoweza kubadilishwa.",
+  "created.liveTextReady": "Inaanza na salio sifuri. Iwekee pesa kutoka kwenye pochi yako ya Kalks na uanze biashara kwenye Kalks Trader.",
+  "created.tradeNow": "Fanya biashara sasa",
+  "created.accountNumber": "Nambari ya akaunti",
+  "created.passwordsTitle": "Manenosiri si lazima",
+  "created.passwordsText": "Huhitaji nenosiri kufanya biashara kwenye Kalks. Weka nenosiri la biashara ili kuingia kutoka programu nyingine ya biashara (aina ya MT), au nenosiri la mwekezaji ili kushiriki ufikiaji wa kutazama tu. Unaweza kufanya hivi wakati wowote kwenye mipangilio ya akaunti.",
 };
 export default accounts;

@@ -562,5 +562,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "현재 이 상품으로 개설할 수 있는 계좌 유형이 없습니다.",
   "wizard.introFirst": "첫 옵션 계좌 전에 1분 옵션 소개를 확인해 주세요.",
   "wizard.agreeLiveOptions": "옵션은 위험이 높다는 것을 이해합니다. 매수한 옵션은 가치 없이 만기될 수 있고, 매도한 옵션은 받은 프리미엄보다 큰 손실이 날 수 있습니다.",
+  "wizard.subtitleQuick": "1분도 걸리지 않습니다. 비밀번호가 필요 없습니다: Kalks에서 바로 거래하세요.",
+  "wizard.typeLabel": "계좌 유형",
+  "wizard.moreOptions": "추가 옵션",
+  "wizard.moreOptionsHint": "선택 사항입니다. 기본값은 대부분의 트레이더에게 적합합니다.",
+  "wizard.review.noPassword": "비밀번호가 필요 없습니다: Kalks에서 바로 거래할 수 있습니다. 거래 비밀번호나 투자자 비밀번호는 언제든 계좌 설정에서 설정하세요.",
+  "summary.afterOpening": "개설 후에는 레버리지만 변경할 수 있습니다.",
+  "created.liveTextReady": "잔액 0으로 시작합니다. Kalks 지갑에서 입금하고 Kalks Trader에서 거래를 시작하세요.",
+  "created.tradeNow": "지금 거래",
+  "created.accountNumber": "계좌 번호",
+  "created.passwordsTitle": "비밀번호는 선택 사항입니다",
+  "created.passwordsText": "Kalks에서 거래할 때는 비밀번호가 필요 없습니다. 다른 거래 앱(MT 방식)에서 로그인하려면 거래 비밀번호를, 조회 전용 접근을 공유하려면 투자자 비밀번호를 설정하세요. 계좌 설정에서 언제든 할 수 있습니다.",
 };
 export default accounts;

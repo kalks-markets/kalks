@@ -570,5 +570,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "Für dieses Produkt sind derzeit keine Kontotypen verfügbar.",
   "wizard.introFirst": "Ein kurzer Schritt vor Ihrem ersten Optionskonto: die 1-minütige Einführung in Optionen.",
   "wizard.agreeLiveOptions": "Mir ist bewusst, dass Optionen ein hohes Risiko bergen: Eine gekaufte Option kann wertlos verfallen, und eine verkaufte Option kann mehr als die erhaltene Prämie verlieren.",
+  "wizard.subtitleQuick": "Dauert weniger als eine Minute. Kein Passwort nötig: Sie handeln direkt über Kalks.",
+  "wizard.typeLabel": "Kontotyp",
+  "wizard.moreOptions": "Weitere Optionen",
+  "wizard.moreOptionsHint": "Optional. Die Standardwerte passen für die meisten Trader.",
+  "wizard.review.noPassword": "Kein Passwort nötig: Sie können sofort über Kalks handeln. Ein Handels- oder Investorpasswort legen Sie jederzeit in den Kontoeinstellungen fest.",
+  "summary.afterOpening": "Nach der Eröffnung lässt sich nur noch der Hebel ändern.",
+  "created.liveTextReady": "Es startet mit einem Saldo von null. Laden Sie es aus Ihrem Kalks-Wallet auf und handeln Sie in Kalks Trader.",
+  "created.tradeNow": "Jetzt handeln",
+  "created.accountNumber": "Kontonummer",
+  "created.passwordsTitle": "Passwörter sind optional",
+  "created.passwordsText": "Zum Handeln auf Kalks brauchen Sie kein Passwort. Legen Sie ein Handelspasswort fest, um sich in einer anderen Trading-App (MT-ähnlich) anzumelden, oder ein Investorpasswort, um reinen Lesezugriff zu teilen. Das geht jederzeit in den Kontoeinstellungen.",
 };
 export default accounts;

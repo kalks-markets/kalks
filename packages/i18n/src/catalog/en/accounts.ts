@@ -597,5 +597,18 @@ const accounts = {
   "ledgerKind.option_premium": "Option premium",
   "ledgerKind.option_settlement": "Option settlement",
   "ledgerKind.option_rebate": "Maker rebate",
+
+  // Quick open: no password at opening (credentials are optional, set later under the account's settings)
+  "wizard.subtitleQuick": "Takes under a minute. No password needed: you trade straight from Kalks.",
+  "wizard.typeLabel": "Account type",
+  "wizard.moreOptions": "More options",
+  "wizard.moreOptionsHint": "Optional. The defaults suit most traders.",
+  "wizard.review.noPassword": "No password needed: you can trade from Kalks straight away. Set a trading or investor password anytime in the account's settings.",
+  "summary.afterOpening": "After opening, only the leverage can be changed.",
+  "created.liveTextReady": "It starts at a zero balance. Fund it from your Kalks wallet and start trading in Kalks Trader.",
+  "created.tradeNow": "Trade now",
+  "created.accountNumber": "Account number",
+  "created.passwordsTitle": "Passwords are optional",
+  "created.passwordsText": "You don't need a password to trade on Kalks. Set a trading password to log in from another trading app (MT-style), or an investor password to share view-only access. You can do this anytime in the account's settings.",
 };
 export default accounts;

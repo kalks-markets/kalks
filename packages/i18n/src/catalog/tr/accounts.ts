@@ -565,5 +565,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "Şu anda bu ürün için açık bir hesap türü yok.",
   "wizard.introFirst": "İlk opsiyon hesabınızdan önce kısa bir adım: 1 dakikalık opsiyon tanıtımı.",
   "wizard.agreeLiveOptions": "Opsiyonların yüksek risk taşıdığını anlıyorum: alınan bir opsiyon değersiz sona erebilir, satılan bir opsiyon ise alınan primden fazla kaybettirebilir.",
+  "wizard.subtitleQuick": "Bir dakikadan kısa sürer. Şifre gerekmez: doğrudan Kalks üzerinden işlem yaparsınız.",
+  "wizard.typeLabel": "Hesap türü",
+  "wizard.moreOptions": "Daha fazla seçenek",
+  "wizard.moreOptionsHint": "İsteğe bağlı. Varsayılanlar çoğu yatırımcıya uygundur.",
+  "wizard.review.noPassword": "Şifre gerekmez: hemen Kalks üzerinden işlem yapabilirsiniz. İşlem veya yatırımcı şifresini istediğiniz zaman hesap ayarlarından belirleyin.",
+  "summary.afterOpening": "Açıldıktan sonra yalnızca kaldıraç değiştirilebilir.",
+  "created.liveTextReady": "Sıfır bakiyeyle başlar. Kalks cüzdanınızdan fonlayın ve Kalks Trader'da işleme başlayın.",
+  "created.tradeNow": "Şimdi işlem yap",
+  "created.accountNumber": "Hesap numarası",
+  "created.passwordsTitle": "Şifreler isteğe bağlıdır",
+  "created.passwordsText": "Kalks'ta işlem yapmak için şifreye ihtiyacınız yok. Başka bir işlem uygulamasından (MT tarzı) giriş yapmak için işlem şifresi, salt görüntüleme erişimi paylaşmak için yatırımcı şifresi belirleyin. Bunu istediğiniz zaman hesap ayarlarından yapabilirsiniz.",
 };
 export default accounts;

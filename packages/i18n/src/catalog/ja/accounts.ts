@@ -562,5 +562,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "現在、この商品で開設できる口座タイプはありません。",
   "wizard.introFirst": "初めてのオプション口座の前に、1分でわかるオプション入門をご覧ください。",
   "wizard.agreeLiveOptions": "オプションには高いリスクがあることを理解しています。買ったオプションは無価値で満期を迎えることがあり、売ったオプションは受け取ったプレミアムを超える損失が出ることがあります。",
+  "wizard.subtitleQuick": "1分もかかりません。パスワードは不要です。Kalksから直接取引できます。",
+  "wizard.typeLabel": "口座タイプ",
+  "wizard.moreOptions": "その他のオプション",
+  "wizard.moreOptionsHint": "任意です。ほとんどのトレーダーにはデフォルト設定で十分です。",
+  "wizard.review.noPassword": "パスワードは不要です。すぐにKalksから取引できます。取引パスワードや投資家パスワードは、口座設定でいつでも設定できます。",
+  "summary.afterOpening": "開設後に変更できるのはレバレッジのみです。",
+  "created.liveTextReady": "残高ゼロから開始します。Kalksウォレットから入金して、Kalks Traderで取引を始めましょう。",
+  "created.tradeNow": "今すぐ取引",
+  "created.accountNumber": "口座番号",
+  "created.passwordsTitle": "パスワードは任意です",
+  "created.passwordsText": "Kalksでの取引にパスワードは必要ありません。他の取引アプリ（MT系）からログインするには取引パスワードを、閲覧専用のアクセスを共有するには投資家パスワードを設定してください。口座設定でいつでも設定できます。",
 };
 export default accounts;

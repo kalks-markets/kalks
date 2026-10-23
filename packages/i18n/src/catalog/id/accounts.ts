@@ -565,5 +565,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "Saat ini belum ada jenis akun yang dibuka untuk produk ini.",
   "wizard.introFirst": "Satu langkah singkat sebelum akun opsi pertama Anda: pengenalan opsi 1 menit.",
   "wizard.agreeLiveOptions": "Saya memahami bahwa opsi berisiko tinggi: opsi yang dibeli bisa kedaluwarsa tanpa nilai, dan opsi yang dijual bisa merugi lebih dari premi yang diterima.",
+  "wizard.subtitleQuick": "Kurang dari satu menit. Tanpa kata sandi: Anda trading langsung dari Kalks.",
+  "wizard.typeLabel": "Jenis akun",
+  "wizard.moreOptions": "Opsi lainnya",
+  "wizard.moreOptionsHint": "Opsional. Pengaturan default cocok untuk sebagian besar trader.",
+  "wizard.review.noPassword": "Tanpa kata sandi: Anda bisa langsung trading dari Kalks. Atur kata sandi trading atau investor kapan saja di pengaturan akun.",
+  "summary.afterOpening": "Setelah dibuka, hanya leverage yang bisa diubah.",
+  "created.liveTextReady": "Dimulai dengan saldo nol. Danai dari dompet Kalks Anda dan mulai trading di Kalks Trader.",
+  "created.tradeNow": "Trading sekarang",
+  "created.accountNumber": "Nomor akun",
+  "created.passwordsTitle": "Kata sandi bersifat opsional",
+  "created.passwordsText": "Anda tidak perlu kata sandi untuk trading di Kalks. Atur kata sandi trading untuk masuk dari aplikasi trading lain (gaya MT), atau kata sandi investor untuk berbagi akses hanya-lihat. Anda bisa melakukannya kapan saja di pengaturan akun.",
 };
 export default accounts;

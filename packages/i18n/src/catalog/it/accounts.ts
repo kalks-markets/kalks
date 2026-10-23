@@ -563,5 +563,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "Al momento non ci sono tipi di conto disponibili per questo prodotto.",
   "wizard.introFirst": "Un breve passo prima del tuo primo conto opzioni: l'introduzione di 1 minuto alle opzioni.",
   "wizard.agreeLiveOptions": "Capisco che le opzioni comportano un rischio elevato: un'opzione acquistata può scadere senza valore e un'opzione venduta può perdere più del premio incassato.",
+  "wizard.subtitleQuick": "Richiede meno di un minuto. Nessuna password necessaria: fai trading direttamente da Kalks.",
+  "wizard.typeLabel": "Tipo di conto",
+  "wizard.moreOptions": "Altre opzioni",
+  "wizard.moreOptionsHint": "Facoltativo. Le impostazioni predefinite vanno bene per la maggior parte dei trader.",
+  "wizard.review.noPassword": "Nessuna password necessaria: puoi fare trading da Kalks subito. Imposta una password di trading o investitore quando vuoi nelle impostazioni del conto.",
+  "summary.afterOpening": "Dopo l'apertura si può cambiare solo la leva.",
+  "created.liveTextReady": "Parte con saldo zero. Finanzialo dal tuo wallet Kalks e inizia a fare trading in Kalks Trader.",
+  "created.tradeNow": "Fai trading ora",
+  "created.accountNumber": "Numero di conto",
+  "created.passwordsTitle": "Le password sono facoltative",
+  "created.passwordsText": "Non ti serve una password per fare trading su Kalks. Imposta una password di trading per accedere da un'altra app di trading (stile MT), o una password investitore per condividere un accesso in sola lettura. Puoi farlo quando vuoi nelle impostazioni del conto.",
 };
 export default accounts;

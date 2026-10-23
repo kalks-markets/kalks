@@ -562,5 +562,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "该产品目前暂无可开立的账户类型。",
   "wizard.introFirst": "开立首个期权账户前的一小步：1 分钟期权入门。",
   "wizard.agreeLiveOptions": "我了解期权风险很高：买入的期权可能到期时毫无价值，卖出的期权亏损可能超过收到的权利金。",
+  "wizard.subtitleQuick": "不到一分钟即可完成。无需密码：您直接在 Kalks 上交易。",
+  "wizard.typeLabel": "账户类型",
+  "wizard.moreOptions": "更多选项",
+  "wizard.moreOptionsHint": "可选。默认设置适合大多数交易者。",
+  "wizard.review.noPassword": "无需密码：您可以立即在 Kalks 上交易。随时可在账户设置中设置交易密码或投资者密码。",
+  "summary.afterOpening": "开户后只能更改杠杆。",
+  "created.liveTextReady": "账户初始余额为零。请从您的 Kalks 钱包入金，然后在 Kalks Trader 中开始交易。",
+  "created.tradeNow": "立即交易",
+  "created.accountNumber": "账号",
+  "created.passwordsTitle": "密码为可选项",
+  "created.passwordsText": "在 Kalks 上交易无需密码。设置交易密码可从其他交易应用（MT 类）登录，设置投资者密码可分享只读访问权限。您可以随时在账户设置中完成。",
 };
 export default accounts;

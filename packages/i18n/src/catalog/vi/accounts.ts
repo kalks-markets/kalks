@@ -562,5 +562,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "Hiện chưa có loại tài khoản nào được mở cho sản phẩm này.",
   "wizard.introFirst": "Một bước nhanh trước tài khoản quyền chọn đầu tiên: phần giới thiệu quyền chọn 1 phút.",
   "wizard.agreeLiveOptions": "Tôi hiểu rằng quyền chọn có rủi ro cao: quyền chọn đã mua có thể đáo hạn không còn giá trị, và quyền chọn đã bán có thể lỗ nhiều hơn phí quyền chọn nhận được.",
+  "wizard.subtitleQuick": "Chưa đến một phút. Không cần mật khẩu: bạn giao dịch ngay trên Kalks.",
+  "wizard.typeLabel": "Loại tài khoản",
+  "wizard.moreOptions": "Tùy chọn khác",
+  "wizard.moreOptionsHint": "Không bắt buộc. Thiết lập mặc định phù hợp với hầu hết nhà giao dịch.",
+  "wizard.review.noPassword": "Không cần mật khẩu: bạn có thể giao dịch trên Kalks ngay. Đặt mật khẩu giao dịch hoặc mật khẩu nhà đầu tư bất cứ lúc nào trong cài đặt tài khoản.",
+  "summary.afterOpening": "Sau khi mở, chỉ có thể thay đổi đòn bẩy.",
+  "created.liveTextReady": "Tài khoản bắt đầu với số dư bằng 0. Nạp tiền từ ví Kalks của bạn và bắt đầu giao dịch trên Kalks Trader.",
+  "created.tradeNow": "Giao dịch ngay",
+  "created.accountNumber": "Số tài khoản",
+  "created.passwordsTitle": "Mật khẩu là tùy chọn",
+  "created.passwordsText": "Bạn không cần mật khẩu để giao dịch trên Kalks. Đặt mật khẩu giao dịch để đăng nhập từ ứng dụng giao dịch khác (kiểu MT), hoặc mật khẩu nhà đầu tư để chia sẻ quyền chỉ xem. Bạn có thể làm việc này bất cứ lúc nào trong cài đặt tài khoản.",
 };
 export default accounts;

@@ -564,5 +564,16 @@ const accounts: NsMessages<"accounts"> = {
   "wizard.noGroups": "Tiada jenis akaun dibuka untuk produk ini buat masa ini.",
   "wizard.introFirst": "Satu langkah ringkas sebelum akaun opsyen pertama anda: pengenalan opsyen 1 minit.",
   "wizard.agreeLiveOptions": "Saya faham bahawa opsyen berisiko tinggi: opsyen yang dibeli boleh tamat tanpa nilai, dan opsyen yang dijual boleh rugi lebih daripada premium yang diterima.",
+  "wizard.subtitleQuick": "Kurang daripada seminit. Tiada kata laluan diperlukan: anda berdagang terus dari Kalks.",
+  "wizard.typeLabel": "Jenis akaun",
+  "wizard.moreOptions": "Lagi pilihan",
+  "wizard.moreOptionsHint": "Pilihan. Tetapan lalai sesuai untuk kebanyakan pedagang.",
+  "wizard.review.noPassword": "Tiada kata laluan diperlukan: anda boleh terus berdagang dari Kalks. Tetapkan kata laluan dagangan atau pelabur bila-bila masa dalam tetapan akaun.",
+  "summary.afterOpening": "Selepas dibuka, hanya leveraj boleh diubah.",
+  "created.liveTextReady": "Ia bermula dengan baki sifar. Biayainya dari dompet Kalks anda dan mula berdagang dalam Kalks Trader.",
+  "created.tradeNow": "Berdagang sekarang",
+  "created.accountNumber": "Nombor akaun",
+  "created.passwordsTitle": "Kata laluan adalah pilihan",
+  "created.passwordsText": "Anda tidak memerlukan kata laluan untuk berdagang di Kalks. Tetapkan kata laluan dagangan untuk log masuk dari aplikasi dagangan lain (gaya MT), atau kata laluan pelabur untuk berkongsi akses lihat sahaja. Anda boleh melakukannya bila-bila masa dalam tetapan akaun.",
 };
 export default accounts;

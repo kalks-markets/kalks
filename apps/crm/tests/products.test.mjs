@@ -4,7 +4,7 @@
 // product (CFD first), and an older engine without `product` reads as CFD everywhere.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { byProduct, offeredGroups, optionsModuleOn, parseProduct, productOf, productOrder, usedFor } from "../lib/products.ts";
+import { byProduct, defaultGroup, offeredGroups, optionsModuleOn, parseProduct, productOf, productOrder, usedFor } from "../lib/products.ts";
 
 const g = (code, product, accountTypes = "both", enabled = true) => ({ code, product, accountTypes, enabled });
 const GROUPS = [
@@ -65,4 +65,13 @@ test("links and the Options module switch", () => {
   assert.equal(optionsModuleOn({}), true, "a key the gateway doesn't send = on");
   assert.equal(optionsModuleOn({ options: true }), true);
   assert.equal(optionsModuleOn({ options: false }), false);
+});
+
+test("the wizard preselects the Standard type, else the first offered", () => {
+  assert.equal(defaultGroup(offeredGroups(GROUPS, "live", "cfd"))?.code, "standard");
+  assert.equal(defaultGroup(offeredGroups(GROUPS, "live", "options"))?.code, "options-standard");
+  assert.equal(defaultGroup([g("pro", "cfd"), g("ecn", "cfd"), g("standard", "cfd")])?.code, "standard", "not only when listed first");
+  assert.equal(defaultGroup([g("pro", "cfd"), g("ecn", "cfd")])?.code, "pro");
+  assert.equal(defaultGroup([g("standard-plus", "cfd"), g("ecn", "cfd")])?.code, "standard-plus", "no exact match: the first");
+  assert.equal(defaultGroup([]), undefined);
 });
