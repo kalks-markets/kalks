@@ -152,10 +152,20 @@ export function WalletUnavailable({ onRetry, message }: { onRetry: () => void; m
   );
 }
 
+/** A NOWPayments coin code as people read it ("usdttrc20" → "USDT TRC20", "bnbbsc" → "BNB"). */
+export function npCoinName(code: string | null | undefined): string {
+  const c = (code ?? "").toLowerCase();
+  const nets: Record<string, string> = { trc20: "TRC20", bsc: "BEP20", erc20: "ERC20", sol: "SOL", matic: "Polygon", ton: "TON" };
+  for (const base of ["usdt", "usdc"]) if (c.startsWith(base) && c.length > base.length) return `${base.toUpperCase()} ${nets[c.slice(base.length)] ?? c.slice(base.length).toUpperCase()}`;
+  if (c === "bnbbsc" || c === "bnbmainnet") return "BNB";
+  return c.toUpperCase();
+}
+
 export function activityTitle(a: ActivityItem, t: T): string {
   const kind = KIND_LABEL[a.kind ?? ""];
   switch (a.type) {
     case "deposit":
+      if (a.kind === "nowpayments") return t("wallet.nowpayments.activityLine", { coin: npCoinName(a.note) });
       return t("wallet.depositLine", { network: a.chain ? CHAIN_LABEL[a.chain].short : "" }).trim();
     case "withdrawal":
       return t("wallet.withdrawalLine", { network: a.chain ? CHAIN_LABEL[a.chain].short : "" }).trim();
@@ -193,7 +203,9 @@ export function ActivityRow({ a }: { a: ActivityItem }) {
       ? t("wallet.activity.confirmations", { done: Math.min(a.confirmations ?? 0, a.required_confirmations), required: a.required_confirmations })
       : a.type === "withdrawal" && a.address
         ? t("wallet.activity.to", { address: shortHash(a.address, 6, 4) })
-        : a.note ?? "";
+        : a.kind === "nowpayments"
+          ? ""
+          : a.note ?? "";
   return (
     <div className="k-row flex items-center gap-3 px-4 py-3">
       <ActivityIcon a={a} />

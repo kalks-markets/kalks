@@ -24,6 +24,9 @@ import { wallet } from "@/lib/wallet";
 //   POST transfers/to-trading {login, amount, idempotency_key}    own live accounts only (D24)
 //   POST transfers/from-trading {login, amount, idempotency_key}
 //   GET  transfers
+//   GET  nowpayments/config                                  crypto deposits through NOWPayments: off, or coins + limits
+//   POST nowpayments/payments {amount (USD), pay_currency}   -> {payment} (address, memo / tag, exact amount, expiry)
+//   GET  nowpayments/payments                    GET nowpayments/payments/{id} (polled by the deposit page)
 
 type Obj = Record<string, unknown>;
 type Ctx = { params: Promise<{ path: string[] }> };
@@ -102,6 +105,13 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   if (path.length === 3 && path[0] === "deposits" && path[1] === "intents" && INTENT_RE.test(path[2]!)) return call(`/v1/deposits/intents/${path[2]}?user_id=${uid}`);
   if (path.length === 2 && path[0] === "deposits" && ID_RE.test(path[1]!)) return call(`/v1/deposits/${path[1]}?user_id=${uid}`);
   if (path.length === 2 && path[0] === "withdrawals" && ID_RE.test(path[1]!)) return call(`/v1/withdrawals/${path[1]}?user_id=${uid}`);
+  if (route === "nowpayments/config") return call("/v1/nowpayments/config");
+  if (route === "nowpayments/payments") {
+    const q = pageQuery(req);
+    if (q instanceof NextResponse) return q;
+    return call(`/v1/nowpayments/payments?user_id=${uid}${q}`);
+  }
+  if (path.length === 3 && path[0] === "nowpayments" && path[1] === "payments" && ID_RE.test(path[2]!)) return call(`/v1/nowpayments/payments/${path[2]}?user_id=${uid}`);
   return error(404, "not_found", "Not found.");
 }
 
@@ -128,6 +138,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const amount = amountOf(body.amount);
       if (!amount) return error(422, "validation", "Enter an amount with up to 6 decimals.", "amount");
       return send("/v1/deposits/intents", { user_id: uid, chain, amount });
+    }
+    case "nowpayments/payments": {
+      const amount = typeof body.amount === "string" || typeof body.amount === "number" ? String(body.amount).trim() : "";
+      if (!/^\d{1,12}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) return error(422, "validation", "Enter an amount in USD with up to 2 decimals.", "amount");
+      const coin = typeof body.pay_currency === "string" ? body.pay_currency.trim().toLowerCase() : "";
+      if (!/^[a-z0-9]{2,24}$/.test(coin)) return error(422, "validation", "Choose a coin.", "pay_currency");
+      return send("/v1/nowpayments/payments", { user_id: uid, amount, pay_currency: coin });
     }
     case "deposits/submit": {
       if (typeof body.intent_id !== "string" || !INTENT_RE.test(body.intent_id)) return error(422, "validation", "Unknown deposit request.", "intent_id");

@@ -11,6 +11,7 @@ import { Trans, useT } from "@kalks/i18n/react";
 import { CHAIN_LABEL, WalletError, fmt, useWallet, walletApi, type Chain, type Deposit, type Intent, type WalletConfig } from "./api";
 import { PayError, hasMetaMask, hasTronLink, isMobile, metamaskDeepLink, payWithMetaMask, payWithTronLink } from "./pay";
 import { Confirmations, DEPOSIT_STATUS, HashLink, InlineError, StatusTag, Tile, WalletUnavailable, cleanAmount } from "./ui";
+import { CryptoDeposit, CryptoHowItWorks, MethodPicker, type NpConfig } from "./crypto-deposit";
 
 type IntentView = { intent: Intent; deposit: Deposit | null };
 
@@ -369,16 +370,32 @@ function Inner() {
   // the request id lives in state and is mirrored into the URL (?intent=…) so a reload or the MetaMask app
   // deep link resumes the same deposit
   const [intentId, setIntentId] = React.useState<string | null>(() => sp.get("intent"));
+  // crypto deposits through NOWPayments (?method=crypto, a payment resumes with ?np=<id>), when the broker offers them
+  const [npId, setNpId] = React.useState<number | null>(() => (/^\d{1,18}$/.test(sp.get("np") ?? "") ? Number(sp.get("np")) : null));
+  const [method, setMethodState] = React.useState<"usdt" | "crypto">(() => (sp.get("method") === "crypto" || sp.get("np") ? "crypto" : "usdt"));
   const cfg = useWallet<WalletConfig>("config");
+  const np = useWallet<NpConfig>("nowpayments/config");
   const valid = !!intentId && /^dep_[0-9a-f]{24}$/.test(intentId);
   const view = useWallet<IntentView>(valid ? `deposits/intents/${intentId}` : null, 5000);
   const setIntent = (id: string | null) => {
     setIntentId(id);
     window.history.replaceState(window.history.state, "", id ? `/wallet/deposit?intent=${id}` : "/wallet/deposit");
   };
+  const setNp = (id: number | null) => {
+    setNpId(id);
+    window.history.replaceState(window.history.state, "", id ? `/wallet/deposit?np=${id}` : "/wallet/deposit?method=crypto");
+  };
+  const setMethod = (m: "usdt" | "crypto") => {
+    setMethodState(m);
+    window.history.replaceState(window.history.state, "", m === "crypto" ? (npId ? `/wallet/deposit?np=${npId}` : "/wallet/deposit?method=crypto") : intentId ? `/wallet/deposit?intent=${intentId}` : "/wallet/deposit");
+  };
+  const cryptoOn = !!np.data?.enabled && (np.data.coins?.length ?? 0) > 0;
+  // a payment link keeps working even if the broker switched the option off since
+  const crypto = method === "crypto" && (cryptoOn || npId !== null);
 
   let main: React.ReactNode;
-  if (cfg.error && !cfg.data) main = <WalletUnavailable onRetry={cfg.reload} />;
+  if (crypto) main = np.data ? <CryptoDeposit cfg={np.data} paymentId={npId} onPayment={setNp} /> : <Skeleton className="h-[420px] w-full rounded-[20px]" />;
+  else if (cfg.error && !cfg.data) main = <WalletUnavailable onRetry={cfg.reload} />;
   else if (!cfg.data || (valid && !view.data && !view.error)) main = <Skeleton className="h-[420px] w-full rounded-[20px]" />;
   else if (valid && view.error) main = <WalletUnavailable onRetry={view.reload} message={view.error.status === 404 ? t("wallet.deposit.notFound") : undefined} />;
   else if (valid && view.data?.deposit) main = <Tracker view={view.data} onNew={() => setIntent(null)} />;
@@ -388,8 +405,8 @@ function Inner() {
   return (
     <div className="pb-16">
       <PageHeader
-        title={t("wallet.depositUsdt")}
-        subtitle={t("wallet.deposit.subtitle")}
+        title={crypto ? t("wallet.nowpayments.title") : t("wallet.depositUsdt")}
+        subtitle={crypto ? t("wallet.nowpayments.subtitle") : t("wallet.deposit.subtitle")}
         actions={
           <Link href="/wallet">
             <Button variant="surface">
@@ -399,8 +416,11 @@ function Inner() {
         }
       />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-8">{main}</div>
-        <div className="xl:col-span-4">{cfg.data && <HowItWorks cfg={cfg.data} />}</div>
+        <div className="xl:col-span-8">
+          {cryptoOn && <MethodPicker value={crypto ? "crypto" : "usdt"} onChange={setMethod} />}
+          {main}
+        </div>
+        <div className="xl:col-span-4">{crypto ? <CryptoHowItWorks /> : cfg.data && <HowItWorks cfg={cfg.data} />}</div>
       </div>
     </div>
   );
