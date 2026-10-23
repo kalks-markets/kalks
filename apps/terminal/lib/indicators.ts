@@ -1381,6 +1381,30 @@ const LEGACY: Record<string, [IndicatorType, Params]> = {
   macd: ["macd", {}],
 };
 
+/**
+ * Up to workspace uiVersion 3 a new workspace's first chart started with EMA 50 and SMA 20. True when `list` is still
+ * exactly that pair as it was added (EMA 50 close, then SMA 20 close, shown, default styles and levels): the one-time
+ * migration removes it (app: indicators.dart isAutoIndicatorPair). Anything the client changed stays.
+ */
+export function isAutoIndicatorPair(list: readonly IndicatorInstance[]): boolean {
+  const plainStyle = (s: IndicatorInstance["style"]) => !s || Object.values(s).every((o) => !o || (o.color === undefined && o.width === undefined && o.visible !== false));
+  const untouched = (i: IndicatorInstance | undefined, type: IndicatorType, period: number) =>
+    !!i &&
+    i.type === type &&
+    i.visible !== false &&
+    i.levels === undefined &&
+    plainStyle(i.style) &&
+    Object.keys(i.params ?? {}).length === 2 &&
+    i.params.period === period &&
+    i.params.source === "close";
+  return list.length === 2 && untouched(list[0], "ema", 50) && untouched(list[1], "sma", 20);
+}
+
+/** Workspace uiVersion 3 -> 4: a chart still showing exactly the automatic EMA 50 + SMA 20 loses them (app: Workspace.fromJson). */
+export function stripAutoIndicators<W extends { tabs: { indicators: IndicatorInstance[] }[]; uiVersion?: number }>(w: W): W {
+  return { ...w, tabs: w.tabs.map((t) => (isAutoIndicatorPair(t.indicators) ? { ...t, indicators: [] } : t)), uiVersion: 4 };
+}
+
 /** Accepts the old `IndicatorId[]` workspace format and the current instance list; drops anything unknown. */
 export function migrateIndicators(raw: unknown): IndicatorInstance[] {
   if (!Array.isArray(raw)) return [];

@@ -34,7 +34,7 @@ import {
 } from "./trading";
 import { beep } from "./sound";
 import { aiTrader } from "./ai-trader/runtime";
-import { migrateIndicators, type IndicatorInstance } from "./indicators";
+import { migrateIndicators, stripAutoIndicators, type IndicatorInstance } from "./indicators";
 import { GUEST_ACCOUNT, GUEST_LOGIN, guestNotice } from "./guest";
 import { engineApi } from "./engine/client";
 import { engineActions } from "./engine/actions";
@@ -157,7 +157,7 @@ export interface Workspace {
   maxDeviation: number | null;
   lot: number; // default one-click lot
   profile: string;
-  /** Workspace format: 3 = the chart-first shell (docs/TERMINAL-DESIGN.md). Older saves are migrated once on load. */
+  /** Workspace format: 3 = the chart-first shell (docs/TERMINAL-DESIGN.md), 4 = charts start without indicators. Older saves are migrated once on load. */
   uiVersion?: number;
 }
 
@@ -229,12 +229,8 @@ export function makeTab(symbol: string, tf: Timeframe = "H1", indicators: Indica
 }
 
 export function defaultWorkspace(): Workspace {
-  const tabs = [
-    makeTab("XAUUSD", "M15", migrateIndicators(["ema50", "sma20"])),
-    makeTab("EURUSD", "H1", migrateIndicators(["bb"])),
-    makeTab("NAS100", "M5", migrateIndicators(["rsi"])),
-    makeTab("BTCUSD", "H4", migrateIndicators(["macd"])),
-  ];
+  // no automatic indicators: the client adds the ones they want
+  const tabs = [makeTab("XAUUSD", "M15"), makeTab("EURUSD", "H1"), makeTab("NAS100", "M5"), makeTab("BTCUSD", "H4")];
   return {
     layout: "1",
     tabs,
@@ -258,7 +254,7 @@ export function defaultWorkspace(): Workspace {
     maxDeviation: null,
     lot: 0.5,
     profile: "Default",
-    uiVersion: 3,
+    uiVersion: 4,
   };
 }
 
@@ -283,7 +279,7 @@ function readWorkspace(): Workspace {
   try {
     const raw = localStorage.getItem(WS_KEY);
     if (!raw) return d;
-    const w = { ...d, ...(JSON.parse(raw) as Partial<Workspace>) };
+    let w = { ...d, ...(JSON.parse(raw) as Partial<Workspace>) };
     w.panels = { ...d.panels, ...w.panels };
     if (!Array.isArray(w.tabs) || w.tabs.length === 0) return d;
     w.tabs = w.tabs.filter((t) => !!INSTRUMENT_MAP[t.symbol]).map((t) => ({ ...t, drawings: t.drawings ?? [], indicators: migrateIndicators(t.indicators) }));
@@ -308,6 +304,8 @@ function readWorkspace(): Workspace {
       w.optPanel = false;
       w.uiVersion = 3;
     }
+    // no automatic indicators: a chart still showing exactly the EMA 50 + SMA 20 every workspace started with loses them
+    if ((w.uiVersion ?? 1) < 4) w = stripAutoIndicators(w);
     if (!["instruments", "book", "ticks", "navigator"].includes(w.side)) w.side = "instruments";
     if (w.posLayout !== "split") w.posLayout = "page";
     if (w.toolboxTab === "trade") w.toolboxTab = "positions";
