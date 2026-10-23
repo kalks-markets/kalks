@@ -31,6 +31,14 @@ async fn main() -> anyhow::Result<()> {
     if cfg.internal_token.is_empty() {
         tracing::warn!("WALLET_INTERNAL_TOKEN is empty: any local process can call the wallet (dev only)");
     }
+    if wallet::secrets::key(&cfg).is_none() {
+        tracing::warn!("WALLET_SECRETS_KEY is missing or invalid: NOWPayments keys can't be stored or used");
+    } else if cfg.secrets_key.is_empty() {
+        tracing::warn!("WALLET_SECRETS_KEY is empty: provider secrets use the development key (dev only)");
+    }
+    if !cfg.nowpayments_api_url.is_empty() && !cfg.dev_mode {
+        tracing::warn!("WALLET_NOWPAYMENTS_API_URL overrides the NOWPayments API in production");
+    }
     if cfg.trongrid_api_key.is_empty() {
         tracing::warn!("TRONGRID_API_KEY is empty: TronGrid rate limits apply");
     }

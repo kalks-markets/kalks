@@ -34,6 +34,15 @@ pub struct Config {
     /// (development default; the events stay queued and are sent once it is set).
     pub ib_url: String,
     pub ib_token: String,
+    /// `WALLET_SECRETS_KEY` (64 hex): encrypts provider secrets stored in the database (NOWPayments API key and IPN
+    /// secret, src/secrets.rs). Required to save or use them in production; development falls back to a fixed key.
+    pub secrets_key: String,
+    /// `WALLET_NOWPAYMENTS_API_URL`: overrides the NOWPayments API base (tests and local mocks). Empty = the official
+    /// API, or its sandbox when the Back Office "Sandbox" switch is on.
+    pub nowpayments_api_url: String,
+    /// `WALLET_NOWPAYMENTS_IPN_URL`: the default public IPN callback (the Client Area route that forwards to this
+    /// service); the Back Office can override it per broker.
+    pub nowpayments_ipn_url: String,
 }
 
 /// Masks the password in a connection URL (`postgres://user:secret@host` → `postgres://user:***@host`).
@@ -93,6 +102,9 @@ impl fmt::Debug for Config {
             .field("support_token", &redact(&self.support_token))
             .field("ib_url", &self.ib_url)
             .field("ib_token", &redact(&self.ib_token))
+            .field("secrets_key", &redact(&self.secrets_key))
+            .field("nowpayments_api_url", &redact_rpc(&self.nowpayments_api_url))
+            .field("nowpayments_ipn_url", &self.nowpayments_ipn_url)
             .finish()
     }
 }
@@ -100,6 +112,9 @@ impl fmt::Debug for Config {
 fn var(key: &str, default: &str) -> String {
     env::var(key).ok().filter(|v| !v.trim().is_empty()).map(|v| v.trim().to_string()).unwrap_or_else(|| default.to_string())
 }
+
+/// The public IPN route of the Client Area (apps/crm/app/api/payments/nowpayments/ipn), which forwards to this service.
+pub const DEFAULT_NOWPAYMENTS_IPN_URL: &str = "https://app.kalkstrade.com/api/payments/nowpayments/ipn";
 
 pub const DEFAULT_BSC_RPCS: &str = "https://bsc-rpc.publicnode.com,https://bsc-dataseed.binance.org,https://bsc-dataseed1.defibit.io";
 
@@ -134,6 +149,9 @@ impl Config {
             support_token: var("SUPPORT_INTERNAL_TOKEN", ""),
             ib_url: var("IB_URL", if dev_mode { "" } else { "http://127.0.0.1:8096" }).trim_end_matches('/').to_string(),
             ib_token: var("IB_INTERNAL_TOKEN", ""),
+            secrets_key: var("WALLET_SECRETS_KEY", ""),
+            nowpayments_api_url: var("WALLET_NOWPAYMENTS_API_URL", "").trim_end_matches('/').to_string(),
+            nowpayments_ipn_url: var("WALLET_NOWPAYMENTS_IPN_URL", DEFAULT_NOWPAYMENTS_IPN_URL),
         })
     }
 
@@ -163,6 +181,9 @@ impl Config {
             support_token: String::new(),
             ib_url: String::new(),
             ib_token: String::new(),
+            secrets_key: "5e".repeat(32),
+            nowpayments_api_url: String::new(),
+            nowpayments_ipn_url: DEFAULT_NOWPAYMENTS_IPN_URL.into(),
         }
     }
 }
@@ -181,7 +202,8 @@ mod tests {
         let mut c = Config::for_tests("postgres://u:pw@h/db");
         c.trongrid_api_key = "secret-key".into();
         c.ib_token = "ib-secret".into();
+        c.secrets_key = "ab".repeat(32);
         let dbg = format!("{c:?}");
-        assert!(!dbg.contains("pw@") && !dbg.contains("secret-key") && !dbg.contains("test-internal-token") && !dbg.contains("ib-secret"));
+        assert!(!dbg.contains("pw@") && !dbg.contains("secret-key") && !dbg.contains("test-internal-token") && !dbg.contains("ib-secret") && !dbg.contains("abab"));
     }
 }

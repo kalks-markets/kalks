@@ -3281,6 +3281,7 @@ dependencies = [
  "dotenvy",
  "getrandom 0.4.3",
  "reqwest",
+ "ring",
  "rust_decimal",
  "serde",
  "serde_json",

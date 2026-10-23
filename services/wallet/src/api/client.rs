@@ -186,6 +186,15 @@ pub async fn activity(State(st): State<AppState>, ctx: Ctx, Path(user_id): Path<
                    confirmations, required_confirmations, from_address AS address
               FROM deposits WHERE tenant_id = $1 AND user_id = $2
             UNION ALL
+            -- NOWPayments crypto deposits (kind nowpayments, note = the coin): unpaid expired ones are left out
+            SELECT 'deposit', 'np' || id::text,
+                   CASE status WHEN 'credited' THEN 'credited' WHEN 'open' THEN 'pending' WHEN 'review' THEN 'review' WHEN 'approval' THEN 'review'
+                               WHEN 'rejected' THEN 'rejected' ELSE 'failed' END,
+                   COALESCE(credit_amount, price_amount), 'USDT', NULL, payin_hash, NULL, 'in', 'nowpayments', NULL, NULL, pay_currency, created_at, updated_at,
+                   NULL, NULL, pay_address
+              FROM nowpayments_payments
+             WHERE tenant_id = $1 AND user_id = $2 AND status NOT IN ('creating', 'error') AND (status <> 'closed' OR COALESCE(actually_paid, 0) > 0)
+            UNION ALL
             SELECT 'withdrawal', id::text, status, amount, currency, chain, payout_tx_hash, NULL, 'out', NULL, fee, net_amount, reason, created_at, updated_at,
                    payout_confirmations, NULL, to_address
               FROM withdrawals WHERE tenant_id = $1 AND user_id = $2

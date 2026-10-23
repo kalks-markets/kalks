@@ -90,7 +90,15 @@ pub async fn cooldown_until(pool: &sqlx::PgPool, tenant_id: i64, user_id: i64, h
     if hours <= 0 {
         return Ok(None);
     }
-    let last: Option<DateTime<Utc>> = sqlx::query_scalar("SELECT max(credited_at) FROM deposits WHERE tenant_id = $1 AND user_id = $2 AND status = 'credited'").bind(tenant_id).bind(user_id).fetch_one(pool).await?;
+    // on-chain and NOWPayments deposits alike
+    let last: Option<DateTime<Utc>> = sqlx::query_scalar(
+        "SELECT GREATEST((SELECT max(credited_at) FROM deposits WHERE tenant_id = $1 AND user_id = $2 AND status = 'credited'),
+                         (SELECT max(credited_at) FROM nowpayments_payments WHERE tenant_id = $1 AND user_id = $2 AND status = 'credited'))",
+    )
+    .bind(tenant_id)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
     Ok(last.map(|t| t + Duration::hours(hours as i64)).filter(|u| *u > Utc::now()))
 }
 

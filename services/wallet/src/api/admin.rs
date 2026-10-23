@@ -610,8 +610,16 @@ pub async fn reconciliation(State(st): State<AppState>, s_ctx: StaffCtx) -> ApiR
     .bind(crate::ib::MAX_ATTEMPTS)
     .fetch_one(pool)
     .await?;
+    // NOWPayments: credited payments against their counter-account
+    let npr = sqlx::query("SELECT COALESCE(sum(credit_amount), 0) AS credited, count(*) AS n, count(*) FILTER (WHERE status IN ('review', 'approval')) AS held FROM nowpayments_payments WHERE tenant_id = $1 AND status = ANY(ARRAY['credited', 'review', 'approval'])")
+        .bind(t)
+        .fetch_one(pool)
+        .await?;
+    let np_ledger = -get(&crate::ledger::sys_account("USDT", crate::ops::nowpayments::SYS_ACCOUNT));
+    let np_credited: D = npr.get("credited");
     let problems = ledger::verify(pool).await?;
     Ok(ok(json!({
+        "nowpayments": {"ledger_received": s(np_ledger), "credited": s(np_credited), "held_count": npr.get::<i64, _>("held"), "ledger_matches": np_ledger == np_credited},
         "liabilities": {"available": s(avail), "locked": s(locked), "total": s(avail + locked)},
         "system_accounts": sys.iter().map(|(k, v)| json!({"account": k, "balance": s(*v)})).collect::<Vec<_>>(),
         "trading_net_in": s(get("sys:USDT:trading")),

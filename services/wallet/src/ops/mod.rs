@@ -2,6 +2,7 @@
 
 pub mod adjustments;
 pub mod deposits;
+pub mod nowpayments;
 pub mod trading;
 pub mod transfers;
 pub mod withdrawals;

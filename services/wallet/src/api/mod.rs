@@ -3,6 +3,7 @@
 pub mod adjust;
 pub mod admin;
 pub mod client;
+pub mod nowpayments;
 
 use axum::Json;
 use axum::Router;
@@ -43,6 +44,11 @@ pub fn router(st: AppState) -> Router {
         .route("/v1/withdrawals/quote", post(client::quote_withdrawal))
         .route("/v1/withdrawals/{id}", get(client::get_withdrawal))
         .route("/v1/withdrawals/{id}/cancel", post(client::cancel_withdrawal))
+        // NOWPayments crypto deposits; the IPN comes through the Client Area route with the raw body
+        .route("/v1/nowpayments/config", get(nowpayments::config))
+        .route("/v1/nowpayments/payments", post(nowpayments::create).get(nowpayments::list))
+        .route("/v1/nowpayments/payments/{id}", get(nowpayments::get))
+        .route("/v1/nowpayments/ipn", post(nowpayments::ipn))
         // Back Office
         .route("/v1/admin/summary", get(admin::summary))
         .route("/v1/admin/deposits", get(admin::deposits))
@@ -66,6 +72,13 @@ pub fn router(st: AppState) -> Router {
         .route("/v1/admin/adjustments/{id}/reject", post(adjust::reject))
         .route("/v1/admin/adjustments/{id}/cancel", post(adjust::cancel))
         .route("/v1/admin/settings", get(admin::settings).put(admin::update_settings))
+        .route("/v1/admin/nowpayments/settings", get(nowpayments::admin_settings).put(nowpayments::admin_update_settings))
+        .route("/v1/admin/nowpayments/test", post(nowpayments::admin_test))
+        .route("/v1/admin/nowpayments/payments", get(nowpayments::admin_list))
+        .route("/v1/admin/nowpayments/payments/{id}", get(nowpayments::admin_get))
+        .route("/v1/admin/nowpayments/payments/{id}/approve", post(nowpayments::admin_approve))
+        .route("/v1/admin/nowpayments/payments/{id}/reject", post(nowpayments::admin_reject))
+        .route("/v1/admin/nowpayments/payments/{id}/refresh", post(nowpayments::admin_refresh))
         .route("/v1/admin/reconciliation", get(admin::reconciliation))
         .route("/v1/admin/audit", get(admin::audit))
         .layer(DefaultBodyLimit::max(64 * 1024))

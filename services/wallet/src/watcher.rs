@@ -1,12 +1,12 @@
 //! Background workers (one instance only, `WALLET_WORKERS=true`):
 //! - every `poll_secs`: verify / confirm / credit open deposits, verify paid withdrawals, settle pending
-//!   trading transfers, expire intents;
+//!   trading transfers, expire intents, re-check open NOWPayments payments (the IPN fallback);
 //! - every `scan_secs`: scan the receiving addresses for incoming transfers nobody claimed.
 
 use std::time::Duration;
 
 use crate::chain::ChainId;
-use crate::ops::{adjustments, deposits, trading, withdrawals};
+use crate::ops::{adjustments, deposits, nowpayments, trading, withdrawals};
 use crate::state::AppState;
 
 /// One pass of the fast loop. Returns (deposits checked, payouts checked, transfers recovered).
@@ -28,6 +28,9 @@ pub async fn tick(st: &AppState) -> anyhow::Result<(usize, usize, usize)> {
         tracing::warn!(error = %e, "adjustment recovery pass failed");
     }
     deposits::expire_intents(st).await?;
+    if let Err(e) = nowpayments::poll(st).await {
+        tracing::warn!(error = %e, "NOWPayments poll pass failed");
+    }
     Ok((deps.len(), pays.len(), rec))
 }
 
