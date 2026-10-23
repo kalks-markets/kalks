@@ -1,6 +1,6 @@
 # wallet
 
-The Kalks central client wallet (D3): per-user multi-currency balances on a double-entry ledger, USDT deposits on BNB Chain (BEP20) and TRON (TRC20) verified on-chain, withdrawals with admin approval, and transfers between the wallet and the client's own trading accounts. It is a Rust service (axum 0.8, sqlx 0.9, PostgreSQL) on `127.0.0.1:8095`.
+The Kalks central client wallet (D3): per-user multi-currency balances on a double-entry ledger, USDT deposits on BNB Chain (BEP20) and TRON (TRC20) verified on-chain, crypto deposits in other coins through [NOWPayments](#nowpayments), withdrawals with admin approval, and transfers between the wallet and the client's own trading accounts. It is a Rust service (axum 0.8, sqlx 0.9, PostgreSQL) on `127.0.0.1:8095`.
 
 Other services (IB, copy/PAMM, prop) move money in and out of client wallets **only** through [`POST /v1/wallets/transfers`](#wallet-api-contract-for-other-services).
 
@@ -10,6 +10,7 @@ Other services (IB, copy/PAMM, prop) move money in and out of client wallets **o
 - [Ledger](#ledger)
 - [Client API (CRM BFF)](#client-api-crm-bff)
 - [Deposits](#deposits)
+- [NOWPayments](#nowpayments)
 - [Withdrawals](#withdrawals)
 - [Wallet and trading accounts](#wallet-and-trading-accounts)
 - [Back Office API](#back-office-api)
@@ -103,6 +104,7 @@ Double-entry and append-only. Each change is one `ledger_txns` row with a unique
 | `user:<id>:<ccy>:available` | spendable client balance |
 | `user:<id>:<ccy>:locked` | pending withdrawals and in-flight transfers to trading |
 | `sys:<ccy>:deposit:<chain>` | on-chain money received (negative = received) |
+| `sys:USDT:deposit:nowpayments` | USD credited for NOWPayments crypto deposits (negative = received; the coins sit in the NOWPayments account) |
 | `sys:<ccy>:withdrawal:<chain>` | on-chain money paid out |
 | `sys:<ccy>:fees` | withdrawal fees earned |
 | `sys:<ccy>:trading` | net money moved into trading accounts |
@@ -130,6 +132,9 @@ The CRM BFF resolves the user from the session cookie and passes `user_id`. For 
 | `POST /v1/wallets/{user_id}/to-trading` | `{login, amount, idempotency_key}` | `{transfer}` |
 | `POST /v1/wallets/{user_id}/from-trading` | `{login, amount, idempotency_key}` | `{transfer}` |
 | `GET /v1/wallets/{user_id}/notifications` / `POST .../notifications/read` | – / `{ids?}` | `{items, unread}` |
+| `GET /v1/nowpayments/config` | – | `{enabled:false}` or `{enabled, sandbox, min_deposit_usd, max_deposit_usd, fee_paid_by_user, coins:[{code, ticker, name, network, icon, chain_icon, needs_extra_id, min_usd}]}` ([NOWPayments](#nowpayments)) |
+| `POST /v1/nowpayments/payments` | `{user_id, amount (USD, 2 dp), pay_currency}` | `{payment}`: `{id, status, price_amount, pay_currency, coin, pay_amount, pay_address, payin_extra_id, expires_at, …}` |
+| `GET /v1/nowpayments/payments?user_id` / `GET /v1/nowpayments/payments/{id}?user_id=` | – | `{items, total}` / `{payment}` (a stale open payment is re-checked with NOWPayments in the background) |
 
 ## Deposits
 
@@ -173,6 +178,65 @@ The IB service decides a client's first deposit (FTD, CPA) from the engine ledge
 - **Idempotency.** `idempotencyKey = wallet:deposit:<tenant_id>:<ledger txn id>` and `at` = the ledger txn time, so a retry is answered `duplicate` by the IB service. The IB service keeps only the earliest deposit as the first one, so the later engine `transfer_in` of the same money is not counted again.
 - **Retries.** Timeouts, 5xx, 401 / 403 and 404 (client not mirrored in the IB service yet) back off 15 s doubling to 1 h, for 60 attempts (`push_attempts`, `push_next_at`, `push_error`); 400 / 409 / 422 are not retried. The IB answer `firstDeposit` is stored on the row.
 - **Reconciliation.** Every 10 minutes (and at start) the worker queues any `deposit` / `manual_deposit` ledger txn that has no row yet, which also backfills deposits booked before this existed. `GET /v1/admin/reconciliation` shows `ib_deposit_events: {enabled, reported, queued, failed}`; to resend failed rows, set `push_attempts = 0, push_next_at = NULL` on them (the key makes it safe).
+
+## NOWPayments
+
+Crypto deposits in other coins (BTC, ETH, LTC, TRX, BNB, USDT on TRC20 / BEP20 / ERC20, …) through [NOWPayments](https://nowpayments.io), next to the direct USDT deposits above (which stay as they are). The client chooses an amount in **USD** and a coin; NOWPayments gives an address (plus a memo / destination tag for the coins that need one) and the exact amount to pay; once NOWPayments reports the payment `finished`, the USD amount is credited to the client's wallet as USDT (1:1). Deposits only: no payouts through NOWPayments. Code: `src/nowpayments.rs` (API client, IPN signature), `src/ops/nowpayments.rs` (rules), `src/api/nowpayments.rs` (routes), `migrations/0005_nowpayments.sql`, `src/secrets.rs` (keys at rest).
+
+### Setup (the owner)
+
+1. **NOWPayments dashboard** (account.nowpayments.io; for tests the sandbox at account-sandbox.nowpayments.io has its own keys):
+   - *Settings → Payments → API keys*: create an API key.
+   - *Settings → Payments → Instant payment notifications*: generate the **IPN secret key** and set the IPN callback URL to `https://app.kalkstrade.com/api/payments/nowpayments/ipn` (the service also sends it with every payment).
+   - *Coins settings*: enable the coins you want to accept, and set the outcome (payout) wallet / currency where NOWPayments sends the money.
+2. **Back Office → Finance → Wallet settings** (`/finance/settings`), card **NOWPayments · crypto deposits** (needs `finance.settings`):
+   - paste the **API key** and the **IPN secret** (password fields, write-only: afterwards the page shows only "Set ✓ …1234" and who changed it when);
+   - **Test connection** (`GET /status` + `GET /merchant/coins` with the pasted or the stored key) and pick the coins to offer from the coins enabled in the merchant account (suggested: `usdttrc20, usdtbsc, usdterc20, btc, eth, ltc, trx, bnbbsc`);
+   - minimum (default 10 USD) and maximum (default 50,000 USD) per deposit, **Client pays the fees** (default on: `is_fee_paid_by_user`, which NOWPayments always runs at a fixed rate), **Sandbox** (api-sandbox.nowpayments.io);
+   - copy the **IPN callback URL** (it can be overridden per broker; empty = `WALLET_NOWPAYMENTS_IPN_URL`);
+   - switch **Enabled** on (refused until both keys are set) and save with a reason (audited).
+3. Clients then see **Crypto (NOWPayments)** next to "USDT direct" on the deposit page, with the offered coins that are also enabled in the merchant account (`GET /merchant/coins`, cached 10 minutes) (Client Area `/wallet/deposit`, and the app's Wallet → Deposit).
+
+### Flow
+
+1. **Create.** `POST /v1/nowpayments/payments` checks: switched on with both keys, the client's `deposits` restriction, the coin is offered, the amount (2 decimals, ≥ the broker minimum and NOWPayments' own minimum for the coin from `GET /min-amount?…&fiat_equivalent=usd`, cached 10 min, ≤ the maximum), at most 5 payments waiting for money and 20 new payments per hour per client. It stores the row (`creating`), then calls `POST /payment {price_amount, price_currency:"usd", pay_currency, order_id:"np_<24 hex>", order_description, ipn_callback_url, is_fee_paid_by_user, is_fixed_rate}` and keeps `payment_id`, `pay_address`, `payin_extra_id`, `pay_amount`, `expiration_estimate_date` (`open`). A refused create is kept as `error` (not shown to the client) and answered `502 provider_error`.
+2. **IPN.** NOWPayments POSTs the payment to `https://app.kalkstrade.com/api/payments/nowpayments/ipn`. The Client Area route (`apps/crm/lib/nowpayments-ipn.ts`; public, open in maintenance mode, JSON ≤ 64 KB, 120 requests / min per IP; Caddy caps the body too) forwards the **raw body** and `x-nowpayments-sig` to `POST /v1/nowpayments/ipn` with the internal token. The service finds the payment (by `payment_id`; by our `order_id` when the create answer was lost; by `parent_payment_id` for a repeated deposit), takes **that broker's** IPN secret and checks `x-nowpayments-sig` = hex HMAC-SHA512 over the body re-serialised with sorted keys, exactly as NOWPayments' documented Node code does (`JSON.stringify(sortObject(body))`, nested objects and arrays included; the PHP / Python variants of the docs are accepted too), compared in constant time. Unknown payment → 404, no IPN secret → 503, bad or missing signature → 401 (nothing stored). A valid IPN is stored (`last_ipn`) and only **wakes** the check below: the body is never trusted for money.
+3. **Check** (`ops::nowpayments::sync`, after every IPN, from the poller and from staff "Re-check"): `GET /payment/{id}` with the broker's key (and the payment's own sandbox / live environment). The answer is recorded (`np_status`, `actually_paid`, outcome, pay-in hash) and must be the payment we created (payment id, `order_id`, `price_amount`, `price_currency = usd`, `pay_currency`), else it goes to review.
+4. **Credit.** `finished` with `pay_amount ≤ actually_paid ≤ pay_amount × 1.01` → `price_amount` USD credited as USDT in one transaction: row locked (`FOR UPDATE`, must still be `open`), ledger txn `deposit:nowpayments:<payment_id>` (kind `deposit`, unique per tenant: an IPN, a duplicate IPN, the poller and staff can race, it books once), `user available +X / sys:USDT:deposit:nowpayments −X`, row `credited`, the IB deposit event (it is a real deposit), the client notification `deposit.credited`, an audit entry. The withdrawal cooldown (`deposit_cooldown_hours`) counts it like an on-chain deposit.
+5. **Review** (staff decide): `partially_paid`; overpaid by more than 1%; `finished` with less than asked; paid after the payment had expired / failed; a mismatch with what we created; a **repeated deposit** to the same address (NOWPayments `parent_payment_id`, recorded as its own row linked to the first payment). `failed` / `expired` / `refunded` without money → `closed`. A credited payment NOWPayments later reports `refunded` is logged as an error for staff.
+6. **Poller** (the IPN fallback, `WALLET_WORKERS`, every `WALLET_POLL_SECS`): open payments are re-checked at most once a minute for 48 hours (7 days once money is on the way); unpaid ones are closed after 48 hours; a create call that never answered becomes `error` after 10 minutes. The client's status page also triggers a background re-check when the payment was not checked for 20 s.
+
+States (`nowpayments_payments.status`): `creating` → `open` → `credited` | `review` → (`approval` →) `credited` | `rejected`; `closed`, `error`. NOWPayments' own status is kept in `np_status`: `waiting`, `confirming`, `confirmed`, `sending`, `partially_paid`, `finished`, `failed`, `refunded`, `expired`. The client sees `waiting`, `confirming`, `credited`, `review`, `expired`, `failed`, `refunded`, `rejected`; activity lists credited / pending / review rows as deposits with `kind: "nowpayments"` and the coin in `note`.
+
+### Review, four-eyes, permissions
+
+| Permission | Allows |
+|---|---|
+| `finance.read` | settings (without secrets), payments, raw IPN and API answers |
+| `finance.settings` | change the settings and keys, Test connection |
+| `finance.write` | approve & credit a payment in review (any USD amount, suggested: price × paid / asked), reject it (the client is notified), Re-check |
+| `finance.adjust_approve` | the second approval above the four-eyes threshold |
+
+The four-eyes threshold is the one of manual adjustments (`tenant_settings.adjust_approval_usd`, Finance → Adjustments). Above it the first approver's amount waits as `approval`; another staff member with `finance.adjust_approve` credits exactly that amount (the proposer gets 403, can only withdraw the proposal back to review). Audit actions: `wallet.settings.nowpayments` (before / after with secrets as `{set, last4}` only), `wallet.nowpayments.credited` (system or staff), `.approval_requested`, `.approval_withdrawn`, `.rejected`.
+
+| Method & path (Back Office) | Body |
+|---|---|
+| `GET /v1/admin/nowpayments/settings` | – (`{settings, secrets_storage, default_coins, history}`) |
+| `PUT /v1/admin/nowpayments/settings` | `{enabled?, sandbox?, api_key?, ipn_secret?, clear_api_key?, clear_ipn_secret?, coins?, min_deposit_usd?, max_deposit_usd?, fee_paid_by_user?, ipn_url?, reason}` (empty key = unchanged) |
+| `POST /v1/admin/nowpayments/test` | `{api_key?, sandbox?}` → `{ok, status, merchant_coins, missing}` |
+| `GET /v1/admin/nowpayments/payments?status=queue\|open\|credited\|review\|approval\|rejected\|closed\|error&user_id&q&page&limit` | – (`{items, total, counts}`) |
+| `GET /v1/admin/nowpayments/payments/{id}` | – (with `last_ipn`, `np_payment`, `history`, `threshold_usd`, `can`) |
+| `POST /v1/admin/nowpayments/payments/{id}/approve` | `{amount?, reason}` |
+| `POST /v1/admin/nowpayments/payments/{id}/reject` | `{reason}` |
+| `POST /v1/admin/nowpayments/payments/{id}/refresh` | `{}` |
+
+The Back Office shows them under **Finance → Deposits → NOWPayments** (review queue, details with the raw IPN, approve / reject) and the settings under **Finance → Wallet settings**.
+
+### Security
+
+- The API key and IPN secret are AES-256-GCM encrypted with `WALLET_SECRETS_KEY` (bound to the broker and the setting), never returned by any API, never logged, and never part of an audit entry (only "set" and the last 4 characters). Without `WALLET_SECRETS_KEY` in production nothing can be saved. Rotating the key means pasting the NOWPayments keys again.
+- Money is credited only on NOWPayments' own API answer, once per NOWPayments payment (unique ledger key + row lock), only for the amount the client asked for, and only automatically when the payment matches exactly; everything else is a staff decision with an audit trail.
+- The IPN endpoint is public but useless without the broker's IPN secret: bad signatures are refused before anything is stored or NOWPayments is called.
 
 ## Withdrawals
 
@@ -318,6 +382,9 @@ The admin BFF forwards the staff member's `finance.*` keys as `X-Kalks-Staff-Per
 | `TRADING_URL` / `TRADING_INTERNAL_TOKEN` | `http://127.0.0.1:8090` | engine |
 | `GATEWAY_URL` / `GATEWAY_INTERNAL_TOKEN` | `http://127.0.0.1:8080` | KYC status |
 | `SUPPORT_URL` / `SUPPORT_INTERNAL_TOKEN` | `http://127.0.0.1:8100` / – | notification push (bell, realtime, email); empty URL = in-app only |
+| `WALLET_SECRETS_KEY` | – (development: a fixed key) | 64 hex: encrypts the NOWPayments API key / IPN secret at rest. Required to save or use them in production; `deploy.sh` generates it once. Back it up with the database |
+| `WALLET_NOWPAYMENTS_IPN_URL` | `https://app.kalkstrade.com/api/payments/nowpayments/ipn` | default IPN callback sent with each payment (Back Office override per broker) |
+| `WALLET_NOWPAYMENTS_API_URL` | – | overrides the NOWPayments API base (tests and local mocks only); empty = `https://api.nowpayments.io/v1`, or `https://api-sandbox.nowpayments.io/v1` with Sandbox on |
 | `IB_URL` / `IB_INTERNAL_TOKEN` | empty in development, `http://127.0.0.1:8096` in production / – | real deposits reported to the IB service ([IB deposit events](#ib-deposit-events)); empty URL = not sent (events stay queued and go out once it is set) |
 
 The apps need `WALLET_URL` (default `http://127.0.0.1:8095`) and `WALLET_INTERNAL_TOKEN` (server-only) in `apps/crm` and `apps/admin`.
@@ -326,7 +393,8 @@ The apps need `WALLET_URL` (default `http://127.0.0.1:8095`) and `WALLET_INTERNA
 
 `cargo test -p wallet` runs:
 
-- **Unit tests:** money parsing and scale, base58check TRON addresses, ABI log decoding, fee maths, address validation, config redaction.
+- **Unit tests:** money parsing and scale, base58check TRON addresses, ABI log decoding, fee maths, address validation, config redaction, secrets at rest (round trip, bound to tenant and setting, production needs a key), the NOWPayments IPN signature (vectors from NOWPayments' documented Node code: valid, tampered, wrong secret, nested objects and arrays, JS number formatting, PHP / Python variants).
+- **NOWPayments** (`tests/nowpayments.rs`, a mock NOWPayments API on a random port): disabled until switched on with both keys, keys write-only and encrypted (never in an answer or the audit log), settings permissions, Test connection, limits and minimums, the 5-open cap, the deposits restriction; create → signed IPN → re-read → credited once (an IPN claiming `finished` while the API says `waiting` books nothing; duplicate IPNs, the poller and six concurrent re-checks still book once; IB event and notification); bad / missing / tampered signatures, unknown payment, no IPN secret; partially paid → review → four-eyes (proposer can't approve, another amount refused, second approver credits); reject notifies; overpaid → review, within 1% credited; expired (poller) then paid late → review; repeated deposit → its own row in review; a refused create.
 - **PostgreSQL integration tests** (`tests/flows.rs`, throw-away database) with a mock chain and a mock engine:
   - transfer idempotency (replay, conflict, concurrent duplicates);
   - insufficient funds;
@@ -350,3 +418,4 @@ The apps need `WALLET_URL` (default `http://127.0.0.1:8095`) and `WALLET_INTERNA
 - Notifications: every row of `notifications` (deposit credited / rejected, withdrawal requested / approved / rejected / completed, transfers, credits) is written in the same transaction as the money change and then pushed by `src/notifier.rs` to the support service (`POST $SUPPORT_URL/v1/notify`, type `wallet.<kind>`, link `/wallet/history`, `dedupeKey wallet:n:<id>`). Support shows it in the Client Area and Kalks Trader bells, on the realtime stream, and emails it per the client's `wallet` preference. The push runs after the commit (woken at once, else every 5 s), retries with backoff (15 s doubling to 1 h, 12 attempts, `push_attempts` / `push_error`), never blocks or rolls back the money transaction, and support's wallet polling adapter uses the same dedupe key, so nothing is shown or emailed twice.
 - RLS: every table carries `tenant_id` and queries are tenant-scoped, but Row-Level Security policies are not enabled yet (same as the trading engine).
 - Workers: run `WALLET_WORKERS=true` on exactly one instance.
+- NOWPayments: `WALLET_SECRETS_KEY` set (deploy.sh) and backed up; keys pasted and **Test connection** green; the IPN URL also set in the NOWPayments dashboard; try one payment with Sandbox on first; the reports service does not read NOWPayments deposits yet (they are in the wallet ledger as kind `deposit` and in the IB deposit events).

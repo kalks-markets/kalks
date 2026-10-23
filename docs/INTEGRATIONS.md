@@ -34,8 +34,9 @@ It mirrors **Back Office → Settings → Integrations** (`/settings/integration
 | 11 | Google sign-in | Google OAuth 2.0 | Optional | Connected |
 | 12 | Web analytics & pixels | GA4 + Meta Pixel / CAPI | Optional | Not configured |
 | 13 | Liquidity provider | FIX 4.4 session | Post-launch | Disabled (B-book at launch) |
+| 14 | Crypto payments | NOWPayments | Optional | Live setting: Finance → Wallet settings (off until keys are pasted) |
 
-**At launch: 9 of 13 configured, all 6 required integrations ready.**
+**At launch: 9 of 14 configured, all 6 required integrations ready.**
 
 Charts are not a third-party integration: the Kalks Trader terminal, Client Area and Back Office use Kalks' own in-house chart, fed by the Kalks market-data service (`services/market-data`). No chart licence is needed.
 
@@ -228,6 +229,21 @@ Sends sign-up, KYC and FTD conversions with UTM parameters. This feeds **Marketi
 | FIX host / port | From the LP's session sheet |
 | SenderCompID | e.g. `KALKS_UAT`, then `KALKS_PROD` |
 | TargetCompID | e.g. `LPPRIME` |
+
+## 14. Crypto payments: NOWPayments · Optional
+Lets clients deposit in BTC, ETH, LTC, TRX, BNB and USDT on TRC20 / BEP20 / ERC20 (and any other coin you enable); the USD amount is credited to their wallet as USDT. Deposits only (no payouts). The direct USDT BEP20 / TRC20 deposits stay as they are. This one is live, not mock: it is configured in **Back Office → Finance → Wallet settings → NOWPayments** (not on the Integrations page). Details: `services/wallet/README.md#nowpayments`.
+
+| Field | Example / notes |
+|---|---|
+| API key (secret) | NOWPayments dashboard → Settings → Payments → API keys. Write-only: the Back Office shows "Set ✓ …1234". |
+| IPN secret (secret) | NOWPayments dashboard → Settings → Payments → Instant payment notifications → IPN secret key |
+| IPN callback URL (copy) | `https://app.kalkstrade.com/api/payments/nowpayments/ipn`: paste it in the same NOWPayments page |
+| Coins | Picked from the coins enabled in the merchant account ("Test connection") |
+| Minimum / maximum deposit | `10` / `50,000` USD |
+| Client pays the fees | On (NOWPayments' network and service fees are added to what the client pays) |
+| Sandbox | api-sandbox.nowpayments.io with sandbox keys, for a test run before going live |
+
+**Where to get it:** sign up at nowpayments.io, finish the merchant verification, set the payout (outcome) wallet, enable the coins, then create the API key and the IPN secret. Keys are encrypted at rest with the wallet's `WALLET_SECRETS_KEY` and every change is audited without the secret values.
 
 ---
 

@@ -250,7 +250,7 @@ header comment of its route file in `apps/crm/app/api/<family>/…/route.ts`.
 | Family | What |
 |---|---|
 | `trading` | accounts (list, open, detail, history, ledger, CSV export, history ZIP), groups, passwords / leverage (step-up), rename / archive / restore / close, group change, demo balance / refill, prefs (default account), transfers between accounts, `accounts/{login}/sso` (web URL only; the app uses `trade/sessions`) |
-| `wallet` | config, overview, deposits (addresses, hash submit), withdrawals (quote, create with step-up), transfers, activity, ledger, notifications |
+| `wallet` | config, overview, deposits (addresses, hash submit), crypto deposits through NOWPayments (`nowpayments/config`, `nowpayments/payments`, `nowpayments/payments/{id}`), withdrawals (quote, create with step-up), transfers, activity, ledger, notifications |
 | `news` | feed, article, map, sources, brief, economic calendar and reminders |
 | `notifications` | the bell: inbox, `read`, `clear`, `prefs` |
 | `kyc` | status, `start`, `details`, `documents` (upload), `submit` |
