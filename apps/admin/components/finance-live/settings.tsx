@@ -7,6 +7,7 @@ import { Button, Card, CardHeader, Chip, Field, Input, PageHeader, Toggle } from
 import { ErrorState, TableSkeleton, useApi, when } from "@/components/live/kit";
 import { useCan } from "@/components/staff-session";
 import { Addr, CHAIN_NAME, CHAIN_SHORT, walletWrite, type AuditItem, type Chain } from "./kit";
+import { NowPaymentsSettingsCard } from "./nowpayments";
 
 type ChainSettings = {
   chain: Chain;
@@ -149,7 +150,7 @@ export function LiveWalletSettingsPage() {
 
   return (
     <div className="pb-10">
-      <PageHeader title="Wallet settings" subtitle="Company addresses, confirmations, deposit and withdrawal limits and fees. Every change is audited with before and after values." />
+      <PageHeader title="Wallet settings" subtitle="Company addresses, confirmations, deposit and withdrawal limits and fees, and NOWPayments crypto deposits. Every change is audited with before and after values." />
       {error ? (
         <ErrorState error={error} onRetry={reload} />
       ) : !data || !limits ? (
@@ -186,6 +187,7 @@ export function LiveWalletSettingsPage() {
               </div>
             )}
           </Card>
+          <NowPaymentsSettingsCard />
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Card>
               <CardHeader title="Address book" subtitle="Every company address the wallet recognises" />

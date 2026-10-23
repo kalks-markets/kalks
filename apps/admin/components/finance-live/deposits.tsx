@@ -3,7 +3,8 @@
 import * as React from "react";
 import { ArrowDownLeft, Inbox, Landmark, RefreshCw, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
-import { Button, Card, DataTable, Dialog, EmptyState, Field, Input, KpiCard, PageHeader, Tabs, type Column } from "@kalks/ui";
+import { Button, Card, DataTable, Dialog, EmptyState, Field, Input, KpiCard, PageHeader, Segmented, Tabs, type Column } from "@kalks/ui";
+import { NowPaymentsDeposits } from "./nowpayments";
 import { ErrorState, FilterSelect, Pager, TableSkeleton, ago, qs, useApi, useDebounced, useNow, when } from "@/components/live/kit";
 import { useCan } from "@/components/staff-session";
 import { Addr, ChainTag, ClientCell, DEP_STATUS, Row, Status, TxLink, usd, usd2, walletWrite, type Deposit, type Paged, type Summary } from "./kit";
@@ -156,6 +157,12 @@ function DepositDrawer({ id, onClose, onChanged }: { id: number | null; onClose:
 
 export function LiveDepositsPage() {
   const now = useNow();
+  // on-chain USDT deposits, or crypto deposits through NOWPayments (?source=nowpayments)
+  const [source, setSourceState] = React.useState<"chain" | "nowpayments">(() => (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("source") === "nowpayments" ? "nowpayments" : "chain"));
+  const setSource = (s: "chain" | "nowpayments") => {
+    setSourceState(s);
+    window.history.replaceState(window.history.state, "", s === "nowpayments" ? "?source=nowpayments" : window.location.pathname);
+  };
   const [tab, setTab] = React.useState<Tab>("queue");
   const [chain, setChain] = React.useState("all");
   const [q, setQ] = React.useState("");
@@ -184,7 +191,7 @@ export function LiveDepositsPage() {
     <div className="pb-10">
       <PageHeader
         title="Deposits"
-        subtitle="USDT deposits on BNB Chain and TRON, verified on chain and credited after the confirmations. Unclaimed transfers and held deposits wait in the queue."
+        subtitle="USDT deposits on BNB Chain and TRON, verified on chain and credited after the confirmations, and crypto deposits through NOWPayments. Unclaimed transfers and held deposits wait in the queue."
         actions={
           <Button variant="surface" size="lg" onClick={() => (reload(), sum.reload())}>
             <RefreshCw /> Refresh
@@ -197,6 +204,21 @@ export function LiveDepositsPage() {
         <KpiCard label="Credited today" icon={<Landmark />} value={<span className="k-num">{s ? `$${usd2(s.deposits.credited_today)}` : "—"}</span>} chip={s ? `${s.deposits.credited_today_count} deposits · GMT+3 day` : "—"} delay={0.08} />
         <KpiCard label="Client wallets" icon={<Landmark />} value={<span className="k-num">{s ? `$${usd2(s.wallets.liabilities)}` : "—"}</span>} chip={s ? `${s.wallets.funded} funded wallets` : "—"} delay={0.12} />
       </div>
+      <Segmented
+        className="mt-4"
+        aria-label="Deposit source"
+        value={source}
+        onChange={setSource}
+        options={[
+          { value: "chain", label: "USDT on chain" },
+          { value: "nowpayments", label: "NOWPayments" },
+        ]}
+      />
+      {source === "nowpayments" ? (
+        <div className="mt-4">
+          <NowPaymentsDeposits />
+        </div>
+      ) : (
       <Card className="mt-4 px-4 py-5 sm:px-6">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <Tabs
@@ -238,6 +260,7 @@ export function LiveDepositsPage() {
           </div>
         )}
       </Card>
+      )}
       <DepositDrawer id={open} onClose={() => setOpen(null)} onChanged={() => (reload(), sum.reload())} />
     </div>
   );

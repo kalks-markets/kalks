@@ -35,6 +35,15 @@ const ROUTES: Route[] = [
   { method: "POST", re: new RegExp(`^adjustments/${N}/cancel$`), perm: ADJ_WRITE },
   { method: "PUT", re: /^adjustments\/settings$/, perm: "finance.settings" },
   { method: "PUT", re: /^settings$/, perm: "finance.settings" },
+  // NOWPayments crypto deposits: settings (keys are write-only, the service never returns them), payments, review.
+  // Approve: finance.write proposes / credits, finance.adjust_approve gives the second approval above the four-eyes
+  // threshold; the service decides which applies to the payment's state.
+  { method: "GET", re: /^nowpayments\/(settings|payments)$/, perm: "finance.read" },
+  { method: "GET", re: new RegExp(`^nowpayments/payments/${N}$`), perm: "finance.read" },
+  { method: "PUT", re: /^nowpayments\/settings$/, perm: "finance.settings" },
+  { method: "POST", re: /^nowpayments\/test$/, perm: "finance.settings" },
+  { method: "POST", re: new RegExp(`^nowpayments/payments/${N}/(approve|reject)$`), perm: ["finance.write", "finance.adjust_approve"] },
+  { method: "POST", re: new RegExp(`^nowpayments/payments/${N}/refresh$`), perm: "finance.write" },
 ];
 
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "cache-control": "no-store" } });
