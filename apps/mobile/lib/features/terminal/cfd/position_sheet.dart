@@ -24,6 +24,23 @@ Future<void> showPositionSheet(BuildContext context, String ticket) => showKShee
 
 Future<void> showPendingSheet(BuildContext context, String ticket) => showKSheet<void>(context, builder: (_) => PendingForm(ticket: ticket));
 
+/// Closes the sheet `context` is in, once. A sheet whose position / order goes away is asked twice: by the successful
+/// Close / Close By / Delete, and by its "closed meanwhile" check when the account stream removes the trade. Both used
+/// `maybePop` on the root navigator, so the second one popped the route under the sheet, the trade room itself (back
+/// to the app shell). Now only the sheet's own route goes, and only while it is still there; a form that is not in a
+/// sheet (the first route) stays.
+void dismissSheet(BuildContext context) {
+  if (!context.mounted) return;
+  final route = ModalRoute.of(context);
+  if (route == null || !route.isActive || route.isFirst) return;
+  final nav = Navigator.of(context);
+  if (route.isCurrent) {
+    nav.pop();
+  } else {
+    nav.removeRoute(route);
+  }
+}
+
 const List<String> _trailOptions = ['none', '15', '20', '30', '50', '100', 'custom'];
 
 class PositionForm extends ConsumerStatefulWidget {
@@ -66,7 +83,7 @@ class _PositionFormState extends ConsumerState<PositionForm> {
     if (p == null || spec == null || a == null) {
       // closed meanwhile: the sheet goes away
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.of(context).maybePop();
+        if (mounted) dismissSheet(context);
       });
       return const SizedBox(height: 120);
     }
@@ -104,7 +121,7 @@ class _PositionFormState extends ConsumerState<PositionForm> {
           if (!mounted) return;
           setState(() => _busy = false);
           final whole = volume >= p.volume - 1e-9;
-          if (ok && whole && context.mounted) Navigator.of(context).maybePop();
+          if (ok && whole && context.mounted) dismissSheet(context);
           if (ok && !whole) setState(() => _vol = fmtVol(math.max(0.01, p.volume - volume)));
         }
 
@@ -126,7 +143,7 @@ class _PositionFormState extends ConsumerState<PositionForm> {
               );
           if (!mounted) return;
           setState(() => _busy = false);
-          if (ok && context.mounted) Navigator.of(context).maybePop();
+          if (ok && context.mounted) dismissSheet(context);
         }
 
         Widget action(String label, VoidCallback? onTap, {Color? fill, Color? fg, Key? key}) => Expanded(
@@ -468,7 +485,7 @@ class _PositionFormState extends ConsumerState<PositionForm> {
                           variant: KButtonVariant.surface,
                           onPressed: () async {
                             final ok = await ref.read(tradeActionsProvider).closeBy(p.ticket, o.ticket);
-                            if (ok && context.mounted) Navigator.of(context).maybePop();
+                            if (ok && context.mounted) dismissSheet(context);
                           },
                         ),
                       ],
@@ -533,7 +550,7 @@ class _PendingFormState extends ConsumerState<PendingForm> {
     final spec = ref.watch(symbolBookProvider.select((b) => o == null ? null : b[o.symbol]));
     if (o == null || spec == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.of(context).maybePop();
+        if (mounted) dismissSheet(context);
       });
       return const SizedBox(height: 120);
     }
@@ -634,7 +651,7 @@ class _PendingFormState extends ConsumerState<PendingForm> {
                     ? null
                     : () async {
                         final ok = await ref.read(tradeActionsProvider).cancelOrder(o.ticket);
-                        if (ok && context.mounted) Navigator.of(context).maybePop();
+                        if (ok && context.mounted) dismissSheet(context);
                       },
               ),
               const Spacer(),
@@ -657,7 +674,7 @@ class _PendingFormState extends ConsumerState<PendingForm> {
                             );
                         if (!mounted) return;
                         setState(() => _busy = false);
-                        if (ok && context.mounted) Navigator.of(context).maybePop();
+                        if (ok && context.mounted) dismissSheet(context);
                       },
               ),
             ],
