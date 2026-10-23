@@ -673,7 +673,8 @@ List<Map<String, dynamic>> _groupOptions(Map<String, dynamic> a) {
     200,
     {
       'account': _withState(account),
-      'credentials': {'login': login, if (pw is! String) 'password': 'Tq7mR4xV2pLs', 'investorPassword': 'Rd8nW3kZ5hJe'},
+      // the BFF answers the login only: the engine's generated passwords stay on the server
+      'credentials': {'login': login},
     },
   );
 }

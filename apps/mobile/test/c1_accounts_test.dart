@@ -14,9 +14,12 @@ import 'package:kalks/features/accounts/account_detail_screen.dart';
 import 'package:kalks/features/accounts/accounts_data.dart';
 import 'package:kalks/features/accounts/accounts_screen.dart';
 import 'package:kalks/features/accounts/open_account_screen.dart';
+import 'package:kalks/features/accounts/widgets/account_bits.dart';
+import 'package:kalks/features/accounts/widgets/group_card.dart';
 import 'package:kalks/preview/c1/preview_accounts.dart';
 import 'package:kalks/preview/preview_data.dart' as sample;
 import 'package:kalks/router/router.dart';
+import 'package:kalks/ui/ui.dart';
 
 import 'helpers/test_app.dart';
 
@@ -40,6 +43,11 @@ EngineAccount _account(Map<String, dynamic> over) => EngineAccount.fromJson({
 Future<void> _reveal(WidgetTester tester, Finder screen, Finder target) async {
   final page = find.descendant(of: screen, matching: find.byType(Scrollable)).first;
   final pos = tester.state<ScrollableState>(page).position;
+  // not built (scrolled past, above): look from the top
+  if (target.evaluate().isEmpty && pos.pixels > 0) {
+    pos.jumpTo(0);
+    await tester.pump(const Duration(milliseconds: 60));
+  }
   for (var i = 0; i < 40 && target.evaluate().isEmpty; i++) {
     if (pos.pixels >= pos.maxScrollExtent) break;
     pos.jumpTo(math.min(pos.pixels + 250, pos.maxScrollExtent));
@@ -263,36 +271,120 @@ void main() {
       await unmount(tester);
     });
 
-    testWidgets('Open account wizard: demo, a type, the review, then the new login', timeout: const Timeout(Duration(minutes: 2)), (tester) async {
+    testWidgets('Open account: the defaults, the acknowledgement, Open; no password asked, sent or shown', timeout: const Timeout(Duration(minutes: 2)), (
+      tester,
+    ) async {
       final c = await pumpApp(tester, signedIn: true);
       c.read(routerProvider).go('/accounts/new?type=demo');
       await settle(tester);
-      expect(find.byType(OpenAccountScreen), findsOneWidget);
-      // the Product step first (a CFD account by default), then Live / Demo
+      final wizard = find.byType(OpenAccountScreen);
+      expect(wizard, findsOneWidget);
+      // the Product step first (a CFD account by default), then the one Account step
       expect(find.text('What will this account trade?'), findsWidgets);
-
-      // walk the steps: Continue, picking the first type when asked
-      for (var i = 0; i < 5 && find.text('Review and confirm').evaluate().isEmpty; i++) {
-        if (find.text('Pick an account type').evaluate().isNotEmpty) {
-          final cards = find.byWidgetPredicate((w) => w.runtimeType.toString() == 'EngineGroupCard');
-          if (cards.evaluate().isNotEmpty) {
-            await tester.tap(cards.first);
-            await _calm(tester);
-          }
-        }
-        if (find.text('Review and confirm').evaluate().isNotEmpty) break;
-        await _reveal(tester, find.byType(OpenAccountScreen), find.text('Continue'));
-        await tester.tap(find.text('Continue').last);
-        await _calm(tester);
-      }
-      expect(find.text('Review and confirm'), findsWidgets);
-      await _reveal(tester, find.byType(OpenAccountScreen), find.textContaining('I understand that demo results use virtual funds'));
+      await _reveal(tester, wizard, find.text('Continue'));
+      await tester.tap(find.text('Continue').last);
+      await _calm(tester);
+      expect(find.text('Choose an account'), findsWidgets);
+      // no password field anywhere on the way, just the note that none is needed
+      expect(find.byType(PasswordInput), findsNothing);
+      expect(find.text('Choose my own trading password'), findsNothing);
+      final note = find.textContaining('Set a trading or investor password anytime');
+      await _reveal(tester, wizard, note);
+      expect(note, findsOneWidget);
+      // the Standard type preselected; Open waits for the acknowledgement
+      final selected = tester.widgetList<EngineGroupCard>(find.byType(EngineGroupCard)).where((x) => x.selected).map((x) => x.group.code);
+      expect(selected, ['standard']);
+      await _reveal(tester, wizard, find.byKey(const ValueKey('wizard-open')));
+      expect(tester.widget<KButton>(find.byKey(const ValueKey('wizard-open'))).onPressed, isNull);
+      await _reveal(tester, wizard, find.textContaining('I understand that demo results use virtual funds'));
       await tester.tap(find.textContaining('I understand that demo results use virtual funds'));
       await tester.pump();
-      await _reveal(tester, find.byType(OpenAccountScreen), find.text('Open demo account'));
+      await _reveal(tester, wizard, find.text('Open demo account'));
       await tester.tap(find.text('Open demo account').last);
       await _calm(tester);
-      expect(previewAccountCalls.where((x) => x.method == 'POST' && x.path == 'trading/accounts'), hasLength(1));
+      final opened = previewAccountCalls.where((x) => x.method == 'POST' && x.path == 'trading/accounts').toList();
+      expect(opened, hasLength(1));
+      expect(opened.single.body['type'], 'demo');
+      expect(opened.single.body['group'], 'standard');
+      expect(opened.single.body.containsKey('password'), isFalse);
+      expect(opened.single.body.containsKey('investorPassword'), isFalse);
+
+      // Done: the account number and server, Trade now, the optional passwords; no password shown
+      expect(find.text('Your account is ready'), findsWidgets);
+      expect(find.byKey(const ValueKey('created-trade')), findsOneWidget);
+      expect(find.text('Trade now'), findsOneWidget);
+      expect(find.text('Account number'), findsOneWidget);
+      expect(find.text('Trading password'), findsNothing);
+      expect(find.text('Investor password'), findsNothing);
+      expect(find.text('Copy all'), findsNothing);
+      await _reveal(tester, wizard, find.byKey(const ValueKey('created-set-investor')));
+      expect(find.text('Passwords are optional'), findsOneWidget);
+      // Set investor password: the account's password sheet (emailed code on Continue)
+      await tester.tap(find.byKey(const ValueKey('created-set-investor')));
+      await _calm(tester);
+      expect(find.text('Set investor (view-only) password'), findsWidgets);
+      expect(find.text('New password'), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('Open account: Live | Demo on the Account step, More options folds leverage and the demo balance', timeout: const Timeout(Duration(minutes: 2)), (
+      tester,
+    ) async {
+      final c = await pumpApp(tester, signedIn: true);
+      c.read(routerProvider).go('/accounts/new?product=cfd');
+      await settle(tester);
+      final wizard = find.byType(OpenAccountScreen);
+      // ?product= goes straight to the Account step; Live by default
+      expect(find.text('Choose an account'), findsWidgets);
+      await tester.tap(find.descendant(of: find.byKey(const ValueKey('wizard-kind')), matching: find.text('Live')));
+      await _calm(tester);
+      await _reveal(tester, wizard, find.text('Open live account'));
+      expect(find.text('Open live account'), findsOneWidget);
+      await _reveal(tester, wizard, find.byKey(const ValueKey('wizard-kind')));
+      await tester.tap(find.descendant(of: find.byKey(const ValueKey('wizard-kind')), matching: find.text('Demo')));
+      await _calm(tester);
+      await _reveal(tester, wizard, find.text('Open demo account'));
+      expect(find.text('Open demo account'), findsOneWidget);
+      // the advanced choices are folded away
+      expect(find.text('Leverage'), findsNothing);
+      expect(find.text('Starting balance'), findsNothing);
+      await _reveal(tester, wizard, find.byKey(const ValueKey('wizard-more-options')));
+      await tester.tap(find.byKey(const ValueKey('wizard-more-options')));
+      await _calm(tester);
+      expect(find.text('Leverage'), findsOneWidget);
+      expect(find.text('Starting balance'), findsOneWidget);
+      await _reveal(tester, wizard, find.text(r'$5,000'));
+      await tester.tap(find.text(r'$5,000'));
+      await tester.pump();
+      await _reveal(tester, wizard, find.textContaining('I understand that demo results use virtual funds'));
+      await tester.tap(find.textContaining('I understand that demo results use virtual funds'));
+      await tester.pump();
+      await _reveal(tester, wizard, find.text('Open demo account'));
+      await tester.tap(find.text('Open demo account').last);
+      await _calm(tester);
+      final opened = previewAccountCalls.where((x) => x.method == 'POST' && x.path == 'trading/accounts').single;
+      expect(opened.body['initialBalance'], 5000);
+      await unmount(tester);
+    });
+
+    testWidgets('Credentials tab: Set trading password and Set investor (view-only) password, each explained', timeout: const Timeout(Duration(minutes: 2)), (
+      tester,
+    ) async {
+      final c = await pumpApp(tester, signedIn: true);
+      c.read(routerProvider).go('/accounts/10042817?tab=credentials');
+      await settle(tester);
+      final screen = find.byType(AccountDetailScreen);
+      await _reveal(tester, screen, find.byKey(const ValueKey('set-investor-password')));
+      expect(find.text('Set trading password'), findsOneWidget);
+      expect(find.text('Set investor (view-only) password'), findsOneWidget);
+      expect(find.text('Full access: log in from another trading app (MT-style) and trade. Not needed on Kalks.'), findsOneWidget);
+      expect(find.text('Read-only: share it so someone can view positions and history without trading.'), findsOneWidget);
+      expect(find.text('Change'), findsNothing);
+      await _reveal(tester, screen, find.byKey(const ValueKey('set-trading-password')));
+      await tester.tap(find.byKey(const ValueKey('set-trading-password')));
+      await _calm(tester);
+      expect(find.text('Set trading password'), findsWidgets);
+      expect(find.textContaining('Setting it replaces any earlier one'), findsOneWidget);
       await unmount(tester);
     });
   });

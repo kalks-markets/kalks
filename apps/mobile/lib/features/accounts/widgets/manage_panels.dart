@@ -73,8 +73,9 @@ class CredentialsPanel extends StatelessWidget {
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: KButton(
-                label: t('accountDetail.creds.change'),
-                icon: LucideIcons.pencil,
+                key: ValueKey('set-$kind-password'),
+                label: t(kind == 'trading' ? 'accountDetail.creds.setTrading' : 'accountDetail.creds.setInvestor'),
+                icon: LucideIcons.keyRound,
                 variant: KButtonVariant.surface,
                 size: KButtonSize.sm,
                 onPressed: () => unawaited(showChangePasswordSheet(context, a, kind)),
@@ -87,7 +88,7 @@ class CredentialsPanel extends StatelessWidget {
       children: [
         DetailCard(
           title: t('accountDetail.creds.title'),
-          subtitle: t('accountDetail.creds.subtitle'),
+          subtitle: t('accountDetail.creds.subtitleOptional'),
           icon: LucideIcons.lock,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,7 +102,7 @@ class CredentialsPanel extends StatelessWidget {
                 ember: true,
                 title: t('accountDetail.pw.trading'),
                 chip: KChip(label: t('accountDetail.creds.fullAccess'), small: true),
-                desc: t('accountDetail.creds.tradingDesc'),
+                desc: t('accountDetail.creds.tradingWhy'),
                 kind: 'trading',
               ),
               const SizedBox(height: 10),
@@ -110,7 +111,7 @@ class CredentialsPanel extends StatelessWidget {
                 ember: false,
                 title: t('accountDetail.pw.investor'),
                 chip: KChip(label: t('accountDetail.creds.readOnly'), tone: KChipTone.info, small: true),
-                desc: t('accountDetail.creds.investorDesc'),
+                desc: t('accountDetail.creds.investorWhy'),
                 kind: 'investor',
               ),
               const SizedBox(height: 12),

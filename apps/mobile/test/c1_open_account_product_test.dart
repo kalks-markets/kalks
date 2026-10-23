@@ -102,6 +102,16 @@ void main() {
       expect(groupOffers(_group('cent', types: 'live'), AccountKind.demo, 'cfd'), isFalse);
     });
 
+    test('the wizard preselects the Standard type, else the first offered (web defaultGroup)', () {
+      String? pick(List<String> codes) => defaultGroup([for (final c in codes) _group(c)])?.code;
+      expect(pick(['standard', 'pro']), 'standard');
+      expect(pick(['pro', 'ecn', 'standard']), 'standard');
+      expect(pick(['options-standard']), 'options-standard');
+      expect(pick(['pro', 'ecn']), 'pro');
+      expect(pick(['standard-plus', 'ecn']), 'standard-plus');
+      expect(pick([]), isNull);
+    });
+
     test('the account limit counts the accounts of that kind and the type\'s product', () {
       final g = _group('options-standard', product: 'options');
       final accounts = [
@@ -186,9 +196,8 @@ void main() {
       await tester.tap(find.text('Open an Options account'));
       await settle(tester);
       expect(_wizard, findsOneWidget);
-      // the terms are accepted: straight to Live / Demo on the Options product
+      // the terms are accepted: straight to the Account step (Live / Demo and the types) on the Options product
       expect(find.text('Choose an account'), findsWidgets);
-      await _continue(tester);
       expect(await _typesShown(tester), {'options-standard'});
       await unmount(tester);
     });
@@ -207,11 +216,10 @@ void main() {
       expect(find.text('CFD ACCOUNT'), findsWidgets);
       expect(find.text('OPTIONS ACCOUNT'), findsWidgets);
 
-      // CFD (the default): Live / Demo, then the CFD types only
+      // CFD (the default): the Account step, Live / Demo and the CFD types only
       await _continue(tester);
       expect(find.text('Choose an account'), findsWidgets);
-      await _continue(tester);
-      expect(find.text('Pick an account type'), findsWidgets);
+      expect(find.text('Account type'), findsWidgets);
       expect(await _typesShown(tester), {'standard', 'pro', 'cent', 'ecn'});
       await unmount(tester);
     });
@@ -236,14 +244,11 @@ void main() {
       await _continue(tester);
       expect(_accepted(), isTrue);
       expect(find.text('Choose an account'), findsWidgets);
-      await _continue(tester);
-      expect(find.text('Pick an account type'), findsWidgets);
       expect(await _typesShown(tester), {'options-standard'});
-      // the intro is done: Back goes past it to Live / Demo, then to the Product step
-      await _tap(tester, find.text('Back'));
-      expect(find.text('Choose an account'), findsWidgets);
+      // the intro is done: Back goes past it to the Product step
       await _tap(tester, find.text('Back'));
       expect(find.text('What will this account trade?'), findsWidgets);
+      expect(find.byType(OptionsIntroCard), findsNothing);
       await unmount(tester);
     });
 
@@ -262,7 +267,6 @@ void main() {
       await settle(tester);
       expect(find.byType(OptionsIntroCard), findsNothing);
       expect(find.text('Choose an account'), findsWidgets);
-      await _continue(tester);
       expect(await _typesShown(tester), {'options-standard'});
       await unmount(tester);
     });
@@ -272,9 +276,13 @@ void main() {
       final c = await pumpApp(tester, signedIn: true);
       c.read(routerProvider).go('/accounts/new?group=options-standard');
       await settle(tester);
-      // straight to Configure (an Options type: no leverage to pick)
-      expect(find.text('Configure your account'), findsWidgets);
-      expect(find.textContaining('Options Standard'), findsWidgets);
+      // straight to the Account step with that type chosen (an Options type: no leverage to pick, even under More
+      // options)
+      expect(find.text('Choose an account'), findsWidgets);
+      await _reveal(tester, find.byType(EngineGroupCard));
+      expect(tester.widgetList<EngineGroupCard>(find.byType(EngineGroupCard)).where((c) => c.selected).map((c) => c.group.code), ['options-standard']);
+      await _tap(tester, find.byKey(const ValueKey('wizard-more-options')));
+      expect(find.text('Nickname'), findsOneWidget);
       expect(find.text('Leverage'), findsNothing);
       await unmount(tester);
     });
@@ -291,7 +299,6 @@ void main() {
       expect(find.byKey(const ValueKey('wizard-product-options')), findsNothing);
       expect(find.byType(OptionsIntroCard), findsNothing);
       expect(find.text('Choose an account'), findsWidgets);
-      await _continue(tester);
       expect(await _typesShown(tester), {'standard', 'pro', 'cent', 'ecn'});
       await unmount(tester);
     });

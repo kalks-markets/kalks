@@ -1147,12 +1147,14 @@ class _TransferBetweenSheetState extends ConsumerState<TransferBetweenSheet> {
   }
 }
 
-/* ------------------------------------------------------------------ Change password (manage.tsx ChangePasswordDialog) */
+/* ------------------------------------------------------------------ Set password (manage.tsx ChangePasswordDialog) */
 
-/// `kind`: trading | investor.
+/// Sets the trading or investor password (replacing any earlier one) after the emailed code. `kind`: trading |
+/// investor. No password is needed to trade on Kalks: these are for other trading apps and for sharing view-only
+/// access. Also opened from the open-account wizard's Done step.
 Future<void> showChangePasswordSheet(BuildContext context, EngineAccount a, String kind) => showKSheet<void>(
   context,
-  title: context.t(kind == 'trading' ? 'accountDetail.pw.changeTitle.trading' : 'accountDetail.pw.changeTitle.investor'),
+  title: context.t(kind == 'trading' ? 'accountDetail.creds.setTrading' : 'accountDetail.creds.setInvestor'),
   builder: (_) => _ChangePasswordSheet(a: a, kind: kind),
 );
 
@@ -1191,7 +1193,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       accountToast(
         context,
         NotificationKind.success,
-        t(_trading ? 'accountDetail.pw.changed.trading' : 'accountDetail.pw.changed.investor'),
+        t(_trading ? 'accountDetail.pw.saved.trading' : 'accountDetail.pw.saved.investor'),
         description: '#${a.login}${revoked > 0 ? ' · ${t('accountDetail.pw.sessionsSignedOut', {'count': revoked})}' : ''}',
       );
     } on ApiException catch (e) {
@@ -1216,7 +1218,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       context,
       action: _trading ? 'trading_password' : 'investor_password',
       target: '${a.login}',
-      title: t(_trading ? 'accountDetail.pw.changeTitle.trading' : 'accountDetail.pw.changeTitle.investor'),
+      title: t(_trading ? 'accountDetail.creds.setTrading' : 'accountDetail.creds.setInvestor'),
       description: t('accountDetail.pw.confirmWithCode'),
       what: t(_trading ? 'accountDetail.pw.stepUpWhat.trading' : 'accountDetail.pw.stepUpWhat.investor', {'login': a.login}),
       confirmLabel: t('accountDetail.pw.confirmSet'),
@@ -1245,7 +1247,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
         primary: KButton(label: t('common.continue'), size: KButtonSize.lg, expand: true, loading: _busy, onPressed: ok && !_busy ? _continue : null),
       ),
       children: [
-        SheetDescription(t(_trading ? 'accountDetail.pw.descTrading' : 'accountDetail.pw.descInvestor', {'login': a.login})),
+        SheetDescription(t(_trading ? 'accountDetail.pw.descTradingSet' : 'accountDetail.pw.descInvestorSet', {'login': a.login})),
         if (_formErr != null) ...[KFormError(_formErr), const SizedBox(height: 12)],
         PasswordInput(label: t('accountDetail.pw.new'), value: _pw, generate: true, onChanged: (v) => setState(() => _pw = v)),
         const SizedBox(height: 10),
