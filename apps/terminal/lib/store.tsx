@@ -304,7 +304,8 @@ function readWorkspace(): Workspace {
       w.optPanel = false;
       w.uiVersion = 3;
     }
-    // no automatic indicators: a chart still showing exactly the EMA 50 + SMA 20 every workspace started with loses them
+    // no automatic indicators: a chart still showing exactly what the old default workspace gave it (EMA 50 + SMA 20,
+    // EURUSD BB, NAS100 RSI, BTCUSD MACD) loses it
     if ((w.uiVersion ?? 1) < 4) w = stripAutoIndicators(w);
     if (!["instruments", "book", "ticks", "navigator"].includes(w.side)) w.side = "instruments";
     if (w.posLayout !== "split") w.posLayout = "page";

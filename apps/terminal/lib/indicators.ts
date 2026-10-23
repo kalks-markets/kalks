@@ -1381,13 +1381,15 @@ const LEGACY: Record<string, [IndicatorType, Params]> = {
   macd: ["macd", {}],
 };
 
+/** No colour, width or hidden output: the indicator's own look. */
+const plainStyle = (s: IndicatorInstance["style"]) => !s || Object.values(s).every((o) => !o || (o.color === undefined && o.width === undefined && o.visible !== false));
+
 /**
  * Up to workspace uiVersion 3 a new workspace's first chart started with EMA 50 and SMA 20. True when `list` is still
  * exactly that pair as it was added (EMA 50 close, then SMA 20 close, shown, default styles and levels): the one-time
  * migration removes it (app: indicators.dart isAutoIndicatorPair). Anything the client changed stays.
  */
 export function isAutoIndicatorPair(list: readonly IndicatorInstance[]): boolean {
-  const plainStyle = (s: IndicatorInstance["style"]) => !s || Object.values(s).every((o) => !o || (o.color === undefined && o.width === undefined && o.visible !== false));
   const untouched = (i: IndicatorInstance | undefined, type: IndicatorType, period: number) =>
     !!i &&
     i.type === type &&
@@ -1400,9 +1402,32 @@ export function isAutoIndicatorPair(list: readonly IndicatorInstance[]): boolean
   return list.length === 2 && untouched(list[0], "ema", 50) && untouched(list[1], "sma", 20);
 }
 
-/** Workspace uiVersion 3 -> 4: a chart still showing exactly the automatic EMA 50 + SMA 20 loses them (app: Workspace.fromJson). */
-export function stripAutoIndicators<W extends { tabs: { indicators: IndicatorInstance[] }[]; uiVersion?: number }>(w: W): W {
-  return { ...w, tabs: w.tabs.map((t) => (isAutoIndicatorPair(t.indicators) ? { ...t, indicators: [] } : t)), uiVersion: 4 };
+/** The other charts of the old default workspace: one indicator each, with its default inputs (web only; the app never had these). */
+const AUTO_SINGLE: Record<string, IndicatorType> = { EURUSD: "bb", NAS100: "rsi", BTCUSD: "macd" };
+
+/**
+ * True when a `symbol` chart still shows exactly the one indicator the old default workspace gave it (EURUSD Bollinger
+ * Bands, NAS100 RSI, BTCUSD MACD): default inputs, shown, default styles and levels. Anything the client changed stays.
+ */
+export function isAutoIndicatorSingle(symbol: string, list: readonly IndicatorInstance[]): boolean {
+  const type = AUTO_SINGLE[symbol];
+  const i = list[0];
+  if (!type || list.length !== 1 || !i || i.type !== type) return false;
+  const def = normalizeParams(type, {});
+  const keys = Object.keys(i.params ?? {});
+  return (
+    i.visible !== false &&
+    i.levels === undefined &&
+    plainStyle(i.style) &&
+    keys.length === Object.keys(def).length &&
+    keys.every((k) => i.params[k] === def[k])
+  );
+}
+
+/** Workspace uiVersion 3 -> 4: a chart still showing exactly its automatic indicators loses them (app: Workspace.fromJson, the pair only). */
+export function stripAutoIndicators<W extends { tabs: { symbol: string; indicators: IndicatorInstance[] }[]; uiVersion?: number }>(w: W): W {
+  const auto = (t: W["tabs"][number]) => isAutoIndicatorPair(t.indicators) || isAutoIndicatorSingle(t.symbol, t.indicators);
+  return { ...w, tabs: w.tabs.map((t) => (auto(t) ? { ...t, indicators: [] } : t)), uiVersion: 4 };
 }
 
 /** Accepts the old `IndicatorId[]` workspace format and the current instance list; drops anything unknown. */
