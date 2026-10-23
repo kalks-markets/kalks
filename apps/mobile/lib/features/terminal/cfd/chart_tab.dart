@@ -1,9 +1,9 @@
 // Chart tab (web MChart, owner design 2026-10): the chart fills the tab (no header, no frame): the symbol pill (tap:
 // another market) and the timeframe control (timeframe_picker.dart: the timeframe chip and the starred timeframes)
 // float at the top with the chart menu (type, indicators,
-// templates), the OHLC legend sits under them, and ONE slim pill at the bottom centre trades: [S bid] − volume +
-// [ask B], the same order path as the rest of the terminal (one-click trading on: at once, with a haptic; off: the
-// prefilled order ticket). Trade lines are compact tags: "B 0.50 +12.30", "S 1.11850" (stop), "T 1.12600" (target).
+// templates), ONE slim pill under them trades: [S bid] − volume + [ask B] (at the top, so the newest candles, the
+// time axis and the Kalks mark at the bottom stay clear), and the OHLC legend sits under it. The pill uses the same
+// order path as the rest of the terminal (one-click trading on: at once, with a haptic; off: the prefilled order ticket). Trade lines are compact tags: "B 0.50 +12.30", "S 1.11850" (stop), "T 1.12600" (target).
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -34,6 +34,9 @@ import 'timeframe_picker.dart';
 /// Room the floating top controls take over the plot (the chart's legend starts below).
 const double kChartTopBar = 48;
 
+/// Room the one-click pill takes under the top controls (36 px pill + 3 px padding each side + a 6 px gap).
+const double kChartTradePill = 48;
+
 class ChartTab extends ConsumerWidget {
   const ChartTab({super.key});
 
@@ -48,7 +51,7 @@ class ChartTab extends ConsumerWidget {
     return Stack(
       children: [
         Positioned.fill(
-          child: _Chart(symbol: symbol, tf: ws.tf, topInset: kChartTopBar),
+          child: _Chart(symbol: symbol, tf: ws.tf, topInset: readOnly ? kChartTopBar : kChartTopBar + kChartTradePill),
         ),
         // the symbol pill · timeframes · chart menu, floating over the top of the plot (a 44 px row: the pills are 34 px
         // tall, the timeframes' touch targets the full 44)
@@ -94,12 +97,12 @@ class ChartTab extends ConsumerWidget {
             ],
           ),
         ),
-        // one-tap trading (MT5's one-click panel, slim): [S bid] − volume + [ask B]
+        // one-tap trading (MT5's one-click panel, slim): [S bid] − volume + [ask B], under the top controls
         if (!readOnly)
           Positioned(
             left: 0,
             right: 0,
-            bottom: 14,
+            top: kChartTopBar,
             child: Center(child: OneClickPill(symbol: symbol)),
           ),
       ],
@@ -336,7 +339,7 @@ class _Chart extends ConsumerWidget {
   }
 }
 
-/// One-tap trading on the chart, like MT5's one-click panel, as ONE slim pill at the bottom centre: [S bid] − volume
+/// One-tap trading on the chart, like MT5's one-click panel, as ONE slim pill at the top centre: [S bid] − volume
 /// + [ask B] (~36 px). The same order path as the rest of the terminal: one-click trading on (Account tab) sends a
 /// market order at once (haptic); off, the tap opens the prefilled order ticket to confirm. A closed market, a delayed
 /// quote or an order on its way: the sides grey out (a small note says why). Tap the volume for quick sizes.
@@ -450,13 +453,6 @@ class _OneClickPillState extends ConsumerState<OneClickPill> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (note != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: k.surface.withValues(alpha: 0.92), borderRadius: BorderRadius.circular(10)),
-                child: Text(note, style: context.text.caption.copyWith(color: k.warn, fontSize: 11)),
-              ),
             Container(
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
@@ -496,6 +492,13 @@ class _OneClickPillState extends ConsumerState<OneClickPill> {
                 ],
               ),
             ),
+            if (note != null)
+              Container(
+                margin: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: k.surface.withValues(alpha: 0.92), borderRadius: BorderRadius.circular(10)),
+                child: Text(note, style: context.text.caption.copyWith(color: k.warn, fontSize: 11)),
+              ),
           ],
         );
       },

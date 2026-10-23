@@ -69,18 +69,19 @@ void main() {
   double priceOn(WidgetTester tester, String side) =>
       tester.widget<PriceText>(find.descendant(of: find.byKey(ValueKey('chart-trade-$side')), matching: find.byType(PriceText))).value;
 
-  testWidgets('one slim pill floats at the bottom centre of the full chart with the live bid and ask', (tester) async {
+  testWidgets('one slim pill floats at the top centre of the full chart, under the symbol and timeframes with the live bid and ask', (tester) async {
     await open(tester);
     expect(find.byKey(const ValueKey('chart-trade-sell')), findsOneWidget);
     expect(priceOn(tester, 'sell'), 63400);
     expect(priceOn(tester, 'buy'), 63418);
-    // over the plot, not under it: at the bottom, centred, ~36 px tall, SELL left of the volume, BUY right of it
+    // over the plot, not above it: at the top under the symbol row (the bottom stays clear), centred, ~36 px tall, SELL left of the volume, BUY right of it
     final chart = tester.getRect(find.byType(TerminalChart));
     final sell = tester.getRect(find.byKey(const ValueKey('chart-trade-sell')));
     final buy = tester.getRect(find.byKey(const ValueKey('chart-trade-buy')));
     final vol = tester.getRect(find.byKey(const ValueKey('chart-vol')));
     expect(chart.contains(sell.center) && chart.contains(buy.center), isTrue);
-    expect(chart.bottom - sell.bottom, lessThan(30));
+    expect(sell.top - chart.top, lessThan(100));
+    expect(sell.top, greaterThan(tester.getRect(find.byKey(const ValueKey('chart-symbol'))).bottom));
     expect(sell.height, 36);
     expect(sell.right <= vol.left && vol.right <= buy.left, isTrue);
     expect(((sell.left + buy.right) / 2 - chart.center.dx).abs(), lessThan(2));
