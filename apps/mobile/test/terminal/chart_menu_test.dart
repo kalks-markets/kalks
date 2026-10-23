@@ -72,13 +72,14 @@ void main() {
     });
   });
 
-  test('a symbol\'s chart is saved in the workspace: the web default until changed, per symbol', () async {
+  test('a symbol\'s chart is saved in the workspace: candles without indicators until changed, per symbol', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await Prefs.open();
     final c1 = ProviderContainer(overrides: [prefsProvider.overrideWithValue(prefs)]);
     final ws = c1.read(workspaceProvider);
     expect(ws.chartOf('XAUUSD').type, 'candles');
-    expect(ws.chartOf('XAUUSD').indicators.map((i) => (i.type, i.params['period'])), [('ema', 50), ('sma', 20)]);
+    // no automatic indicators: a new chart is empty
+    expect(ws.chartOf('XAUUSD').indicators, isEmpty);
     c1.read(workspaceProvider.notifier).updateChart('XAUUSD', (c) => c.copyWith(type: 'area', indicators: [makeInstance(reg, 'rsi', const [])]));
     c1.read(workspaceProvider.notifier).toggleIndicatorFavourite('atr');
     c1.dispose();
@@ -87,9 +88,95 @@ void main() {
     final again = c2.read(workspaceProvider);
     expect(again.chartOf('XAUUSD').type, 'area');
     expect(again.chartOf('XAUUSD').indicators.single.type, 'rsi');
-    expect(again.chartOf('EURUSD').indicators, hasLength(2));
+    expect(again.chartOf('EURUSD').indicators, isEmpty);
+    expect(again.toJson()['version'], kWorkspaceVersion);
     expect(again.indicatorFavourites, [...kDefaultIndicatorFavourites, 'atr']);
     expect(jsonDecode(jsonEncode(again.toJson())), again.toJson());
+  });
+
+  group('the one-time migration away from the automatic EMA 50 + SMA 20', () {
+    Map<String, Object?> ind(String type, int period, {String source = 'close', bool visible = true, Map<String, Object?>? style, List<num>? levels}) => {
+      'uid': '$type$period',
+      'type': type,
+      'params': {'period': period, 'source': source},
+      'visible': visible,
+      'style': ?style,
+      'levels': ?levels,
+    };
+    List<Map<String, Object?>> pair() => [ind('ema', 50), ind('sma', 20)];
+    Map<String, dynamic> saved(Map<String, Object?> charts, {int? version}) => jsonDecode(
+      jsonEncode({
+        'symbol': 'XAUUSD',
+        'charts': {
+          for (final e in charts.entries) e.key: {'type': 'candles', 'indicators': e.value},
+        },
+        'version': ?version,
+      }),
+    ) as Map<String, dynamic>;
+
+    test('an untouched default pair is removed from a version 1 workspace; the chart type stays', () {
+      final j = saved({'XAUUSD': pair()});
+      (j['charts'] as Map)['XAUUSD']['type'] = 'area';
+      final w = Workspace.fromJson(j);
+      expect(w.chartOf('XAUUSD').indicators, isEmpty);
+      expect(w.chartOf('XAUUSD').type, 'area');
+      expect(w.toJson()['version'], kWorkspaceVersion);
+    });
+
+    test('a customised chart keeps its indicators', () {
+      final w = Workspace.fromJson(
+        saved({
+          'A': [ind('ema', 50), ind('sma', 21)], // period changed
+          'B': [ind('ema', 50, visible: false), ind('sma', 20)], // hidden
+          'C': [
+            ind(
+              'ema',
+              50,
+              style: {
+                'ma': {'color': 'info'},
+              },
+            ),
+            ind('sma', 20),
+          ], // recoloured
+          'D': [...pair(), ind('rsi', 14)], // one added
+          'E': [ind('ema', 50)], // one removed
+          'F': [ind('ema', 50), ind('sma', 20, source: 'hl2')], // source changed
+          'G': [
+            ind('ema', 50, levels: [1]),
+            ind('sma', 20),
+          ], // levels set
+          'H': [ind('sma', 20), ind('ema', 50)], // not the order the app added them in
+        }),
+      );
+      for (final s in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']) {
+        expect(w.chartOf(s).indicators, isNotEmpty, reason: s);
+      }
+      expect(w.chartOf('D').indicators.map((i) => i.type), ['ema', 'sma', 'rsi']);
+    });
+
+    test('runs once: a pair the client adds again in a version 2 workspace stays', () {
+      expect(Workspace.fromJson(saved({'XAUUSD': pair()}, version: kWorkspaceVersion)).chartOf('XAUUSD').indicators, hasLength(2));
+      expect(isAutoIndicatorPair(Workspace.fromJson(saved({'XAUUSD': pair()}, version: 2)).chartOf('XAUUSD').indicators), isTrue);
+    });
+
+    test('the controller saves the migrated workspace at the current version', () async {
+      SharedPreferences.setMockInitialValues({
+        'kalks.trader.workspace': jsonEncode(
+          saved({
+            'XAUUSD': pair(),
+            'EURUSD': [ind('ema', 50)],
+          }),
+        ),
+      });
+      final prefs = await Prefs.open();
+      final c = ProviderContainer(overrides: [prefsProvider.overrideWithValue(prefs)]);
+      addTearDown(c.dispose);
+      expect(c.read(workspaceProvider).chartOf('XAUUSD').indicators, isEmpty);
+      expect(c.read(workspaceProvider).chartOf('EURUSD').indicators.single.type, 'ema');
+      final stored = prefs.featureJson('trader.workspace')!;
+      expect(stored['version'], kWorkspaceVersion);
+      expect((stored['charts'] as Map)['XAUUSD']['indicators'], isEmpty);
+    });
   });
 
   group('sheets', () {
@@ -129,6 +216,11 @@ void main() {
     testWidgets('the menu: chart type, the indicators on the chart (hide, remove), templates', (tester) async {
       await show(tester, const ChartMenu(symbol: 'XAUUSD'));
       expect(find.text('CHART TYPE'), findsOneWidget);
+      expect(find.text('EMA 50'), findsNothing);
+      ChartEdits(h.container.read, 'XAUUSD')
+        ..add('ema')
+        ..add('sma');
+      await tester.pump();
       expect(find.text('EMA 50'), findsOneWidget);
       expect(find.text('SMA 20'), findsOneWidget);
       for (final l in ['Candlesticks', 'Bars', 'Line', 'Area']) {
@@ -162,6 +254,11 @@ void main() {
 
     testWidgets('the indicators list: tap adds, search, favourites, on this chart', (tester) async {
       await show(tester, const IndicatorList(symbol: 'XAUUSD'));
+      expect(find.text('1 ON CHART'), findsNothing);
+      ChartEdits(h.container.read, 'XAUUSD')
+        ..add('ema')
+        ..add('sma');
+      await tester.pump();
       expect(find.text('Moving Average (Simple)'), findsOneWidget);
       expect(find.text('1 ON CHART'), findsNWidgets(2));
       await tester.enterText(find.byType(EditableText), 'relative');
@@ -271,14 +368,17 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
       await tester.pump(const Duration(milliseconds: 100));
     }
-    // the count of indicators on the button, and the legend rows of the chart
-    expect(find.descendant(of: find.byKey(const ValueKey('chart-menu')), matching: find.text('2')), findsOneWidget);
+    // a new chart has no indicators: no count on the button
+    expect(h.container.read(workspaceProvider).chartOf('XAUUSD').indicators, isEmpty);
+    expect(find.descendant(of: find.byKey(const ValueKey('chart-menu')), matching: find.text('2')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('chart-menu')));
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
     expect(find.text('CHART TYPE'), findsOneWidget);
     expect(find.text('ON THIS CHART'), findsOneWidget);
+    expect(find.text('EMA 50'), findsNothing);
+    expect(find.text('SMA 20'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('chart-type-area')));
     await tester.pump();
     expect(h.container.read(workspaceProvider).chartOf('XAUUSD').type, 'area');

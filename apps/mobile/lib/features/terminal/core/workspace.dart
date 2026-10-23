@@ -108,7 +108,7 @@ class Workspace {
   final List<PriceAlert> alerts;
   final String? lastLogin;
 
-  /// Chart type and indicators per symbol (a symbol without its own: candles with EMA 50 and SMA 20).
+  /// Chart type and indicators per symbol (a symbol without its own: candles, no indicators).
   final Map<String, ChartSettings> charts;
 
   /// Starred indicator types of the indicators list.
@@ -120,8 +120,8 @@ class Workspace {
   /// Starred timeframes: next to the chart's timeframe chip, in [kTimeframes] order.
   final List<String> tfFavourites;
 
-  /// The chart of a symbol (the web's default chart until changed).
-  ChartSettings chartOf(String symbol) => charts[symbol] ?? ChartSettings(indicators: _defaultIndicators);
+  /// The chart of a symbol (candles without indicators until changed).
+  ChartSettings chartOf(String symbol) => charts[symbol] ?? const ChartSettings();
 
   Workspace copyWith({
     List<String>? favourites,
@@ -171,6 +171,7 @@ class Workspace {
     'indicatorFavourites': indicatorFavourites,
     'advancedQuotes': advancedQuotes,
     'tfFavourites': tfFavourites,
+    'version': kWorkspaceVersion,
   };
 
   static Workspace fromJson(Map<String, dynamic>? j) {
@@ -182,6 +183,9 @@ class Workspace {
     final charts = j['charts'];
     final indFav = j['indicatorFavourites'];
     final tfFav = j['tfFavourites'];
+    // version 1 (no field): every chart started with EMA 50 + SMA 20; a chart still showing exactly that pair loses it
+    final v = j['version'];
+    final stripAuto = (v is num ? v.toInt() : 1) < 2;
     return Workspace(
       favourites: fav is List ? fav.whereType<String>().toList() : d.favourites,
       segment: j['segment'] is String ? j['segment'] as String : d.segment,
@@ -195,7 +199,9 @@ class Workspace {
       lastLogin: j['lastLogin'] as String?,
       charts: {
         if (charts is Map)
-          for (final e in charts.entries) '${e.key}': ?ChartSettings.fromJson(e.value),
+          for (final e in charts.entries)
+            if (ChartSettings.fromJson(e.value) case final c?)
+              '${e.key}': stripAuto && isAutoIndicatorPair(c.indicators) ? c.copyWith(indicators: const []) : c,
       },
       indicatorFavourites: indFav is List ? indFav.whereType<String>().toList() : d.indicatorFavourites,
       advancedQuotes: j['advancedQuotes'] == true,
@@ -204,14 +210,21 @@ class Workspace {
   }
 }
 
-/// The default chart's indicators, made once so their ids stay put until the client changes the chart.
-final List<IndInstance> _defaultIndicators = defaultIndicators();
+/// The saved workspace's schema: 2 = new charts have no indicators (1 added EMA 50 + SMA 20 to every chart).
+const int kWorkspaceVersion = 2;
 
 class WorkspaceController extends Notifier<Workspace> {
   static const _key = 'trader.workspace';
 
   @override
-  Workspace build() => Workspace.fromJson(ref.read(prefsProvider).featureJson(_key));
+  Workspace build() {
+    final prefs = ref.read(prefsProvider);
+    final j = prefs.featureJson(_key);
+    final w = Workspace.fromJson(j);
+    // an older workspace is migrated once: saved again at the current version
+    if (j != null && j['version'] != kWorkspaceVersion) prefs.setFeatureJson(_key, w.toJson()).ignore();
+    return w;
+  }
 
   void update(Workspace Function(Workspace w) f) {
     state = f(state);

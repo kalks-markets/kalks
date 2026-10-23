@@ -303,11 +303,23 @@ IndInstance makeInstance(IndRegistry r, String type, List<IndInstance> existing,
   return inst;
 }
 
-/// The web chart's default indicators (store.tsx defaultWorkspace: EMA 50, SMA 20).
-List<IndInstance> defaultIndicators() => [
-  IndInstance(uid: newIndicatorUid(), type: 'ema', params: const {'period': 50, 'source': 'close'}),
-  IndInstance(uid: newIndicatorUid(), type: 'sma', params: const {'period': 20, 'source': 'close'}),
-];
+/// A new chart has no indicators (web store.tsx defaultWorkspace); the client adds the ones they want.
+///
+/// Up to workspace version 2 every chart started with EMA 50 and SMA 20. True when [list] is still exactly that pair as
+/// it was added (EMA 50 close, then SMA 20 close, shown, default styles and levels): the one-time migration removes it
+/// (web isAutoIndicatorPair). Anything the client changed stays.
+bool isAutoIndicatorPair(List<IndInstance> list) {
+  bool untouched(IndInstance i, String type, int period) =>
+      i.type == type &&
+      i.visible &&
+      i.levels == null &&
+      i.style.values.every((s) => s.isEmpty) &&
+      i.params.length == 2 &&
+      i.params['period'] is num &&
+      i.params['period'] == period &&
+      i.params['source'] == 'close';
+  return list.length == 2 && untouched(list[0], 'ema', 50) && untouched(list[1], 'sma', 20);
+}
 
 /// The web's indicator favourites until the client stars others (state.ts).
 const kDefaultIndicatorFavourites = ['sma', 'ema', 'bb', 'rsi', 'macd'];
