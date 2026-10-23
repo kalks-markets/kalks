@@ -461,5 +461,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "Dígito {n}",
   "field.show": "Mostrar",
   "field.hide": "Ocultar",
+  "creds.subtitleOptional": "Kalks inicia tu sesión automáticamente. Las contraseñas solo sirven para otras apps y para compartir.",
+  "creds.setTrading": "Definir contraseña de trading",
+  "creds.setInvestor": "Definir contraseña de inversor (solo lectura)",
+  "creds.tradingWhy": "Acceso total: inicia sesión desde otra app de trading (tipo MT) y opera. No hace falta en Kalks.",
+  "creds.investorWhy": "Solo lectura: compártela para que alguien vea posiciones e historial sin poder operar.",
+  "pw.saved.trading": "Contraseña de trading definida",
+  "pw.saved.investor": "Contraseña de inversor definida",
+  "pw.descTradingSet": "Acceso total para #{login} en otras apps de trading. Al definirla se reemplaza la anterior y se cierran las sesiones que la usaban.",
+  "pw.descInvestorSet": "Acceso de solo lectura para #{login}: compártela para que alguien siga la cuenta sin operar. Al definirla se reemplaza la anterior y se cierran las sesiones que la usaban.",
 };
 export default accountDetail;

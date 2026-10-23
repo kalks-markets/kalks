@@ -425,5 +425,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "{n}桁目",
   "field.show": "表示",
   "field.hide": "非表示",
+  "creds.subtitleOptional": "Kalksでは自動的にサインインされます。パスワードは他のアプリと共有のためだけに使います。",
+  "creds.setTrading": "取引パスワードを設定",
+  "creds.setInvestor": "投資家（閲覧専用）パスワードを設定",
+  "creds.tradingWhy": "フルアクセス：他の取引アプリ（MT系）からログインして取引できます。Kalksでは不要です。",
+  "creds.investorWhy": "閲覧専用：共有すると、相手は取引せずにポジションと履歴を閲覧できます。",
+  "pw.saved.trading": "取引パスワードを設定しました",
+  "pw.saved.investor": "投資家パスワードを設定しました",
+  "pw.descTradingSet": "他の取引アプリで使う#{login}のフルアクセスログインです。設定すると以前のパスワードは置き換えられ、それを使っていたセッションはサインアウトされます。",
+  "pw.descInvestorSet": "#{login}の閲覧専用ログインです。共有すると、相手は取引せずに口座を確認できます。設定すると以前のパスワードは置き換えられ、それを使っていたセッションはサインアウトされます。",
 };
 export default accountDetail;

@@ -421,5 +421,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "Tarakimu {n}",
   "field.show": "Onyesha",
   "field.hide": "Ficha",
+  "creds.subtitleOptional": "Kalks inakuingiza kiotomatiki. Manenosiri ni kwa ajili ya programu nyingine na kushiriki tu.",
+  "creds.setTrading": "Weka nenosiri la biashara",
+  "creds.setInvestor": "Weka nenosiri la mwekezaji (kutazama tu)",
+  "creds.tradingWhy": "Ufikiaji kamili: ingia kutoka programu nyingine ya biashara (aina ya MT) na ufanye biashara. Halihitajiki kwenye Kalks.",
+  "creds.investorWhy": "Kusoma tu: lishiriki ili mtu aone nafasi na historia bila kufanya biashara.",
+  "pw.saved.trading": "Nenosiri la biashara limewekwa",
+  "pw.saved.investor": "Nenosiri la mwekezaji limewekwa",
+  "pw.descTradingSet": "Kuingia kwa ufikiaji kamili kwa #{login} kwenye programu nyingine za biashara. Kuliweka kunachukua nafasi ya lile la awali na kutoa vipindi vilivyolitumia.",
+  "pw.descInvestorSet": "Kuingia kwa kutazama tu kwa #{login}: lishiriki ili mtu afuatilie akaunti bila kufanya biashara. Kuliweka kunachukua nafasi ya lile la awali na kutoa vipindi vilivyolitumia.",
 };
 export default accountDetail;

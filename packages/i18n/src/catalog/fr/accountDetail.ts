@@ -427,5 +427,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "Chiffre {n}",
   "field.show": "Afficher",
   "field.hide": "Masquer",
+  "creds.subtitleOptional": "Kalks vous connecte automatiquement. Les mots de passe ne servent qu'aux autres apps et au partage.",
+  "creds.setTrading": "Définir le mot de passe de trading",
+  "creds.setInvestor": "Définir le mot de passe investisseur (lecture seule)",
+  "creds.tradingWhy": "Accès complet : connectez-vous depuis une autre app de trading (type MT) et tradez. Inutile sur Kalks.",
+  "creds.investorWhy": "Lecture seule : partagez-le pour qu'une personne voie les positions et l'historique sans pouvoir trader.",
+  "pw.saved.trading": "Mot de passe de trading défini",
+  "pw.saved.investor": "Mot de passe investisseur défini",
+  "pw.descTradingSet": "Accès complet pour #{login} dans d'autres apps de trading. Le définir remplace l'ancien et déconnecte les sessions qui l'utilisaient.",
+  "pw.descInvestorSet": "Accès en lecture seule pour #{login} : partagez-le pour qu'une personne suive le compte sans trader. Le définir remplace l'ancien et déconnecte les sessions qui l'utilisaient.",
 };
 export default accountDetail;

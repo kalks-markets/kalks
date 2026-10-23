@@ -427,5 +427,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "Digit {n}",
   "field.show": "Tampilkan",
   "field.hide": "Sembunyikan",
+  "creds.subtitleOptional": "Kalks memasukkan Anda secara otomatis. Kata sandi hanya untuk aplikasi lain dan untuk berbagi.",
+  "creds.setTrading": "Atur kata sandi trading",
+  "creds.setInvestor": "Atur kata sandi investor (hanya-lihat)",
+  "creds.tradingWhy": "Akses penuh: masuk dari aplikasi trading lain (gaya MT) dan trading. Tidak diperlukan di Kalks.",
+  "creds.investorWhy": "Hanya-baca: bagikan agar seseorang bisa melihat posisi dan riwayat tanpa bisa trading.",
+  "pw.saved.trading": "Kata sandi trading diatur",
+  "pw.saved.investor": "Kata sandi investor diatur",
+  "pw.descTradingSet": "Login akses penuh untuk #{login} di aplikasi trading lain. Mengaturnya menggantikan kata sandi sebelumnya dan mengeluarkan sesi yang memakainya.",
+  "pw.descInvestorSet": "Login hanya-lihat untuk #{login}: bagikan agar seseorang bisa memantau akun tanpa trading. Mengaturnya menggantikan kata sandi sebelumnya dan mengeluarkan sesi yang memakainya.",
 };
 export default accountDetail;

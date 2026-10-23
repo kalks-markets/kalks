@@ -448,5 +448,16 @@ const accountDetail = {
   "otp.digit": "Digit {n}",
   "field.show": "Show",
   "field.hide": "Hide",
+
+  // Credentials: passwords are optional (Kalks signs the client in); set one for other apps or for sharing
+  "creds.subtitleOptional": "Kalks signs you in automatically. Passwords are only for other apps and for sharing.",
+  "creds.setTrading": "Set trading password",
+  "creds.setInvestor": "Set investor (view-only) password",
+  "creds.tradingWhy": "Full access: log in from another trading app (MT-style) and trade. Not needed on Kalks.",
+  "creds.investorWhy": "Read-only: share it so someone can view positions and history without trading.",
+  "pw.saved.trading": "Trading password set",
+  "pw.saved.investor": "Investor password set",
+  "pw.descTradingSet": "Full-access login for #{login} in other trading apps. Setting it replaces any earlier one and signs out sessions that used it.",
+  "pw.descInvestorSet": "View-only login for #{login}: share it to let someone watch the account without trading. Setting it replaces any earlier one and signs out sessions that used it.",
 };
 export default accountDetail;

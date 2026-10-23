@@ -423,5 +423,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "{n}번째 숫자",
   "field.show": "표시",
   "field.hide": "숨기기",
+  "creds.subtitleOptional": "Kalks는 자동으로 로그인합니다. 비밀번호는 다른 앱과 공유용으로만 필요합니다.",
+  "creds.setTrading": "거래 비밀번호 설정",
+  "creds.setInvestor": "투자자(조회 전용) 비밀번호 설정",
+  "creds.tradingWhy": "전체 권한: 다른 거래 앱(MT 방식)에서 로그인해 거래합니다. Kalks에서는 필요 없습니다.",
+  "creds.investorWhy": "읽기 전용: 공유하면 상대방이 거래 없이 포지션과 내역을 볼 수 있습니다.",
+  "pw.saved.trading": "거래 비밀번호가 설정되었습니다",
+  "pw.saved.investor": "투자자 비밀번호가 설정되었습니다",
+  "pw.descTradingSet": "다른 거래 앱에서 사용하는 #{login}의 전체 권한 로그인입니다. 설정하면 이전 비밀번호를 대체하고 이를 사용하던 세션은 로그아웃됩니다.",
+  "pw.descInvestorSet": "#{login}의 조회 전용 로그인입니다: 공유하면 상대방이 거래 없이 계좌를 지켜볼 수 있습니다. 설정하면 이전 비밀번호를 대체하고 이를 사용하던 세션은 로그아웃됩니다.",
 };
 export default accountDetail;

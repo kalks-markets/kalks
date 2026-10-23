@@ -427,5 +427,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "Digit {n}",
   "field.show": "Tunjuk",
   "field.hide": "Sembunyi",
+  "creds.subtitleOptional": "Kalks log masuk anda secara automatik. Kata laluan hanya untuk aplikasi lain dan untuk berkongsi.",
+  "creds.setTrading": "Tetapkan kata laluan dagangan",
+  "creds.setInvestor": "Tetapkan kata laluan pelabur (lihat sahaja)",
+  "creds.tradingWhy": "Akses penuh: log masuk dari aplikasi dagangan lain (gaya MT) dan berdagang. Tidak diperlukan di Kalks.",
+  "creds.investorWhy": "Baca sahaja: kongsikan supaya seseorang boleh melihat posisi dan sejarah tanpa berdagang.",
+  "pw.saved.trading": "Kata laluan dagangan ditetapkan",
+  "pw.saved.investor": "Kata laluan pelabur ditetapkan",
+  "pw.descTradingSet": "Log masuk akses penuh untuk #{login} dalam aplikasi dagangan lain. Menetapkannya menggantikan kata laluan terdahulu dan mengelog keluar sesi yang menggunakannya.",
+  "pw.descInvestorSet": "Log masuk lihat sahaja untuk #{login}: kongsikan supaya seseorang boleh memantau akaun tanpa berdagang. Menetapkannya menggantikan kata laluan terdahulu dan mengelog keluar sesi yang menggunakannya.",
 };
 export default accountDetail;

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Eye, Globe, Lock, Pencil, RefreshCcw, ShieldAlert, TriangleAlert, Users } from "lucide-react";
+import { Eye, Globe, KeyRound, Lock, RefreshCcw, ShieldAlert, TriangleAlert, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Card, CardHeader, Chip, Dialog, Field, KeyValue, Money, Reveal, cn } from "@/components/kit";
 import { PasswordInput } from "@/components/accounts/security";
@@ -12,10 +12,13 @@ import { PasswordRules, SecretField, TradeButton, demoTarget, livePasswordOk, re
 import { Trans, useT } from "@kalks/i18n/react";
 
 /* ------------------------------------------------------------------ */
-/* Change password (D4, D90)                                           */
+/* Set / change a password (D4, D90)                                   */
 /* ------------------------------------------------------------------ */
 
-function ChangePasswordDialog({ a, kind, open, onOpenChange }: { a: EngineAccount; kind: "trading" | "investor"; open: boolean; onOpenChange: (o: boolean) => void }) {
+/** Sets the trading or investor password (replacing any earlier one) after the emailed code. No password is needed
+ *  to trade on Kalks: these are for other trading apps and for sharing view-only access. Also opened from the
+ *  open-account wizard's Done screen. */
+export function ChangePasswordDialog({ a, kind, open, onOpenChange }: { a: EngineAccount; kind: "trading" | "investor"; open: boolean; onOpenChange: (o: boolean) => void }) {
   const t = useT();
   const [pw, setPw] = React.useState("");
   const [confirm, setConfirm] = React.useState("");
@@ -55,7 +58,7 @@ function ChangePasswordDialog({ a, kind, open, onOpenChange }: { a: EngineAccoun
       setPhase("done");
       setPw("");
       setConfirm("");
-      toast.success(t(kind === "trading" ? "accountDetail.pw.changed.trading" : "accountDetail.pw.changed.investor"), { description: `#${a.login}${r.sessionsRevoked ? ` · ${t("accountDetail.pw.sessionsSignedOut", { count: r.sessionsRevoked })}` : ""}` });
+      toast.success(t(kind === "trading" ? "accountDetail.pw.saved.trading" : "accountDetail.pw.saved.investor"), { description: `#${a.login}${r.sessionsRevoked ? ` · ${t("accountDetail.pw.sessionsSignedOut", { count: r.sessionsRevoked })}` : ""}` });
     } catch (e) {
       // the confirmation is spent either way: back to the form, a new code is sent on the next try
       s.reset();
@@ -71,13 +74,13 @@ function ChangePasswordDialog({ a, kind, open, onOpenChange }: { a: EngineAccoun
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={kind === "trading" ? t("accountDetail.pw.changeTitle.trading") : t("accountDetail.pw.changeTitle.investor")}
+      title={kind === "trading" ? t("accountDetail.creds.setTrading") : t("accountDetail.creds.setInvestor")}
       description={
         phase === "code"
           ? t("accountDetail.pw.confirmWithCode")
           : kind === "trading"
-            ? t("accountDetail.pw.descTrading", { login: a.login })
-            : t("accountDetail.pw.descInvestor", { login: a.login })
+            ? t("accountDetail.pw.descTradingSet", { login: a.login })
+            : t("accountDetail.pw.descInvestorSet", { login: a.login })
       }
       width={520}
       footer={
@@ -146,7 +149,7 @@ export function CredentialsPanel({ a }: { a: EngineAccount }) {
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
       <Reveal className="xl:col-span-7">
         <Card className="h-full">
-          <CardHeader title={t("accountDetail.creds.title")} subtitle={t("accountDetail.creds.subtitle")} icon={<Lock />} />
+          <CardHeader title={t("accountDetail.creds.title")} subtitle={t("accountDetail.creds.subtitleOptional")} icon={<Lock />} />
           <div className="grid grid-cols-1 gap-4 px-4 pb-6 pt-5 sm:grid-cols-2 sm:px-6">
             <SecretField label={t("accountDetail.info.login")} value={String(a.login)} />
             <SecretField label={t("accountDetail.info.server")} value={serverOf(a)} hint="GMT+3 / GMT+2" />
@@ -159,10 +162,10 @@ export function CredentialsPanel({ a }: { a: EngineAccount }) {
                   <div className="flex items-center gap-2 text-[14px] font-medium">
                     {t("accountDetail.pw.trading")} <Chip size="sm">{t("accountDetail.creds.fullAccess")}</Chip>
                   </div>
-                  <div className="text-[12.5px] text-fg-3">{t("accountDetail.creds.tradingDesc")}</div>
+                  <div className="text-[12.5px] text-fg-3">{t("accountDetail.creds.tradingWhy")}</div>
                 </div>
-                <Button size="sm" variant="surface" onClick={() => setDlg("trading")}>
-                  <Pencil /> {t("accountDetail.creds.change")}
+                <Button size="sm" variant="surface" onClick={() => setDlg("trading")} data-testid="set-trading-password">
+                  <KeyRound /> {t("accountDetail.creds.setTrading")}
                 </Button>
               </div>
             </div>
@@ -175,10 +178,10 @@ export function CredentialsPanel({ a }: { a: EngineAccount }) {
                   <div className="flex items-center gap-2 text-[14px] font-medium">
                     {t("accountDetail.pw.investor")} <Chip size="sm" tone="info">{t("accountDetail.creds.readOnly")}</Chip>
                   </div>
-                  <div className="text-[12.5px] text-fg-3">{t("accountDetail.creds.investorDesc")}</div>
+                  <div className="text-[12.5px] text-fg-3">{t("accountDetail.creds.investorWhy")}</div>
                 </div>
-                <Button size="sm" variant="surface" onClick={() => setDlg("investor")}>
-                  <Pencil /> {t("accountDetail.creds.change")}
+                <Button size="sm" variant="surface" onClick={() => setDlg("investor")} data-testid="set-investor-password">
+                  <KeyRound /> {t("accountDetail.creds.setInvestor")}
                 </Button>
               </div>
             </div>

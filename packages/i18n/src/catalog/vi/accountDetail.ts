@@ -422,5 +422,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "Chữ số {n}",
   "field.show": "Hiện",
   "field.hide": "Ẩn",
+  "creds.subtitleOptional": "Kalks tự động đăng nhập cho bạn. Mật khẩu chỉ dùng cho ứng dụng khác và để chia sẻ.",
+  "creds.setTrading": "Đặt mật khẩu giao dịch",
+  "creds.setInvestor": "Đặt mật khẩu nhà đầu tư (chỉ xem)",
+  "creds.tradingWhy": "Toàn quyền: đăng nhập từ ứng dụng giao dịch khác (kiểu MT) và giao dịch. Không cần trên Kalks.",
+  "creds.investorWhy": "Chỉ đọc: chia sẻ để người khác xem vị thế và lịch sử mà không thể giao dịch.",
+  "pw.saved.trading": "Đã đặt mật khẩu giao dịch",
+  "pw.saved.investor": "Đã đặt mật khẩu nhà đầu tư",
+  "pw.descTradingSet": "Đăng nhập toàn quyền cho #{login} trong các ứng dụng giao dịch khác. Đặt mật khẩu mới sẽ thay thế mật khẩu cũ và đăng xuất các phiên đã dùng nó.",
+  "pw.descInvestorSet": "Đăng nhập chỉ xem cho #{login}: chia sẻ để người khác theo dõi tài khoản mà không giao dịch. Đặt mật khẩu mới sẽ thay thế mật khẩu cũ và đăng xuất các phiên đã dùng nó.",
 };
 export default accountDetail;

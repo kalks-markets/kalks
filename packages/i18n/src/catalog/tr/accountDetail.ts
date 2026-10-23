@@ -431,5 +431,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "{n}. hane",
   "field.show": "Göster",
   "field.hide": "Gizle",
+  "creds.subtitleOptional": "Kalks oturumunuzu otomatik açar. Şifreler yalnızca diğer uygulamalar ve paylaşım içindir.",
+  "creds.setTrading": "İşlem şifresi belirle",
+  "creds.setInvestor": "Yatırımcı (salt görüntüleme) şifresi belirle",
+  "creds.tradingWhy": "Tam erişim: başka bir işlem uygulamasından (MT tarzı) giriş yapıp işlem yapın. Kalks'ta gerekmez.",
+  "creds.investorWhy": "Salt okunur: birinin işlem yapmadan pozisyonları ve geçmişi görebilmesi için paylaşın.",
+  "pw.saved.trading": "İşlem şifresi belirlendi",
+  "pw.saved.investor": "Yatırımcı şifresi belirlendi",
+  "pw.descTradingSet": "Diğer işlem uygulamalarında #{login} için tam erişimli giriş. Belirlemek önceki şifrenin yerini alır ve onu kullanan oturumları kapatır.",
+  "pw.descInvestorSet": "#{login} için salt görüntüleme girişi: birinin işlem yapmadan hesabı izlemesi için paylaşın. Belirlemek önceki şifrenin yerini alır ve onu kullanan oturumları kapatır.",
 };
 export default accountDetail;

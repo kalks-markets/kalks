@@ -429,5 +429,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "Cifra {n}",
   "field.show": "Mostra",
   "field.hide": "Nascondi",
+  "creds.subtitleOptional": "Kalks ti fa accedere automaticamente. Le password servono solo per altre app e per la condivisione.",
+  "creds.setTrading": "Imposta password di trading",
+  "creds.setInvestor": "Imposta password investitore (sola lettura)",
+  "creds.tradingWhy": "Accesso completo: accedi da un'altra app di trading (stile MT) e fai trading. Non serve su Kalks.",
+  "creds.investorWhy": "Sola lettura: condividila perché qualcuno veda posizioni e storico senza poter fare trading.",
+  "pw.saved.trading": "Password di trading impostata",
+  "pw.saved.investor": "Password investitore impostata",
+  "pw.descTradingSet": "Accesso completo per #{login} in altre app di trading. Impostarla sostituisce quella precedente e disconnette le sessioni che la usavano.",
+  "pw.descInvestorSet": "Accesso in sola lettura per #{login}: condividila perché qualcuno segua il conto senza fare trading. Impostarla sostituisce quella precedente e disconnette le sessioni che la usavano.",
 };
 export default accountDetail;

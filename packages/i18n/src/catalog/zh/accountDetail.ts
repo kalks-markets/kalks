@@ -423,5 +423,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "第 {n} 位",
   "field.show": "显示",
   "field.hide": "隐藏",
+  "creds.subtitleOptional": "Kalks 会自动为您登录。密码仅用于其他应用和分享。",
+  "creds.setTrading": "设置交易密码",
+  "creds.setInvestor": "设置投资者（只读）密码",
+  "creds.tradingWhy": "完全权限：可从其他交易应用（MT 类）登录并交易。在 Kalks 上无需使用。",
+  "creds.investorWhy": "只读：分享给他人，让其查看持仓和历史但无法交易。",
+  "pw.saved.trading": "交易密码已设置",
+  "pw.saved.investor": "投资者密码已设置",
+  "pw.descTradingSet": "#{login} 在其他交易应用中的完全权限登录。设置后将替换之前的密码，并登出使用旧密码的会话。",
+  "pw.descInvestorSet": "#{login} 的只读登录：分享给他人，让其关注账户但无法交易。设置后将替换之前的密码，并登出使用旧密码的会话。",
 };
 export default accountDetail;

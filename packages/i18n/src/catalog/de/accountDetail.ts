@@ -444,5 +444,14 @@ const accountDetail: NsMessages<"accountDetail"> = {
   "otp.digit": "Ziffer {n}",
   "field.show": "Anzeigen",
   "field.hide": "Verbergen",
+  "creds.subtitleOptional": "Kalks meldet Sie automatisch an. Passwörter brauchen Sie nur für andere Apps und zum Teilen.",
+  "creds.setTrading": "Handelspasswort festlegen",
+  "creds.setInvestor": "Investorpasswort (nur Ansicht) festlegen",
+  "creds.tradingWhy": "Vollzugriff: in einer anderen Trading-App (MT-ähnlich) anmelden und handeln. Auf Kalks nicht nötig.",
+  "creds.investorWhy": "Nur lesen: teilen Sie es, damit jemand Positionen und Verlauf sehen kann, ohne zu handeln.",
+  "pw.saved.trading": "Handelspasswort festgelegt",
+  "pw.saved.investor": "Investorpasswort festgelegt",
+  "pw.descTradingSet": "Vollzugriff für #{login} in anderen Trading-Apps. Das Festlegen ersetzt ein früheres Passwort und meldet Sitzungen ab, die es genutzt haben.",
+  "pw.descInvestorSet": "Nur-Ansicht-Zugang für #{login}: Teilen Sie es, damit jemand das Konto verfolgen kann, ohne zu handeln. Das Festlegen ersetzt ein früheres Passwort und meldet Sitzungen ab, die es genutzt haben.",
 };
 export default accountDetail;
